@@ -6,6 +6,7 @@
 * [Cache](cache.md)
 * [Messages](msg_overview.md)
 * [Lambda captures](lambda_captures.md)
+* [Capturing cache keys](capturing_cache_keys.md)
 
 
 ## Setup

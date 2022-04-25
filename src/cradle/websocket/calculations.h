@@ -10,7 +10,7 @@ namespace cradle {
 template<class Return, class... Args>
 auto make_function_id(Return (*ptr)(Args... args))
 {
-    return make_id(ptr);
+    return make_captured_id(ptr);
 }
 
 // Make an ID for a lambda function (or potentially another function object).
@@ -29,7 +29,7 @@ template<class Function>
 auto
 make_function_id(Function f)
 {
-    return make_id(typeid(f).name());
+    return make_captured_id(typeid(f).name());
 }
 
 template<class Function>
@@ -37,7 +37,7 @@ lambda_function
 make_function(Function&& function)
 {
     lambda_function f;
-    f.id.capture(make_function_id(function));
+    f.id = make_function_id(function);
     f.object = std::forward<Function>(function);
     return f;
 }

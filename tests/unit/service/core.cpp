@@ -136,27 +136,27 @@ TEST_CASE("cached tasks", "[service][core]")
     };
 
     {
-        auto result
-            = cached<integer>(core, make_id(12), [&](id_interface const&) {
-                  return counted_task(12);
-              });
+        auto result = cached<integer>(
+            core, make_captured_id(12), [&](id_interface const&) {
+                return counted_task(12);
+            });
         REQUIRE(cppcoro::sync_wait(result) == integer(12));
         REQUIRE(execution_count == 1);
     }
     {
-        auto result
-            = cached<integer>(core, make_id(42), [&](id_interface const&) {
-                  return counted_task(42);
-              });
+        auto result = cached<integer>(
+            core, make_captured_id(42), [&](id_interface const&) {
+                return counted_task(42);
+            });
         REQUIRE(cppcoro::sync_wait(result) == integer(42));
         REQUIRE(execution_count == 2);
     }
     // Now redo the '12' task to see that it's not actually rerun.
     {
-        auto result
-            = cached<integer>(core, make_id(12), [&](id_interface const&) {
-                  return counted_task(12);
-              });
+        auto result = cached<integer>(
+            core, make_captured_id(12), [&](id_interface const&) {
+                return counted_task(12);
+            });
         REQUIRE(cppcoro::sync_wait(result) == integer(12));
         REQUIRE(execution_count == 2);
     }
@@ -176,7 +176,7 @@ TEST_CASE("lazily generated cached tasks", "[service][core]")
     {
         auto result = cached<integer>(
             core,
-            make_id(12),
+            make_captured_id(12),
             [&](id_interface const&) -> cppcoro::task<integer> {
                 return counted_task(12);
             });
@@ -186,7 +186,7 @@ TEST_CASE("lazily generated cached tasks", "[service][core]")
     {
         auto result = cached<integer>(
             core,
-            make_id(42),
+            make_captured_id(42),
             [&](id_interface const&) -> cppcoro::task<integer> {
                 return counted_task(42);
             });
@@ -197,7 +197,7 @@ TEST_CASE("lazily generated cached tasks", "[service][core]")
     {
         auto result = cached<integer>(
             core,
-            make_id(12),
+            make_captured_id(12),
             [&](id_interface const&) -> cppcoro::task<integer> {
                 return counted_task(12);
             });

@@ -30,31 +30,30 @@ TEST_CASE("captured_id basics", "[inner][id]")
     captured_id c;
     REQUIRE(!c.is_initialized());
     REQUIRE(!c.matches(make_id(0)));
-    c.capture(make_id(0));
-    REQUIRE(c.is_initialized());
-    REQUIRE(c.matches(make_id(0)));
-    REQUIRE(!c.matches(make_id(1)));
-    REQUIRE(*c == make_id(0));
-    c.clear();
-    REQUIRE(!c.is_initialized());
+    auto d = make_captured_id(0);
+    REQUIRE(d.is_initialized());
+    REQUIRE(d.matches(make_id(0)));
+    REQUIRE(!d.matches(make_id(1)));
+    REQUIRE(*d == make_id(0));
+    d.clear();
+    REQUIRE(!d.is_initialized());
 }
 
 TEST_CASE("captured_id operators", "[inner][id]")
 {
-    captured_id c;
-    c.capture(make_id(0));
+    auto c = make_captured_id(0);
     captured_id d;
     REQUIRE(c != d);
-    d.capture(make_id(0));
-    REQUIRE(c == d);
-    d.capture(make_id(1));
-    REQUIRE(c != d);
-    REQUIRE(c < d);
+    auto e = make_captured_id(0);
+    REQUIRE(c == e);
+    auto f = make_captured_id(1);
+    REQUIRE(c != f);
+    REQUIRE(c < f);
 }
 
 TEST_CASE("captured_id construction from raw pointer", "[inner][id]")
 {
-    captured_id c{new simple_id(87)};
+    auto c = make_captured_id(87);
     REQUIRE(c.is_initialized());
     REQUIRE(*c == make_id(87));
     c.clear();
@@ -63,26 +62,26 @@ TEST_CASE("captured_id construction from raw pointer", "[inner][id]")
 
 TEST_CASE("captured_id copy construction", "[inner][id]")
 {
-    captured_id c;
-    c.capture(make_id(0));
+    auto c = make_captured_id(0);
     captured_id d = c;
     REQUIRE(d == c);
     // Check that d is independent of changes in c.
-    c.capture(make_id(1));
+    auto tmp0 = make_captured_id(1);
+    swap(c, tmp0);
     REQUIRE(d != c);
 
     c.clear();
     captured_id e = c;
     REQUIRE(e == c);
     // Check that e is independent of changes in c.
-    c.capture(make_id(1));
+    auto tmp1 = make_captured_id(1);
+    swap(c, tmp1);
     REQUIRE(e != c);
 }
 
 TEST_CASE("captured_id move construction", "[inner][id]")
 {
-    captured_id c;
-    c.capture(make_id(0));
+    auto c = make_captured_id(0);
     captured_id d = std::move(c);
     REQUIRE(d.matches(make_id(0)));
 
@@ -94,13 +93,13 @@ TEST_CASE("captured_id move construction", "[inner][id]")
 
 TEST_CASE("captured_id copy assignment", "[inner][id]")
 {
-    captured_id c;
-    c.capture(make_id(0));
+    auto c = make_captured_id(0);
     captured_id d;
     d = c;
     REQUIRE(d == c);
     // Check that d is independent of changes in c.
-    c.capture(make_id(1));
+    auto tmp0 = make_captured_id(1);
+    swap(c, tmp0);
     REQUIRE(d != c);
 
     c.clear();
@@ -108,14 +107,14 @@ TEST_CASE("captured_id copy assignment", "[inner][id]")
     e = c;
     REQUIRE(e == c);
     // Check that e is independent of changes in c.
-    c.capture(make_id(1));
+    auto tmp1 = make_captured_id(1);
+    swap(c, tmp1);
     REQUIRE(e != c);
 }
 
 TEST_CASE("captured_id move assignment", "[inner][id]")
 {
-    captured_id c;
-    c.capture(make_id(0));
+    auto c = make_captured_id(0);
     captured_id d;
     d = std::move(c);
     REQUIRE(d.matches(make_id(0)));
@@ -153,38 +152,6 @@ TEST_CASE("combine_ids x4", "[inner][id]")
     auto a = combine_ids(make_id(0), make_id(1), make_id(2), make_id(3));
     auto b = combine_ids(make_id(1), make_id(2), make_id(3), make_id(4));
     test_different_ids(a, b);
-}
-
-TEST_CASE("clone_into/pointer", "[inner][id]")
-{
-    id_interface* storage = 0;
-    auto zero = make_id(0);
-    auto abc = make_id(std::string("abc"));
-    auto one = make_id(1);
-    clone_into(storage, &zero);
-    REQUIRE(*storage == zero);
-    clone_into(storage, &one);
-    REQUIRE(*storage == one);
-    clone_into(storage, &abc);
-    REQUIRE(*storage == abc);
-    clone_into(storage, nullptr);
-    REQUIRE(!storage);
-}
-
-TEST_CASE("clone_into/unique_ptr", "[inner][id]")
-{
-    std::unique_ptr<id_interface> storage;
-    auto zero = make_id(0);
-    auto abc = make_id(std::string("abc"));
-    auto one = make_id(1);
-    clone_into(storage, &zero);
-    REQUIRE(*storage == zero);
-    clone_into(storage, &one);
-    REQUIRE(*storage == one);
-    clone_into(storage, &abc);
-    REQUIRE(*storage == abc);
-    clone_into(storage, nullptr);
-    REQUIRE(!storage);
 }
 
 TEST_CASE("map of IDs", "[inner][id]")

@@ -69,13 +69,13 @@ perform_local_function_calc(
 cppcoro::task<dynamic>
 perform_local_function_calc(
     thinknode_request_context ctx,
-    string const& context_id,
-    string const& account,
-    string const& app,
-    string const& name,
+    string context_id,
+    string account,
+    string app,
+    string name,
     std::vector<dynamic> args)
 {
-    auto cache_key = make_sha256_hashed_id(
+    auto cache_key = make_captured_sha256_hashed_id(
         "local_function_calc",
         ctx.session.api_url,
         context_id,
@@ -85,7 +85,7 @@ perform_local_function_calc(
         map(CRADLE_LAMBDIFY(natively_encoded_sha256), args));
 
     tasklet_await around_await(
-        ctx.tasklet, "perform_local_function_calc", cache_key);
+        ctx.tasklet, "perform_local_function_calc", *cache_key);
     auto task_creator = [&] {
         return uncached::perform_local_function_calc(
             ctx, context_id, account, app, name, std::move(args));

@@ -63,22 +63,22 @@ acquire_cache_record_no_lock(immutable_cache_record* record)
 }
 
 // create_task() is called with a key that will live until the task has run.
-// `key` may not live long enough.
+// Due to `key` being a shared_ptr, it can be used.
 immutable_cache_record*
 acquire_cache_record(
     immutable_cache& cache,
-    id_interface const& key,
+    captured_id const& key,
     function_view<std::any(
         immutable_cache& cache, id_interface const& key)> const& create_task)
 {
     std::scoped_lock<std::mutex> lock(cache.mutex);
-    cache_record_map::iterator i = cache.records.find(&key);
+    cache_record_map::iterator i = cache.records.find(&*key);
     if (i == cache.records.end())
     {
         auto record = std::make_unique<immutable_cache_record>();
         record->owner_cache = &cache;
         record->eviction_list_iterator = cache.eviction_list.records.end();
-        record->key.capture(key);
+        record->key = key;
         record->ref_count = 0;
         record->task = create_task(cache, *(record->key));
         i = cache.records.emplace(&*record->key, std::move(record)).first;
@@ -145,18 +145,16 @@ untyped_immutable_cache_ptr::reset()
         detail::release_cache_record(record_);
         record_ = nullptr;
     }
-    key_.clear();
 }
 
 void
 untyped_immutable_cache_ptr::acquire(
     cradle::immutable_cache& cache,
-    id_interface const& key,
+    captured_id const& key,
     function_view<std::any(
         immutable_cache& cache, id_interface const& key)> const& create_task)
 {
     record_ = detail::acquire_cache_record(*cache.impl, key, create_task);
-    key_.capture(key);
 }
 
 void
@@ -165,7 +163,6 @@ untyped_immutable_cache_ptr::copy(untyped_immutable_cache_ptr const& other)
     record_ = other.record_;
     if (record_)
         detail::acquire_cache_record(record_);
-    key_ = other.key_;
 }
 
 void
@@ -173,7 +170,6 @@ untyped_immutable_cache_ptr::move_in(untyped_immutable_cache_ptr&& other)
 {
     record_ = other.record_;
     other.record_ = nullptr;
-    key_ = std::move(other.key_);
 }
 
 } // namespace detail

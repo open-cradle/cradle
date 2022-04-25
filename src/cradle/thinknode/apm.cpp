@@ -38,7 +38,7 @@ get_app_version_info(
     };
     return make_shared_task_for_cacheable<thinknode_app_version_info>(
         ctx.service,
-        std::move(cache_key),
+        cache_key,
         create_task,
         ctx.tasklet,
         std::move(function_name));

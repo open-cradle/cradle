@@ -61,7 +61,7 @@ struct untyped_immutable_cache_ptr
     void
     reset(
         cradle::immutable_cache& cache,
-        id_interface const& key,
+        captured_id const& key,
         function_view<
             std::any(immutable_cache& cache, id_interface const& key)> const&
             create_task)
@@ -82,7 +82,7 @@ struct untyped_immutable_cache_ptr
     id_interface const&
     key() const
     {
-        return *key_;
+        return *record_->key;
     }
 
     immutable_cache_record*
@@ -101,13 +101,10 @@ struct untyped_immutable_cache_ptr
     void
     acquire(
         cradle::immutable_cache& cache,
-        id_interface const& key,
+        captured_id const& key,
         function_view<
             std::any(immutable_cache& cache, id_interface const& key)> const&
             create_task);
-
-    // the key of the entry
-    captured_id key_;
 
     // the internal cache record for the entry
     detail::immutable_cache_record* record_ = nullptr;
@@ -124,17 +121,17 @@ record_immutable_cache_failure(
 template<class Value>
 cppcoro::shared_task<Value>
 cache_task_wrapper(
-    immutable_cache& cache, captured_id key, cppcoro::task<Value> task)
+    immutable_cache& cache, id_interface const& key, cppcoro::task<Value> task)
 {
     try
     {
         Value value = co_await task;
-        record_immutable_cache_value(cache, *key, deep_sizeof(value));
+        record_immutable_cache_value(cache, key, deep_sizeof(value));
         co_return value;
     }
     catch (...)
     {
-        record_immutable_cache_failure(cache, *key);
+        record_immutable_cache_failure(cache, key);
         throw;
     }
 }
@@ -145,8 +142,7 @@ wrap_task_creator(CreateTask&& create_task)
 {
     return [create_task = std::forward<CreateTask>(create_task)](
                immutable_cache& cache, id_interface const& key) {
-        return cache_task_wrapper<Value>(
-            cache, captured_id{key}, create_task(key));
+        return cache_task_wrapper<Value>(cache, key, create_task(key));
     };
 }
 
@@ -175,7 +171,7 @@ struct immutable_cache_ptr
     template<class CreateTask>
     immutable_cache_ptr(
         cradle::immutable_cache& cache,
-        id_interface const& key,
+        captured_id const& key,
         CreateTask&& create_task)
     {
         reset(cache, key, std::forward<CreateTask>(create_task));
@@ -191,7 +187,7 @@ struct immutable_cache_ptr
     void
     reset(
         cradle::immutable_cache& cache,
-        id_interface const& key,
+        captured_id const& key,
         CreateTask&& create_task)
     {
         untyped_.reset(
