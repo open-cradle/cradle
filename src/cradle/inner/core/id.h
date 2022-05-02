@@ -114,63 +114,25 @@ struct id_interface_pointer_hash
     }
 };
 
-// Given an ID and some storage, clone the ID into the storage as efficiently
-// as possible. Specifically, if :storage already contains an ID of the same
-// type, perform a deep copy into the existing ID. Otherwise, delete the
-// existing ID (if any) and create a new clone to store there.
-void
-clone_into(id_interface*& storage, id_interface const* id);
-// Same, but where the storage is a unique_ptr.
-void
-clone_into(std::unique_ptr<id_interface>& storage, id_interface const* id);
-
 // captured_id is used to capture an ID for long-term storage (beyond the point
 // where the id_interface reference will be valid).
 struct captured_id
 {
-    captured_id()
-    {
-    }
+    captured_id() = default;
     explicit captured_id(id_interface* id) : id_{id}
     {
     }
-    explicit captured_id(id_interface const& id)
-    {
-        this->capture(id);
-    }
-    captured_id(captured_id const& other)
-    {
-        if (other.is_initialized())
-            this->capture(*other);
-    }
-    captured_id(captured_id&& other) noexcept
-    {
-        id_ = std::move(other.id_);
-    }
+    captured_id(captured_id const& other) = default;
+    captured_id(captured_id&& other) noexcept = default;
     captured_id&
     operator=(captured_id const& other)
-    {
-        if (other.is_initialized())
-            this->capture(*other);
-        else
-            this->clear();
-        return *this;
-    }
+        = default;
     captured_id&
-    operator=(captured_id&& other) noexcept
-    {
-        id_ = std::move(other.id_);
-        return *this;
-    }
+    operator=(captured_id&& other) noexcept = default;
     void
     clear()
     {
         id_.reset();
-    }
-    void
-    capture(id_interface const& new_id)
-    {
-        clone_into(id_, &new_id);
     }
     bool
     is_initialized() const
@@ -199,7 +161,7 @@ struct captured_id
     }
 
  private:
-    std::unique_ptr<id_interface> id_;
+    std::shared_ptr<id_interface> id_;
 };
 bool
 operator==(captured_id const& a, captured_id const& b);
@@ -355,6 +317,14 @@ simple_id<Value>
 make_id(Value value)
 {
     return simple_id<Value>(value);
+}
+
+// make_captured_id(value) creates a captured simple_id with the given value.
+template<class Value>
+captured_id
+make_captured_id(Value value)
+{
+    return captured_id(new simple_id<Value>(value));
 }
 
 // simple_id_by_reference is like simple_id but takes a pointer to the value.

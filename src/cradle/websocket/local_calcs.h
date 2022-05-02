@@ -20,10 +20,10 @@ get_local_compute_pool_for_image(
 cppcoro::task<dynamic>
 perform_local_function_calc(
     thinknode_request_context ctx,
-    string const& context_id,
-    string const& account,
-    string const& app,
-    string const& name,
+    string context_id,
+    string account,
+    string app,
+    string name,
     std::vector<dynamic> args);
 
 cppcoro::task<dynamic>

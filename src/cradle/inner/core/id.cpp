@@ -18,42 +18,6 @@ operator<(id_interface const& a, id_interface const& b)
            || (types_match(a, b) && a.less_than(b));
 }
 
-void
-clone_into(id_interface*& storage, id_interface const* id)
-{
-    if (!id)
-    {
-        delete storage;
-        storage = 0;
-    }
-    else if (storage && types_match(*storage, *id))
-    {
-        id->deep_copy(storage);
-    }
-    else
-    {
-        delete storage;
-        storage = id->clone();
-    }
-}
-
-void
-clone_into(std::unique_ptr<id_interface>& storage, id_interface const* id)
-{
-    if (!id)
-    {
-        storage.reset();
-    }
-    else if (storage && types_match(*storage, *id))
-    {
-        id->deep_copy(&*storage);
-    }
-    else
-    {
-        storage.reset(id->clone());
-    }
-}
-
 bool
 operator==(captured_id const& a, captured_id const& b)
 {

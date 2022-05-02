@@ -84,7 +84,7 @@ resolve_iss_object_to_immutable(
     };
     return make_shared_task_for_cacheable<string>(
         ctx.service,
-        std::move(cache_key),
+        cache_key,
         create_task,
         ctx.tasklet,
         std::move(function_name));
@@ -147,7 +147,7 @@ get_iss_object_metadata(
     };
     return make_shared_task_for_cacheable<std::map<string, string>>(
         ctx.service,
-        std::move(cache_key),
+        cache_key,
         create_task,
         ctx.tasklet,
         std::move(function_name));
@@ -185,7 +185,7 @@ retrieve_immutable(
     };
     return make_shared_task_for_cacheable<dynamic>(
         ctx.service,
-        std::move(cache_key),
+        cache_key,
         create_task,
         ctx.tasklet,
         std::move(function_name));
@@ -224,7 +224,7 @@ retrieve_immutable_blob(
     };
     return make_shared_task_for_cacheable<blob>(
         ctx.service,
-        std::move(cache_key),
+        cache_key,
         create_task,
         ctx.tasklet,
         std::move(function_name));
@@ -512,7 +512,7 @@ post_iss_object(
     };
     return make_shared_task_for_cacheable<string>(
         ctx.service,
-        std::move(cache_key),
+        cache_key,
         create_task,
         ctx.tasklet,
         std::move(function_name));

@@ -179,20 +179,17 @@ template<typename Value, typename TaskCreator>
 cppcoro::shared_task<Value>
 make_shared_task_for_cacheable(
     inner_service_core& service,
-    captured_id cache_key,
+    captured_id const& cache_key,
     TaskCreator task_creator,
     tasklet_tracker* client,
     std::string summary)
 {
     auto shared_task
-        = fully_cached<Value>(service, *cache_key, std::move(task_creator));
+        = fully_cached<Value>(service, cache_key, std::move(task_creator));
     if (client)
     {
         return detail::shared_task_wrapper<Value>(
-            std::move(shared_task),
-            client,
-            std::move(cache_key),
-            std::move(summary));
+            std::move(shared_task), client, cache_key, std::move(summary));
     }
     else
     {

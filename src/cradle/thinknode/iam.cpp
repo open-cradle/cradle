@@ -48,7 +48,7 @@ get_context_contents(thinknode_request_context ctx, string context_id)
         = [=]() { return uncached::get_context_contents(ctx, context_id); };
     return make_shared_task_for_cacheable<thinknode_context_contents>(
         ctx.service,
-        std::move(cache_key),
+        cache_key,
         create_task,
         ctx.tasklet,
         std::move(function_name));

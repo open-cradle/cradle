@@ -128,7 +128,7 @@ post_calculation(
     };
     return make_shared_task_for_cacheable<string>(
         ctx.service,
-        std::move(cache_key),
+        cache_key,
         create_task,
         ctx.tasklet,
         std::move(function_name));
@@ -329,7 +329,7 @@ retrieve_calculation_request(
     };
     return make_shared_task_for_cacheable<thinknode_calc_request>(
         ctx.service,
-        std::move(cache_key),
+        cache_key,
         create_task,
         ctx.tasklet,
         std::move(function_name));

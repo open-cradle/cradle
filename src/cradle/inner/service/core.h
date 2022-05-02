@@ -57,9 +57,7 @@ disk_cached(
 template<class Value, class TaskCreator>
 cppcoro::shared_task<Value>
 cached(
-    inner_service_core& core,
-    id_interface const& key,
-    TaskCreator task_creator)
+    inner_service_core& core, captured_id const& key, TaskCreator task_creator)
 {
     immutable_cache_ptr<Value> ptr(
         core.inner_internals().cache, key, task_creator);
@@ -69,13 +67,11 @@ cached(
 template<class Value, class TaskCreator>
 cppcoro::shared_task<Value>
 fully_cached(
-    inner_service_core& core,
-    id_interface const& key,
-    TaskCreator task_creator)
+    inner_service_core& core, captured_id const& key, TaskCreator task_creator)
 {
     // cached() will ensure that a captured id_interface object exists
     // equalling `key`; it will pass a reference to that object to the lambda.
-    // It will be a different object from `key`; `key` may no longer exist when
+    // It may be a different object from `key`: `key` may no longer exist when
     // the lambda is called.
     return cached<Value>(
         core, key, [&core, task_creator](id_interface const& key1) {

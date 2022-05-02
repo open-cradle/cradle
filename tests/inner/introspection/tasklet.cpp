@@ -136,7 +136,7 @@ TEST_CASE("shared_task_for_cacheable", "[introspection]")
     inner_service_core core;
     init_test_inner_service(core);
 
-    captured_id cache_key{make_id(87)};
+    captured_id cache_key{make_captured_id(87)};
     auto task_creator = []() -> cppcoro::task<blob> {
         co_return make_blob(std::string("314"));
     };

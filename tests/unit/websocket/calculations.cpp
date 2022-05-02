@@ -14,30 +14,30 @@ using namespace cradle;
 
 namespace {
 
-// Test all the relevant ID operations on a pair of equal IDs.
+// Test all the relevant ID operations on a pair of equal captured_id's.
 static void
-test_equal_ids(id_interface const& a, id_interface const& b)
+test_equal_ids(captured_id const& a, captured_id const& b)
 {
     REQUIRE(a == b);
     REQUIRE(b == a);
     REQUIRE(!(a < b));
     REQUIRE(!(b < a));
     REQUIRE(a.hash() == b.hash());
-    auto a_string = boost::lexical_cast<std::string>(a);
-    auto b_string = boost::lexical_cast<std::string>(b);
+    auto a_string = boost::lexical_cast<std::string>(*a);
+    auto b_string = boost::lexical_cast<std::string>(*b);
     REQUIRE(a_string == b_string);
 }
 
-// Test all the ID operations on a pair of different IDs.
+// Test all the ID operations on a pair of different captured_id's.
 void
 test_different_ids(
-    id_interface const& a, id_interface const& b, bool ignore_strings = false)
+    captured_id const& a, captured_id const& b, bool ignore_strings = false)
 {
     REQUIRE(a != b);
     REQUIRE((a < b && !(b < a) || b < a && !(a < b)));
     REQUIRE(a.hash() != b.hash());
-    auto a_string = boost::lexical_cast<std::string>(a);
-    auto b_string = boost::lexical_cast<std::string>(b);
+    auto a_string = boost::lexical_cast<std::string>(*a);
+    auto b_string = boost::lexical_cast<std::string>(*b);
     // Raw function pointers are implicitly converted to bool
     if (!ignore_strings)
     {
@@ -79,15 +79,15 @@ TEST_CASE("function IDs", "[calcs][ws]")
     test_different_ids(
         make_function_id(subtract), make_function_id(lambda_subtract));
 
-    captured_id captured(make_function_id(add));
-    REQUIRE(captured.matches(make_function_id(add)));
-    REQUIRE(!captured.matches(make_function_id(subtract)));
-    REQUIRE(!captured.matches(make_function_id(lambda_add)));
+    captured_id captured0(make_function_id(add));
+    REQUIRE(captured0.matches(*make_function_id(add)));
+    REQUIRE(!captured0.matches(*make_function_id(subtract)));
+    REQUIRE(!captured0.matches(*make_function_id(lambda_add)));
 
-    captured.capture(make_function_id(lambda_add));
-    REQUIRE(captured.matches(make_function_id(lambda_add)));
-    REQUIRE(!captured.matches(make_function_id(lambda_subtract)));
-    REQUIRE(!captured.matches(make_function_id(add)));
+    captured_id captured1(make_function_id(lambda_add));
+    REQUIRE(captured1.matches(*make_function_id(lambda_add)));
+    REQUIRE(!captured1.matches(*make_function_id(lambda_subtract)));
+    REQUIRE(!captured1.matches(*make_function_id(add)));
 }
 
 namespace {

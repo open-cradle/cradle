@@ -330,7 +330,7 @@ resolve_named_type_reference(
     };
     return make_shared_task_for_cacheable<api_type_info>(
         ctx.service,
-        std::move(cache_key),
+        cache_key,
         create_task,
         ctx.tasklet,
         std::move(function_name));
@@ -416,7 +416,7 @@ coerce_encoded_object(
     };
     return make_shared_task_for_cacheable<blob>(
         ctx.service,
-        std::move(cache_key),
+        cache_key,
         create_task,
         ctx.tasklet,
         std::move(function_name));
@@ -545,7 +545,7 @@ type_contains_references(
         co_return false;
     already_visited.insert(type);
 
-    auto cache_key = make_sha256_hashed_id(
+    auto cache_key = make_captured_sha256_hashed_id(
         "type_contains_references", ctx.session.api_url, context_id, type);
     auto create_task = [&] {
         return uncached::type_contains_references(
@@ -738,7 +738,7 @@ deeply_copy_iss_object(
         << CRADLE_LOG_ARG(source_context_id)
         << CRADLE_LOG_ARG(destination_context_id) << CRADLE_LOG_ARG(object_id))
 
-    auto cache_key = make_sha256_hashed_id(
+    auto cache_key = make_captured_sha256_hashed_id(
         "deeply_copy_iss_object",
         ctx.session.api_url,
         source_context_id,
@@ -919,7 +919,7 @@ deeply_copy_calculation(
         << CRADLE_LOG_ARG(destination_context_id)
         << CRADLE_LOG_ARG(calculation_id))
 
-    auto cache_key = make_sha256_hashed_id(
+    auto cache_key = make_captured_sha256_hashed_id(
         "deeply_copy_calculation",
         ctx.session.api_url,
         source_context_id,
@@ -1355,7 +1355,7 @@ resolve_results_api_query(
         << CRADLE_LOG_ARG(context_id) << CRADLE_LOG_ARG(plan_iss_id)
         << CRADLE_LOG_ARG(function) << CRADLE_LOG_ARG(args))
 
-    auto cache_key = make_sha256_hashed_id(
+    auto cache_key = make_captured_sha256_hashed_id(
         "resolve_results_api_query",
         ctx.session.api_url,
         context_id,
@@ -1383,7 +1383,7 @@ locally_resolve_results_api_query(
         << CRADLE_LOG_ARG(context_id) << CRADLE_LOG_ARG(plan_iss_id)
         << CRADLE_LOG_ARG(function) << CRADLE_LOG_ARG(args))
 
-    auto cache_key = make_sha256_hashed_id(
+    auto cache_key = make_captured_sha256_hashed_id(
         "locally_resolve_results_api_query",
         ctx.session.api_url,
         context_id,
