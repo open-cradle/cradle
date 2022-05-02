@@ -53,7 +53,7 @@ TEST_CASE("captured_id operators", "[inner][id]")
 
 TEST_CASE("captured_id construction from raw pointer", "[inner][id]")
 {
-    auto c = make_captured_id(87);
+    captured_id c{new simple_id(87)};
     REQUIRE(c.is_initialized());
     REQUIRE(*c == make_id(87));
     c.clear();
