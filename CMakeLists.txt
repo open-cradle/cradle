@@ -69,6 +69,7 @@ conan_cmake_configure(
         simdjson/0.9.1
         lz4/1.9.3
         fmt/7.1.3
+        cereal/1.3.1
     OPTIONS
         boost:without_chrono=True
         boost:without_container=True
@@ -146,6 +147,7 @@ find_package(yaml-cpp REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(simdjson REQUIRED)
 find_package(lz4 REQUIRED)
+find_package(cereal REQUIRED)
 
 # Add the given linker options on anything that gets linked.
 macro(add_link_options )
@@ -291,7 +293,8 @@ target_link_libraries(cradle_inner PUBLIC
     BZip2::BZip2
     spdlog::spdlog
     lz4::lz4
-    cppcoro)
+    cppcoro
+    cereal::cereal)
 target_link_libraries(cradle_outer PUBLIC
     Boost::headers
     Catch2::Catch2

@@ -8,6 +8,7 @@
 #include <cradle/inner/caching/disk_cache.h>
 #include <cradle/inner/caching/immutable.h>
 #include <cradle/inner/caching/immutable/cache.h>
+#include <cradle/inner/generic/generic.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/service/internals.h>
 
@@ -54,6 +55,11 @@ disk_cached(
     id_interface const& key,
     std::function<cppcoro::task<blob>()> create_task);
 
+template<typename Request>
+cppcoro::task<typename Request::value_type>
+new_disk_cached(
+    inner_service_core& core, std::shared_ptr<Request> const& shared_req);
+
 template<class Value, class TaskCreator>
 cppcoro::shared_task<Value>
 cached(
@@ -61,6 +67,29 @@ cached(
 {
     immutable_cache_ptr<Value> ptr(
         core.inner_internals().cache, key, task_creator);
+    return ptr.task();
+}
+
+template<typename Request>
+cppcoro::shared_task<typename Request::value_type>
+memory_cached(inner_service_core& core, std::shared_ptr<Request> const& req)
+{
+    using Value = typename Request::value_type;
+    immutable_cache_ptr<Value> ptr(core.inner_internals().cache, req);
+    return ptr.task();
+}
+
+template<typename Request>
+cppcoro::shared_task<typename Request::value_type>
+memory_cached(
+    inner_service_core& core, std::shared_ptr<Request> const& req, int)
+{
+    using Value = typename Request::value_type;
+    auto disk_fallback = [&core, req]() -> cppcoro::task<Value> {
+        return new_disk_cached(core, req);
+    };
+    immutable_cache_ptr<Value> ptr(
+        core.inner_internals().cache, req, disk_fallback);
     return ptr.task();
 }
 
@@ -77,6 +106,33 @@ fully_cached(
         core, key, [&core, task_creator](id_interface const& key1) {
             return disk_cached<Value>(core, key1, std::move(task_creator));
         });
+}
+
+template<typename Request>
+cppcoro::shared_task<typename Request::value_type>
+eval_uncached(Request const& req)
+{
+    co_return co_await req.create_task();
+}
+
+template<typename Request>
+cppcoro::shared_task<typename Request::value_type>
+new_fully_cached(
+    inner_service_core& core, std::shared_ptr<Request> const& shared_req)
+{
+    Request const& req = *shared_req;
+    if constexpr (req.get_caching_level() == caching_level_type::none)
+    {
+        return eval_uncached(req);
+    }
+    else if constexpr (req.get_caching_level() == caching_level_type::memory)
+    {
+        return memory_cached(core, shared_req);
+    }
+    else
+    {
+        return memory_cached(core, shared_req, 0);
+    }
 }
 
 } // namespace cradle

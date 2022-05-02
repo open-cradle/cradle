@@ -146,6 +146,29 @@ wrap_task_creator(CreateTask&& create_task)
     };
 }
 
+template<typename Request>
+auto
+new_wrap_task_creator(std::shared_ptr<Request> const& shared_req)
+{
+    using Value = typename Request::value_type;
+    return [=](immutable_cache& cache) {
+        return cache_task_wrapper<Value>(
+            cache, shared_req->captured_id(), shared_req->create_task());
+    };
+}
+
+template<typename Request, typename Fallback>
+auto
+new_wrap_task_creator(
+    std::shared_ptr<Request> const& shared_req, Fallback const& fallback)
+{
+    using Value = typename Request::value_type;
+    return [=](immutable_cache& cache) {
+        return cache_task_wrapper<Value>(
+            cache, shared_req->captured_id(), fallback.create_task());
+    };
+}
+
 } // namespace detail
 
 // immutable_cache_ptr<T> represents one's interest in a particular immutable
@@ -177,6 +200,22 @@ struct immutable_cache_ptr
         reset(cache, key, std::forward<CreateTask>(create_task));
     }
 
+    template<typename Request>
+    immutable_cache_ptr(
+        cradle::immutable_cache& cache, std::shared_ptr<Request> const& req)
+    {
+        reset(cache, req);
+    }
+
+    template<typename Request, typename Fallback>
+    immutable_cache_ptr(
+        cradle::immutable_cache& cache,
+        std::shared_ptr<Request> const& req,
+        Fallback const& fallback)
+    {
+        reset(cache, req, fallback);
+    }
+
     void
     reset()
     {
@@ -195,6 +234,29 @@ struct immutable_cache_ptr
             key,
             detail::wrap_task_creator<T>(
                 std::forward<CreateTask>(create_task)));
+    }
+
+    template<typename Request>
+    void
+    reset(cradle::immutable_cache& cache, std::shared_ptr<Request> const& req)
+    {
+        untyped_.reset(
+            cache,
+            req->get_captured_id(),
+            detail::new_wrap_task_creator<Request>(req));
+    }
+
+    template<typename Request, typename Fallback>
+    void
+    reset(
+        cradle::immutable_cache& cache,
+        std::shared_ptr<Request> const& req,
+        Fallback const& fallback)
+    {
+        untyped_.reset(
+            cache,
+            req->get_captured_id(),
+            detail::new_wrap_task_creator<Request, Fallback>(req, fallback));
     }
 
     // Access the underlying untyped pointer.

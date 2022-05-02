@@ -6,10 +6,10 @@
 #include <cppcoro/shared_task.hpp>
 
 #include <cradle/inner/core/id.h>
+#include <cradle/inner/generic/generic.h>
 
 namespace cradle {
 
-struct id_interface;
 struct inner_service_core;
 
 /**
@@ -161,6 +161,21 @@ shared_task_wrapper(
     co_return res;
 }
 
+// Preconditions:
+// - req must be introspective and cacheable
+template<typename Request>
+cppcoro::shared_task<typename Request::value_type>
+new_shared_task_wrapper(
+    cppcoro::shared_task<typename Request::value_type> shared_task,
+    std::shared_ptr<Request> req,
+    tasklet_tracker& client)
+{
+    client.on_before_await(req->get_summary(), req->get_captured_id());
+    auto res = co_await shared_task;
+    client.on_after_await();
+    co_return res;
+}
+
 } // namespace detail
 
 /**
@@ -195,6 +210,28 @@ make_shared_task_for_cacheable(
     {
         return shared_task;
     }
+}
+
+template<typename Request>
+cppcoro::shared_task<typename Request::value_type>
+make_shared_task_for_request(
+    inner_service_core& service, // part of request?
+    std::shared_ptr<Request> const& shared_req,
+    tasklet_tracker* client)
+{
+    Request const& req = *shared_req;
+    auto shared_task = new_fully_cached<Request>(service, shared_req);
+    if constexpr (
+        req.introspective()
+        && req.get_caching_level() != caching_level_type::none)
+    {
+        if (client)
+        {
+            return detail::new_shared_task_wrapper<Request>(
+                std::move(shared_task), shared_req, *client);
+        }
+    }
+    return shared_task;
 }
 
 } // namespace cradle
