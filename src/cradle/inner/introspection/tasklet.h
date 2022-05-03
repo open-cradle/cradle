@@ -170,7 +170,7 @@ new_shared_task_wrapper(
     std::shared_ptr<Request> req,
     tasklet_tracker& client)
 {
-    client.on_before_await(req->get_summary(), req->get_captured_id());
+    client.on_before_await(req->get_summary(), *req->get_captured_id());
     auto res = co_await shared_task;
     client.on_after_await();
     co_return res;

@@ -195,7 +195,6 @@ generic_disk_cached(
 
 } // namespace detail
 
-// The inner core has just this one specialization.
 template<>
 cppcoro::task<blob>
 disk_cached(

@@ -100,9 +100,7 @@ class literal_request
     /**
      * Creates an uninitialized object
      */
-    literal_request()
-    {
-    }
+    literal_request() = default;
 
     literal_request(Value literal) : literal_(literal)
     {

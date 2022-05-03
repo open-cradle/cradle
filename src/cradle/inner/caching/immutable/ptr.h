@@ -159,13 +159,13 @@ new_wrap_task_creator(std::shared_ptr<Request> const& shared_req)
 
 template<typename Request, typename Fallback>
 auto
-new_wrap_task_creator(
-    std::shared_ptr<Request> const& shared_req, Fallback const& fallback)
+new_wrap_task_creator1(
+    std::shared_ptr<Request> const& shared_req, Fallback fallback)
 {
     using Value = typename Request::value_type;
-    return [=](immutable_cache& cache) {
-        return cache_task_wrapper<Value>(
-            cache, shared_req->captured_id(), fallback.create_task());
+    return [shared_req, fallback = std::forward<Fallback>(fallback)](
+               immutable_cache& cache, id_interface const& key) {
+        return cache_task_wrapper<Value>(cache, key, fallback());
     };
 }
 
@@ -256,7 +256,7 @@ struct immutable_cache_ptr
         untyped_.reset(
             cache,
             req->get_captured_id(),
-            detail::new_wrap_task_creator<Request, Fallback>(req, fallback));
+            detail::new_wrap_task_creator1<Request, Fallback>(req, fallback));
     }
 
     // Access the underlying untyped pointer.

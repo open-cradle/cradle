@@ -3,6 +3,8 @@
 
 #include <optional>
 
+#include <cereal/archives/binary.hpp>
+#include <cppcoro/fmap.hpp>
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/caching/disk_cache.h>
@@ -47,7 +49,6 @@ disk_cached(
     id_interface const& key,
     std::function<cppcoro::task<Value>()> create_task);
 
-// The inner core has just this one specialization.
 template<>
 cppcoro::task<blob>
 disk_cached(
@@ -55,10 +56,53 @@ disk_cached(
     id_interface const& key,
     std::function<cppcoro::task<blob>()> create_task);
 
+template<typename Value>
+cppcoro::task<Value>
+new_disk_cached(
+    inner_service_core& core,
+    id_interface const& key,
+    std::function<cppcoro::task<Value>()> create_task)
+{
+    auto value_to_blob = [](Value x) -> blob {
+        std::stringstream ss;
+        cereal::BinaryOutputArchive oarchive(ss);
+        oarchive(x);
+        return make_blob(ss.str());
+    };
+    auto create_blob_task = [&]() {
+        return cppcoro::make_task(cppcoro::fmap(value_to_blob, create_task()));
+    };
+    blob x = co_await disk_cached<blob>(core, key, create_blob_task);
+    auto data = reinterpret_cast<char const*>(x.data());
+    std::stringstream is;
+    is.str(std::string(data, x.size()));
+    cereal::BinaryInputArchive iarchive(is);
+    Value res;
+    iarchive(res);
+    co_return res;
+}
+
+template<>
+cppcoro::task<blob> inline new_disk_cached(
+    inner_service_core& core,
+    id_interface const& key,
+    std::function<cppcoro::task<blob>()> create_task)
+{
+    return disk_cached(core, key, std::move(create_task));
+}
+
 template<typename Request>
 cppcoro::task<typename Request::value_type>
 new_disk_cached(
-    inner_service_core& core, std::shared_ptr<Request> const& shared_req);
+    inner_service_core& core, std::shared_ptr<Request> const& shared_req)
+{
+    using Value = typename Request::value_type;
+    auto create_task = [shared_req]() -> cppcoro::task<Value> {
+        return shared_req->create_task();
+    };
+    return new_disk_cached<Value>(
+        core, *shared_req->get_captured_id(), std::move(create_task));
+}
 
 template<class Value, class TaskCreator>
 cppcoro::shared_task<Value>
