@@ -309,7 +309,8 @@ target_link_libraries(cradle_outer PUBLIC
     yaml-cpp::yaml-cpp
     spdlog::spdlog
     simdjson::simdjson
-    cppcoro)
+    cppcoro
+    cereal::cereal)
 target_compile_definitions(
     cradle_inner PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 target_compile_definitions(
