@@ -34,22 +34,18 @@ class abstract_request
  public:
     using value_type = Value;
 
-    // static constexpr
-    virtual caching_level_type
-    get_caching_level() const = 0;
+    static constexpr caching_level_type caching_level
+        = caching_level_type::none;
+    static constexpr bool introspective = false;
 
     /**
-     * Needs to be defined only if caching level > none
+     * Needs to be defined only if caching_level > none
      */
     virtual captured_id const&
     get_captured_id() const = 0;
 
-    // static constexpr
-    virtual bool
-    introspective() const = 0;
-
     /**
-     * Needs to be defined only if introspective()
+     * Needs to be defined only if introspective
      */
     virtual std::string const&
     get_summary() const = 0;
@@ -97,6 +93,10 @@ class literal_request
  public:
     using value_type = Value;
 
+    static constexpr caching_level_type caching_level{
+        caching_level_type::none};
+    static constexpr bool introspective{false};
+
     /**
      * Creates an uninitialized object
      */
@@ -106,18 +106,6 @@ class literal_request
 
     literal_request(Value literal) : literal_(literal)
     {
-    }
-
-    static constexpr caching_level_type
-    get_caching_level()
-    {
-        return caching_level_type::none;
-    }
-
-    static constexpr bool
-    introspective()
-    {
-        return false;
     }
 
     cppcoro::task<Value>

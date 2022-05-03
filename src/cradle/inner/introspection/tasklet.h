@@ -219,11 +219,10 @@ make_shared_task_for_request(
     std::shared_ptr<Request> const& shared_req,
     tasklet_tracker* client)
 {
-    Request const& req = *shared_req;
     auto shared_task = new_fully_cached<Request>(service, shared_req);
     if constexpr (
-        req.introspective()
-        && req.get_caching_level() != caching_level_type::none)
+        Request::introspective
+        && Request::caching_level != caching_level_type::none)
     {
         if (client)
         {

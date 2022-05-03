@@ -120,12 +120,11 @@ cppcoro::shared_task<typename Request::value_type>
 new_fully_cached(
     inner_service_core& core, std::shared_ptr<Request> const& shared_req)
 {
-    Request const& req = *shared_req;
-    if constexpr (req.get_caching_level() == caching_level_type::none)
+    if constexpr (Request::caching_level == caching_level_type::none)
     {
-        return eval_uncached(req);
+        return eval_uncached(*shared_req);
     }
-    else if constexpr (req.get_caching_level() == caching_level_type::memory)
+    else if constexpr (Request::caching_level == caching_level_type::memory)
     {
         return memory_cached(core, shared_req);
     }
