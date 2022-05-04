@@ -19,6 +19,11 @@ class Session:
                                           self.impl.api_url, self.impl.api_token)
         self.impl.perform_command(command)
 
+    def kill(self) -> None:
+        print('KILL', file=sys.stderr)
+        command = cmd.KillCommand(self.context_id)
+        self.impl.send_request(command)
+
     def get_iss_object(self, object_id: str, ignore_upgrades: bool = False) -> cmd.Object:
         """Retrieve an object from the ISS."""
         print('FETCHING ' + object_id, file=sys.stderr)

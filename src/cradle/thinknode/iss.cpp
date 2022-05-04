@@ -1,4 +1,5 @@
 #include <cradle/thinknode/iss.h>
+#include <cradle/thinknode/iss_impl.h>
 
 #include <boost/tokenizer.hpp>
 #include <cereal/types/string.hpp>
@@ -464,73 +465,12 @@ parse_url_type_string(string const& url_type)
     }
 }
 
-class post_iss_object_request
-{
- public:
-    using value_type = std::string;
-
-    static constexpr caching_level_type caching_level
-        = caching_level_type::full;
-    static constexpr bool introspective = true;
-
-    post_iss_object_request() = default;
-
-    post_iss_object_request(
-        thinknode_request_context ctx,
-        string context_id,
-        thinknode_type_info schema,
-        blob object_data);
-
-    captured_id const&
-    get_captured_id() const
-    {
-        return id_;
-    }
-
-    std::string const&
-    get_summary() const
-    {
-        return summary_;
-    }
-
-    cppcoro::task<value_type>
-    create_task() const;
-
-    template<class Archive>
-    void
-    save(Archive& ar) const
-    {
-        ar(summary_, ctx_, context_id_, schema_, object_data_);
-    }
-
-    template<class Archive>
-    void
-    load(Archive& ar)
-    {
-        ar(summary_, ctx_, context_id_, schema_, object_data_);
-        create_id();
-    }
-
- public:
-    thinknode_request_context ctx_;
-    string context_id_;
-    thinknode_type_info schema_;
-    blob object_data_;
-
- private:
-    std::string summary_{"post_iss_object"};
-    captured_id id_;
-
-    void
-    create_id();
-};
-
-post_iss_object_request::post_iss_object_request(
-    thinknode_request_context ctx,
+my_post_iss_object_request::my_post_iss_object_request(
+    std::shared_ptr<thinknode_request_context> const& ctx,
     string context_id,
     thinknode_type_info schema,
     blob object_data)
-    : ctx_{std::move(ctx)},
+    : ctx_{ctx},
       context_id_{std::move(context_id)},
       schema_{std::move(schema)},
       object_data_{std::move(object_data)}
@@ -539,19 +479,19 @@ post_iss_object_request::post_iss_object_request(
 }
 
 cppcoro::task<string>
-post_iss_object_request::create_task() const
+my_post_iss_object_request::create_task() const
 {
     auto query = make_http_request(
         http_request_method::POST,
-        ctx_.session.api_url + "/iss/"
-            + get_url_type_string(ctx_.session, schema_)
+        ctx_->session.api_url + "/iss/"
+            + get_url_type_string(ctx_->session, schema_)
             + "?context=" + context_id_,
-        {{"Authorization", "Bearer " + ctx_.session.access_token},
+        {{"Authorization", "Bearer " + ctx_->session.access_token},
          {"Accept", "application/json"},
          {"Content-Type", "application/octet-stream"}},
         object_data_);
 
-    auto response = co_await async_http_request(ctx_, std::move(query));
+    auto response = co_await async_http_request(*ctx_, std::move(query));
 
     co_return from_dynamic<id_response>(parse_json_response(response)).id;
 }
@@ -563,17 +503,17 @@ post_iss_object(
     thinknode_type_info schema,
     blob object_data)
 {
-    auto req{make_shared<post_iss_object_request>(
-        ctx,
+    auto req{make_shared<my_post_iss_object_request>(
+        std::make_shared<thinknode_request_context>(ctx),
         std::move(context_id),
         std::move(schema),
         std::move(object_data))};
-    return make_shared_task_for_request<post_iss_object_request>(
+    return make_shared_task_for_request<my_post_iss_object_request>(
         ctx.service, req, ctx.tasklet);
 }
 
 void
-post_iss_object_request::create_id()
+my_post_iss_object_request::create_id()
 {
     std::string data_hash;
     uint8_t const* data
@@ -582,9 +522,9 @@ post_iss_object_request::create_id()
 
     id_ = make_captured_sha256_hashed_id(
         summary_,
-        ctx_.session.api_url,
+        ctx_->session.api_url,
         context_id_,
-        get_url_type_string(ctx_.session, schema_),
+        get_url_type_string(ctx_->session, schema_),
         data_hash);
 }
 

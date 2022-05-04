@@ -46,6 +46,21 @@ class RegistrationCommand(Command):
         return None
 
 
+class KillCommand(Command):
+    def name(self) -> str:
+        return 'kill'
+
+    def create_content(self) -> Content:
+        return \
+            {
+                'kill': {
+                }
+            }
+
+    def decode_content(self, _content: Content) -> None:
+        return None
+
+
 class IssObjectCommand(Command):
     def __init__(self, context_id: str, object_id: str, ignore_upgrades: bool = False):
         super().__init__(context_id)
