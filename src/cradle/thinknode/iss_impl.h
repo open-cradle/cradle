@@ -16,7 +16,15 @@ class my_post_iss_object_request
         = caching_level_type::full;
     static constexpr bool introspective = true;
 
-    my_post_iss_object_request() = default;
+    // Serializing this class is problematic due to:
+    // - thinknode_request_context::service_core& service (reference)
+    // - thinknode_request_context::tasklet_tracker* tasklet (pointer)
+    // - thinknode_type_info schema_ (api(union))
+    // - blob object_data_ (should be solvable)
+    // Without serialization possibilities, there is no need for:
+    // - Default constructor
+    // - serialize(), save(), load()
+    static constexpr bool serializable = false;
 
     my_post_iss_object_request(
         std::shared_ptr<thinknode_request_context> const& ctx,
@@ -38,21 +46,6 @@ class my_post_iss_object_request
 
     cppcoro::task<value_type>
     create_task() const;
-
-    template<class Archive>
-    void
-    save(Archive& ar) const
-    {
-        ar(summary_, ctx_, context_id_, schema_, object_data_);
-    }
-
-    template<class Archive>
-    void
-    load(Archive& ar)
-    {
-        ar(summary_, ctx_, context_id_, schema_, object_data_);
-        create_id();
-    }
 
  public:
     std::shared_ptr<thinknode_request_context> ctx_;
