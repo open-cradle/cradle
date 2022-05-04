@@ -161,8 +161,17 @@ shared_task_wrapper(
     co_return res;
 }
 
-// Preconditions:
-// - req must be introspective and cacheable
+/*
+ * Coroutine co_await'ing a shared task and tracking this
+ *
+ * Preconditions:
+ * - req must be introspective and cacheable
+ *
+ * Lifetimes:
+ * - client needs the result so lives at least until it's been returned
+ * - shared_task and req are shared objects; copying and storing them in the
+ *   coroutine should be fairly cheap
+ */
 template<typename Request>
 cppcoro::shared_task<typename Request::value_type>
 new_shared_task_wrapper(

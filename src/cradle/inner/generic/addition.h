@@ -26,8 +26,9 @@ class addition_request
     }
 
     addition_request(std::vector<std::shared_ptr<subtype>> const& subrequests)
-        : id_(make_captured_id(234)), subrequests_(subrequests)
+        : summary_{"addition"}, subrequests_(subrequests)
     {
+        create_id();
     }
 
     captured_id const&
@@ -48,18 +49,6 @@ class addition_request
     cppcoro::task<value_type>
     create_task() const;
 
-#if 0
-    template<class Archive>
-    void
-    serialize(Archive& ar)
-    {
-        // TODO cereal fails on id_ and subrequests_
-        // Fix id_ by separating into save() and load()
-        //ar(id_, summary_, subrequests_);
-        ar(summary_, subrequests_);
-    }
-#endif
-
     template<class Archive>
     void
     save(Archive& ar) const
@@ -72,7 +61,7 @@ class addition_request
     load(Archive& ar)
     {
         ar(summary_, subrequests_);
-        // Create id_
+        create_id();
     }
 
     std::vector<std::shared_ptr<subtype>> const&
@@ -85,6 +74,12 @@ class addition_request
     captured_id id_;
     std::string summary_;
     std::vector<std::shared_ptr<subtype>> subrequests_;
+
+    void
+    create_id()
+    {
+        id_ = make_captured_id(summary_);
+    }
 };
 
 } // namespace cradle

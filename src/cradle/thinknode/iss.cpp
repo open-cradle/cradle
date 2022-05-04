@@ -1,6 +1,7 @@
 #include <cradle/thinknode/iss.h>
 
 #include <boost/tokenizer.hpp>
+#include <cereal/types/string.hpp>
 
 #include <cradle/inner/utilities/text.h>
 #include <cradle/thinknode/calc.h>
@@ -463,31 +464,97 @@ parse_url_type_string(string const& url_type)
     }
 }
 
-namespace uncached {
+class post_iss_object_request
+{
+ public:
+    using value_type = std::string;
 
-cppcoro::task<string>
-post_iss_object(
+    static constexpr caching_level_type caching_level
+        = caching_level_type::full;
+    static constexpr bool introspective = true;
+
+    post_iss_object_request() = default;
+
+    post_iss_object_request(
+        thinknode_request_context ctx,
+        string context_id,
+        thinknode_type_info schema,
+        blob object_data);
+
+    captured_id const&
+    get_captured_id() const
+    {
+        return id_;
+    }
+
+    std::string const&
+    get_summary() const
+    {
+        return summary_;
+    }
+
+    cppcoro::task<value_type>
+    create_task() const;
+
+    template<class Archive>
+    void
+    save(Archive& ar) const
+    {
+        ar(summary_, ctx_, context_id_, schema_, object_data_);
+    }
+
+    template<class Archive>
+    void
+    load(Archive& ar)
+    {
+        ar(summary_, ctx_, context_id_, schema_, object_data_);
+        create_id();
+    }
+
+ public:
+    thinknode_request_context ctx_;
+    string context_id_;
+    thinknode_type_info schema_;
+    blob object_data_;
+
+ private:
+    std::string summary_{"post_iss_object"};
+    captured_id id_;
+
+    void
+    create_id();
+};
+
+post_iss_object_request::post_iss_object_request(
     thinknode_request_context ctx,
     string context_id,
     thinknode_type_info schema,
     blob object_data)
+    : ctx_{std::move(ctx)},
+      context_id_{std::move(context_id)},
+      schema_{std::move(schema)},
+      object_data_{std::move(object_data)}
+{
+    create_id();
+}
+
+cppcoro::task<string>
+post_iss_object_request::create_task() const
 {
     auto query = make_http_request(
         http_request_method::POST,
-        ctx.session.api_url + "/iss/"
-            + get_url_type_string(ctx.session, schema)
-            + "?context=" + context_id,
-        {{"Authorization", "Bearer " + ctx.session.access_token},
+        ctx_.session.api_url + "/iss/"
+            + get_url_type_string(ctx_.session, schema_)
+            + "?context=" + context_id_,
+        {{"Authorization", "Bearer " + ctx_.session.access_token},
          {"Accept", "application/json"},
          {"Content-Type", "application/octet-stream"}},
-        object_data);
+        object_data_);
 
-    auto response = co_await async_http_request(ctx, std::move(query));
+    auto response = co_await async_http_request(ctx_, std::move(query));
 
     co_return from_dynamic<id_response>(parse_json_response(response)).id;
 }
-
-} // namespace uncached
 
 cppcoro::shared_task<string>
 post_iss_object(
@@ -496,26 +563,29 @@ post_iss_object(
     thinknode_type_info schema,
     blob object_data)
 {
-    string function_name{"post_iss_object"};
-    std::string data_hash;
-    uint8_t const* data = reinterpret_cast<uint8_t const*>(object_data.data());
-    picosha2::hash256_hex_string(data, data + object_data.size(), data_hash);
+    auto req{make_shared<post_iss_object_request>(
+        ctx,
+        std::move(context_id),
+        std::move(schema),
+        std::move(object_data))};
+    return make_shared_task_for_request<post_iss_object_request>(
+        ctx.service, req, ctx.tasklet);
+}
 
-    auto cache_key = make_captured_sha256_hashed_id(
-        function_name,
-        ctx.session.api_url,
-        context_id,
-        get_url_type_string(ctx.session, schema),
+void
+post_iss_object_request::create_id()
+{
+    std::string data_hash;
+    uint8_t const* data
+        = reinterpret_cast<uint8_t const*>(object_data_.data());
+    picosha2::hash256_hex_string(data, data + object_data_.size(), data_hash);
+
+    id_ = make_captured_sha256_hashed_id(
+        summary_,
+        ctx_.session.api_url,
+        context_id_,
+        get_url_type_string(ctx_.session, schema_),
         data_hash);
-    auto create_task = [=]() {
-        return uncached::post_iss_object(ctx, context_id, schema, object_data);
-    };
-    return make_shared_task_for_cacheable<string>(
-        ctx.service,
-        cache_key,
-        create_task,
-        ctx.tasklet,
-        std::move(function_name));
 }
 
 cppcoro::shared_task<string>
