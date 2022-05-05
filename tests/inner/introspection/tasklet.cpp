@@ -13,16 +13,6 @@
 
 using namespace cradle;
 
-// A newly created tasklet will be the latest one for which
-// info can be retrieved.
-tasklet_info
-latest_tasklet_info()
-{
-    auto all_infos = get_tasklet_infos(true);
-    REQUIRE(all_infos.size() > 0);
-    return all_infos[all_infos.size() - 1];
-}
-
 TEST_CASE("create_tasklet_tracker", "[introspection]")
 {
     clean_tasklet_admin_fixture fixture;

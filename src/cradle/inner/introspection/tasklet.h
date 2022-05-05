@@ -221,10 +221,11 @@ make_shared_task_for_cacheable(
     }
 }
 
+// Request should be a NonTrivialRequest concept (tbd), not literal_request
 template<typename Request>
 cppcoro::shared_task<typename Request::value_type>
 make_shared_task_for_request(
-    inner_service_core& service, // part of request?
+    inner_service_core& service,
     std::shared_ptr<Request> const& shared_req,
     tasklet_tracker* client)
 {

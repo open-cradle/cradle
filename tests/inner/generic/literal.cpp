@@ -1,5 +1,4 @@
-#include <cradle/inner/generic/addition.h>
-#include <cradle/inner/generic/generic.h>
+#include <cradle/inner/generic/literal.h>
 
 #include <fstream>
 #include <sstream>
@@ -39,18 +38,16 @@ TEST_CASE("serialize literal request", "[generic]")
     }
 }
 
-TEST_CASE("make shared task for literal request", "[generic]")
+TEST_CASE("evaluate literal request", "[generic]")
 {
     clean_tasklet_admin_fixture fixture;
     inner_service_core core;
     init_test_inner_service(core);
 
-    using Request = literal_request<int>;
-    auto req{std::make_shared<Request>(87)};
-    auto me = make_shared_task_for_request(core, req, nullptr);
+    literal_request<int> req{87};
 
     auto res = cppcoro::sync_wait(
-        [&]() -> cppcoro::task<int> { co_return co_await me; }());
+        [&]() -> cppcoro::task<int> { co_return co_await req.calculate(); }());
 
     REQUIRE(res == 87);
 }

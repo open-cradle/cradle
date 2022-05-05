@@ -23,15 +23,16 @@ enum class caching_level_type
     full
 };
 
-// A request (concept) expressed as an abstract base class.
-// Creating derived classes may not be possible, e.g. it looks like cereal
-// cannot handle template base classes. So this is more like a concept. If
-// there are subrequests then, unless all value types are identical, Value
-// should be a kind of Variant / Any / dynamic.
 template<typename Value>
 class abstract_request
 {
  public:
+    // The only thing common to literal_request and addition_request
+    // This could be a wrapper for a cppcoro::shared_task
+    virtual cppcoro::task<Value>
+    calculate() const = 0;
+
+#if 0
     using value_type = Value;
 
     static constexpr caching_level_type caching_level
@@ -69,6 +70,7 @@ class abstract_request
  private:
     std::string summary_;
     std::vector<std::shared_ptr<abstract_request>> subrequests_;
+#endif
 };
 
 class dont_call_exception : public std::logic_error
@@ -79,58 +81,6 @@ class dont_call_exception : public std::logic_error
     {
         return "Illegal function call";
     }
-};
-
-/**
- * Request for a literal value.
- *
- * Concrete class, there should be no need to subclass.
- * Creating a shared_task for literal values may imply too much overhead.
- */
-template<typename Value>
-class literal_request
-{
- public:
-    using value_type = Value;
-
-    static constexpr caching_level_type caching_level{
-        caching_level_type::none};
-    static constexpr bool introspective{false};
-
-    /**
-     * Creates an uninitialized object
-     */
-    literal_request() = default;
-
-    literal_request(Value literal) : literal_(literal)
-    {
-    }
-
-    cppcoro::task<Value>
-    create_task() const
-    {
-        auto task_function
-            = [](literal_request const& req) -> cppcoro::task<Value> {
-            co_return req.get_literal();
-        };
-        return task_function(*this);
-    }
-
-    template<class Archive>
-    void
-    serialize(Archive& ar)
-    {
-        ar(literal_);
-    }
-
-    Value const&
-    get_literal() const
-    {
-        return literal_;
-    }
-
- private:
-    Value literal_;
 };
 
 } // namespace cradle

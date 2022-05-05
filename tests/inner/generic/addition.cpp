@@ -1,7 +1,9 @@
 #include <cradle/inner/generic/addition.h>
+#include <cradle/inner/generic/literal.h>
 
 #include <catch2/catch.hpp>
 #include <cereal/archives/binary.hpp>
+#include <cereal/types/polymorphic.hpp>
 #include <cppcoro/sync_wait.hpp>
 
 #include "../introspection/tasklet_testing.h"
@@ -10,69 +12,65 @@
 
 using namespace cradle;
 
-// A newly created tasklet will be the latest one for which
-// info can be retrieved.
-static tasklet_info
-latest_tasklet_info()
-{
-    auto all_infos = get_tasklet_infos(true);
-    REQUIRE(all_infos.size() > 0);
-    return all_infos[all_infos.size() - 1];
-}
+CEREAL_REGISTER_TYPE(cradle::literal_request<int>)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(
+    cradle::abstract_request<int>, cradle::literal_request<int>)
 
 TEST_CASE("serialize addition request", "[generic]")
 {
     using Value = int;
-    using Subtype = literal_request<Value>;
+    using AdditionRequest = addition_request<Value>;
+    using LiteralRequest = literal_request<Value>;
     std::stringstream ss;
 
     {
-        std::vector<std::shared_ptr<Subtype>> subrequests{
-            std::make_shared<Subtype>(1),
-            std::make_shared<Subtype>(2),
-            std::make_shared<Subtype>(3),
-            std::make_shared<Subtype>(4),
-        };
-        addition_request req{subrequests};
+        std::vector<std::shared_ptr<abstract_request<Value>>> subrequests;
+        for (int i = 0; i < 4; ++i)
+        {
+            subrequests.emplace_back(std::make_shared<LiteralRequest>(i + 1));
+        }
+        AdditionRequest req{subrequests};
         cereal::BinaryOutputArchive oarchive(ss);
         oarchive(req);
     }
 
     {
-        addition_request req1;
+        AdditionRequest req1;
         cereal::BinaryInputArchive iarchive(ss);
         iarchive(req1);
 
         REQUIRE(req1.get_summary() == "addition");
-        REQUIRE(req1.get_subrequests()[0]->get_literal() == 1);
-        REQUIRE(req1.get_subrequests()[1]->get_literal() == 2);
-        REQUIRE(req1.get_subrequests()[2]->get_literal() == 3);
-        REQUIRE(req1.get_subrequests()[3]->get_literal() == 4);
+        for (int i = 0; i < 4; ++i)
+        {
+            auto subreq = req1.get_subrequests()[i];
+            LiteralRequest* litreq = dynamic_cast<LiteralRequest*>(&*subreq);
+            REQUIRE(litreq != nullptr);
+            REQUIRE(litreq->get_literal() == i + 1);
+        }
     }
 }
 
-TEST_CASE("make shared task for addition request", "[generic]")
+TEST_CASE("evaluate addition request", "[generic]")
 {
     clean_tasklet_admin_fixture fixture;
     inner_service_core core;
     init_test_inner_service(core);
 
-    using Request = addition_request;
     using Value = int;
-    using Subtype = literal_request<Value>;
-    std::vector<std::shared_ptr<Subtype>> subrequests{
-        std::make_shared<Subtype>(1),
-        std::make_shared<Subtype>(2),
-        std::make_shared<Subtype>(3),
-        std::make_shared<Subtype>(4),
-    };
+    using LiteralRequest = literal_request<Value>;
+    std::stringstream ss;
 
-    auto req{std::make_shared<Request>(subrequests)};
+    std::vector<std::shared_ptr<abstract_request<Value>>> subrequests;
+    for (int i = 0; i < 4; ++i)
+    {
+        subrequests.emplace_back(std::make_shared<LiteralRequest>(i + 1));
+    }
     auto client = create_tasklet_tracker("client_pool", "client_title");
-    auto me = make_shared_task_for_request(core, req, client);
+    auto shared_req{make_shared_addition_request(core, client, subrequests)};
 
-    auto res = cppcoro::sync_wait(
-        [&]() -> cppcoro::task<int> { co_return co_await me; }());
+    auto res = cppcoro::sync_wait([&]() -> cppcoro::task<int> {
+        co_return co_await shared_req->calculate();
+    }());
 
     REQUIRE(res == 10);
     auto events = latest_tasklet_info().events();

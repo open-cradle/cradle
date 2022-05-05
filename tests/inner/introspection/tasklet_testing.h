@@ -28,6 +28,16 @@ struct clean_tasklet_admin_fixture
     }
 };
 
+// A newly created tasklet will be the latest one for which
+// info can be retrieved.
+inline tasklet_info
+latest_tasklet_info()
+{
+    auto all_infos = get_tasklet_infos(true);
+    REQUIRE(all_infos.size() > 0);
+    return all_infos[all_infos.size() - 1];
+}
+
 } // namespace cradle
 
 #endif

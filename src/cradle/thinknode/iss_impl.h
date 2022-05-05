@@ -54,7 +54,7 @@ class my_post_iss_object_request
     blob object_data_;
 
  private:
-    std::string summary_{"post_iss_object"};
+    static inline const std::string summary_{"post_iss_object"};
     captured_id id_;
 
     void
