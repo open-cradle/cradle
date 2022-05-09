@@ -1,12 +1,14 @@
 #ifndef CRADLE_INNER_GENERIC_LITERAL_H
 #define CRADLE_INNER_GENERIC_LITERAL_H
 
+#include <utility>
+
 #include <cradle/inner/generic/generic.h>
 
 namespace cradle {
 
 /**
- * Request for a literal value.
+ * Request for a literal (immediate) value.
  *
  * Concrete class, there should be no need to subclass.
  * No caching, no introspection, making this class very simple.
@@ -16,39 +18,45 @@ template<typename Value>
 class literal_request : public abstract_request<Value>
 {
  public:
-    /**
-     * Intended to be initialized by deserializer
-     */
     literal_request() = default;
 
-    literal_request(Value literal) : literal_(literal)
+    literal_request(Value const& value) : value_{value}
     {
     }
 
-    ~literal_request() override = default;
+    literal_request(Value&& value) : value_{std::move(value)}
+    {
+    }
 
     Value
-    get_literal() const
+    get_value() const
     {
-        return literal_;
+        return value_;
     }
 
     cppcoro::task<Value>
     calculate() const override
     {
-        co_return literal_;
+        co_return value_;
     }
 
     template<class Archive>
     void
     serialize(Archive& ar)
     {
-        ar(literal_);
+        ar(value_);
     }
 
  private:
-    Value literal_;
+    Value value_;
 };
+
+template<typename Value>
+auto // literal_request<std::remove_cvref_t<Value>>
+rq_value(Value&& value)
+{
+    return literal_request{std::forward<Value>(value)};
+}
 
 } // namespace cradle
 

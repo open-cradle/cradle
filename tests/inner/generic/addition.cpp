@@ -45,7 +45,7 @@ TEST_CASE("serialize addition request", "[generic]")
             auto subreq = req1.get_subrequests()[i];
             LiteralRequest* litreq = dynamic_cast<LiteralRequest*>(&*subreq);
             REQUIRE(litreq != nullptr);
-            REQUIRE(litreq->get_literal() == i + 1);
+            REQUIRE(litreq->get_value() == i + 1);
         }
     }
 }
