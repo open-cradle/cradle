@@ -1,7 +1,7 @@
-#ifndef CRADLE_INNER_GENERIC_ADDITION_H
-#define CRADLE_INNER_GENERIC_ADDITION_H
+#ifndef CRADLE_INNER_GENERIC_ADD_LITERALS_H
+#define CRADLE_INNER_GENERIC_ADD_LITERALS_H
 
-#include <cradle/inner/generic/generic.h>
+#include <cradle/inner/generic/literal.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/service/core.h>
 
@@ -11,11 +11,11 @@
 namespace cradle {
 
 template<typename Value>
-class addition_request : public abstract_request<Value>
+class add_literals_request
 {
  public:
     using value_type = Value;
-    using subtype = abstract_request<Value>;
+    using subtype = literal_request<Value>;
 
     static constexpr caching_level_type caching_level
         = caching_level_type::full;
@@ -24,18 +24,20 @@ class addition_request : public abstract_request<Value>
     /**
      * Object should be constructed by deserializer
      */
-    addition_request() = default;
+    add_literals_request() = default;
 
-    addition_request(std::vector<std::shared_ptr<subtype>> const& subrequests)
-        : summary_{"addition"}, subrequests_(subrequests)
+    add_literals_request(std::vector<Value> const& values)
+        : summary_{"add_literals"}
     {
+        for (auto v: values)
+        {
+            subrequests_.emplace_back(subtype{std::move(v)});
+        }
         create_id();
     }
 
-    ~addition_request() override = default;
-
     cppcoro::task<Value>
-    calculate() const override
+    calculate() const
     {
         co_return co_await shared_task_;
     }
@@ -61,7 +63,7 @@ class addition_request : public abstract_request<Value>
         Value res{};
         for (auto const& subreq : subrequests_)
         {
-            res += co_await subreq->calculate();
+            res += co_await subreq.calculate();
         }
         co_return res;
     }
@@ -81,7 +83,7 @@ class addition_request : public abstract_request<Value>
         create_id();
     }
 
-    std::vector<std::shared_ptr<subtype>> const&
+    std::vector<subtype> const&
     get_subrequests() const
     {
         return subrequests_;
@@ -96,7 +98,7 @@ class addition_request : public abstract_request<Value>
  private:
     captured_id id_;
     std::string summary_;
-    std::vector<std::shared_ptr<subtype>> subrequests_;
+    std::vector<subtype> subrequests_;
     cppcoro::shared_task<Value> shared_task_;
 
     void
@@ -107,13 +109,13 @@ class addition_request : public abstract_request<Value>
 };
 
 template<typename Value>
-std::shared_ptr<addition_request<Value>>
-make_shared_addition_request(
+std::shared_ptr<add_literals_request<Value>>
+make_shared_add_literals_request(
     inner_service_core& service,
     tasklet_tracker* client,
-    std::vector<std::shared_ptr<abstract_request<Value>>> const& subrequests)
+    std::vector<Value> const& values)
 {
-    auto shared_req{make_shared<addition_request<Value>>(subrequests)};
+    auto shared_req{make_shared<add_literals_request<Value>>(values)};
     auto shared_task
         = make_shared_task_for_request(service, shared_req, client);
     shared_req->set_shared_task(shared_task);
