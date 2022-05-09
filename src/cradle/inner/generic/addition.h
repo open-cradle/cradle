@@ -34,6 +34,8 @@ class addition_request : public abstract_request<Value>
         create_id();
     }
 
+    ~addition_request() override = default;
+
     cppcoro::task<Value>
     calculate() const override
     {

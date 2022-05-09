@@ -27,6 +27,8 @@ template<typename Value>
 class abstract_request
 {
  public:
+    virtual ~abstract_request() = default;
+
     // The only thing common to literal_request and addition_request
     // This could be a wrapper for a cppcoro::shared_task
     virtual cppcoro::task<Value>

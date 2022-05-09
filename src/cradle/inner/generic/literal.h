@@ -25,6 +25,8 @@ class literal_request : public abstract_request<Value>
     {
     }
 
+    ~literal_request() override = default;
+
     Value
     get_literal() const
     {
