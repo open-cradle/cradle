@@ -3,12 +3,15 @@
 
 #include <optional>
 
+#include <cppcoro/fmap.hpp>
+#include <cppcoro/shared_task.hpp>
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/caching/disk_cache.h>
 #include <cradle/inner/caching/immutable.h>
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/introspection/tasklet.h>
+#include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/internals.h>
 
 namespace cradle {
@@ -46,7 +49,6 @@ disk_cached(
     id_interface const& key,
     std::function<cppcoro::task<Value>()> create_task);
 
-// The inner core has just this one specialization.
 template<>
 cppcoro::task<blob>
 disk_cached(
@@ -77,6 +79,30 @@ fully_cached(
         core, key, [&core, task_creator](id_interface const& key1) {
             return disk_cached<Value>(core, key1, std::move(task_creator));
         });
+}
+
+template<typename Context, typename Request>
+cppcoro::task<typename Request::value_type>
+resolve_request(Context const& ctx, Request const& req)
+{
+    static_assert(Request::caching_level == caching_level_type::none);
+    return req.resolve(ctx);
+}
+
+template<typename Context, typename Request>
+cppcoro::task<typename Request::value_type>
+resolve_request(Context const& ctx, std::unique_ptr<Request> const& req)
+{
+    static_assert(Request::caching_level == caching_level_type::none);
+    return req->resolve(ctx);
+}
+
+template<typename Context, typename Request>
+cppcoro::task<typename Request::value_type>
+resolve_request(Context const& ctx, std::shared_ptr<Request> const& req)
+{
+    static_assert(Request::caching_level == caching_level_type::none);
+    return req->resolve(ctx);
 }
 
 } // namespace cradle

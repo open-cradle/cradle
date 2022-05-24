@@ -58,6 +58,11 @@ jobs:
         pip3 install -e python
         cmake --build build --config Release --target integration_tests
 
+    - name: Benchmarks
+      if: ${{ matrix.config == 'Release' }}
+      run: |
+        cmake --build build --config Release --target benchmark_tests
+
     - name: Unit test with coverage
       if: ${{ matrix.config == 'Debug' }}
       run: |

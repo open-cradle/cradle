@@ -424,7 +424,8 @@ add_test(
         --target external_tests)
 
 # Add a runner covering all unit tests (including external and inner).
-file(GLOB_RECURSE test_srcs_all CONFIGURE_DEPENDS "tests/*/*.cpp")
+file(GLOB_RECURSE test_srcs_all CONFIGURE_DEPENDS
+    "tests/inner/*.cpp" "tests/unit/*.cpp" "tests/external/*.cpp")
 add_executable(all_unit_tests_runner tests/runner.cpp ${test_srcs_all})
 target_include_directories(all_unit_tests_runner PRIVATE
     ${generated_include_dir}/src
@@ -478,3 +479,19 @@ add_test(
     COMMAND ${CMAKE_COMMAND}
         --build ${CMAKE_BINARY_DIR}
         --target integration_tests)
+
+file(GLOB_RECURSE test_srcs_benchmark CONFIGURE_DEPENDS "tests/benchmarks/*.cpp")
+add_executable(benchmark_test_runner ${test_srcs_benchmark})
+target_include_directories(benchmark_test_runner PRIVATE
+    src/inner)
+target_link_libraries(benchmark_test_runner cradle_inner)
+
+add_custom_target(
+    benchmark_tests
+    COMMAND $<TARGET_FILE:benchmark_test_runner>
+    DEPENDS benchmark_test_runner)
+add_test(
+    NAME benchmark_tests
+    COMMAND ${CMAKE_COMMAND}
+        --build ${CMAKE_BINARY_DIR}
+        --target benchmark_tests)

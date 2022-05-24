@@ -1,6 +1,7 @@
 #include "../support/core.h"
 #include <cradle/inner/fs/types.h>
 #include <cradle/inner/fs/utilities.h>
+#include <cradle/inner/service/core.h>
 
 using namespace cradle;
 
