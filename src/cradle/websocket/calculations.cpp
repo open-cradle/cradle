@@ -62,6 +62,8 @@ perform_lambda_calc(
     std::vector<dynamic> args)
 {
     string function_name{"lambda_calc"};
+    // TODO create a capturing combine_ids() and we won't need id_interface's
+    // clone() and deep_copy() anymore (!?)
     auto combined_id{combine_ids(
         make_id(function_name),
         ref(*function.id),

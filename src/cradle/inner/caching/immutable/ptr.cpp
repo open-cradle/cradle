@@ -97,13 +97,6 @@ acquire_cache_record(
 }
 
 void
-acquire_cache_record(immutable_cache_record* record)
-{
-    std::scoped_lock<std::mutex> lock(record->owner_cache->mutex);
-    acquire_cache_record_no_lock(record);
-}
-
-void
 add_to_eviction_list(immutable_cache& cache, immutable_cache_record* record)
 {
     auto& list = cache.eviction_list;
@@ -137,39 +130,18 @@ release_cache_record(immutable_cache_record* record)
 
 // UNTYPED_IMMUTABLE_CACHE_PTR
 
-void
-untyped_immutable_cache_ptr::reset()
-{
-    if (record_)
-    {
-        detail::release_cache_record(record_);
-        record_ = nullptr;
-    }
-}
-
-void
-untyped_immutable_cache_ptr::acquire(
+untyped_immutable_cache_ptr::untyped_immutable_cache_ptr(
     cradle::immutable_cache& cache,
     captured_id const& key,
     function_view<std::any(
         immutable_cache& cache, id_interface const& key)> const& create_task)
+    : record_{*detail::acquire_cache_record(*cache.impl, key, create_task)}
 {
-    record_ = detail::acquire_cache_record(*cache.impl, key, create_task);
 }
 
-void
-untyped_immutable_cache_ptr::copy(untyped_immutable_cache_ptr const& other)
+untyped_immutable_cache_ptr::~untyped_immutable_cache_ptr()
 {
-    record_ = other.record_;
-    if (record_)
-        detail::acquire_cache_record(record_);
-}
-
-void
-untyped_immutable_cache_ptr::move_in(untyped_immutable_cache_ptr&& other)
-{
-    record_ = other.record_;
-    other.record_ = nullptr;
+    detail::release_cache_record(&record_);
 }
 
 } // namespace detail

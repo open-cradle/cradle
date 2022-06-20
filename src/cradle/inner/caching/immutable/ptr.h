@@ -23,92 +23,40 @@ struct immutable_cache_record;
 // immutable_cache_ptr without compile-time knowledge of the data type.
 struct untyped_immutable_cache_ptr
 {
-    untyped_immutable_cache_ptr()
-    {
-    }
-
-    ~untyped_immutable_cache_ptr()
-    {
-        reset();
-    }
-
-    untyped_immutable_cache_ptr(untyped_immutable_cache_ptr const& other)
-    {
-        copy(other);
-    }
-    untyped_immutable_cache_ptr(untyped_immutable_cache_ptr&& other)
-    {
-        move_in(std::move(other));
-    }
-
-    untyped_immutable_cache_ptr&
-    operator=(untyped_immutable_cache_ptr const& other)
-    {
-        reset();
-        copy(other);
-        return *this;
-    }
-    untyped_immutable_cache_ptr&
-    operator=(untyped_immutable_cache_ptr&& other)
-    {
-        reset();
-        move_in(std::move(other));
-        return *this;
-    }
-
-    void
-    reset();
-
-    void
-    reset(
-        cradle::immutable_cache& cache,
-        captured_id const& key,
-        function_view<
-            std::any(immutable_cache& cache, id_interface const& key)> const&
-            create_task)
-    {
-        this->reset();
-        acquire(cache, key, create_task);
-    }
-
-    bool
-    is_initialized() const
-    {
-        return record_ != nullptr;
-    }
-
-    // Everything below here should only be called if the pointer is
-    // initialized...
-
-    id_interface const&
-    key() const
-    {
-        return *record_->key;
-    }
-
-    immutable_cache_record*
-    record() const
-    {
-        return record_;
-    }
-
- private:
-    void
-    copy(untyped_immutable_cache_ptr const& other);
-
-    void
-    move_in(untyped_immutable_cache_ptr&& other);
-
-    void
-    acquire(
+    untyped_immutable_cache_ptr(
         cradle::immutable_cache& cache,
         captured_id const& key,
         function_view<
             std::any(immutable_cache& cache, id_interface const& key)> const&
             create_task);
 
+    ~untyped_immutable_cache_ptr();
+
+    untyped_immutable_cache_ptr(untyped_immutable_cache_ptr const& other)
+        = delete;
+    untyped_immutable_cache_ptr(untyped_immutable_cache_ptr&& other) = delete;
+    untyped_immutable_cache_ptr&
+    operator=(untyped_immutable_cache_ptr const& other)
+        = delete;
+    untyped_immutable_cache_ptr&
+    operator=(untyped_immutable_cache_ptr&& other)
+        = delete;
+
+    id_interface const&
+    key() const
+    {
+        return *record_.key;
+    }
+
+    immutable_cache_record*
+    record() const
+    {
+        return &record_;
+    }
+
+ private:
     // the internal cache record for the entry
-    detail::immutable_cache_record* record_ = nullptr;
+    detail::immutable_cache_record& record_;
 };
 
 void
@@ -183,84 +131,31 @@ requires CachedContextRequest<Ctx, Req>
 template<class T>
 struct immutable_cache_ptr
 {
-    immutable_cache_ptr()
-    {
-    }
-
-    immutable_cache_ptr(detail::untyped_immutable_cache_ptr& untyped)
-        : untyped_(untyped)
-    {
-    }
-
     template<class CreateTask>
     immutable_cache_ptr(
         cradle::immutable_cache& cache,
         captured_id const& key,
         CreateTask&& create_task)
+        : untyped_{
+            cache,
+            key,
+            detail::wrap_task_creator<T>(
+                std::forward<CreateTask>(create_task))}
     {
-        reset(cache, key, std::forward<CreateTask>(create_task));
     }
 
     template<CachedContext Ctx, CachedRequest Req>
     immutable_cache_ptr(Ctx& ctx, Req const& req)
-    {
-        reset_for_request(ctx, req);
-    }
-
-    void
-    reset()
-    {
-        untyped_.reset();
-    }
-
-    template<class CreateTask>
-    void
-    reset(
-        cradle::immutable_cache& cache,
-        captured_id const& key,
-        CreateTask&& create_task)
-    {
-        untyped_.reset(
-            cache,
-            key,
-            detail::wrap_task_creator<T>(
-                std::forward<CreateTask>(create_task)));
-    }
-
-    template<CachedContext Ctx, CachedRequest Req>
-    void
-    reset_for_request(Ctx& ctx, Req const& req)
-    {
-        untyped_.reset(
+        : untyped_{
             ctx.get_cache(),
             req.get_captured_id(),
             [&](detail::immutable_cache& internal_cache,
                 id_interface const& key) {
                 return detail::resolve_by_request<Ctx, Req>(
                     internal_cache, key, ctx, req);
-            });
-    }
-
-    // Access the underlying untyped pointer.
-    detail::untyped_immutable_cache_ptr const&
-    untyped() const
+            }}
     {
-        return untyped_;
     }
-    detail::untyped_immutable_cache_ptr&
-    untyped()
-    {
-        return untyped_;
-    }
-
-    bool
-    is_initialized() const
-    {
-        return untyped_.is_initialized();
-    }
-
-    // Everything below here should only be called if the pointer is
-    // initialized...
 
     cppcoro::shared_task<T> const&
     task() const

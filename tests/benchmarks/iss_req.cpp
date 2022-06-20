@@ -94,6 +94,7 @@ TEST_CASE("ISS POST", "[iss]")
 
 #ifdef __clang__
     // TODO investigate hangups occurring with Clang
+    // Related to https://github.com/lewissbaker/cppcoro/issues/98 ?
     set_mock_script(mock_http, 1);
     expected_result(1);
 #else

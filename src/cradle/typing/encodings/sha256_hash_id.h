@@ -38,6 +38,7 @@ fold_into_sha256(picosha2::hash256_one_by_one& hasher, char const* value)
 template<class... Args>
 struct sha256_hashed_id : id_interface
 {
+    // Seems to be used in test code only
     sha256_hashed_id()
     {
     }
@@ -74,6 +75,7 @@ struct sha256_hashed_id : id_interface
         *static_cast<sha256_hashed_id*>(copy) = *this;
     }
 
+    // Should prevent hash collisions in the disk cache
     void
     stream(std::ostream& o) const override
     {
@@ -84,6 +86,8 @@ struct sha256_hashed_id : id_interface
             },
             args_);
         hasher.finish();
+        // Or use picosha2::get_hash_hex_string(hasher) because
+        // ultimately we need a string.
         picosha2::byte_t hashed[32];
         hasher.get_hash_bytes(hashed, hashed + 32);
         picosha2::output_hex(hashed, hashed + 32, o);
@@ -100,6 +104,8 @@ struct sha256_hashed_id : id_interface
         }
     }
 
+    // aka hash_value()
+    // Should prevent hash collisions in the memory cache
     size_t
     hash() const override
     {
@@ -112,6 +118,7 @@ struct sha256_hashed_id : id_interface
     std::tuple<Args...> args_;
 };
 
+// TODO unused, consider removing
 template<class... Args>
 sha256_hashed_id<Args...>
 make_sha256_hashed_id(Args... args)
