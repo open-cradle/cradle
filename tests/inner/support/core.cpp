@@ -3,7 +3,7 @@
 #include <cradle/inner/fs/utilities.h>
 #include <cradle/inner/service/core.h>
 
-using namespace cradle;
+namespace cradle {
 
 void
 init_test_inner_service(inner_service_core& core)
@@ -22,3 +22,5 @@ memory_cached_request_resolution_context::
 {
     init_test_inner_service(service);
 }
+
+} // namespace cradle

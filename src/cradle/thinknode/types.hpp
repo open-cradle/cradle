@@ -1,6 +1,7 @@
 #ifndef CRADLE_THINKNODE_TYPES_HPP
 #define CRADLE_THINKNODE_TYPES_HPP
 
+#include <cradle/inner/requests/generic.h>
 #include <cradle/typing/core.h>
 
 namespace cradle {
@@ -24,14 +25,26 @@ struct thinknode_session
     std::string access_token;
 };
 
+struct inner_service_core;
 struct service_core;
 class tasklet_tracker;
 
-struct thinknode_request_context
+struct thinknode_request_context : public cached_context_intf
 {
     service_core& service;
     thinknode_session session;
     tasklet_tracker* tasklet;
+
+    thinknode_request_context(
+        service_core& service,
+        thinknode_session session,
+        tasklet_tracker* tasklet)
+        : service{service}, session{std::move(session)}, tasklet{tasklet}
+    {
+    }
+
+    inner_service_core&
+    get_service();
 };
 
 struct thinknode_array_info;

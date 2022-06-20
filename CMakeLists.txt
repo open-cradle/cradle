@@ -481,7 +481,7 @@ add_test(
         --target integration_tests)
 
 file(GLOB_RECURSE test_srcs_benchmark CONFIGURE_DEPENDS "tests/benchmarks/*.cpp")
-add_executable(benchmark_test_runner ${test_srcs_benchmark})
+add_executable(benchmark_test_runner ${test_srcs_benchmark} tests/inner/support/core.cpp)
 target_include_directories(benchmark_test_runner PRIVATE
     src/inner)
 target_link_libraries(benchmark_test_runner cradle_outer cradle_inner)

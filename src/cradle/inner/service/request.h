@@ -22,7 +22,7 @@ requires CachedContextRequest<Ctx, Req>
     resolve_request_cached(Ctx& ctx, Req const& req)
 {
     using Value = typename Req::value_type;
-    inner_service_core& svc{ctx.service};
+    inner_service_core& svc{ctx.get_service()};
     immutable_cache_ptr<Value> ptr(svc.inner_internals().cache, ctx, req);
     return ptr.task();
 }

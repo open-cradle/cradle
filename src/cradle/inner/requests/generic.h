@@ -3,6 +3,8 @@
 
 #include <concepts>
 
+#include <cppcoro/task.hpp>
+
 #include <cradle/inner/core/id.h>
 
 namespace cradle {
@@ -32,12 +34,12 @@ concept UncachedRequestPtr = UncachedRequest<typename T::element_type>;
 template<typename T>
 concept UncachedRequestOrPtr = UncachedRequest<T> || UncachedRequestPtr<T>;
 
-template<typename T>
-concept CachedRequest
-    = Request<T>&& T::caching_level != caching_level_type::none&& requires(T r)
+template<typename Req>
+concept CachedRequest = Request<Req>&& Req::caching_level
+                        != caching_level_type::none&& requires(Req const& req)
 {
     {
-        r.get_captured_id()
+        req.get_captured_id()
     }
     ->std::convertible_to<captured_id const&>;
 };
@@ -56,11 +58,11 @@ concept UncachedContext = true;
 
 struct inner_service_core;
 
-template<typename T>
-concept CachedContext = requires(T ctx)
+template<typename Ctx>
+concept CachedContext = requires(Ctx& ctx)
 {
     {
-        ctx.service
+        ctx.get_service()
     }
     ->std::convertible_to<inner_service_core&>;
 };
@@ -81,6 +83,45 @@ concept UncachedContextRequest = UncachedContext<Ctx>&& UncachedRequest<Req>&&
 template<typename Ctx, typename Req>
 concept CachedContextRequest = CachedContext<Ctx>&& CachedRequest<Req>&&
     MatchingContextRequest<Ctx, Req>;
+
+class uncached_context_intf
+{
+ public:
+    virtual ~uncached_context_intf() = default;
+};
+
+class cached_context_intf
+{
+ public:
+    virtual ~cached_context_intf() = default;
+
+    virtual inner_service_core&
+    get_service()
+        = 0;
+};
+
+template<typename Value>
+class uncached_request_intf
+{
+ public:
+    virtual ~uncached_request_intf() = default;
+
+    virtual cppcoro::task<Value>
+    resolve(uncached_context_intf& ctx) const = 0;
+};
+
+template<typename Value>
+class cached_request_intf
+{
+ public:
+    virtual ~cached_request_intf() = default;
+
+    virtual captured_id const&
+    get_captured_id() const = 0;
+
+    virtual cppcoro::task<Value>
+    resolve(cached_context_intf& ctx) const = 0;
+};
 
 } // namespace cradle
 

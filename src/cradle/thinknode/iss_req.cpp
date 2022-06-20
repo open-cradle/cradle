@@ -21,7 +21,7 @@ my_post_iss_object_request_base::my_post_iss_object_request_base(
 void
 my_post_iss_object_request_base::create_id()
 {
-    // TODO
+    // TODO captured_id for my_post_iss_object_request
     id_ = make_captured_id(context_id_);
 }
 

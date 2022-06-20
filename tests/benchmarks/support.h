@@ -59,6 +59,24 @@ resolve_request_loop(Req const& req, int expected)
     REQUIRE(actual == expected * num_loops);
 }
 
+template<CachedRequestOrPtr Req>
+auto
+resolve_request_loop(Req const& req, int expected)
+{
+    constexpr int num_loops = 1000;
+    memory_cached_request_resolution_context ctx{};
+    auto loop = [&]() -> cppcoro::task<int> {
+        int total{};
+        for (auto i = 0; i < num_loops; ++i)
+        {
+            total += co_await resolve_request(ctx, req);
+        }
+        co_return total;
+    };
+    auto actual = cppcoro::sync_wait(loop());
+    REQUIRE(actual == expected * num_loops);
+}
+
 } // namespace cradle
 
 #endif
