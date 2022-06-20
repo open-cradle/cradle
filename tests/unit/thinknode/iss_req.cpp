@@ -2,6 +2,7 @@
 
 #include <cppcoro/sync_wait.hpp>
 
+#include <cradle/inner/service/request.h>
 #include <cradle/typing/encodings/msgpack.h>
 #include <cradle/typing/io/mock_http.h>
 #include <cradle/typing/service/core.h>

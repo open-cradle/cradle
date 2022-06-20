@@ -6,6 +6,7 @@
 
 #include "../support/core.h"
 #include <cradle/inner/service/core.h>
+#include <cradle/inner/service/request.h>
 
 using namespace cradle;
 

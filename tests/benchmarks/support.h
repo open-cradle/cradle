@@ -1,6 +1,8 @@
 #ifndef CRADLE_TESTS_BENCHMARKS_SUPPORT_H
 #define CRADLE_TESTS_BENCHMARKS_SUPPORT_H
 
+#include <cradle/inner/service/request.h>
+
 template<typename Request>
 auto
 call_resolve_by_ref_loop(Request const& req, int expected)
