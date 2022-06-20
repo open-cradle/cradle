@@ -57,6 +57,7 @@ class function_request_cached
         invoke_result_t<Function, typename Args::element_type::value_type...>;
 
     static constexpr caching_level_type caching_level = level;
+    static constexpr bool introspective = false;
 
     function_request_cached(Function function, Args... args)
         : function_{std::move(function)}, args_{std::move(args)...}
@@ -201,6 +202,7 @@ class function_request_cached_erased
     using value_type = Value;
 
     static constexpr caching_level_type caching_level = level;
+    static constexpr bool introspective = false;
 
     template<typename Function, typename... Args>
     function_request_cached_erased(Function function, Args... args)

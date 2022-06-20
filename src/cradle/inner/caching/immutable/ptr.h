@@ -147,11 +147,16 @@ wrap_task_creator(CreateTask&& create_task)
     };
 }
 
-template<CachedContext Ctx, CachedRequest Req>
-cppcoro::shared_task<typename Req::value_type>
-resolve_by_request(
-    immutable_cache& cache, id_interface const& key, Ctx& ctx, Req const& req)
+template<typename Ctx, typename Req>
+requires CachedContextRequest<Ctx, Req>
+    cppcoro::shared_task<typename Req::value_type>
+    resolve_by_request(
+        immutable_cache& cache,
+        id_interface const& key,
+        Ctx& ctx,
+        Req const& req)
 {
+    // cache and key could be retrieved from ctx and req, respectively.
     try
     {
         auto value = co_await req.resolve(ctx);
@@ -197,10 +202,9 @@ struct immutable_cache_ptr
     }
 
     template<CachedContext Ctx, CachedRequest Req>
-    immutable_cache_ptr(
-        cradle::immutable_cache& cache, Ctx& ctx, Req const& req)
+    immutable_cache_ptr(Ctx& ctx, Req const& req)
     {
-        reset_for_request(cache, ctx, req);
+        reset_for_request(ctx, req);
     }
 
     void
@@ -225,10 +229,10 @@ struct immutable_cache_ptr
 
     template<CachedContext Ctx, CachedRequest Req>
     void
-    reset_for_request(cradle::immutable_cache& cache, Ctx& ctx, Req const& req)
+    reset_for_request(Ctx& ctx, Req const& req)
     {
         untyped_.reset(
-            cache,
+            ctx.get_cache(),
             req.get_captured_id(),
             [&](detail::immutable_cache& internal_cache,
                 id_interface const& key) {

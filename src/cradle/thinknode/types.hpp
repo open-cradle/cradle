@@ -25,7 +25,7 @@ struct thinknode_session
     std::string access_token;
 };
 
-struct inner_service_core;
+struct immutable_cache;
 struct service_core;
 class tasklet_tracker;
 
@@ -43,8 +43,8 @@ struct thinknode_request_context : public cached_context_intf
     {
     }
 
-    inner_service_core&
-    get_service();
+    immutable_cache&
+    get_cache();
 };
 
 struct thinknode_array_info;

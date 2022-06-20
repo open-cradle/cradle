@@ -27,6 +27,12 @@ class my_post_iss_object_request_base
     cppcoro::task<std::string>
     resolve(thinknode_request_context const& ctx) const;
 
+    std::string
+    get_summary() const
+    {
+        return "my_post_iss_object_request";
+    }
+
  protected:
     ~my_post_iss_object_request_base() = default;
 
@@ -48,6 +54,7 @@ class my_post_iss_object_request : public my_post_iss_object_request_base
     using value_type = std::string;
 
     static constexpr caching_level_type caching_level = level;
+    static constexpr bool introspective = true;
 
     using my_post_iss_object_request_base::my_post_iss_object_request_base;
 };

@@ -19,10 +19,10 @@ struct memory_cached_request_resolution_context : public cached_context_intf
 
     memory_cached_request_resolution_context();
 
-    inner_service_core&
-    get_service() override
+    immutable_cache&
+    get_cache() override
     {
-        return service;
+        return service.inner_internals().cache;
     }
 };
 

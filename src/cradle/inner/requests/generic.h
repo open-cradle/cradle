@@ -9,6 +9,9 @@
 
 namespace cradle {
 
+struct immutable_cache;
+class tasklet_tracker;
+
 enum class caching_level_type
 {
     none,
@@ -35,13 +38,27 @@ template<typename T>
 concept UncachedRequestOrPtr = UncachedRequest<T> || UncachedRequestPtr<T>;
 
 template<typename Req>
-concept CachedRequest = Request<Req>&& Req::caching_level
-                        != caching_level_type::none&& requires(Req const& req)
+concept CachedRequest
+    = Request<Req>&& Req::caching_level != caching_level_type::none&& requires
+{
+    std::same_as<decltype(Req::introspective), bool>;
+}
+&&requires(Req const& req)
 {
     {
         req.get_captured_id()
     }
     ->std::convertible_to<captured_id const&>;
+};
+
+template<typename Req>
+concept IntrospectiveRequest
+    = CachedRequest<Req>&& Req::introspective&& requires(Req const& req)
+{
+    {
+        req.get_summary()
+    }
+    ->std::convertible_to<std::string>;
 };
 
 template<typename T>
@@ -56,15 +73,22 @@ concept RequestContext = true;
 template<typename T>
 concept UncachedContext = true;
 
-struct inner_service_core;
-
 template<typename Ctx>
 concept CachedContext = requires(Ctx& ctx)
 {
     {
-        ctx.get_service()
+        ctx.get_cache()
     }
-    ->std::convertible_to<inner_service_core&>;
+    ->std::convertible_to<immutable_cache&>;
+};
+
+template<typename Ctx>
+concept IntrospectiveContext = CachedContext<Ctx>&& requires(Ctx const& ctx)
+{
+    {
+        ctx.tasklet
+    }
+    ->std::convertible_to<tasklet_tracker const*>;
 };
 
 template<typename Ctx, typename Req>
@@ -84,6 +108,10 @@ template<typename Ctx, typename Req>
 concept CachedContextRequest = CachedContext<Ctx>&& CachedRequest<Req>&&
     MatchingContextRequest<Ctx, Req>;
 
+template<typename Ctx, typename Req>
+concept IntrospectiveContextRequest = IntrospectiveContext<Ctx>&&
+    IntrospectiveRequest<Req>&& MatchingContextRequest<Ctx, Req>;
+
 class uncached_context_intf
 {
  public:
@@ -95,8 +123,8 @@ class cached_context_intf
  public:
     virtual ~cached_context_intf() = default;
 
-    virtual inner_service_core&
-    get_service()
+    virtual immutable_cache&
+    get_cache()
         = 0;
 };
 
