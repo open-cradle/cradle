@@ -62,13 +62,16 @@ perform_lambda_calc(
     std::vector<dynamic> args)
 {
     string function_name{"lambda_calc"};
-    // TODO create a capturing combine_ids() and we won't need id_interface's
-    // clone() and deep_copy() anymore (!?)
-    auto combined_id{combine_ids(
-        make_id(function_name),
-        ref(*function.id),
-        make_id(natively_encoded_sha256(args)))};
-    auto cache_key{captured_id{combined_id.clone()}};
+#if 0
+    // TODO this looks like the only place where we need to clone an id
+    // (function.id, being a captured_id). Try to get rid of this one too.
+    auto combined_id{new id_pair{
+        id_pair{make_id(function_name), ref(*function.id)},
+            make_id(natively_encoded_sha256(args))}};
+#endif
+    auto combined_id{new id_pair{
+        make_id(function_name), make_id(natively_encoded_sha256(args))}};
+    auto cache_key{captured_id{combined_id}};
 
     auto await_guard = tasklet_await(ctx.tasklet, function_name, *cache_key);
     co_return co_await cached<dynamic>(

@@ -28,19 +28,6 @@ void
 test_single_id(Id const& id)
 {
     test_equal_ids(id, id);
-
-    std::shared_ptr<cradle::id_interface> clone(id.clone());
-    test_equal_ids(id, *clone);
-
-    Id copy;
-    id.deep_copy(&copy);
-    test_equal_ids(id, copy);
-
-    // Copying a clone is sometimes different because the clone is free of
-    // references to the surrounding stack frame.
-    Id clone_copy;
-    clone->deep_copy(&clone_copy);
-    test_equal_ids(id, clone_copy);
 }
 
 // Test all the ID operations on a pair of different IDs.

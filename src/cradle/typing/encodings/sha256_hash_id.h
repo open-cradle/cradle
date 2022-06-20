@@ -47,12 +47,6 @@ struct sha256_hashed_id : id_interface
     {
     }
 
-    id_interface*
-    clone() const override
-    {
-        return new sha256_hashed_id(args_);
-    }
-
     bool
     equals(id_interface const& other) const override
     {
@@ -67,12 +61,6 @@ struct sha256_hashed_id : id_interface
         sha256_hashed_id const& other_id
             = static_cast<sha256_hashed_id const&>(other);
         return args_ < other_id.args_;
-    }
-
-    void
-    deep_copy(id_interface* copy) const override
-    {
-        *static_cast<sha256_hashed_id*>(copy) = *this;
     }
 
     // Should prevent hash collisions in the disk cache

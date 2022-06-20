@@ -16,18 +16,7 @@ namespace cradle {
 // id_interface defines the interface required of all ID types.
 struct id_interface
 {
-    virtual ~id_interface()
-    {
-    }
-
-    // Create a standalone copy of the ID.
-    virtual id_interface*
-    clone() const = 0;
-
-    // Given another ID of the same type, set it equal to a standalone copy
-    // of this ID.
-    virtual void
-    deep_copy(id_interface* copy) const = 0;
+    virtual ~id_interface() = default;
 
     // Given another ID of the same type, return true iff it's equal to this
     // one.
@@ -181,14 +170,6 @@ struct id_ref : id_interface
     {
     }
 
-    id_interface*
-    clone() const override
-    {
-        id_ref* copy = new id_ref;
-        this->deep_copy(copy);
-        return copy;
-    }
-
     bool
     equals(id_interface const& other) const override
     {
@@ -201,22 +182,6 @@ struct id_ref : id_interface
     {
         id_ref const& other_id = static_cast<id_ref const&>(other);
         return *id_ < *other_id.id_;
-    }
-
-    void
-    deep_copy(id_interface* copy) const override
-    {
-        auto& typed_copy = *static_cast<id_ref*>(copy);
-        if (ownership_)
-        {
-            typed_copy.ownership_ = ownership_;
-            typed_copy.id_ = id_;
-        }
-        else
-        {
-            typed_copy.ownership_.reset(id_->clone());
-            typed_copy.id_ = typed_copy.ownership_.get();
-        }
     }
 
     void
@@ -263,12 +228,6 @@ struct simple_id : id_interface
         return value_;
     }
 
-    id_interface*
-    clone() const override
-    {
-        return new simple_id(value_);
-    }
-
     bool
     equals(id_interface const& other) const override
     {
@@ -288,12 +247,6 @@ struct simple_id : id_interface
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
-    }
-
-    void
-    deep_copy(id_interface* copy) const override
-    {
-        *static_cast<simple_id*>(copy) = *this;
     }
 
     void
@@ -328,7 +281,7 @@ make_captured_id(Value value)
 }
 
 // simple_id_by_reference is like simple_id but takes a pointer to the value.
-// The value is only copied if the ID is cloned or deep-copied.
+// The value is never copied.
 template<class Value>
 struct simple_id_by_reference : id_interface
 {
@@ -338,14 +291,6 @@ struct simple_id_by_reference : id_interface
 
     simple_id_by_reference(Value const* value) : value_(value), storage_()
     {
-    }
-
-    id_interface*
-    clone() const override
-    {
-        simple_id_by_reference* copy = new simple_id_by_reference;
-        this->deep_copy(copy);
-        return copy;
     }
 
     bool
@@ -362,22 +307,6 @@ struct simple_id_by_reference : id_interface
         simple_id_by_reference const& other_id
             = static_cast<simple_id_by_reference const&>(other);
         return *value_ < *other_id.value_;
-    }
-
-    void
-    deep_copy(id_interface* copy) const override
-    {
-        auto& typed_copy = *static_cast<simple_id_by_reference*>(copy);
-        if (storage_)
-        {
-            typed_copy.storage_ = this->storage_;
-            typed_copy.value_ = this->value_;
-        }
-        else
-        {
-            typed_copy.storage_.reset(new Value(*this->value_));
-            typed_copy.value_ = typed_copy.storage_.get();
-        }
     }
 
     void
@@ -417,14 +346,6 @@ struct id_pair : id_interface
     {
     }
 
-    id_interface*
-    clone() const override
-    {
-        id_pair* copy = new id_pair;
-        this->deep_copy(copy);
-        return copy;
-    }
-
     bool
     equals(id_interface const& other) const override
     {
@@ -439,14 +360,6 @@ struct id_pair : id_interface
         return id0_.less_than(other_id.id0_)
                || (id0_.equals(other_id.id0_)
                    && id1_.less_than(other_id.id1_));
-    }
-
-    void
-    deep_copy(id_interface* copy) const override
-    {
-        id_pair* typed_copy = static_cast<id_pair*>(copy);
-        id0_.deep_copy(&typed_copy->id0_);
-        id1_.deep_copy(&typed_copy->id1_);
     }
 
     void
