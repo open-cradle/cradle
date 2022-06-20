@@ -88,3 +88,8 @@ jobs:
 
         cmake --build build --config ${{matrix.config}}
         --target all_unit_tests -j4
+
+    - name: Benchmarks
+      if: ${{ matrix.config == 'Release' }}
+      run: |
+        cmake --build build --config Release --target benchmark_tests

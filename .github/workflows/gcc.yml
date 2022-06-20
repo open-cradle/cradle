@@ -49,3 +49,8 @@ jobs:
         source .venv/bin/activate
         pip3 install -e python
         cmake --build build --config ${{matrix.config}} --target integration_tests
+
+    - name: Benchmarks
+      if: ${{ matrix.config == 'Release' }}
+      run: |
+        cmake --build build --config Release --target benchmark_tests
