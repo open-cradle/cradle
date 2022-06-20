@@ -146,6 +146,27 @@ wrap_task_creator(CreateTask&& create_task)
     };
 }
 
+template<typename Context, typename Request>
+cppcoro::shared_task<typename Request::value_type>
+resolve_by_request(
+    immutable_cache& cache,
+    id_interface const& key,
+    Context& ctx,
+    Request const& req)
+{
+    try
+    {
+        auto value = co_await req.resolve(ctx);
+        record_immutable_cache_value(cache, key, deep_sizeof(value));
+        co_return value;
+    }
+    catch (...)
+    {
+        record_immutable_cache_failure(cache, key);
+        throw;
+    }
+}
+
 } // namespace detail
 
 // immutable_cache_ptr<T> represents one's interest in a particular immutable
@@ -177,6 +198,13 @@ struct immutable_cache_ptr
         reset(cache, key, std::forward<CreateTask>(create_task));
     }
 
+    template<typename Context, typename Request>
+    immutable_cache_ptr(
+        cradle::immutable_cache& cache, Context& ctx, Request const& req)
+    {
+        reset_for_request(cache, ctx, req);
+    }
+
     void
     reset()
     {
@@ -195,6 +223,21 @@ struct immutable_cache_ptr
             key,
             detail::wrap_task_creator<T>(
                 std::forward<CreateTask>(create_task)));
+    }
+
+    template<typename Context, typename Request>
+    void
+    reset_for_request(
+        cradle::immutable_cache& cache, Context& ctx, Request const& req)
+    {
+        untyped_.reset(
+            cache,
+            req.get_captured_id(),
+            [&](detail::immutable_cache& internal_cache,
+                id_interface const& key) {
+                return detail::resolve_by_request<Context, Request>(
+                    internal_cache, key, ctx, req);
+            });
     }
 
     // Access the underlying untyped pointer.

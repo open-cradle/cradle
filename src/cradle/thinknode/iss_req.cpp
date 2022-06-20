@@ -2,20 +2,32 @@
 
 #include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/utilities.h>
-#include <cradle/typing/encodings/msgpack.h>
 
 namespace cradle {
 
-my_post_iss_object_request::my_post_iss_object_request(
+my_post_iss_object_request_base::my_post_iss_object_request_base(
     string context_id, thinknode_type_info schema, blob object_data)
     : context_id_{std::move(context_id)},
       schema_{std::move(schema)},
       object_data_{std::move(object_data)}
 {
+    // This is where the constructor spends most of its time.
+    // The id is needed only when caching, so the current code does not
+    // let us measure how long it really takes to create an uncached
+    // ISS POST request object.
+    create_id();
+}
+
+void
+my_post_iss_object_request_base::create_id()
+{
+    // TODO
+    id_ = make_captured_id(context_id_);
 }
 
 cppcoro::task<string>
-my_post_iss_object_request::resolve(thinknode_request_context const& ctx) const
+my_post_iss_object_request_base::resolve(
+    thinknode_request_context const& ctx) const
 {
     auto query = make_http_request(
         http_request_method::POST,
@@ -30,22 +42,6 @@ my_post_iss_object_request::resolve(thinknode_request_context const& ctx) const
     auto response = co_await async_http_request(ctx, std::move(query));
 
     co_return from_dynamic<id_response>(parse_json_response(response)).id;
-}
-
-my_post_iss_object_request
-rq_post_iss_object(
-    string context_id, thinknode_type_info schema, blob object_data)
-{
-    return my_post_iss_object_request{
-        std::move(context_id), std::move(schema), std::move(object_data)};
-}
-
-my_post_iss_object_request
-rq_post_iss_object(string context_id, thinknode_type_info schema, dynamic data)
-{
-    blob msgpack_data = value_to_msgpack_blob(data);
-    return my_post_iss_object_request{
-        std::move(context_id), std::move(schema), std::move(msgpack_data)};
 }
 
 } // namespace cradle

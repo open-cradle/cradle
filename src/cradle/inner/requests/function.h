@@ -6,35 +6,38 @@
 
 #include <cppcoro/task.hpp>
 
+#include <cradle/inner/core/id.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/core.h>
 
 namespace cradle {
 
-template<caching_level_type level, class Function, class... Args>
-class function_request
+template<class Function, class... Args>
+class function_request_uncached
 {
  public:
-    using element_type = function_request;
+    using element_type = function_request_uncached;
     using value_type = std::
         invoke_result_t<Function, typename Args::element_type::value_type...>;
 
-    static constexpr caching_level_type caching_level = level;
+    static constexpr caching_level_type caching_level
+        = caching_level_type::none;
 
-    function_request(Function function, Args... args)
+    function_request_uncached(Function function, Args... args)
         : function_{std::move(function)}, args_{std::move(args)...}
     {
     }
 
     template<typename Context>
     cppcoro::task<value_type>
-    resolve(Context const& ctx) const
+    resolve(Context& ctx) const
     {
         // The "func=function_" is a workaround to prevent a gcc-10 internal
         // compiler error in release builds.
         co_return co_await std::apply(
             [&, func = function_](auto&&... args)
-                -> cppcoro::task<typename function_request::value_type> {
+                -> cppcoro::task<
+                    typename function_request_uncached::value_type> {
                 co_return func((co_await resolve_request(ctx, args))...);
             },
             args_);
@@ -46,26 +49,112 @@ class function_request
 };
 
 template<caching_level_type level, class Function, class... Args>
-auto
+class function_request_cached
+{
+ public:
+    using element_type = function_request_cached;
+    using value_type = std::
+        invoke_result_t<Function, typename Args::element_type::value_type...>;
+
+    static constexpr caching_level_type caching_level = level;
+
+    function_request_cached(Function function, Args... args)
+        : function_{std::move(function)}, args_{std::move(args)...}
+    {
+        create_id();
+    }
+
+    captured_id const&
+    get_captured_id() const
+    {
+        return id_;
+    }
+
+    template<typename Context>
+    cppcoro::task<value_type>
+    resolve(Context& ctx) const
+    {
+        // The "func=function_" is a workaround to prevent a gcc-10 internal
+        // compiler error in release builds.
+        co_return co_await std::apply(
+            [&, func = function_](auto&&... args)
+                -> cppcoro::task<
+                    typename function_request_cached::value_type> {
+                co_return func((co_await resolve_request(ctx, args))...);
+            },
+            args_);
+    }
+
+ private:
+    Function function_;
+    std::tuple<Args...> args_;
+    captured_id id_;
+
+    void
+    create_id()
+    {
+        // TODO
+        id_ = make_captured_id(&function_);
+    }
+};
+
+template<caching_level_type level, class Function, class... Args>
+std::enable_if_t<
+    level == caching_level_type::none,
+    function_request_uncached<Function, Args...>>
 rq_function(Function function, Args... args)
 {
-    return function_request<level, Function, Args...>{
+    return function_request_uncached<Function, Args...>{
         std::move(function), std::move(args)...};
 }
 
 template<caching_level_type level, class Function, class... Args>
-auto
+std::enable_if_t<
+    level != caching_level_type::none,
+    function_request_cached<level, Function, Args...>>
+rq_function(Function function, Args... args)
+{
+    return function_request_cached<level, Function, Args...>{
+        std::move(function), std::move(args)...};
+}
+
+template<caching_level_type level, class Function, class... Args>
+std::enable_if_t<
+    level == caching_level_type::none,
+    std::unique_ptr<function_request_uncached<Function, Args...>>>
 rq_function_up(Function function, Args... args)
 {
-    return std::make_unique<function_request<level, Function, Args...>>(
+    return std::make_unique<function_request_uncached<Function, Args...>>(
         std::move(function), std::move(args)...);
 }
 
 template<caching_level_type level, class Function, class... Args>
-auto
+std::enable_if_t<
+    level != caching_level_type::none,
+    std::unique_ptr<function_request_cached<level, Function, Args...>>>
+rq_function_up(Function function, Args... args)
+{
+    return std::make_unique<function_request_cached<level, Function, Args...>>(
+        std::move(function), std::move(args)...);
+}
+
+template<caching_level_type level, class Function, class... Args>
+std::enable_if_t<
+    level == caching_level_type::none,
+    std::shared_ptr<function_request_uncached<Function, Args...>>>
 rq_function_sp(Function function, Args... args)
 {
-    return std::make_shared<function_request<level, Function, Args...>>(
+    return std::make_shared<function_request_uncached<Function, Args...>>(
+        std::move(function), std::move(args)...);
+}
+
+template<caching_level_type level, class Function, class... Args>
+std::enable_if_t<
+    level != caching_level_type::none,
+    std::shared_ptr<function_request_cached<level, Function, Args...>>>
+rq_function_sp(Function function, Args... args)
+{
+    return std::make_shared<function_request_cached<level, Function, Args...>>(
         std::move(function), std::move(args)...);
 }
 

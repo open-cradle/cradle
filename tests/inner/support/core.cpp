@@ -16,3 +16,9 @@ init_test_inner_service(inner_service_core& core)
         immutable_cache_config{0x40'00'00'00},
         disk_cache_config{cache_dir.string(), 0x40'00'00'00}});
 }
+
+memory_cached_request_resolution_context::
+    memory_cached_request_resolution_context()
+{
+    init_test_inner_service(service);
+}

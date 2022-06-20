@@ -39,7 +39,7 @@ class value_request
 
     template<typename Context>
     cppcoro::task<Value>
-    resolve(Context const& ctx) const
+    resolve(Context& ctx) const
     {
         co_return value_;
     }
