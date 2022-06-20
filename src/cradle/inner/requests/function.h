@@ -28,9 +28,9 @@ class function_request_uncached
     {
     }
 
-    template<typename Context>
+    template<UncachedContext Ctx>
     cppcoro::task<value_type>
-    resolve(Context& ctx) const
+    resolve(Ctx& ctx) const
     {
         // The "func=function_" is a workaround to prevent a gcc-10 internal
         // compiler error in release builds.
@@ -70,9 +70,9 @@ class function_request_cached
         return id_;
     }
 
-    template<typename Context>
+    template<CachedContext Ctx>
     cppcoro::task<value_type>
-    resolve(Context& ctx) const
+    resolve(Ctx& ctx) const
     {
         // The "func=function_" is a workaround to prevent a gcc-10 internal
         // compiler error in release builds.
@@ -99,60 +99,48 @@ class function_request_cached
 };
 
 template<caching_level_type level, class Function, class... Args>
-std::enable_if_t<
-    level == caching_level_type::none,
-    function_request_uncached<Function, Args...>>
-rq_function(Function function, Args... args)
+requires(level == caching_level_type::none) auto rq_function(
+    Function function, Args... args)
 {
     return function_request_uncached<Function, Args...>{
         std::move(function), std::move(args)...};
 }
 
 template<caching_level_type level, class Function, class... Args>
-std::enable_if_t<
-    level != caching_level_type::none,
-    function_request_cached<level, Function, Args...>>
-rq_function(Function function, Args... args)
+requires(level != caching_level_type::none) auto rq_function(
+    Function function, Args... args)
 {
     return function_request_cached<level, Function, Args...>{
         std::move(function), std::move(args)...};
 }
 
 template<caching_level_type level, class Function, class... Args>
-std::enable_if_t<
-    level == caching_level_type::none,
-    std::unique_ptr<function_request_uncached<Function, Args...>>>
-rq_function_up(Function function, Args... args)
+requires(level == caching_level_type::none) auto rq_function_up(
+    Function function, Args... args)
 {
     return std::make_unique<function_request_uncached<Function, Args...>>(
         std::move(function), std::move(args)...);
 }
 
 template<caching_level_type level, class Function, class... Args>
-std::enable_if_t<
-    level != caching_level_type::none,
-    std::unique_ptr<function_request_cached<level, Function, Args...>>>
-rq_function_up(Function function, Args... args)
+requires(level != caching_level_type::none) auto rq_function_up(
+    Function function, Args... args)
 {
     return std::make_unique<function_request_cached<level, Function, Args...>>(
         std::move(function), std::move(args)...);
 }
 
 template<caching_level_type level, class Function, class... Args>
-std::enable_if_t<
-    level == caching_level_type::none,
-    std::shared_ptr<function_request_uncached<Function, Args...>>>
-rq_function_sp(Function function, Args... args)
+requires(level == caching_level_type::none) auto rq_function_sp(
+    Function function, Args... args)
 {
     return std::make_shared<function_request_uncached<Function, Args...>>(
         std::move(function), std::move(args)...);
 }
 
 template<caching_level_type level, class Function, class... Args>
-std::enable_if_t<
-    level != caching_level_type::none,
-    std::shared_ptr<function_request_cached<level, Function, Args...>>>
-rq_function_sp(Function function, Args... args)
+requires(level != caching_level_type::none) auto rq_function_sp(
+    Function function, Args... args)
 {
     return std::make_shared<function_request_cached<level, Function, Args...>>(
         std::move(function), std::move(args)...);

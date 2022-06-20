@@ -6,6 +6,7 @@
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/caching/immutable/internals.h>
 #include <cradle/inner/core/type_interfaces.h>
+#include <cradle/inner/requests/generic.h>
 #include <cradle/inner/utilities/functional.h>
 
 // This file provides the interface for consuming cache entries.
@@ -146,13 +147,10 @@ wrap_task_creator(CreateTask&& create_task)
     };
 }
 
-template<typename Context, typename Request>
-cppcoro::shared_task<typename Request::value_type>
+template<CachedContext Ctx, CachedRequest Req>
+cppcoro::shared_task<typename Req::value_type>
 resolve_by_request(
-    immutable_cache& cache,
-    id_interface const& key,
-    Context& ctx,
-    Request const& req)
+    immutable_cache& cache, id_interface const& key, Ctx& ctx, Req const& req)
 {
     try
     {
@@ -198,9 +196,9 @@ struct immutable_cache_ptr
         reset(cache, key, std::forward<CreateTask>(create_task));
     }
 
-    template<typename Context, typename Request>
+    template<CachedContext Ctx, CachedRequest Req>
     immutable_cache_ptr(
-        cradle::immutable_cache& cache, Context& ctx, Request const& req)
+        cradle::immutable_cache& cache, Ctx& ctx, Req const& req)
     {
         reset_for_request(cache, ctx, req);
     }
@@ -225,17 +223,16 @@ struct immutable_cache_ptr
                 std::forward<CreateTask>(create_task)));
     }
 
-    template<typename Context, typename Request>
+    template<CachedContext Ctx, CachedRequest Req>
     void
-    reset_for_request(
-        cradle::immutable_cache& cache, Context& ctx, Request const& req)
+    reset_for_request(cradle::immutable_cache& cache, Ctx& ctx, Req const& req)
     {
         untyped_.reset(
             cache,
             req.get_captured_id(),
             [&](detail::immutable_cache& internal_cache,
                 id_interface const& key) {
-                return detail::resolve_by_request<Context, Request>(
+                return detail::resolve_by_request<Ctx, Req>(
                     internal_cache, key, ctx, req);
             });
     }

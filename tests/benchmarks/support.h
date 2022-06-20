@@ -3,9 +3,11 @@
 
 #include <cradle/inner/service/request.h>
 
-template<typename Request>
+namespace cradle {
+
+template<UncachedRequest Req>
 auto
-call_resolve_by_ref_loop(Request const& req, int expected)
+call_resolve_by_ref_loop(Req const& req, int expected)
 {
     constexpr int num_loops = 1000;
     uncached_request_resolution_context ctx{};
@@ -21,9 +23,9 @@ call_resolve_by_ref_loop(Request const& req, int expected)
     REQUIRE(actual == expected * num_loops);
 }
 
-template<typename Request>
+template<UncachedRequestPtr Req>
 auto
-call_resolve_by_ptr_loop(Request const& req, int expected)
+call_resolve_by_ptr_loop(Req const& req, int expected)
 {
     constexpr int num_loops = 1000;
     uncached_request_resolution_context ctx{};
@@ -39,9 +41,9 @@ call_resolve_by_ptr_loop(Request const& req, int expected)
     REQUIRE(actual == expected * num_loops);
 }
 
-template<typename Request>
+template<UncachedRequestOrPtr Req>
 auto
-resolve_request_loop(Request const& req, int expected)
+resolve_request_loop(Req const& req, int expected)
 {
     constexpr int num_loops = 1000;
     uncached_request_resolution_context ctx{};
@@ -56,5 +58,7 @@ resolve_request_loop(Request const& req, int expected)
     auto actual = cppcoro::sync_wait(loop());
     REQUIRE(actual == expected * num_loops);
 }
+
+} // namespace cradle
 
 #endif

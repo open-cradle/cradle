@@ -49,9 +49,9 @@ expected_result(int num_loops)
     return result;
 }
 
-template<typename Context, typename Request>
+template<Request Req>
 cppcoro::task<string>
-resolve_n_requests(int n, Context& ctx, Request const& req)
+resolve_n_requests(int n, thinknode_request_context& ctx, Req const& req)
 {
     string result;
     for (int i = 0; i < n; ++i)

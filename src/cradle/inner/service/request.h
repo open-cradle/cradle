@@ -16,67 +16,55 @@
 
 namespace cradle {
 
-template<typename Context, typename Request>
-cppcoro::shared_task<typename Request::value_type>
-resolve_request_cached(Context& ctx, Request const& req)
+template<typename Ctx, typename Req>
+requires CachedContextRequest<Ctx, Req>
+    cppcoro::shared_task<typename Req::value_type>
+    resolve_request_cached(Ctx& ctx, Req const& req)
 {
-    static_assert(Request::caching_level == caching_level_type::memory);
-    using Value = typename Request::value_type;
+    using Value = typename Req::value_type;
     inner_service_core& svc{ctx.service};
     immutable_cache_ptr<Value> ptr(svc.inner_internals().cache, ctx, req);
     return ptr.task();
 }
 
-template<typename Context, typename Request>
-std::enable_if_t<
-    Request::caching_level == caching_level_type::none,
-    cppcoro::task<typename Request::value_type>>
-resolve_request(Context& ctx, Request const& req)
+template<typename Ctx, typename Req>
+requires UncachedContextRequest<Ctx, Req> auto
+resolve_request(Ctx& ctx, Req const& req)
 {
     return req.resolve(ctx);
 }
 
-template<typename Context, typename Request>
-std::enable_if_t<
-    Request::caching_level != caching_level_type::none,
-    cppcoro::shared_task<typename Request::value_type>>
-resolve_request(Context& ctx, Request const& req)
+template<typename Ctx, typename Req>
+requires CachedContextRequest<Ctx, Req> auto
+resolve_request(Ctx& ctx, Req const& req)
 {
     return resolve_request_cached(ctx, req);
 }
 
-template<typename Context, typename Request>
-std::enable_if_t<
-    Request::caching_level == caching_level_type::none,
-    cppcoro::task<typename Request::value_type>>
-resolve_request(Context& ctx, std::unique_ptr<Request> const& req)
+template<typename Ctx, typename Req>
+requires UncachedContextRequest<Ctx, Req> auto
+resolve_request(Ctx& ctx, std::unique_ptr<Req> const& req)
 {
     return req->resolve(ctx);
 }
 
-template<typename Context, typename Request>
-std::enable_if_t<
-    Request::caching_level != caching_level_type::none,
-    cppcoro::shared_task<typename Request::value_type>>
-resolve_request(Context& ctx, std::unique_ptr<Request> const& req)
+template<typename Ctx, typename Req>
+requires CachedContextRequest<Ctx, Req> auto
+resolve_request(Ctx& ctx, std::unique_ptr<Req> const& req)
 {
     return resolve_request_cached(ctx, *req);
 }
 
-template<typename Context, typename Request>
-std::enable_if_t<
-    Request::caching_level == caching_level_type::none,
-    cppcoro::task<typename Request::value_type>>
-resolve_request(Context& ctx, std::shared_ptr<Request> const& req)
+template<typename Ctx, typename Req>
+requires UncachedContextRequest<Ctx, Req> auto
+resolve_request(Ctx& ctx, std::shared_ptr<Req> const& req)
 {
     return req->resolve(ctx);
 }
 
-template<typename Context, typename Request>
-std::enable_if_t<
-    Request::caching_level != caching_level_type::none,
-    cppcoro::shared_task<typename Request::value_type>>
-resolve_request(Context& ctx, std::shared_ptr<Request> const& req)
+template<typename Ctx, typename Req>
+requires CachedContextRequest<Ctx, Req> auto
+resolve_request(Ctx& ctx, std::shared_ptr<Req> const& req)
 {
     return resolve_request_cached(ctx, *req);
 }

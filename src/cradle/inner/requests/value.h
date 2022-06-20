@@ -37,9 +37,11 @@ class value_request
         return value_;
     }
 
-    template<typename Context>
+    // VS2019 build fails with
+    // resolve(UncachedContext auto& ctx) const
+    template<UncachedContext Ctx>
     cppcoro::task<Value>
-    resolve(Context& ctx) const
+    resolve(Ctx& ctx) const
     {
         co_return value_;
     }
