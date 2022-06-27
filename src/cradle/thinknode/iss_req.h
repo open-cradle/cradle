@@ -9,6 +9,8 @@
 
 namespace cradle {
 
+// my_post_iss_object_request base class not depending on caching_level_type,
+// to avoid object code duplication.
 class my_post_iss_object_request_base
 {
  public:

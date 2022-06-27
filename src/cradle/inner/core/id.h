@@ -113,6 +113,13 @@ struct captured_id
     }
     captured_id(captured_id const& other) = default;
     captured_id(captured_id&& other) noexcept = default;
+
+    // The aliasing constructor; ownership information shared with other
+    captured_id(std::shared_ptr<id_interface> const& other)
+        : id_{other, other.get()}
+    {
+    }
+
     captured_id&
     operator=(captured_id const& other)
         = default;

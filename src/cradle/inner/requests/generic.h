@@ -112,43 +112,15 @@ template<typename Ctx, typename Req>
 concept IntrospectiveContextRequest = IntrospectiveContext<Ctx>&&
     IntrospectiveRequest<Req>&& MatchingContextRequest<Ctx, Req>;
 
-class uncached_context_intf
+class context_intf
 {
  public:
-    virtual ~uncached_context_intf() = default;
-};
+    virtual ~context_intf() = default;
 
-class cached_context_intf
-{
- public:
-    virtual ~cached_context_intf() = default;
-
+    // Only implemented in uncached context
     virtual immutable_cache&
     get_cache()
         = 0;
-};
-
-template<typename Value>
-class uncached_request_intf
-{
- public:
-    virtual ~uncached_request_intf() = default;
-
-    virtual cppcoro::task<Value>
-    resolve(uncached_context_intf& ctx) const = 0;
-};
-
-template<typename Value>
-class cached_request_intf
-{
- public:
-    virtual ~cached_request_intf() = default;
-
-    virtual captured_id const&
-    get_captured_id() const = 0;
-
-    virtual cppcoro::task<Value>
-    resolve(cached_context_intf& ctx) const = 0;
 };
 
 } // namespace cradle

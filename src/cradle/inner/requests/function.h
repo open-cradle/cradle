@@ -2,10 +2,12 @@
 #define CRADLE_INNER_REQUESTS_FUNCTION_H
 
 #include <memory>
+#include <typeinfo>
 #include <utility>
 
 #include <cppcoro/task.hpp>
 
+#include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/id.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/core.h>
@@ -99,134 +101,217 @@ class function_request_cached
     }
 };
 
-template<typename Value, class Function, class... Args>
-class function_request_uncached_impl : public uncached_request_intf<Value>
-{
- public:
-    function_request_uncached_impl(Function function, Args... args)
-        : function_{std::move(function)}, args_{std::move(args)...}
-    {
-    }
-
-    cppcoro::task<Value>
-    resolve(uncached_context_intf& ctx) const override
-    {
-        // The "func=function_" is a workaround to prevent a gcc-10 internal
-        // compiler error in release builds.
-        co_return co_await std::apply(
-            [&, func = function_](auto&&... args) -> cppcoro::task<Value> {
-                co_return func((co_await resolve_request(ctx, args))...);
-            },
-            args_);
-    }
-
- private:
-    Function function_;
-    std::tuple<Args...> args_;
-};
-
 template<typename Value>
-class function_request_uncached_erased
+class function_request_intf : public id_interface
 {
  public:
-    using element_type = function_request_uncached_erased;
-    using value_type = Value;
+    virtual ~function_request_intf() = default;
 
-    static constexpr caching_level_type caching_level
-        = caching_level_type::none;
-
-    template<typename Function, typename... Args>
-    function_request_uncached_erased(Function function, Args... args)
-        : impl_{std::make_shared<
-            function_request_uncached_impl<Value, Function, Args...>>(
-            std::move(function), std::move(args)...)}
-    {
-    }
-
-    cppcoro::task<value_type>
-    resolve(uncached_context_intf& ctx) const
-    {
-        return impl_->resolve(ctx);
-    }
-
- private:
-    std::shared_ptr<uncached_request_intf<Value>> impl_;
+    virtual cppcoro::task<Value>
+    resolve(context_intf& ctx) const = 0;
 };
 
+// - This class implements id_interface exactly like sha256_hashed_id
+// - The major advantage is that args_ need not be copied
 template<typename Value, class Function, class... Args>
-class function_request_cached_impl : public cached_request_intf<Value>
+class function_request_impl : public function_request_intf<Value>
 {
  public:
-    function_request_cached_impl(Function function, Args... args)
-        : function_{std::move(function)}, args_{std::move(args)...}
+    function_request_impl(Function function, Args... args)
+        : function_{std::move(function)},
+          function_id_{typeid(function).name()},
+          args_{std::move(args)...}
     {
-        create_id();
     }
 
-    captured_id const&
-    get_captured_id() const override
+    bool
+    equals(function_request_impl const& other) const
     {
-        return id_;
+        return function_id_ == other.function_id_ && args_ == other.args_;
     }
 
-    cppcoro::task<Value>
-    resolve(cached_context_intf& ctx) const override
+    bool
+    less_than(function_request_impl const& other) const
     {
-        // The "func=function_" is a workaround to prevent a gcc-10 internal
-        // compiler error in release builds.
-        co_return co_await std::apply(
-            [&, func = function_](auto&&... args) -> cppcoro::task<Value> {
-                co_return func((co_await resolve_request(ctx, args))...);
-            },
-            args_);
+        if (function_id_ != other.function_id_)
+        {
+            return function_id_ < other.function_id_;
+        }
+        return args_ < other.args_;
     }
 
- private:
-    Function function_;
-    std::tuple<Args...> args_;
-    captured_id id_;
+    bool
+    equals(id_interface const& other) const override
+    {
+        auto const* other1
+            = dynamic_cast<function_request_impl const*>(&other);
+        if (!other1)
+        {
+            return false;
+        }
+        return equals(*other1);
+    }
+
+    bool
+    less_than(id_interface const& other) const override
+    {
+        auto const* other1
+            = dynamic_cast<function_request_impl const*>(&other);
+        if (!other1)
+        {
+            throw "unexpected"; // TODO can this happen?
+        }
+        return less_than(*other1);
+    }
 
     void
-    create_id()
+    stream(std::ostream& o) const override
     {
         // TODO
-        id_ = make_captured_id(&function_);
     }
+
+    // TODO consider caching this value
+    size_t
+    hash() const override
+    {
+        auto function_hash = invoke_hash(function_id_);
+        auto args_hash = std::apply(
+            [](auto&&... args) {
+                return combine_hashes(invoke_hash(args)...);
+            },
+            args_);
+        return combine_hashes(function_hash, args_hash);
+    }
+
+    cppcoro::task<Value>
+    resolve(context_intf& ctx) const override
+    {
+        // The "func=function_" is a workaround to prevent a gcc-10 internal
+        // compiler error in release builds.
+        co_return co_await std::apply(
+            [&, func = function_](auto&&... args) -> cppcoro::task<Value> {
+                co_return func((co_await resolve_request(ctx, args))...);
+            },
+            args_);
+    }
+
+ private:
+    Function function_;
+    std::string function_id_;
+    std::tuple<Args...> args_;
 };
 
 template<caching_level_type level, typename Value>
-class function_request_cached_erased
+class function_request_erased
 {
  public:
-    using element_type = function_request_cached_erased;
+    using element_type = function_request_erased;
     using value_type = Value;
 
     static constexpr caching_level_type caching_level = level;
-    static constexpr bool introspective = false;
+    static constexpr bool introspective = false; // TODO
 
     template<typename Function, typename... Args>
-    function_request_cached_erased(Function function, Args... args)
-        : impl_{std::make_shared<
-            function_request_cached_impl<Value, Function, Args...>>(
-            std::move(function), std::move(args)...)}
+    function_request_erased(Function function, Args... args)
+        : obj_id_(next_id_++)
     {
+        auto impl{
+            std::make_shared<function_request_impl<Value, Function, Args...>>(
+                std::move(function), std::move(args)...)};
+        impl_ = impl;
+        if constexpr (caching_level != caching_level_type::none)
+        {
+            captured_id_ = captured_id{impl};
+        }
+    }
+
+    int
+    obj_id() const
+    {
+        return obj_id_;
+    }
+
+    bool
+    equals(function_request_erased const& other) const
+    {
+        return impl_->equals(*other.impl_);
+    }
+
+    bool
+    less_than(function_request_erased const& other) const
+    {
+        return impl_->less_than(*other.impl_);
+    }
+
+    size_t
+    hash() const
+    {
+        // TODO combine with caching_level?
+        return impl_->hash();
     }
 
     captured_id const&
     get_captured_id() const
     {
-        return impl_->get_captured_id();
+        if constexpr (caching_level == caching_level_type::none)
+        {
+            throw not_implemented_error(
+                "captured_id only available for cached function requests");
+        }
+        return captured_id_;
     }
 
     cppcoro::task<value_type>
-    resolve(cached_context_intf& ctx) const
+    resolve(context_intf& ctx) const
     {
         return impl_->resolve(ctx);
     }
 
  private:
-    std::shared_ptr<cached_request_intf<Value>> impl_;
+    inline static int next_id_{};
+    int obj_id_;
+    std::shared_ptr<function_request_intf<Value>> impl_;
+    captured_id captured_id_;
 };
+
+template<
+    caching_level_type lhs_level,
+    caching_level_type rhs_level,
+    typename Value>
+bool
+operator==(
+    function_request_erased<lhs_level, Value> const& lhs,
+    function_request_erased<rhs_level, Value> const& rhs)
+{
+    if constexpr (lhs_level != rhs_level)
+    {
+        return false;
+    }
+    return lhs.equals(rhs);
+}
+
+template<
+    caching_level_type lhs_level,
+    caching_level_type rhs_level,
+    typename Value>
+bool
+operator<(
+    function_request_erased<lhs_level, Value> const& lhs,
+    function_request_erased<rhs_level, Value> const& rhs)
+{
+    if constexpr (lhs_level != rhs_level)
+    {
+        return lhs_level < rhs_level;
+    }
+    return lhs.less_than(rhs);
+}
+
+template<caching_level_type level, typename Value>
+size_t
+hash_value(function_request_erased<level, Value> const& req)
+{
+    return req.hash();
+}
 
 template<caching_level_type level, class Function, class... Args>
 requires(level == caching_level_type::none) auto rq_function(
@@ -277,22 +362,12 @@ requires(level != caching_level_type::none) auto rq_function_sp(
 }
 
 template<caching_level_type level, class Function, class... Args>
-requires(level == caching_level_type::none) auto rq_function_erased(
-    Function function, Args... args)
+auto
+rq_function_erased(Function function, Args... args)
 {
     using value_type = std::
         invoke_result_t<Function, typename Args::element_type::value_type...>;
-    return function_request_uncached_erased<value_type>{
-        std::move(function), std::move(args)...};
-}
-
-template<caching_level_type level, class Function, class... Args>
-requires(level != caching_level_type::none) auto rq_function_erased(
-    Function function, Args... args)
-{
-    using value_type = std::
-        invoke_result_t<Function, typename Args::element_type::value_type...>;
-    return function_request_cached_erased<level, value_type>{
+    return function_request_erased<level, value_type>{
         std::move(function), std::move(args)...};
 }
 
