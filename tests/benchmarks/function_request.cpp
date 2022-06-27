@@ -2,6 +2,7 @@
 #include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
+#include <spdlog/spdlog.h>
 
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/value.h>
@@ -653,6 +654,7 @@ resolve_loop_triangular_erased()
 {
     int expected = (1 << (H - 1)) * 3;
     resolve_request_loop(create_triangular_tree_erased<level, H>(), expected);
+    return expected;
 }
 
 TEST_CASE("resolve type-erased function request (uncached)", "[erased]")
@@ -732,5 +734,31 @@ TEST_CASE("resolve type-erased function request (cached)", "[erased]")
     BENCHMARK("1000x resolve △ tree H=6")
     {
         return resolve_loop_triangular_erased<level, 6>();
+    };
+}
+
+template<int H>
+auto
+resolve_loop_triangular_erased_full()
+{
+    auto constexpr level = caching_level_type::full;
+    int expected = (1 << (H - 1)) * 3;
+    resolve_request_loop_full(
+        create_triangular_tree_erased<level, H>(), expected);
+    return expected;
+}
+
+TEST_CASE("resolve type-erased function request (fully cached)", "[erased]")
+{
+    spdlog::set_level(spdlog::level::warn);
+
+    BENCHMARK("1000x resolve △ tree H=4")
+    {
+        return resolve_loop_triangular_erased_full<4>();
+    };
+
+    BENCHMARK("1000x resolve △ tree H=6")
+    {
+        return resolve_loop_triangular_erased_full<6>();
     };
 }

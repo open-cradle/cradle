@@ -1,6 +1,7 @@
 #ifndef CRADLE_TESTS_BENCHMARKS_SUPPORT_H
 #define CRADLE_TESTS_BENCHMARKS_SUPPORT_H
 
+#include "../inner/support/concurrency_testing.h"
 #include <cradle/inner/service/request.h>
 
 namespace cradle {
@@ -69,6 +70,29 @@ resolve_request_loop(Req const& req, int expected)
         int total{};
         for (auto i = 0; i < num_loops; ++i)
         {
+            total += co_await resolve_request(ctx, req);
+        }
+        co_return total;
+    };
+    auto actual = cppcoro::sync_wait(loop());
+    REQUIRE(actual == expected * num_loops);
+}
+
+template<CachedRequest Req>
+requires(
+    Req::caching_level
+    == caching_level_type::
+        full) auto resolve_request_loop_full(Req const& req, int expected)
+{
+    constexpr int num_loops = 1000;
+    cached_request_resolution_context ctx{};
+    auto loop = [&]() -> cppcoro::task<int> {
+        ctx.reset_memory_cache();
+        int total{co_await resolve_request(ctx, req)};
+        sync_wait_write_disk_cache(ctx.get_service());
+        for (auto i = 1; i < num_loops; ++i)
+        {
+            ctx.reset_memory_cache();
             total += co_await resolve_request(ctx, req);
         }
         co_return total;
