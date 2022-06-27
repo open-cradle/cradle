@@ -57,7 +57,7 @@ concept IntrospectiveRequest
     = CachedRequest<Req>&& Req::introspective&& requires(Req const& req)
 {
     {
-        req.get_summary()
+        req.get_introspection_title()
     }
     ->std::convertible_to<std::string>;
 };
@@ -84,10 +84,10 @@ concept CachedContext = requires(Ctx& ctx)
 };
 
 template<typename Ctx>
-concept IntrospectiveContext = CachedContext<Ctx>&& requires(Ctx const& ctx)
+concept IntrospectiveContext = CachedContext<Ctx>&& requires(Ctx& ctx)
 {
     {
-        ctx.tasklet
+        ctx.get_tasklet()
     }
     ->std::convertible_to<tasklet_tracker const*>;
 };
@@ -118,6 +118,7 @@ class context_intf
  public:
     virtual ~context_intf() = default;
 
+    // Only implemented in cached context
     virtual inner_service_core&
     get_service()
         = 0;
@@ -125,6 +126,11 @@ class context_intf
     // Only implemented in cached context
     virtual immutable_cache&
     get_cache()
+        = 0;
+
+    // Only implemented in cached context
+    virtual tasklet_tracker*
+    get_tasklet()
         = 0;
 };
 

@@ -30,7 +30,7 @@ class my_post_iss_object_request_base
     resolve(thinknode_request_context const& ctx) const;
 
     std::string
-    get_summary() const
+    get_introspection_title() const
     {
         return "my_post_iss_object_request";
     }

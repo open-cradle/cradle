@@ -560,6 +560,27 @@ requires(H > 1) auto create_triangular_tree_erased()
         create_triangular_tree_erased<level, H - 1>());
 }
 
+template<caching_level_type level, int H>
+requires(H == 1) auto create_triangular_tree_erased_introspected()
+{
+    std::string title{"add 2+1"};
+    return rq_function_erased_intrsp<level>(
+        title, add, rq_value(2), rq_value(1));
+}
+
+template<caching_level_type level, int H>
+requires(H > 1) auto create_triangular_tree_erased_introspected()
+{
+    std::stringstream ss;
+    ss << "add H" << H;
+    std::string title{ss.str()};
+    return rq_function_erased_intrsp<level>(
+        title,
+        add,
+        create_triangular_tree_erased_introspected<level, H - 1>(),
+        create_triangular_tree_erased_introspected<level, H - 1>());
+}
+
 TEST_CASE("create type-erased function request (uncached)", "[erased]")
 {
     auto constexpr level = caching_level_type::none;
@@ -637,6 +658,22 @@ TEST_CASE("create type-erased function request (cached)", "[erased]")
     BENCHMARK("create △ tree H=6")
     {
         return create_triangular_tree_erased<level, 6>();
+    };
+}
+
+TEST_CASE(
+    "create type-erased function request (cached, introspected)", "[erased]")
+{
+    auto constexpr level = caching_level_type::memory;
+
+    BENCHMARK("create △ tree H=4")
+    {
+        return create_triangular_tree_erased_introspected<level, 4>();
+    };
+
+    BENCHMARK("create △ tree H=6")
+    {
+        return create_triangular_tree_erased_introspected<level, 6>();
     };
 }
 

@@ -16,4 +16,10 @@ thinknode_request_context::get_cache()
     return service.inner_internals().cache;
 }
 
+tasklet_tracker*
+thinknode_request_context::get_tasklet()
+{
+    return tasklet;
+}
+
 } // namespace cradle

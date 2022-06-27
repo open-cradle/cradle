@@ -48,6 +48,9 @@ struct thinknode_request_context : public context_intf
 
     immutable_cache&
     get_cache() override;
+
+    tasklet_tracker*
+    get_tasklet() override;
 };
 
 struct thinknode_array_info;

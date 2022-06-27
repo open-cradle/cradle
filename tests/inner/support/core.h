@@ -23,6 +23,12 @@ struct uncached_request_resolution_context : public context_intf
     {
         throw not_implemented_error("No cache in this context");
     }
+
+    tasklet_tracker*
+    get_tasklet() override
+    {
+        throw not_implemented_error("No introspection in this context");
+    }
 };
 
 struct cached_request_resolution_context : public context_intf
@@ -41,6 +47,12 @@ struct cached_request_resolution_context : public context_intf
     get_cache() override
     {
         return service.inner_internals().cache;
+    }
+
+    tasklet_tracker*
+    get_tasklet() override
+    {
+        return nullptr;
     }
 
     void

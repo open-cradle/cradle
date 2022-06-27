@@ -87,7 +87,8 @@ requires IntrospectiveContextRequest<Ctx, Req>
         cppcoro::shared_task<typename Req::value_type> shared_task,
         tasklet_tracker& client)
 {
-    client.on_before_await(req.get_summary(), *req.get_captured_id());
+    client.on_before_await(
+        req.get_introspection_title(), *req.get_captured_id());
     auto res = co_await shared_task;
     client.on_after_await();
     co_return res;
@@ -109,10 +110,10 @@ requires CachedContextRequest<Ctx, Req>
     auto shared_task = ptr.task();
     if constexpr (Req::introspective)
     {
-        if (ctx.tasklet)
+        if (auto tasklet = ctx.get_tasklet())
         {
             return resolve_request_introspected<Ctx, Req>(
-                ctx, req, shared_task, *ctx.tasklet);
+                ctx, req, shared_task, *tasklet);
         }
     }
     return shared_task;

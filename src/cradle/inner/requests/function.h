@@ -200,7 +200,7 @@ class function_request_impl : public function_request_intf<Value>
     std::tuple<Args...> args_;
 };
 
-template<caching_level_type level, typename Value>
+template<caching_level_type level, typename Value, bool introspective_>
 class function_request_erased
 {
  public:
@@ -208,11 +208,27 @@ class function_request_erased
     using value_type = Value;
 
     static constexpr caching_level_type caching_level = level;
-    static constexpr bool introspective = false; // TODO
+    static constexpr bool introspective = introspective_;
 
     template<typename Function, typename... Args>
-    function_request_erased(Function function, Args... args)
+    requires(!introspective)
+        function_request_erased(Function function, Args... args)
         : obj_id_(next_id_++)
+    {
+        auto impl{
+            std::make_shared<function_request_impl<Value, Function, Args...>>(
+                std::move(function), std::move(args)...)};
+        impl_ = impl;
+        if constexpr (caching_level != caching_level_type::none)
+        {
+            captured_id_ = captured_id{impl};
+        }
+    }
+
+    template<typename Function, typename... Args>
+    requires(introspective) function_request_erased(
+        std::string const& title, Function function, Args... args)
+        : obj_id_(next_id_++), title_{title}
     {
         auto impl{
             std::make_shared<function_request_impl<Value, Function, Args...>>(
@@ -272,9 +288,16 @@ class function_request_erased
         return impl_->resolve(ctx);
     }
 
+    std::string
+    get_introspection_title() const requires(introspective)
+    {
+        return title_;
+    }
+
  private:
     inline static int next_id_{};
     int obj_id_;
+    std::string title_;
     std::shared_ptr<function_request_intf<Value>> impl_;
     captured_id captured_id_;
 };
@@ -282,11 +305,13 @@ class function_request_erased
 template<
     caching_level_type lhs_level,
     caching_level_type rhs_level,
-    typename Value>
+    typename Value,
+    bool lhs_intrsp,
+    bool rhs_intrsp>
 bool
 operator==(
-    function_request_erased<lhs_level, Value> const& lhs,
-    function_request_erased<rhs_level, Value> const& rhs)
+    function_request_erased<lhs_level, Value, lhs_intrsp> const& lhs,
+    function_request_erased<rhs_level, Value, rhs_intrsp> const& rhs)
 {
     if constexpr (lhs_level != rhs_level)
     {
@@ -298,11 +323,13 @@ operator==(
 template<
     caching_level_type lhs_level,
     caching_level_type rhs_level,
-    typename Value>
+    typename Value,
+    bool lhs_intrsp,
+    bool rhs_intrsp>
 bool
 operator<(
-    function_request_erased<lhs_level, Value> const& lhs,
-    function_request_erased<rhs_level, Value> const& rhs)
+    function_request_erased<lhs_level, Value, lhs_intrsp> const& lhs,
+    function_request_erased<rhs_level, Value, rhs_intrsp> const& rhs)
 {
     if constexpr (lhs_level != rhs_level)
     {
@@ -311,17 +338,18 @@ operator<(
     return lhs.less_than(rhs);
 }
 
-template<caching_level_type level, typename Value>
+template<caching_level_type level, typename Value, bool intrsp>
 size_t
-hash_value(function_request_erased<level, Value> const& req)
+hash_value(function_request_erased<level, Value, intrsp> const& req)
 {
     return req.hash();
 }
 
-template<caching_level_type level, typename Value>
+template<caching_level_type level, typename Value, bool intrsp>
 void
 update_unique_hash(
-    unique_hasher& hasher, function_request_erased<level, Value> const& req)
+    unique_hasher& hasher,
+    function_request_erased<level, Value, intrsp> const& req)
 {
     req.update_hash(hasher);
 }
@@ -380,8 +408,29 @@ rq_function_erased(Function function, Args... args)
 {
     using value_type = std::
         invoke_result_t<Function, typename Args::element_type::value_type...>;
-    return function_request_erased<level, value_type>{
+    return function_request_erased<level, value_type, false>{
         std::move(function), std::move(args)...};
+}
+
+template<caching_level_type level, class Function, class... Args>
+auto
+rq_function_erased_intrsp(
+    std::string const& title, Function function, Args... args)
+{
+    using value_type = std::
+        invoke_result_t<Function, typename Args::element_type::value_type...>;
+    return function_request_erased<level, value_type, true>{
+        title, std::move(function), std::move(args)...};
+}
+
+template<caching_level_type level, class Function, class... Args>
+auto
+rq_function_erased_intrsp(std::string&& title, Function function, Args... args)
+{
+    using value_type = std::
+        invoke_result_t<Function, typename Args::element_type::value_type...>;
+    return function_request_erased<level, value_type, true>{
+        std::move(title), std::move(function), std::move(args)...};
 }
 
 } // namespace cradle
