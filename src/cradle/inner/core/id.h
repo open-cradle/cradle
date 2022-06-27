@@ -8,6 +8,7 @@
 #include <boost/lexical_cast.hpp>
 
 #include <cradle/inner/core/hash.h>
+#include <cradle/inner/core/unique_hash.h>
 
 // This file implements the concept of IDs in CRADLE.
 
@@ -28,16 +29,14 @@ struct id_interface
     virtual bool
     less_than(id_interface const& other) const = 0;
 
-    // Write a textual representation of the ID to the given ostream.
-    // The textual representation is intended for informational purposes only.
-    // It's not required to guarantee uniqueness. (In particular, it doesn't
-    // need to capture type information about the ID.)
-    virtual void
-    stream(std::ostream& o) const = 0;
-
-    // Generate a hash of the ID.
+    // Generate a hash of the ID. This need not be unique over co-existing
+    // objects.
     virtual size_t
     hash() const = 0;
+
+    // Update hasher's hash according to this ID.
+    virtual void
+    update_hash(unique_hasher& hasher) const = 0;
 };
 
 // The following convert the interface of the ID operations into the usual form
@@ -60,16 +59,6 @@ operator!=(id_interface const& a, id_interface const& b)
 
 bool
 operator<(id_interface const& a, id_interface const& b);
-
-// The textual representation is intended for informational purposes only.
-// It's not required to guarantee uniqueness. (In particular, it doesn't
-// need to capture type information about the ID.)
-inline std::ostream&
-operator<<(std::ostream& o, id_interface const& id)
-{
-    id.stream(o);
-    return o;
-}
 
 // The following allow the use of IDs as keys in a map or unordered_map.
 // The IDs are stored separately as captured_ids in the mapped values and
@@ -191,16 +180,16 @@ struct id_ref : id_interface
         return *id_ < *other_id.id_;
     }
 
-    void
-    stream(std::ostream& o) const override
-    {
-        o << *id_;
-    }
-
     size_t
     hash() const override
     {
         return id_->hash();
+    }
+
+    void
+    update_hash(unique_hasher& hasher) const override
+    {
+        id_->update_hash(hasher);
     }
 
  private:
@@ -256,16 +245,16 @@ struct simple_id : id_interface
 #endif
     }
 
-    void
-    stream(std::ostream& o) const override
-    {
-        o << value_;
-    }
-
     size_t
     hash() const override
     {
         return invoke_hash(value_);
+    }
+
+    void
+    update_hash(unique_hasher& hasher) const override
+    {
+        update_unique_hash(hasher, value_);
     }
 
     Value value_;
@@ -316,16 +305,16 @@ struct simple_id_by_reference : id_interface
         return *value_ < *other_id.value_;
     }
 
-    void
-    stream(std::ostream& o) const override
-    {
-        o << *value_;
-    }
-
     size_t
     hash() const override
     {
         return invoke_hash(*value_);
+    }
+
+    void
+    update_hash(unique_hasher& hasher) const override
+    {
+        update_unique_hash(hasher, *value_);
     }
 
  private:
@@ -369,16 +358,17 @@ struct id_pair : id_interface
                    && id1_.less_than(other_id.id1_));
     }
 
-    void
-    stream(std::ostream& o) const override
-    {
-        o << "(" << id0_ << "," << id1_ << ")";
-    }
-
     size_t
     hash() const override
     {
         return id0_.hash() ^ id1_.hash();
+    }
+
+    void
+    update_hash(unique_hasher& hasher) const override
+    {
+        id0_.update_hash(hasher);
+        id1_.update_hash(hasher);
     }
 
  private:
@@ -417,11 +407,23 @@ struct null_id_type
 };
 static simple_id<null_id_type*> const null_id(nullptr);
 
+inline void
+update_unique_hash(unique_hasher& hasher, null_id_type* val)
+{
+    hasher.encode_type<null_id_type>();
+}
+
 // unit_id can be used when there is only possible identify.
 struct unit_id_type
 {
 };
 static simple_id<unit_id_type*> const unit_id(nullptr);
+
+inline void
+update_unique_hash(unique_hasher& hasher, unit_id_type* val)
+{
+    hasher.encode_type<unit_id_type>();
+}
 
 } // namespace cradle
 

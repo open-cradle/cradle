@@ -5,8 +5,10 @@
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/id.h>
+#include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/typing/core/dynamic.h>
 #include <cradle/typing/core/type_interfaces.h>
+#include <cradle/typing/core/unique_hash.h>
 #include <cradle/websocket/calculations.h>
 #include <cradle/websocket/sample_lambdas.h>
 #include <cradle/websocket/types.hpp>

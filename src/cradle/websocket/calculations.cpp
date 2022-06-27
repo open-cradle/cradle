@@ -15,6 +15,7 @@
 
 #include <cppcoro/when_all.hpp>
 
+#include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
@@ -24,7 +25,7 @@
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/dynamic.h>
 #include <cradle/typing/encodings/msgpack.h>
-#include <cradle/typing/encodings/sha256_hash_id.h>
+#include <cradle/typing/encodings/native.h>
 #include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/logging.h>
 #include <cradle/websocket/local_calcs.h>

@@ -9,6 +9,7 @@
 
 #include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/id.h>
+#include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/core.h>
 
@@ -143,31 +144,17 @@ class function_request_impl : public function_request_intf<Value>
     bool
     equals(id_interface const& other) const override
     {
-        auto const* other1
-            = dynamic_cast<function_request_impl const*>(&other);
-        if (!other1)
-        {
-            return false;
-        }
-        return equals(*other1);
+        auto const& other_id
+            = static_cast<function_request_impl const&>(other);
+        return equals(other_id);
     }
 
     bool
     less_than(id_interface const& other) const override
     {
-        auto const* other1
-            = dynamic_cast<function_request_impl const*>(&other);
-        if (!other1)
-        {
-            throw "unexpected"; // TODO can this happen?
-        }
-        return less_than(*other1);
-    }
-
-    void
-    stream(std::ostream& o) const override
-    {
-        // TODO
+        auto const& other_id
+            = static_cast<function_request_impl const&>(other);
+        return less_than(other_id);
     }
 
     // TODO consider caching this value
@@ -181,6 +168,18 @@ class function_request_impl : public function_request_intf<Value>
             },
             args_);
         return combine_hashes(function_hash, args_hash);
+    }
+
+    void
+    update_hash(unique_hasher& hasher) const override
+    {
+        hasher.using_lambda();
+        hasher.encode_type<Function>();
+        std::apply(
+            [&hasher](auto&&... args) {
+                (update_unique_hash(hasher, args), ...);
+            },
+            args_);
     }
 
     cppcoro::task<Value>
@@ -250,6 +249,12 @@ class function_request_erased
         return impl_->hash();
     }
 
+    void
+    update_hash(unique_hasher& hasher) const
+    {
+        impl_->update_hash(hasher);
+    }
+
     captured_id const&
     get_captured_id() const
     {
@@ -311,6 +316,14 @@ size_t
 hash_value(function_request_erased<level, Value> const& req)
 {
     return req.hash();
+}
+
+template<caching_level_type level, typename Value>
+void
+update_unique_hash(
+    unique_hasher& hasher, function_request_erased<level, Value> const& req)
+{
+    req.update_hash(hasher);
 }
 
 template<caching_level_type level, class Function, class... Args>

@@ -8,6 +8,7 @@
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/core/hash.h>
+#include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/requests/generic.h>
 
 namespace cradle {
@@ -108,6 +109,31 @@ size_t
 hash_value(std::shared_ptr<value_request<Value>> const& req)
 {
     return invoke_hash(req->get_value());
+}
+
+class unique_hasher;
+
+template<typename Value>
+void
+update_unique_hash(unique_hasher& hasher, value_request<Value> const& req)
+{
+    update_unique_hash(hasher, req.get_value());
+}
+
+template<typename Value>
+void
+update_unique_hash(
+    unique_hasher& hasher, std::unique_ptr<value_request<Value>> const& req)
+{
+    update_unique_hash(hasher, req->get_value());
+}
+
+template<typename Value>
+void
+update_unique_hash(
+    unique_hasher& hasher, std::shared_ptr<value_request<Value>> const& req)
+{
+    update_unique_hash(hasher, req->get_value());
 }
 
 } // namespace cradle

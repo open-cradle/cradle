@@ -2,12 +2,12 @@
 
 #include <boost/tokenizer.hpp>
 
+#include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/utilities/text.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/monitoring.h>
 #include <cradle/typing/encodings/msgpack.h>
-#include <cradle/typing/encodings/sha256_hash_id.h>
 #include <cradle/typing/io/http_requests.hpp>
 #include <cradle/typing/utilities/logging.h>
 

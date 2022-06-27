@@ -3,9 +3,9 @@
 
 #include <memory>
 
-#include <boost/lexical_cast.hpp>
 #include <catch2/catch.hpp>
 
+#include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/id.h>
 
 // Test all the relevant ID operations on a pair of equal IDs.
@@ -17,9 +17,7 @@ test_equal_ids(cradle::id_interface const& a, cradle::id_interface const& b)
     REQUIRE(!(a < b));
     REQUIRE(!(b < a));
     REQUIRE(a.hash() == b.hash());
-    REQUIRE(
-        boost::lexical_cast<std::string>(a)
-        == boost::lexical_cast<std::string>(b));
+    REQUIRE(create_unique_hash(a) == create_unique_hash(b));
 }
 
 // Test all the ID operations on a single ID.
@@ -40,9 +38,7 @@ test_different_ids(A const& a, B const& b)
     REQUIRE(a != b);
     REQUIRE((a < b && !(b < a) || b < a && !(a < b)));
     REQUIRE(a.hash() != b.hash());
-    REQUIRE(
-        boost::lexical_cast<std::string>(a)
-        != boost::lexical_cast<std::string>(b));
+    REQUIRE(create_unique_hash(a) != create_unique_hash(b));
 }
 
 #endif

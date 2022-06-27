@@ -38,6 +38,7 @@
 #include <cppcoro/when_all.hpp>
 
 #include <cradle/inner/caching/disk_cache.h>
+#include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/file_io.h>
@@ -50,9 +51,9 @@
 #include <cradle/thinknode/iam.h>
 #include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/utilities.h>
+#include <cradle/typing/core/unique_hash.h>
 #include <cradle/typing/encodings/json.h>
 #include <cradle/typing/encodings/msgpack.h>
-#include <cradle/typing/encodings/sha256_hash_id.h>
 #include <cradle/typing/encodings/yaml.h>
 #include <cradle/typing/io/http_requests.hpp>
 #include <cradle/typing/utilities/diff.hpp>
