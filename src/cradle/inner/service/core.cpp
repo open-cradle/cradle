@@ -51,6 +51,13 @@ inner_service_core::inner_reset(inner_service_config const& config)
         .disk_write_pool = thread_pool(2)});
 }
 
+void
+inner_service_core::inner_reset_memory_cache(
+    immutable_cache_config const& config)
+{
+    impl_->reset_memory_cache(config);
+}
+
 cppcoro::task<std::string>
 read_file_contents(inner_service_core& core, file_path const& path)
 {

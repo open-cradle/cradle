@@ -42,6 +42,9 @@ struct cached_request_resolution_context : public context_intf
     {
         return service.inner_internals().cache;
     }
+
+    void
+    reset_memory_cache();
 };
 
 } // namespace cradle

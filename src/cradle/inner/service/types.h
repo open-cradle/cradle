@@ -23,8 +23,12 @@ struct inner_service_core
 {
     void
     inner_reset();
+
     void
     inner_reset(inner_service_config const& config);
+
+    void
+    inner_reset_memory_cache(immutable_cache_config const& config);
 
     detail::inner_service_core_internals&
     inner_internals()

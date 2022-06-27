@@ -22,4 +22,10 @@ cached_request_resolution_context::cached_request_resolution_context()
     init_test_inner_service(service);
 }
 
+void
+cached_request_resolution_context::reset_memory_cache()
+{
+    service.inner_reset_memory_cache(immutable_cache_config{0x40'00'00'00});
+}
+
 } // namespace cradle
