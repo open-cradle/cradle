@@ -64,7 +64,7 @@ auto
 resolve_request_loop(Req const& req, int expected)
 {
     constexpr int num_loops = 1000;
-    memory_cached_request_resolution_context ctx{};
+    cached_request_resolution_context ctx{};
     auto loop = [&]() -> cppcoro::task<int> {
         int total{};
         for (auto i = 0; i < num_loops; ++i)

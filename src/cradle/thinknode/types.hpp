@@ -43,8 +43,11 @@ struct thinknode_request_context : public context_intf
     {
     }
 
+    inner_service_core&
+    get_service() override;
+
     immutable_cache&
-    get_cache();
+    get_cache() override;
 };
 
 struct thinknode_array_info;

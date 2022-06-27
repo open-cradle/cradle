@@ -19,7 +19,7 @@ immutable_cache::immutable_cache(immutable_cache_config config)
 void
 immutable_cache::reset(immutable_cache_config config)
 {
-    this->impl = std::make_unique<detail::immutable_cache>();
+    this->impl = std::make_unique<detail::immutable_cache_impl>();
     this->impl->config = std::move(config);
 }
 

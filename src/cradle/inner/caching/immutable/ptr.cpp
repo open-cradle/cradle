@@ -3,17 +3,16 @@
 #include <cradle/inner/caching/immutable/internals.h>
 
 namespace cradle {
-namespace detail {
 
 void
 record_immutable_cache_value(
-    immutable_cache& cache, id_interface const& key, size_t size)
+    detail::immutable_cache_impl& cache, id_interface const& key, size_t size)
 {
     std::scoped_lock<std::mutex> lock(cache.mutex);
-    cache_record_map::iterator i = cache.records.find(&key);
+    detail::cache_record_map::iterator i = cache.records.find(&key);
     if (i != cache.records.end())
     {
-        immutable_cache_record& record = *i->second;
+        detail::immutable_cache_record& record = *i->second;
         record.state.store(
             immutable_cache_entry_state::READY, std::memory_order_relaxed);
         record.size = size;
@@ -21,23 +20,25 @@ record_immutable_cache_value(
 }
 
 void
-record_immutable_cache_failure(immutable_cache& cache, id_interface const& key)
+record_immutable_cache_failure(
+    detail::immutable_cache_impl& cache, id_interface const& key)
 {
     std::scoped_lock<std::mutex> lock(cache.mutex);
-    cache_record_map::iterator i = cache.records.find(&key);
+    detail::cache_record_map::iterator i = cache.records.find(&key);
     if (i != cache.records.end())
     {
-        immutable_cache_record& record = *i->second;
+        detail::immutable_cache_record& record = *i->second;
         record.state.store(
             immutable_cache_entry_state::FAILED, std::memory_order_relaxed);
     }
 }
 
+namespace detail {
 namespace {
 
 void
 remove_from_eviction_list(
-    immutable_cache& cache, immutable_cache_record* record)
+    immutable_cache_impl& cache, immutable_cache_record* record)
 {
     auto& list = cache.eviction_list;
     assert(record->eviction_list_iterator != list.records.end());
@@ -66,10 +67,9 @@ acquire_cache_record_no_lock(immutable_cache_record* record)
 // Due to `key` being a shared_ptr, it can be used.
 immutable_cache_record*
 acquire_cache_record(
-    immutable_cache& cache,
+    immutable_cache_impl& cache,
     captured_id const& key,
-    function_view<std::any(
-        immutable_cache& cache, id_interface const& key)> const& create_task)
+    create_task_function const& create_task)
 {
     std::scoped_lock<std::mutex> lock(cache.mutex);
     cache_record_map::iterator i = cache.records.find(&*key);
@@ -97,7 +97,8 @@ acquire_cache_record(
 }
 
 void
-add_to_eviction_list(immutable_cache& cache, immutable_cache_record* record)
+add_to_eviction_list(
+    immutable_cache_impl& cache, immutable_cache_record* record)
 {
     auto& list = cache.eviction_list;
     assert(record->eviction_list_iterator == list.records.end());
@@ -131,10 +132,9 @@ release_cache_record(immutable_cache_record* record)
 // UNTYPED_IMMUTABLE_CACHE_PTR
 
 untyped_immutable_cache_ptr::untyped_immutable_cache_ptr(
-    cradle::immutable_cache& cache,
+    immutable_cache& cache,
     captured_id const& key,
-    function_view<std::any(
-        immutable_cache& cache, id_interface const& key)> const& create_task)
+    create_task_function const& create_task)
     : record_{*detail::acquire_cache_record(*cache.impl, key, create_task)}
 {
 }

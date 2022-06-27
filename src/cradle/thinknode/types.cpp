@@ -4,6 +4,12 @@
 
 namespace cradle {
 
+inner_service_core&
+thinknode_request_context::get_service()
+{
+    return service;
+}
+
 immutable_cache&
 thinknode_request_context::get_cache()
 {

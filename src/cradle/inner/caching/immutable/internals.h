@@ -17,12 +17,12 @@ struct immutable_cache_entry_watcher;
 
 namespace detail {
 
-struct immutable_cache;
+struct immutable_cache_impl;
 
 struct immutable_cache_record
 {
     // These remain constant for the life of the record.
-    immutable_cache* owner_cache;
+    immutable_cache_impl* owner_cache;
     captured_id key;
 
     // All of the following fields are protected by the cache mutex. The only
@@ -68,7 +68,7 @@ struct cache_record_eviction_list
     }
 };
 
-struct immutable_cache : boost::noncopyable
+struct immutable_cache_impl : boost::noncopyable
 {
     immutable_cache_config config;
     cache_record_map records;
@@ -79,7 +79,7 @@ struct immutable_cache : boost::noncopyable
 // Evict unused entries (in LRU order) until the total size of unused entries
 // in the cache is at most :desired_size (in bytes).
 void
-reduce_memory_cache_size(immutable_cache& cache, uint64_t desired_size);
+reduce_memory_cache_size(immutable_cache_impl& cache, uint64_t desired_size);
 
 } // namespace detail
 } // namespace cradle

@@ -10,6 +10,7 @@
 namespace cradle {
 
 struct immutable_cache;
+struct inner_service_core;
 class tasklet_tracker;
 
 enum class caching_level_type
@@ -117,7 +118,11 @@ class context_intf
  public:
     virtual ~context_intf() = default;
 
-    // Only implemented in uncached context
+    virtual inner_service_core&
+    get_service()
+        = 0;
+
+    // Only implemented in cached context
     virtual immutable_cache&
     get_cache()
         = 0;

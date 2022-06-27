@@ -15,6 +15,9 @@ namespace cradle {
 
 struct immutable_cache;
 
+using create_task_function = function_view<std::any(
+    detail::immutable_cache_impl& cache, id_interface const& key)>;
+
 namespace detail {
 
 struct immutable_cache_record;
@@ -24,11 +27,9 @@ struct immutable_cache_record;
 struct untyped_immutable_cache_ptr
 {
     untyped_immutable_cache_ptr(
-        cradle::immutable_cache& cache,
+        immutable_cache& cache,
         captured_id const& key,
-        function_view<
-            std::any(immutable_cache& cache, id_interface const& key)> const&
-            create_task);
+        create_task_function const& create_task);
 
     ~untyped_immutable_cache_ptr();
 
@@ -59,66 +60,15 @@ struct untyped_immutable_cache_ptr
     detail::immutable_cache_record& record_;
 };
 
+} // namespace detail
+
 void
 record_immutable_cache_value(
-    immutable_cache& cache, id_interface const& key, size_t size);
+    detail::immutable_cache_impl& cache, id_interface const& key, size_t size);
 
 void
 record_immutable_cache_failure(
-    immutable_cache& cache, id_interface const& key);
-
-template<class Value>
-cppcoro::shared_task<Value>
-cache_task_wrapper(
-    immutable_cache& cache, id_interface const& key, cppcoro::task<Value> task)
-{
-    try
-    {
-        Value value = co_await task;
-        record_immutable_cache_value(cache, key, deep_sizeof(value));
-        co_return value;
-    }
-    catch (...)
-    {
-        record_immutable_cache_failure(cache, key);
-        throw;
-    }
-}
-
-template<class Value, class CreateTask>
-auto
-wrap_task_creator(CreateTask&& create_task)
-{
-    return [create_task = std::forward<CreateTask>(create_task)](
-               immutable_cache& cache, id_interface const& key) {
-        return cache_task_wrapper<Value>(cache, key, create_task(key));
-    };
-}
-
-template<typename Ctx, typename Req>
-requires CachedContextRequest<Ctx, Req>
-    cppcoro::shared_task<typename Req::value_type>
-    resolve_by_request(
-        immutable_cache& cache,
-        id_interface const& key,
-        Ctx& ctx,
-        Req const& req)
-{
-    // cache and key could be retrieved from ctx and req, respectively.
-    try
-    {
-        auto value = co_await req.resolve(ctx);
-        record_immutable_cache_value(cache, key, deep_sizeof(value));
-        co_return value;
-    }
-    catch (...)
-    {
-        record_immutable_cache_failure(cache, key);
-        throw;
-    }
-}
-
-} // namespace detail
+    detail::immutable_cache_impl& cache, id_interface const& key);
 
 // immutable_cache_ptr<T> represents one's interest in a particular immutable
 // value (of type T). The value is assumed to be the result of performing some
@@ -131,29 +81,11 @@ requires CachedContextRequest<Ctx, Req>
 template<class T>
 struct immutable_cache_ptr
 {
-    template<class CreateTask>
     immutable_cache_ptr(
-        cradle::immutable_cache& cache,
+        immutable_cache& cache,
         captured_id const& key,
-        CreateTask&& create_task)
-        : untyped_{
-            cache,
-            key,
-            detail::wrap_task_creator<T>(
-                std::forward<CreateTask>(create_task))}
-    {
-    }
-
-    template<CachedContext Ctx, CachedRequest Req>
-    immutable_cache_ptr(Ctx& ctx, Req const& req)
-        : untyped_{
-            ctx.get_cache(),
-            req.get_captured_id(),
-            [&](detail::immutable_cache& internal_cache,
-                id_interface const& key) {
-                return detail::resolve_by_request<Ctx, Req>(
-                    internal_cache, key, ctx, req);
-            }}
+        create_task_function const& create_task_function)
+        : untyped_{cache, key, create_task_function}
     {
     }
 

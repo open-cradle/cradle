@@ -8,10 +8,15 @@
 namespace cradle {
 
 void
-init_test_inner_service(cradle::inner_service_core& core);
+init_test_inner_service(inner_service_core& core);
 
 struct uncached_request_resolution_context : public context_intf
 {
+    inner_service_core&
+    get_service() override
+    {
+        throw not_implemented_error("No service in this context");
+    }
 
     immutable_cache&
     get_cache() override
@@ -20,11 +25,17 @@ struct uncached_request_resolution_context : public context_intf
     }
 };
 
-struct memory_cached_request_resolution_context : public context_intf
+struct cached_request_resolution_context : public context_intf
 {
-    cradle::inner_service_core service;
+    inner_service_core service;
 
-    memory_cached_request_resolution_context();
+    cached_request_resolution_context();
+
+    inner_service_core&
+    get_service() override
+    {
+        return service;
+    }
 
     immutable_cache&
     get_cache() override

@@ -59,13 +59,13 @@ test_resolve_uncached(
 
 template<typename Request>
 void
-test_resolve_memory_cached(
+test_resolve_cached(
     Request const& req,
     int expected,
     int& num_calls1,
     int* num_calls2 = nullptr)
 {
-    memory_cached_request_resolution_context ctx;
+    cached_request_resolution_context ctx;
 
     auto res0 = cppcoro::sync_wait(resolve_request(ctx, req));
 
@@ -102,7 +102,7 @@ TEST_CASE("evaluate function request - memory cached", "[requests]")
     auto add{create_adder(num_add_calls)};
     auto req{rq_function<caching_level_type::memory>(
         add, rq_value(6), rq_value(1))};
-    test_resolve_memory_cached(req, 7, num_add_calls);
+    test_resolve_cached(req, 7, num_add_calls);
 }
 #endif
 
@@ -162,7 +162,7 @@ TEST_CASE("evaluate erased function request V+V - memory cached", "[requests]")
     auto add{create_adder(num_add_calls)};
     auto req{rq_function_erased<caching_level_type::memory>(
         add, rq_value(6), rq_value(1))};
-    test_resolve_memory_cached(req, 7, num_add_calls);
+    test_resolve_cached(req, 7, num_add_calls);
 }
 
 TEST_CASE("evaluate erased function request V+U - memory cached", "[requests]")
@@ -171,7 +171,7 @@ TEST_CASE("evaluate erased function request V+U - memory cached", "[requests]")
     auto add{create_adder(num_add_calls)};
     auto req{rq_function_erased<caching_level_type::memory>(
         add, rq_value(6), rq_value_up(1))};
-    test_resolve_memory_cached(req, 7, num_add_calls);
+    test_resolve_cached(req, 7, num_add_calls);
 }
 
 TEST_CASE("evaluate erased function request V+S - memory cached", "[requests]")
@@ -180,7 +180,7 @@ TEST_CASE("evaluate erased function request V+S - memory cached", "[requests]")
     auto add{create_adder(num_add_calls)};
     auto req{rq_function_erased<caching_level_type::memory>(
         add, rq_value(6), rq_value_sp(1))};
-    test_resolve_memory_cached(req, 7, num_add_calls);
+    test_resolve_cached(req, 7, num_add_calls);
 }
 
 TEST_CASE("evaluate erased function request S+V - memory cached", "[requests]")
@@ -189,7 +189,7 @@ TEST_CASE("evaluate erased function request S+V - memory cached", "[requests]")
     auto add{create_adder(num_add_calls)};
     auto req{rq_function_erased<caching_level_type::memory>(
         add, rq_value_sp(6), rq_value(1))};
-    test_resolve_memory_cached(req, 7, num_add_calls);
+    test_resolve_cached(req, 7, num_add_calls);
 }
 
 TEST_CASE(
@@ -203,5 +203,14 @@ TEST_CASE(
         add, rq_value(1), rq_value(2))};
     auto req{rq_function_erased<caching_level_type::memory>(
         mul, inner, rq_value_sp(3))};
-    test_resolve_memory_cached(req, 9, num_add_calls, &num_mul_calls);
+    test_resolve_cached(req, 9, num_add_calls, &num_mul_calls);
+}
+
+TEST_CASE("evaluate erased function request V+V - fully cached", "[nu]")
+{
+    int num_add_calls{};
+    auto add{create_adder(num_add_calls)};
+    auto req{rq_function_erased<caching_level_type::full>(
+        add, rq_value(6), rq_value(1))};
+    test_resolve_cached(req, 7, num_add_calls);
 }

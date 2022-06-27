@@ -17,8 +17,7 @@ init_test_inner_service(inner_service_core& core)
         disk_cache_config{cache_dir.string(), 0x40'00'00'00}});
 }
 
-memory_cached_request_resolution_context::
-    memory_cached_request_resolution_context()
+cached_request_resolution_context::cached_request_resolution_context()
 {
     init_test_inner_service(service);
 }
