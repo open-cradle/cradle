@@ -4,6 +4,8 @@
 #include <functional>
 #include <memory>
 #include <sstream>
+#include <string>
+#include <typeinfo>
 
 #include <boost/lexical_cast.hpp>
 
@@ -34,7 +36,12 @@ struct id_interface
     virtual size_t
     hash() const = 0;
 
+    // Get a hash value that is unique for this ID.
+    virtual std::string
+    get_unique_hash() const;
+
     // Update hasher's hash according to this ID.
+    // Used in the get_unique_hash() implementation.
     virtual void
     update_hash(unique_hasher& hasher) const = 0;
 };
@@ -128,6 +135,11 @@ struct captured_id
     operator*() const
     {
         return *id_;
+    }
+    id_interface const*
+    operator->() const
+    {
+        return &*id_;
     }
     bool
     matches(id_interface const& id) const

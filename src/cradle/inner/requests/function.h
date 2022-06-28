@@ -2,6 +2,7 @@
 #define CRADLE_INNER_REQUESTS_FUNCTION_H
 
 #include <memory>
+#include <optional>
 #include <typeinfo>
 #include <utility>
 
@@ -157,17 +158,31 @@ class function_request_impl : public function_request_intf<Value>
         return less_than(other_id);
     }
 
-    // TODO consider caching this value
+    // Maybe caching the hashes could be optional (policy?).
     size_t
     hash() const override
     {
-        auto function_hash = invoke_hash(function_id_);
-        auto args_hash = std::apply(
-            [](auto&&... args) {
-                return combine_hashes(invoke_hash(args)...);
-            },
-            args_);
-        return combine_hashes(function_hash, args_hash);
+        if (!hash_)
+        {
+            auto function_hash = invoke_hash(function_id_);
+            auto args_hash = std::apply(
+                [](auto&&... args) {
+                    return combine_hashes(invoke_hash(args)...);
+                },
+                args_);
+            hash_ = combine_hashes(function_hash, args_hash);
+        }
+        return *hash_;
+    }
+
+    std::string
+    get_unique_hash() const override
+    {
+        if (unique_hash_.empty())
+        {
+            unique_hash_ = id_interface::get_unique_hash();
+        }
+        return unique_hash_;
     }
 
     void
@@ -198,6 +213,8 @@ class function_request_impl : public function_request_intf<Value>
     Function function_;
     std::string function_id_;
     std::tuple<Args...> args_;
+    mutable std::optional<size_t> hash_;
+    mutable std::string unique_hash_;
 };
 
 template<caching_level_type level, typename Value, bool introspective_>

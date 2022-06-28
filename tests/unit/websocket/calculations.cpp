@@ -25,8 +25,8 @@ test_equal_ids(captured_id const& a, captured_id const& b)
     REQUIRE(!(a < b));
     REQUIRE(!(b < a));
     REQUIRE(a.hash() == b.hash());
-    auto a_string = create_unique_hash(*a);
-    auto b_string = create_unique_hash(*b);
+    auto a_string = a->get_unique_hash();
+    auto b_string = b->get_unique_hash();
     REQUIRE(a_string == b_string);
 }
 
@@ -38,8 +38,8 @@ test_different_ids(
     REQUIRE(a != b);
     REQUIRE((a < b && !(b < a) || b < a && !(a < b)));
     REQUIRE(a.hash() != b.hash());
-    auto a_string = create_unique_hash(*a);
-    auto b_string = create_unique_hash(*b);
+    auto a_string = a->get_unique_hash();
+    auto b_string = b->get_unique_hash();
     // Raw function pointers are implicitly converted to bool
     if (!ignore_strings)
     {

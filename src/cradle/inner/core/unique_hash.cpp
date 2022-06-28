@@ -19,12 +19,4 @@ unique_hasher::finish()
     }
 }
 
-std::string
-create_unique_hash(id_interface const& id)
-{
-    unique_hasher hasher;
-    id.update_hash(hasher);
-    return hasher.get_string();
-}
-
 } // namespace cradle

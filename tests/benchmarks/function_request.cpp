@@ -734,7 +734,7 @@ TEST_CASE("resolve type-erased function request (uncached)", "[erased]")
     };
 }
 
-TEST_CASE("resolve type-erased function request (cached)", "[erased]")
+TEST_CASE("resolve type-erased function request (memory-cached)", "[erased]")
 {
     auto constexpr level = caching_level_type::memory;
 

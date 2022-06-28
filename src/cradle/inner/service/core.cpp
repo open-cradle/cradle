@@ -13,7 +13,6 @@
 #endif
 
 #include <cradle/inner/core/type_definitions.h>
-#include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/encodings/lz4.h>
 #include <cradle/inner/fs/file_io.h>
@@ -81,9 +80,7 @@ generic_disk_cached(
     id_interface const& id_key,
     std::function<cppcoro::task<blob>()> create_task)
 {
-    unique_hasher hasher;
-    id_key.update_hash(hasher);
-    std::string key{hasher.get_string()};
+    std::string key{id_key.get_unique_hash()};
     // Check the cache for an existing value.
     auto& cache = core.inner_internals().disk_cache;
     try

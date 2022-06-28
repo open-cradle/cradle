@@ -17,7 +17,7 @@ test_equal_ids(cradle::id_interface const& a, cradle::id_interface const& b)
     REQUIRE(!(a < b));
     REQUIRE(!(b < a));
     REQUIRE(a.hash() == b.hash());
-    REQUIRE(create_unique_hash(a) == create_unique_hash(b));
+    REQUIRE(a.get_unique_hash() == b.get_unique_hash());
 }
 
 // Test all the ID operations on a single ID.
@@ -38,7 +38,7 @@ test_different_ids(A const& a, B const& b)
     REQUIRE(a != b);
     REQUIRE((a < b && !(b < a) || b < a && !(a < b)));
     REQUIRE(a.hash() != b.hash());
-    REQUIRE(create_unique_hash(a) != create_unique_hash(b));
+    REQUIRE(a.get_unique_hash() != b.get_unique_hash());
 }
 
 #endif
