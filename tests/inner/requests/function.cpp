@@ -87,7 +87,6 @@ test_resolve_cached(
     }
 }
 
-#if 0
 TEST_CASE("evaluate function request - uncached", "[requests]")
 {
     int num_add_calls{};
@@ -101,11 +100,29 @@ TEST_CASE("evaluate function request - memory cached", "[requests]")
 {
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    auto req{rq_function<caching_level_type::memory>(
+    auto req0{rq_function<caching_level_type::memory>(
         add, rq_value(6), rq_value(1))};
-    test_resolve_cached(req, 7, num_add_calls);
+    auto req1{rq_function<caching_level_type::memory>(
+        add, rq_value(5), rq_value(3))};
+
+    cached_request_resolution_context ctx;
+
+    // Resolve the two requests, storing the results in the memory cache
+    auto res00 = cppcoro::sync_wait(resolve_request(ctx, req0));
+    REQUIRE(res00 == 7);
+    REQUIRE(num_add_calls == 1);
+    auto res10 = cppcoro::sync_wait(resolve_request(ctx, req1));
+    REQUIRE(res10 == 8);
+    REQUIRE(num_add_calls == 2);
+
+    // Resolve the two requests, retrieving the results from the memory cache
+    auto res01 = cppcoro::sync_wait(resolve_request(ctx, req0));
+    REQUIRE(res01 == 7);
+    REQUIRE(num_add_calls == 2);
+    auto res11 = cppcoro::sync_wait(resolve_request(ctx, req1));
+    REQUIRE(res11 == 8);
+    REQUIRE(num_add_calls == 2);
 }
-#endif
 
 TEST_CASE("evaluate erased function request V+V - uncached", "[requests]")
 {

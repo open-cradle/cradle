@@ -27,7 +27,7 @@ class unique_hasher
     encode_type()
     {
         assert(!finished_);
-        // TODO
+        // TODO need unique type name
         // From https://en.cppreference.com/w/cpp/types/type_info/name
         // The returned string can be identical for several types and change
         // between invocations of the same program.

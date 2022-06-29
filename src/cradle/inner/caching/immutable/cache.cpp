@@ -45,7 +45,7 @@ get_cache_snapshot(immutable_cache& cache_object)
     for (auto const& [key, record] : cache.records)
     {
         immutable_cache_entry_snapshot entry{
-            "abc", // TODO lexical_cast<string>(*record->key),
+            record->key->get_unique_hash(),
             record->state.load(std::memory_order_relaxed),
             // is_initialized(data) ? some(data.ptr->type_info()) : none,
             record->size};

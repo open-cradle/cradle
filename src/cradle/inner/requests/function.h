@@ -10,6 +10,7 @@
 
 #include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/id.h>
+#include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/core.h>
@@ -64,9 +65,11 @@ class function_request_cached
     static constexpr bool introspective = false;
 
     function_request_cached(Function function, Args... args)
-        : function_{std::move(function)}, args_{std::move(args)...}
+        : id_{make_captured_sha256_hashed_id(
+            typeid(function).name(), args...)},
+          function_{std::move(function)},
+          args_{std::move(args)...}
     {
-        create_id();
     }
 
     captured_id const&
@@ -91,16 +94,9 @@ class function_request_cached
     }
 
  private:
+    captured_id id_;
     Function function_;
     std::tuple<Args...> args_;
-    captured_id id_;
-
-    void
-    create_id()
-    {
-        // TODO
-        id_ = make_captured_id(&function_);
-    }
 };
 
 template<typename Value>
@@ -115,12 +111,16 @@ class function_request_intf : public id_interface
 
 // - This class implements id_interface exactly like sha256_hashed_id
 // - The major advantage is that args_ need not be copied
+// TODO how can we deserialize these objects? Creator needs to
+// provide all template arguments.
 template<typename Value, class Function, class... Args>
 class function_request_impl : public function_request_intf<Value>
 {
  public:
     function_request_impl(Function function, Args... args)
         : function_{std::move(function)},
+          // TODO function_id_ not guaranteed to be unique.
+          // Use &function_ instead?
           function_id_{typeid(function).name()},
           args_{std::move(args)...}
     {
