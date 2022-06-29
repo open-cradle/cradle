@@ -29,6 +29,18 @@ struct uncached_request_resolution_context : public context_intf
     {
         throw not_implemented_error("No introspection in this context");
     }
+
+    void
+    push_tasklet(tasklet_tracker* tasklet) override
+    {
+        throw not_implemented_error("No introspection in this context");
+    }
+
+    void
+    pop_tasklet() override
+    {
+        throw not_implemented_error("No introspection in this context");
+    }
 };
 
 struct cached_request_resolution_context : public context_intf
@@ -53,6 +65,18 @@ struct cached_request_resolution_context : public context_intf
     get_tasklet() override
     {
         return nullptr;
+    }
+
+    void
+    push_tasklet(tasklet_tracker* tasklet) override
+    {
+        throw not_implemented_error("tasklet stack not supported");
+    }
+
+    void
+    pop_tasklet() override
+    {
+        throw not_implemented_error("tasklet stack not supported");
     }
 
     void

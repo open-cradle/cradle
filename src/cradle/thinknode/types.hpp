@@ -1,6 +1,8 @@
 #ifndef CRADLE_THINKNODE_TYPES_HPP
 #define CRADLE_THINKNODE_TYPES_HPP
 
+#include <vector>
+
 #include <cradle/inner/requests/generic.h>
 #include <cradle/typing/core.h>
 
@@ -33,15 +35,11 @@ struct thinknode_request_context : public context_intf
 {
     service_core& service;
     thinknode_session session;
-    tasklet_tracker* tasklet;
 
     thinknode_request_context(
         service_core& service,
         thinknode_session session,
-        tasklet_tracker* tasklet)
-        : service{service}, session{std::move(session)}, tasklet{tasklet}
-    {
-    }
+        tasklet_tracker* tasklet);
 
     inner_service_core&
     get_service() override;
@@ -51,6 +49,15 @@ struct thinknode_request_context : public context_intf
 
     tasklet_tracker*
     get_tasklet() override;
+
+    void
+    push_tasklet(tasklet_tracker* tasklet) override;
+
+    void
+    pop_tasklet() override;
+
+ private:
+    std::vector<tasklet_tracker*> tasklets_;
 };
 
 struct thinknode_array_info;

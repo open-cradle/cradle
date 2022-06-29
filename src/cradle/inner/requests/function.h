@@ -293,6 +293,8 @@ class function_request_erased
     {
         if constexpr (caching_level == caching_level_type::none)
         {
+            // TODO split this class into uncached/cached ones
+            // Could also pass cached_context_intf& to resolve() for cached
             throw not_implemented_error(
                 "captured_id only available for cached function requests");
         }

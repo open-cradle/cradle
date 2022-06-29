@@ -2,6 +2,7 @@
 #define CRADLE_INNER_REQUESTS_GENERIC_H
 
 #include <concepts>
+#include <string>
 
 #include <cppcoro/task.hpp>
 
@@ -78,6 +79,10 @@ template<typename Ctx>
 concept CachedContext = requires(Ctx& ctx)
 {
     {
+        ctx.get_service()
+    }
+    ->std::convertible_to<inner_service_core&>;
+    {
         ctx.get_cache()
     }
     ->std::convertible_to<immutable_cache&>;
@@ -119,6 +124,7 @@ class context_intf
     virtual ~context_intf() = default;
 
     // Only implemented in cached context
+    // TODO create cached_context_intf class
     virtual inner_service_core&
     get_service()
         = 0;
@@ -132,6 +138,30 @@ class context_intf
     virtual tasklet_tracker*
     get_tasklet()
         = 0;
+
+    // Only implemented in cached context
+    virtual void
+    push_tasklet(tasklet_tracker* tasklet)
+        = 0;
+
+    // Only implemented in cached context
+    virtual void
+    pop_tasklet()
+        = 0;
+};
+
+class context_tasklet
+{
+ public:
+    context_tasklet(
+        context_intf& ctx,
+        std::string const& pool_name,
+        std::string const& title);
+
+    ~context_tasklet();
+
+ private:
+    context_intf* ctx_{nullptr};
 };
 
 } // namespace cradle

@@ -40,7 +40,7 @@ get_app_version_info(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 

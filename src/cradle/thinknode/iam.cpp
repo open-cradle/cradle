@@ -50,7 +50,7 @@ get_context_contents(thinknode_request_context ctx, string context_id)
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 

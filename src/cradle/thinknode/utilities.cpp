@@ -109,9 +109,9 @@ get_thinknode_service_id(string const& thinknode_id)
 void
 log_info(thinknode_request_context& ctx, const char* msg)
 {
-    if (ctx.tasklet)
+    if (auto* tasklet = ctx.get_tasklet())
     {
-        ctx.tasklet->log(msg);
+        tasklet->log(msg);
     }
     else
     {

@@ -55,12 +55,12 @@ perform_local_function_calc(
     auto const image = as_private(*version_info.manifest->provider).image;
 
     auto pool_name = std::string{"local@"} + app;
-    auto tasklet
-        = create_tasklet_tracker(pool_name, "local calc", ctx.tasklet);
+    context_tasklet tasklet_guard{ctx, pool_name, "local calc"};
     co_await get_local_compute_pool_for_image(
         ctx.service, std::make_pair(app, image))
         .schedule();
 
+    auto tasklet{ctx.get_tasklet()};
     auto run_guard = tasklet_run(tasklet);
     co_return supervise_thinknode_calculation(
         ctx.service, account, app, image, name, std::move(args));
@@ -87,7 +87,7 @@ perform_local_function_calc(
         map(CRADLE_LAMBDIFY(natively_encoded_sha256), args));
 
     tasklet_await around_await(
-        ctx.tasklet, "perform_local_function_calc", *cache_key);
+        ctx.get_tasklet(), "perform_local_function_calc", *cache_key);
     auto task_creator = [&] {
         return uncached::perform_local_function_calc(
             ctx, context_id, account, app, name, std::move(args));

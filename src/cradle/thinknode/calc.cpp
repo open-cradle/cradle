@@ -131,7 +131,7 @@ post_calculation(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 
@@ -332,7 +332,7 @@ retrieve_calculation_request(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 

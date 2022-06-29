@@ -239,7 +239,7 @@ TEST_CASE("evaluate erased function request V+V - fully cached", "[requests]")
     // Resolving a fully-cached request stores the result in both
     // memory cache and disk cache.
     auto res00 = cppcoro::sync_wait(resolve_request(ctx, req_full));
-    sync_wait_write_disk_cache(ctx.service);
+    sync_wait_write_disk_cache(ctx.get_service());
     REQUIRE(res00 == 7);
     REQUIRE(num_add_calls == 1);
 

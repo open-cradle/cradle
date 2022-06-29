@@ -86,7 +86,7 @@ resolve_iss_object_to_immutable(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 
@@ -149,7 +149,7 @@ get_iss_object_metadata(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 
@@ -187,7 +187,7 @@ retrieve_immutable(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 
@@ -226,7 +226,7 @@ retrieve_immutable_blob(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 
@@ -514,7 +514,7 @@ post_iss_object(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 

@@ -28,7 +28,9 @@ requires(Req::caching_level == caching_level_type::memory)
 }
 
 template<typename Ctx, typename Req>
-requires(Req::caching_level == caching_level_type::full)
+requires(
+    CachedContextRequest<Ctx, Req>&& Req::caching_level
+    == caching_level_type::full)
     cppcoro::task<typename Req::value_type> resolve_disk_cached(
         Ctx& ctx, Req const& req)
 {
