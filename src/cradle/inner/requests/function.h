@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <optional>
+#include <typeindex>
 #include <typeinfo>
 #include <utility>
 
@@ -119,9 +120,6 @@ class function_request_impl : public function_request_intf<Value>
  public:
     function_request_impl(Function function, Args... args)
         : function_{std::move(function)},
-          // TODO function_id_ not guaranteed to be unique.
-          // Use &function_ instead?
-          function_id_{typeid(function).name()},
           args_{std::move(args)...}
     {
     }
@@ -129,15 +127,18 @@ class function_request_impl : public function_request_intf<Value>
     bool
     equals(function_request_impl const& other) const
     {
-        return function_id_ == other.function_id_ && args_ == other.args_;
+        return get_function_type_index() == other.get_function_type_index()
+               && args_ == other.args_;
     }
 
     bool
     less_than(function_request_impl const& other) const
     {
-        if (function_id_ != other.function_id_)
+        auto this_type_index = get_function_type_index();
+        auto other_type_index = other.get_function_type_index();
+        if (this_type_index != other_type_index)
         {
-            return function_id_ < other.function_id_;
+            return this_type_index < other_type_index;
         }
         return args_ < other.args_;
     }
@@ -164,7 +165,7 @@ class function_request_impl : public function_request_intf<Value>
     {
         if (!hash_)
         {
-            auto function_hash = invoke_hash(function_id_);
+            auto function_hash = invoke_hash(get_function_type_index());
             auto args_hash = std::apply(
                 [](auto&&... args) {
                     return combine_hashes(invoke_hash(args)...);
@@ -211,10 +212,16 @@ class function_request_impl : public function_request_intf<Value>
 
  private:
     Function function_;
-    std::string function_id_;
     std::tuple<Args...> args_;
     mutable std::optional<size_t> hash_;
     mutable std::string unique_hash_;
+
+    std::type_index
+    get_function_type_index() const
+    {
+        // The typeid() is evaluated at compile time
+        return std::type_index(typeid(Function));
+    }
 };
 
 template<caching_level_type level, typename Value, bool introspective_>
