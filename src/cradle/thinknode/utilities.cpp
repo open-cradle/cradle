@@ -74,10 +74,15 @@ as_api_type(thinknode_type_info const& tn)
 string
 get_account_name(thinknode_session const& session)
 {
-    auto const& url = session.api_url;
-    auto start = url.find("://") + 3;
-    auto end = url.find(".");
-    return url.substr(start, end - start);
+    return get_account_name(session.api_url);
+}
+
+string
+get_account_name(string const& api_url)
+{
+    auto start = api_url.find("://") + 3;
+    auto end = api_url.find(".");
+    return api_url.substr(start, end - start);
 }
 
 thinknode_service_id

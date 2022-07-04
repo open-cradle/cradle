@@ -13,6 +13,9 @@ api_type_info
 as_api_type(thinknode_type_info const& tn);
 
 string
+get_account_name(std::string const& api_url);
+
+string
 get_account_name(thinknode_session const& session);
 
 // Get the service associated with the given Thinknode ID.

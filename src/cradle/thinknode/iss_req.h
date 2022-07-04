@@ -1,30 +1,27 @@
 #ifndef CRADLE_THINKNODE_ISS_REQ_H
 #define CRADLE_THINKNODE_ISS_REQ_H
 
+#include <tuple>
+
 #include <cppcoro/task.hpp>
 
-#include <cradle/inner/requests/generic.h>
+#include <cradle/thinknode/request.h>
 #include <cradle/typing/encodings/msgpack.h>
-#include <cradle/typing/service/core.h>
 
 namespace cradle {
 
-// my_post_iss_object_request base class not depending on caching_level_type,
-// to avoid object code duplication.
 class my_post_iss_object_request_base
 {
  public:
+    using value_type = std::string;
+    // Tuple of arguments passed to archive()
+    using tuple_type = std::tuple<std::string, std::string, std::string, blob>;
+
     my_post_iss_object_request_base(
-        // TODO also need api_url, access_token for id?
+        std::string api_url,
         std::string context_id,
         thinknode_type_info schema,
         blob object_data);
-
-    captured_id const&
-    get_captured_id() const
-    {
-        return id_;
-    }
 
     cppcoro::task<std::string>
     resolve(thinknode_request_context const& ctx) const;
@@ -35,52 +32,60 @@ class my_post_iss_object_request_base
         return "my_post_iss_object_request";
     }
 
- protected:
-    ~my_post_iss_object_request_base() = default;
+    template<typename Archive>
+    void
+    serialize(Archive& archive)
+    {
+        archive(api_url_, context_id_, url_type_string_, object_data_);
+    }
 
  private:
+    // id depends on these, plus something unique for this class
+    // These also form the data to be (de-)serialized
+    std::string api_url_;
     std::string context_id_;
-    thinknode_type_info schema_;
+    // Or a request that can calculate url_type_string_ from schema and
+    // api_url? It's now always evaluated and maybe the value is not needed.
+    std::string url_type_string_;
     blob object_data_;
-    captured_id id_;
-
-    void
-    create_id();
 };
 
 template<caching_level_type level>
-class my_post_iss_object_request : public my_post_iss_object_request_base
-{
- public:
-    using element_type = my_post_iss_object_request;
-    using value_type = std::string;
-
-    static constexpr caching_level_type caching_level = level;
-    static constexpr bool introspective = true;
-
-    using my_post_iss_object_request_base::my_post_iss_object_request_base;
-};
+using my_post_iss_object_request
+    = thinknode_request_container<level, my_post_iss_object_request_base>;
 
 // Create a request to post an ISS object from a raw blob of data
 // (e.g. encoded in MessagePack format), and return its ID.
 template<caching_level_type level>
 auto
 rq_post_iss_object(
-    std::string context_id, thinknode_type_info schema, blob object_data)
+    std::string api_url,
+    std::string context_id,
+    thinknode_type_info schema,
+    blob object_data)
 {
     return my_post_iss_object_request<level>{
-        std::move(context_id), std::move(schema), std::move(object_data)};
+        std::move(api_url),
+        std::move(context_id),
+        std::move(schema),
+        std::move(object_data)};
 }
 
 // Create a request to post an ISS object and return its ID.
 template<caching_level_type level>
 auto
 rq_post_iss_object(
-    std::string context_id, thinknode_type_info schema, dynamic data)
+    std::string api_url,
+    std::string context_id,
+    thinknode_type_info schema,
+    dynamic data)
 {
     blob msgpack_data = value_to_msgpack_blob(data);
     return my_post_iss_object_request<level>{
-        std::move(context_id), std::move(schema), std::move(msgpack_data)};
+        std::move(api_url),
+        std::move(context_id),
+        std::move(schema),
+        std::move(msgpack_data)};
 }
 
 } // namespace cradle

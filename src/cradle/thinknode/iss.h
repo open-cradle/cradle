@@ -33,9 +33,14 @@ retrieve_immutable_blob(
     thinknode_request_context ctx, string context_id, string immutable_id);
 
 // Get the URL form of a schema.
+// The only thing needed from session is api_url, from which the default
+// account name can be derived.
 string
 get_url_type_string(
     thinknode_session const& session, thinknode_type_info const& schema);
+
+string
+get_url_type_string(string const& api_url, thinknode_type_info const& schema);
 
 // Parse a schema in URL form.
 thinknode_type_info

@@ -39,6 +39,7 @@ TEST_CASE("ISS POST - blob, uncached", "[requests]")
     string context_id{"123"};
 
     auto req{rq_post_iss_object<caching_level_type::none>(
+        session.api_url,
         context_id,
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
         make_blob("payload"))};
@@ -72,6 +73,7 @@ TEST_CASE("ISS POST - dynamic, uncached", "[requests]")
     string context_id{"123"};
 
     auto req{rq_post_iss_object<caching_level_type::none>(
+        session.api_url,
         context_id,
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
         dynamic("payload"))};
@@ -107,17 +109,19 @@ TEST_CASE("ISS POST - blob, memory cached", "[requests]")
     string context_id{"123"};
 
     auto req{rq_post_iss_object<caching_level_type::memory>(
+        session.api_url,
         context_id,
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
         make_blob("payload"))};
-    auto id0 = cppcoro::sync_wait(resolve_request(ctx, req));
 
+    // Resolve using task, storing result in memory cache (and disk cache)
+    auto id0 = cppcoro::sync_wait(resolve_request(ctx, req));
     REQUIRE(id0 == "def");
     REQUIRE(mock_http.is_complete());
     REQUIRE(mock_http.is_in_order());
 
+    // Resolve using memory cache
     auto id1 = cppcoro::sync_wait(resolve_request(ctx, req));
-
     REQUIRE(id1 == "def");
 
     auto infos = get_tasklet_infos(true);
@@ -158,6 +162,7 @@ TEST_CASE("ISS POST - blob, fully cached", "[requests]")
     string context_id{"123"};
 
     auto req{rq_post_iss_object<caching_level_type::full>(
+        session.api_url,
         context_id,
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
         make_blob("payload"))};

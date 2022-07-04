@@ -76,20 +76,20 @@ TEST_CASE("ISS POST", "[iss]")
         make_thinknode_type_info_with_string_type(thinknode_string_type())};
     auto object_data{make_blob("payload")};
     auto req_none{rq_post_iss_object<caching_level_type::none>(
-        context_id, schema, object_data)};
+        session.api_url, context_id, schema, object_data)};
     auto req_mem{rq_post_iss_object<caching_level_type::memory>(
-        context_id, schema, object_data)};
+        session.api_url, context_id, schema, object_data)};
 
     BENCHMARK("create request, uncached")
     {
         return rq_post_iss_object<caching_level_type::none>(
-            context_id, schema, object_data);
+            session.api_url, context_id, schema, object_data);
     };
 
     BENCHMARK("create request, memory cached")
     {
         return rq_post_iss_object<caching_level_type::memory>(
-            context_id, schema, object_data);
+            session.api_url, context_id, schema, object_data);
     };
 
 #ifdef __clang__

@@ -8,6 +8,7 @@
 #include <catch2/catch.hpp>
 
 #include <cradle/inner/service/internals.h>
+#include <cradle/inner/service/types.h>
 
 namespace cradle {
 
