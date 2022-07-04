@@ -42,7 +42,7 @@ template<class Base>
 class request_tuple_maker
 {
  public:
-    using value_type = Base::tuple_type;
+    using value_type = typename Base::tuple_type;
 
     template<typename... Args>
     void
