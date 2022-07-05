@@ -1,6 +1,7 @@
 #ifndef CRADLE_THINKNODE_REQUEST_H
 #define CRADLE_THINKNODE_REQUEST_H
 
+#include <compare>
 #include <memory>
 #include <optional>
 #include <typeindex>
@@ -38,27 +39,48 @@ class request_hasher
     size_t value_;
 };
 
-template<class Base>
-class request_tuple_maker
+struct args_comparator
 {
- public:
-    using value_type = typename Base::tuple_type;
-
-    template<typename... Args>
     void
-    operator()(Args&&... args)
+    operator()()
     {
-        value_ = std::make_tuple(args...);
+        value_ = 0;
     }
 
-    value_type
-    get_value()
+    template<typename Arg0, typename... Args>
+    requires(std::three_way_comparable<Arg0>) void
+    operator()(Arg0&& lhs_arg0, Arg0&& rhs_arg0, Args&&... args)
     {
-        return value_;
+        auto diff = lhs_arg0 <=> rhs_arg0;
+        if (diff != 0)
+        {
+            value_ = diff < 0 ? -1 : diff == 0 ? 0 : 1;
+        }
+        else
+        {
+            operator()(std::forward<Args>(args)...);
+        }
     }
 
- private:
-    value_type value_;
+    template<typename Arg0, typename... Args>
+    requires(!std::three_way_comparable<Arg0>) void
+    operator()(Arg0&& lhs_arg0, Arg0&& rhs_arg0, Args&&... args)
+    {
+        if (lhs_arg0 < rhs_arg0)
+        {
+            value_ = -1;
+        }
+        else if (rhs_arg0 < lhs_arg0)
+        {
+            value_ = 1;
+        }
+        else
+        {
+            operator()(std::forward<Args>(args)...);
+        }
+    }
+
+    int value_;
 };
 
 template<typename Base>
@@ -76,8 +98,13 @@ class thinknode_request_mixin : public Base, public id_interface
     bool
     equals(thinknode_request_mixin const& other) const
     {
-        return get_function_type_index() == other.get_function_type_index()
-               && get_tuple() == other.get_tuple();
+        if (get_function_type_index() != other.get_function_type_index())
+        {
+            return false;
+        }
+        args_comparator cmp;
+        this->template compare(cmp, other);
+        return cmp.value_ == 0;
     }
 
     bool
@@ -89,7 +116,9 @@ class thinknode_request_mixin : public Base, public id_interface
         {
             return this_type_index < other_type_index;
         }
-        return get_tuple() < other.get_tuple();
+        args_comparator cmp;
+        this->template compare(cmp, other);
+        return cmp.value_ < 0;
     }
 
     bool
@@ -131,14 +160,6 @@ class thinknode_request_mixin : public Base, public id_interface
     {
         // The typeid() is evaluated at compile time
         return std::type_index(typeid(Base));
-    }
-
-    auto
-    get_tuple() const
-    {
-        detail::request_tuple_maker<Base> maker;
-        const_cast<thinknode_request_mixin*>(this)->serialize(maker);
-        return maker.get_value();
     }
 
  private:

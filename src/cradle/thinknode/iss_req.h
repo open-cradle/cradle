@@ -39,6 +39,20 @@ class my_post_iss_object_request_base
         archive(api_url_, context_id_, url_type_string_, object_data_);
     }
 
+    template<typename Cmp>
+    void
+    compare(Cmp& cmp, my_post_iss_object_request_base const& other) const
+    {
+        cmp(api_url_,
+            other.api_url_,
+            context_id_,
+            other.context_id_,
+            url_type_string_,
+            other.url_type_string_,
+            object_data_,
+            other.object_data_);
+    }
+
  private:
     // id depends on these, plus something unique for this class
     // These also form the data to be (de-)serialized
