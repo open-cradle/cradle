@@ -77,6 +77,10 @@ struct immutable_cache_impl : boost::noncopyable
 void
 reduce_memory_cache_size(immutable_cache_impl& cache, uint64_t desired_size);
 
+void
+reduce_memory_cache_size_no_lock(
+    immutable_cache_impl& cache, uint64_t desired_size);
+
 } // namespace detail
 } // namespace cradle
 

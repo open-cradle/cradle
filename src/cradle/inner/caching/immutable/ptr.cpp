@@ -106,19 +106,13 @@ void
 release_cache_record(immutable_cache_record* record)
 {
     auto& cache = *record->owner_cache;
-    bool do_lru_eviction = false;
+    std::scoped_lock<std::mutex> lock(cache.mutex);
+    --record->ref_count;
+    if (record->ref_count == 0)
     {
-        std::scoped_lock<std::mutex> lock(cache.mutex);
-        --record->ref_count;
-        if (record->ref_count == 0)
-        {
-            add_to_eviction_list(cache, record);
-            do_lru_eviction = true;
-        }
-    }
-    if (do_lru_eviction)
-    {
-        reduce_memory_cache_size(cache, cache.config.unused_size_limit);
+        add_to_eviction_list(cache, record);
+        reduce_memory_cache_size_no_lock(
+            cache, cache.config.unused_size_limit);
     }
 }
 
