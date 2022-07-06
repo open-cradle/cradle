@@ -98,6 +98,10 @@ class thinknode_request_mixin : public Base, public id_interface
     bool
     equals(thinknode_request_mixin const& other) const
     {
+        if (this == &other)
+        {
+            return true;
+        }
         if (get_function_type_index() != other.get_function_type_index())
         {
             return false;
@@ -110,6 +114,10 @@ class thinknode_request_mixin : public Base, public id_interface
     bool
     less_than(thinknode_request_mixin const& other) const
     {
+        if (this == &other)
+        {
+            return false;
+        }
         auto this_type_index = get_function_type_index();
         auto other_type_index = other.get_function_type_index();
         if (this_type_index != other_type_index)
