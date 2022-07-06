@@ -97,9 +97,25 @@ requires IntrospectiveContextRequest<Ctx, Req>
 }
 
 template<typename Ctx, typename Req>
-requires CachedContextRequest<Ctx, Req>
-    cppcoro::shared_task<typename Req::value_type>
-    resolve_request_cached(Ctx& ctx, Req const& req)
+requires(CachedContextRequest<Ctx, Req> && !Req::introspective) cppcoro::
+    shared_task<typename Req::value_type> const& resolve_request_cached(
+        Ctx& ctx, Req const& req)
+{
+    immutable_cache_ptr<typename Req::value_type> ptr{
+        ctx.get_cache(),
+        req.get_captured_id(),
+        [&](detail::immutable_cache_impl& internal_cache,
+            id_interface const& key) {
+            return resolve_request_on_memory_cache_miss<Ctx, Req>(
+                internal_cache, key, ctx, req);
+        }};
+    return ptr.task();
+}
+
+template<typename Ctx, typename Req>
+requires(CachedContextRequest<Ctx, Req>&& Req::introspective)
+    cppcoro::shared_task<typename Req::value_type> resolve_request_cached(
+        Ctx& ctx, Req const& req)
 {
     immutable_cache_ptr<typename Req::value_type> ptr{
         ctx.get_cache(),
@@ -110,13 +126,10 @@ requires CachedContextRequest<Ctx, Req>
                 internal_cache, key, ctx, req);
         }};
     auto shared_task = ptr.task();
-    if constexpr (Req::introspective)
+    if (auto tasklet = ctx.get_tasklet())
     {
-        if (auto tasklet = ctx.get_tasklet())
-        {
-            return resolve_request_introspected<Ctx, Req>(
-                ctx, req, shared_task, *tasklet);
-        }
+        return resolve_request_introspected<Ctx, Req>(
+            ctx, req, shared_task, *tasklet);
     }
     return shared_task;
 }
@@ -128,9 +141,19 @@ resolve_request(Ctx& ctx, Req const& req)
     return req.resolve(ctx);
 }
 
+// Not copying shared_task's looks like a worthwhile optimization.
 template<typename Ctx, typename Req>
-requires CachedContextRequest<Ctx, Req> auto
-resolve_request(Ctx& ctx, Req const& req)
+requires(CachedContextRequest<Ctx, Req> && !Req::introspective)
+    cppcoro::shared_task<typename Req::value_type> const& resolve_request(
+        Ctx& ctx, Req const& req)
+{
+    return resolve_request_cached(ctx, req);
+}
+
+template<typename Ctx, typename Req>
+requires(CachedContextRequest<Ctx, Req>&& Req::introspective)
+    cppcoro::shared_task<typename Req::value_type> resolve_request(
+        Ctx& ctx, Req const& req)
 {
     return resolve_request_cached(ctx, req);
 }
