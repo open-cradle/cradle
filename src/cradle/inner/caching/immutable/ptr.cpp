@@ -13,8 +13,7 @@ record_immutable_cache_value(
     if (i != cache.records.end())
     {
         detail::immutable_cache_record& record = *i->second;
-        record.state.store(
-            immutable_cache_entry_state::READY, std::memory_order_relaxed);
+        record.state = immutable_cache_entry_state::READY;
         record.size = size;
     }
 }
@@ -28,8 +27,7 @@ record_immutable_cache_failure(
     if (i != cache.records.end())
     {
         detail::immutable_cache_record& record = *i->second;
-        record.state.store(
-            immutable_cache_entry_state::FAILED, std::memory_order_relaxed);
+        record.state = immutable_cache_entry_state::FAILED;
     }
 }
 
@@ -44,8 +42,7 @@ remove_from_eviction_list(
     assert(record->eviction_list_iterator != list.records.end());
     list.records.erase(record->eviction_list_iterator);
     record->eviction_list_iterator = list.records.end();
-    if (record->state.load(std::memory_order_relaxed)
-        == immutable_cache_entry_state::READY)
+    if (record->state == immutable_cache_entry_state::READY)
     {
         list.total_size -= record->size;
     }
@@ -85,12 +82,10 @@ acquire_cache_record(
     }
     immutable_cache_record* record = i->second.get();
     // TODO: Better (optional) retry logic.
-    if (record->state.load(std::memory_order_relaxed)
-        == immutable_cache_entry_state::FAILED)
+    if (record->state == immutable_cache_entry_state::FAILED)
     {
         record->task = create_task(cache, *(record->key));
-        record->state.store(
-            immutable_cache_entry_state::LOADING, std::memory_order_relaxed);
+        record->state = immutable_cache_entry_state::LOADING;
     }
     acquire_cache_record_no_lock(record);
     return record;

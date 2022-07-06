@@ -2,7 +2,6 @@
 #define CRADLE_INNER_CACHING_IMMUTABLE_INTERNALS_H
 
 #include <any>
-#include <atomic>
 #include <list>
 #include <mutex>
 #include <unordered_map>
@@ -25,10 +24,8 @@ struct immutable_cache_record
     immutable_cache_impl* owner_cache;
     captured_id key;
 
-    // All of the following fields are protected by the cache mutex. The only
-    // exception is that the :state and :progress fields can be polled for
-    // informational purposes. However, before accessing any other fields based
-    // on the value of :state, you should acquire the mutex and recheck state.
+    // All of the following fields are protected by the cache mutex, i.e.,
+    // should be accessed only while holding that mutex.
 
     // This is a count of how many active pointers reference this data.
     // If this is 0, the data is no longer actively in use and is queued for
@@ -40,8 +37,7 @@ struct immutable_cache_record
     std::list<immutable_cache_record*>::iterator eviction_list_iterator;
 
     // Is the data ready?
-    std::atomic<immutable_cache_entry_state> state
-        = immutable_cache_entry_state::LOADING;
+    immutable_cache_entry_state state = immutable_cache_entry_state::LOADING;
 
     // the associated cppcoro task - This should probably be stored more
     // efficiently. It holds a cppcoro::shared_task<T>, where T is the type

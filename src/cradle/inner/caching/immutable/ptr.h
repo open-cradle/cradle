@@ -96,10 +96,12 @@ struct immutable_cache_ptr
             untyped_.record()->task);
     }
 
+    // Should be called while holding the cache's mutex.
+    // Used by test code only (also the three is_* functions).
     immutable_cache_entry_state
     state() const
     {
-        return untyped_.record()->state.load(std::memory_order_relaxed);
+        return untyped_.record()->state;
     }
     bool
     is_loading() const
