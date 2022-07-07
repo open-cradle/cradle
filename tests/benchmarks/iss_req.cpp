@@ -1,7 +1,6 @@
 #include <cradle/thinknode/iss_req.h>
 
-#define CATCH_CONFIG_ENABLE_BENCHMARKING
-#include <catch2/catch.hpp>
+#include <benchmark/benchmark.h>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
 
@@ -38,6 +37,7 @@ set_mock_script(mock_http_session& mock_http, int num_loops)
     mock_http.set_script(script);
 }
 
+#if 0
 static string
 expected_result(int num_loops)
 {
@@ -48,6 +48,7 @@ expected_result(int num_loops)
     }
     return result;
 }
+#endif
 
 template<Request Req>
 cppcoro::task<string>
@@ -61,6 +62,7 @@ resolve_n_requests(int n, thinknode_request_context& ctx, Req const& req)
     co_return result;
 }
 
+#if 0
 TEST_CASE("ISS POST", "[iss]")
 {
     service_core service;
@@ -144,3 +146,68 @@ TEST_CASE("ISS POST", "[iss]")
     };
 #endif
 }
+#endif
+
+static void
+BM_resolve_request_uncached(benchmark::State& state)
+{
+    service_core service;
+    init_test_service(service);
+    auto& mock_http = enable_http_mocking(service);
+
+    thinknode_session session;
+    session.api_url = "https://mgh.thinknode.io/api/v1.0";
+    session.access_token = "xyz";
+    thinknode_request_context ctx{service, session, nullptr};
+    string context_id{"123"};
+    auto schema{
+        make_thinknode_type_info_with_string_type(thinknode_string_type())};
+    auto object_data{make_blob("payload")};
+    auto req_none{rq_post_iss_object<caching_level_type::none>(
+        session.api_url, context_id, schema, object_data)};
+    //    auto req_mem{rq_post_iss_object<caching_level_type::memory>(
+    //        session.api_url, context_id, schema, object_data)};
+
+    for (auto _ : state)
+    {
+        int num_loops = state.range(0);
+        set_mock_script(mock_http, num_loops);
+        benchmark::DoNotOptimize(
+            cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_none)));
+    }
+}
+
+static void
+BM_resolve_request_memory_cached(benchmark::State& state)
+{
+    service_core service;
+    init_test_service(service);
+    auto& mock_http = enable_http_mocking(service);
+
+    thinknode_session session;
+    session.api_url = "https://mgh.thinknode.io/api/v1.0";
+    session.access_token = "xyz";
+    thinknode_request_context ctx{service, session, nullptr};
+    string context_id{"123"};
+    auto schema{
+        make_thinknode_type_info_with_string_type(thinknode_string_type())};
+    auto object_data{make_blob("payload")};
+    //    auto req_none{rq_post_iss_object<caching_level_type::none>(
+    //        session.api_url, context_id, schema, object_data)};
+    auto req_mem{rq_post_iss_object<caching_level_type::memory>(
+        session.api_url, context_id, schema, object_data)};
+
+    // Fill the memory cache
+    set_mock_script(mock_http, 1000);
+    cppcoro::sync_wait(resolve_n_requests(1000, ctx, req_mem));
+
+    for (auto _ : state)
+    {
+        int num_loops = state.range(0);
+        set_mock_script(mock_http, num_loops);
+        cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_mem));
+    }
+}
+
+BENCHMARK(BM_resolve_request_uncached)->Arg(10)->Arg(20);
+BENCHMARK(BM_resolve_request_memory_cached)->Arg(10)->Arg(20);
