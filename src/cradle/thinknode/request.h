@@ -107,7 +107,7 @@ class thinknode_request_mixin : public Base, public id_interface
             return false;
         }
         args_comparator cmp;
-        this->template compare(cmp, other);
+        this->compare(cmp, other);
         return cmp.value_ == 0;
     }
 
@@ -125,7 +125,7 @@ class thinknode_request_mixin : public Base, public id_interface
             return this_type_index < other_type_index;
         }
         args_comparator cmp;
-        this->template compare(cmp, other);
+        this->compare(cmp, other);
         return cmp.value_ < 0;
     }
 
