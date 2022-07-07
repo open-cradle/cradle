@@ -32,7 +32,7 @@ TEST_CASE("request headers", "[io][http]")
            {"Cradle-Test-Header", "present"},
            {"Color", "navy"}};
     auto response = perform_simple_request(
-        make_get_request("http://postman-echo.com/headers", request_headers));
+        make_get_request("https://postman-echo.com/headers", request_headers));
     REQUIRE(response.status_code == 200);
     auto body = parse_json_response(response);
     http_header_list response_headers;
@@ -50,7 +50,7 @@ TEST_CASE("request headers", "[io][http]")
 TEST_CASE("response headers", "[io][http]")
 {
     auto response = perform_simple_request(make_get_request(
-        "http://postman-echo.com/"
+        "https://postman-echo.com/"
         "response-headers?cradle-test-header=present&color=navy",
         {{"Accept", "application/json"}}));
     REQUIRE(response.status_code == 200);
@@ -66,7 +66,7 @@ TEST_CASE("response headers", "[io][http]")
 TEST_CASE("GET request", "[io][http]")
 {
     auto response = perform_simple_request(make_get_request(
-        "http://postman-echo.com/get?color=navy", http_header_list()));
+        "https://postman-echo.com/get?color=navy", http_header_list()));
     REQUIRE(response.status_code == 200);
     auto body = parse_json_response(response);
     REQUIRE(
@@ -93,7 +93,7 @@ test_method_with_content(http_request_method method)
           dynamic({integer(4), integer(3), integer(2), integer(1)})}});
     auto response = perform_simple_request(make_http_request(
         method,
-        "http://postman-echo.com/" + string(get_value_id(method)),
+        "https://postman-echo.com/" + string(get_value_id(method)),
         {{"Accept", "application/json"}, {"Content-Type", "application/json"}},
         make_blob(value_to_json(content))));
     REQUIRE(response.status_code == 200);
@@ -120,7 +120,7 @@ TEST_CASE("DELETE request", "[io][http]")
 {
     auto response = perform_simple_request(make_http_request(
         http_request_method::DELETE,
-        "http://postman-echo.com/delete",
+        "https://postman-echo.com/delete",
         http_header_list(),
         http_body()));
     REQUIRE(response.status_code == 200);
@@ -136,7 +136,7 @@ TEST_CASE("large HTTP request", "[io][http]")
     auto content = dynamic({{"numbers", to_dynamic(numbers)}});
     auto response = perform_simple_request(make_http_request(
         http_request_method::POST,
-        "http://postman-echo.com/post",
+        "https://postman-echo.com/post",
         {{"Accept", "application/json"}, {"Content-Type", "application/json"}},
         make_blob(value_to_json(content))));
     REQUIRE(response.status_code == 200);
@@ -147,7 +147,7 @@ TEST_CASE("large HTTP request", "[io][http]")
 TEST_CASE("404 response code", "[io][http]")
 {
     auto request = make_get_request(
-        "http://postman-echo.com/status/404", http_header_list());
+        "https://postman-echo.com/status/404", http_header_list());
     try
     {
         perform_simple_request(request);
@@ -171,9 +171,9 @@ TEST_CASE("authorization header redaction", "[io][http]")
         = {{"Accept", "application/json"}, {"Authorization", "[redacted]"}};
 
     auto request = make_get_request(
-        "http://postman-echo.com/status/404", request_headers);
+        "https://postman-echo.com/status/404", request_headers);
     auto redacted_request = make_get_request(
-        "http://postman-echo.com/status/404", redacted_headers);
+        "https://postman-echo.com/status/404", redacted_headers);
     try
     {
         perform_simple_request(request);
@@ -190,7 +190,7 @@ TEST_CASE("authorization header redaction", "[io][http]")
 TEST_CASE("500 response code", "[io][http]")
 {
     auto request = make_get_request(
-        "http://postman-echo.com/status/500", http_header_list());
+        "https://postman-echo.com/status/500", http_header_list());
     try
     {
         perform_simple_request(request);
@@ -240,7 +240,7 @@ TEST_CASE("interrupted request", "[io][http]")
         }
     };
     auto request = make_get_request(
-        "http://postman-echo.com/delay/10", http_header_list());
+        "https://postman-echo.com/delay/10", http_header_list());
     try
     {
         http_connection connection(the_http_request_system);
