@@ -77,8 +77,10 @@ disk_cached(
 }
 
 // Initialize a service for unit testing purposes.
+// `single_threaded_http` should be true for benchmark tests
+// (otherwise, hangups tend to occur with Clang in release builds).
 void
-init_test_service(service_core& core);
+init_test_service(service_core& core, bool single_threaded_http = false);
 
 // Set up HTTP mocking for a service.
 // This returns the mock_http_session that's been associated with the service.

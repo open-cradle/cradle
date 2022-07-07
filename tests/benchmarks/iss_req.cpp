@@ -66,7 +66,7 @@ resolve_n_requests(int n, thinknode_request_context& ctx, Req const& req)
 TEST_CASE("ISS POST", "[iss]")
 {
     service_core service;
-    init_test_service(service);
+    init_test_service(service, true);
     auto& mock_http = enable_http_mocking(service);
 
     thinknode_session session;
@@ -94,12 +94,6 @@ TEST_CASE("ISS POST", "[iss]")
             session.api_url, context_id, schema, object_data);
     };
 
-#ifdef __clang__
-    // TODO investigate hangups occurring with Clang
-    // Related to https://github.com/lewissbaker/cppcoro/issues/98 ?
-    set_mock_script(mock_http, 1);
-    expected_result(1);
-#else
     BENCHMARK("resolve request x 10, uncached")
     {
         constexpr int num_loops = 10;
@@ -144,7 +138,6 @@ TEST_CASE("ISS POST", "[iss]")
             = cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_mem));
         REQUIRE(id == expected_result(num_loops));
     };
-#endif
 }
 #endif
 
@@ -152,7 +145,7 @@ static void
 BM_resolve_request_uncached(benchmark::State& state)
 {
     service_core service;
-    init_test_service(service);
+    init_test_service(service, true);
     auto& mock_http = enable_http_mocking(service);
 
     thinknode_session session;
@@ -181,7 +174,7 @@ static void
 BM_resolve_request_memory_cached(benchmark::State& state)
 {
     service_core service;
-    init_test_service(service);
+    init_test_service(service, true);
     auto& mock_http = enable_http_mocking(service);
 
     thinknode_session session;
