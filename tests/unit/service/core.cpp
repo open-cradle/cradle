@@ -19,7 +19,7 @@ TEST_CASE("HTTP requests", "[service][core]")
     auto async_response = async_http_request(
         core,
         make_get_request(
-            "http://postman-echo.com/get?color=navy", http_header_list()));
+            "https://postman-echo.com/get?color=navy", http_header_list()));
 
     auto response = cppcoro::sync_wait(async_response);
     REQUIRE(response.status_code == 200);
