@@ -54,7 +54,7 @@ include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
 conan_cmake_configure(
     REQUIRES
         boost/1.77.0
-        catch2/2.13.4
+        catch2/2.13.9
         nlohmann_json/3.9.1
         msgpack/3.3.0
         libcurl/7.75.0
