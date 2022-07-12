@@ -5,9 +5,9 @@
 #include <filesystem>
 
 #include <cradle/typing/service/internals.h>
-#include <cradle/typing/utilities/concurrency_testing.h>
-
 #include <cradle/typing/utilities/testing.h>
+
+#include "../../inner/support/concurrency_testing.h"
 
 using namespace cradle;
 
@@ -56,9 +56,7 @@ TEST_CASE("small value disk caching", "[service][core]")
     }
     // Data is written to the disk cache in a background thread, so we need to
     // wait for that to finish.
-    REQUIRE(occurs_soon([&] {
-        return core.inner_internals().disk_write_pool.get_tasks_total() == 0;
-    }));
+    sync_wait_write_disk_cache(core);
     // Now redo the 'id_12' task to see that it's not actually rerun.
     {
         auto key = make_id("id_12");
@@ -109,9 +107,7 @@ TEST_CASE("large value disk caching", "[service][core]")
     }
     // Data is written to the disk cache in a background thread, so we need to
     // wait for that to finish.
-    REQUIRE(occurs_soon([&] {
-        return core.inner_internals().disk_write_pool.get_tasks_total() == 0;
-    }));
+    sync_wait_write_disk_cache(core);
     // Now redo the 'id_12' task to see that it's not actually rerun.
     {
         auto key = make_id("id_12");

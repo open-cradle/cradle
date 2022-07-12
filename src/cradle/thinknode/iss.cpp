@@ -2,12 +2,12 @@
 
 #include <boost/tokenizer.hpp>
 
+#include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/utilities/text.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/monitoring.h>
 #include <cradle/typing/encodings/msgpack.h>
-#include <cradle/typing/encodings/sha256_hash_id.h>
 #include <cradle/typing/io/http_requests.hpp>
 #include <cradle/typing/utilities/logging.h>
 
@@ -86,7 +86,7 @@ resolve_iss_object_to_immutable(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 
@@ -149,7 +149,7 @@ get_iss_object_metadata(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 
@@ -187,7 +187,7 @@ retrieve_immutable(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 
@@ -226,7 +226,7 @@ retrieve_immutable_blob(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 
@@ -234,12 +234,18 @@ string
 get_url_type_string(
     thinknode_session const& session, thinknode_type_info const& schema)
 {
+    return get_url_type_string(session.api_url, schema);
+}
+
+string
+get_url_type_string(string const& api_url, thinknode_type_info const& schema)
+{
     switch (get_tag(schema))
     {
         case thinknode_type_info_tag::ARRAY_TYPE:
             return "array/"
                    + get_url_type_string(
-                       session, as_array_type(schema).element_schema);
+                       api_url, as_array_type(schema).element_schema);
         case thinknode_type_info_tag::BLOB_TYPE:
             return "blob";
         case thinknode_type_info_tag::BOOLEAN_TYPE:
@@ -264,13 +270,13 @@ get_url_type_string(
             return "integer";
         case thinknode_type_info_tag::MAP_TYPE: {
             auto const& m = as_map_type(schema);
-            return "map/" + get_url_type_string(session, m.key_schema) + "/"
-                   + get_url_type_string(session, m.value_schema);
+            return "map/" + get_url_type_string(api_url, m.key_schema) + "/"
+                   + get_url_type_string(api_url, m.value_schema);
         }
         case thinknode_type_info_tag::NAMED_TYPE: {
             auto const& n = as_named_type(schema);
             return "named/"
-                   + (n.account ? *n.account : get_account_name(session)) + "/"
+                   + (n.account ? *n.account : get_account_name(api_url)) + "/"
                    + n.app + "/" + n.name;
         }
         case thinknode_type_info_tag::NIL_TYPE:
@@ -278,10 +284,10 @@ get_url_type_string(
             return "nil";
         case thinknode_type_info_tag::OPTIONAL_TYPE:
             return "optional/"
-                   + get_url_type_string(session, as_optional_type(schema));
+                   + get_url_type_string(api_url, as_optional_type(schema));
         case thinknode_type_info_tag::REFERENCE_TYPE:
             return "reference/"
-                   + get_url_type_string(session, as_reference_type(schema));
+                   + get_url_type_string(api_url, as_reference_type(schema));
         case thinknode_type_info_tag::STRING_TYPE:
             return "string";
         case thinknode_type_info_tag::STRUCTURE_TYPE: {
@@ -291,7 +297,7 @@ get_url_type_string(
             for (auto const& f : s.fields)
             {
                 ss << "/" << f.first << "/"
-                   << get_url_type_string(session, f.second.schema);
+                   << get_url_type_string(api_url, f.second.schema);
             }
             return ss.str();
         }
@@ -302,7 +308,7 @@ get_url_type_string(
             for (auto const& m : u.members)
             {
                 ss << "/" << m.first << "/"
-                   << get_url_type_string(session, m.second.schema);
+                   << get_url_type_string(api_url, m.second.schema);
             }
             return ss.str();
         }
@@ -514,7 +520,7 @@ post_iss_object(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 

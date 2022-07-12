@@ -2,6 +2,7 @@
 #include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
+#include <spdlog/spdlog.h>
 
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/value.h>
@@ -119,10 +120,13 @@ TEST_CASE("resolve function request", "[function]")
         resolve_loop_thin<16>();
     };
 
+#ifndef _MSC_VER
+    // VS2019 internal compiler error
     BENCHMARK("1000x resolve thin tree H=64")
     {
         resolve_loop_thin<64>();
     };
+#endif
 
     BENCHMARK("1000x resolve △ tree H=2")
     {
@@ -525,5 +529,273 @@ TEST_CASE("resolve mixed function request", "[function]")
     BENCHMARK("1000x resolve △ tree H=6")
     {
         return resolve_loop_triangular_mixed<6>();
+    };
+}
+
+template<caching_level_type level, int H>
+requires(H == 1) auto create_thin_tree_erased()
+{
+    return rq_function_erased<level>(add, rq_value(2), rq_value(1));
+}
+
+template<caching_level_type level, int H>
+requires(H > 1) auto create_thin_tree_erased()
+{
+    return rq_function_erased<level>(
+        add, create_thin_tree_erased<level, H - 1>(), rq_value(1));
+}
+
+template<caching_level_type level, int H>
+requires(H == 1) auto create_triangular_tree_erased()
+{
+    return rq_function_erased<level>(add, rq_value(2), rq_value(1));
+}
+
+template<caching_level_type level, int H>
+requires(H > 1) auto create_triangular_tree_erased()
+{
+    return rq_function_erased<level>(
+        add,
+        create_triangular_tree_erased<level, H - 1>(),
+        create_triangular_tree_erased<level, H - 1>());
+}
+
+template<caching_level_type level, int H>
+requires(H == 1) auto create_triangular_tree_erased_introspected()
+{
+    std::string title{"add 2+1"};
+    return rq_function_erased_intrsp<level>(
+        title, add, rq_value(2), rq_value(1));
+}
+
+template<caching_level_type level, int H>
+requires(H > 1) auto create_triangular_tree_erased_introspected()
+{
+    std::stringstream ss;
+    ss << "add H" << H;
+    std::string title{ss.str()};
+    return rq_function_erased_intrsp<level>(
+        title,
+        add,
+        create_triangular_tree_erased_introspected<level, H - 1>(),
+        create_triangular_tree_erased_introspected<level, H - 1>());
+}
+
+TEST_CASE("create type-erased function request (uncached)", "[erased]")
+{
+    auto constexpr level = caching_level_type::none;
+
+    BENCHMARK("create thin tree H=2")
+    {
+        return create_thin_tree_erased<level, 2>();
+    };
+
+    BENCHMARK("create thin tree H=4")
+    {
+        return create_thin_tree_erased<level, 4>();
+    };
+
+    BENCHMARK("create thin tree H=16")
+    {
+        return create_thin_tree_erased<level, 16>();
+    };
+
+    BENCHMARK("create thin tree H=64")
+    {
+        return create_thin_tree_erased<level, 64>();
+    };
+
+    BENCHMARK("create △ tree H=2")
+    {
+        return create_triangular_tree_erased<level, 2>();
+    };
+
+    BENCHMARK("create △ tree H=4")
+    {
+        return create_triangular_tree_erased<level, 4>();
+    };
+
+    BENCHMARK("create △ tree H=6")
+    {
+        return create_triangular_tree_erased<level, 6>();
+    };
+}
+
+TEST_CASE("create type-erased function request (cached)", "[erased]")
+{
+    auto constexpr level = caching_level_type::memory;
+
+    BENCHMARK("create thin tree H=2")
+    {
+        return create_thin_tree_erased<level, 2>();
+    };
+
+    BENCHMARK("create thin tree H=4")
+    {
+        return create_thin_tree_erased<level, 4>();
+    };
+
+    BENCHMARK("create thin tree H=16")
+    {
+        return create_thin_tree_erased<level, 16>();
+    };
+
+    BENCHMARK("create thin tree H=64")
+    {
+        return create_thin_tree_erased<level, 64>();
+    };
+
+    BENCHMARK("create △ tree H=2")
+    {
+        return create_triangular_tree_erased<level, 2>();
+    };
+
+    BENCHMARK("create △ tree H=4")
+    {
+        return create_triangular_tree_erased<level, 4>();
+    };
+
+    BENCHMARK("create △ tree H=6")
+    {
+        return create_triangular_tree_erased<level, 6>();
+    };
+}
+
+TEST_CASE(
+    "create type-erased function request (cached, introspected)", "[erased]")
+{
+    auto constexpr level = caching_level_type::memory;
+
+    BENCHMARK("create △ tree H=4")
+    {
+        return create_triangular_tree_erased_introspected<level, 4>();
+    };
+
+    BENCHMARK("create △ tree H=6")
+    {
+        return create_triangular_tree_erased_introspected<level, 6>();
+    };
+}
+
+template<caching_level_type level, int H>
+auto
+resolve_loop_thin_erased()
+{
+    auto expected = 2 + H;
+    resolve_request_loop(create_thin_tree_erased<level, H>(), expected);
+}
+
+template<caching_level_type level, int H>
+auto
+resolve_loop_triangular_erased()
+{
+    int expected = (1 << (H - 1)) * 3;
+    resolve_request_loop(create_triangular_tree_erased<level, H>(), expected);
+    return expected;
+}
+
+TEST_CASE("resolve type-erased function request (uncached)", "[erased]")
+{
+    auto constexpr level = caching_level_type::none;
+
+    BENCHMARK("1000x resolve thin tree H=2")
+    {
+        resolve_loop_thin_erased<level, 2>();
+    };
+
+    BENCHMARK("1000x resolve thin tree H=4")
+    {
+        resolve_loop_thin_erased<level, 4>();
+    };
+
+    BENCHMARK("1000x resolve thin tree H=16")
+    {
+        resolve_loop_thin_erased<level, 16>();
+    };
+
+    BENCHMARK("1000x resolve thin tree H=64")
+    {
+        resolve_loop_thin_erased<level, 64>();
+    };
+
+    BENCHMARK("1000x resolve △ tree H=2")
+    {
+        return resolve_loop_triangular_erased<level, 2>();
+    };
+
+    BENCHMARK("1000x resolve △ tree H=4")
+    {
+        return resolve_loop_triangular_erased<level, 4>();
+    };
+
+    BENCHMARK("1000x resolve △ tree H=6")
+    {
+        return resolve_loop_triangular_erased<level, 6>();
+    };
+}
+
+TEST_CASE("resolve type-erased function request (memory-cached)", "[erased]")
+{
+    auto constexpr level = caching_level_type::memory;
+
+    BENCHMARK("1000x resolve thin tree H=2")
+    {
+        resolve_loop_thin_erased<level, 2>();
+    };
+
+    BENCHMARK("1000x resolve thin tree H=4")
+    {
+        resolve_loop_thin_erased<level, 4>();
+    };
+
+    BENCHMARK("1000x resolve thin tree H=16")
+    {
+        resolve_loop_thin_erased<level, 16>();
+    };
+
+    BENCHMARK("1000x resolve thin tree H=64")
+    {
+        resolve_loop_thin_erased<level, 64>();
+    };
+
+    BENCHMARK("1000x resolve △ tree H=2")
+    {
+        return resolve_loop_triangular_erased<level, 2>();
+    };
+
+    BENCHMARK("1000x resolve △ tree H=4")
+    {
+        return resolve_loop_triangular_erased<level, 4>();
+    };
+
+    BENCHMARK("1000x resolve △ tree H=6")
+    {
+        return resolve_loop_triangular_erased<level, 6>();
+    };
+}
+
+template<int H>
+auto
+resolve_loop_triangular_erased_full()
+{
+    auto constexpr level = caching_level_type::full;
+    int expected = (1 << (H - 1)) * 3;
+    resolve_request_loop_full(
+        create_triangular_tree_erased<level, H>(), expected);
+    return expected;
+}
+
+TEST_CASE("resolve type-erased function request (fully cached)", "[erased]")
+{
+    spdlog::set_level(spdlog::level::warn);
+
+    BENCHMARK("1000x resolve △ tree H=4")
+    {
+        return resolve_loop_triangular_erased_full<4>();
+    };
+
+    BENCHMARK("1000x resolve △ tree H=6")
+    {
+        return resolve_loop_triangular_erased_full<6>();
     };
 }

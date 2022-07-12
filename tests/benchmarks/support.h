@@ -1,9 +1,14 @@
 #ifndef CRADLE_TESTS_BENCHMARKS_SUPPORT_H
 #define CRADLE_TESTS_BENCHMARKS_SUPPORT_H
 
-template<typename Request>
+#include "../inner/support/concurrency_testing.h"
+#include <cradle/inner/service/request.h>
+
+namespace cradle {
+
+template<UncachedRequest Req>
 auto
-call_resolve_by_ref_loop(Request const& req, int expected)
+call_resolve_by_ref_loop(Req const& req, int expected)
 {
     constexpr int num_loops = 1000;
     uncached_request_resolution_context ctx{};
@@ -19,9 +24,9 @@ call_resolve_by_ref_loop(Request const& req, int expected)
     REQUIRE(actual == expected * num_loops);
 }
 
-template<typename Request>
+template<UncachedRequestPtr Req>
 auto
-call_resolve_by_ptr_loop(Request const& req, int expected)
+call_resolve_by_ptr_loop(Req const& req, int expected)
 {
     constexpr int num_loops = 1000;
     uncached_request_resolution_context ctx{};
@@ -37,9 +42,9 @@ call_resolve_by_ptr_loop(Request const& req, int expected)
     REQUIRE(actual == expected * num_loops);
 }
 
-template<typename Request>
+template<UncachedRequestOrPtr Req>
 auto
-resolve_request_loop(Request const& req, int expected)
+resolve_request_loop(Req const& req, int expected)
 {
     constexpr int num_loops = 1000;
     uncached_request_resolution_context ctx{};
@@ -54,5 +59,48 @@ resolve_request_loop(Request const& req, int expected)
     auto actual = cppcoro::sync_wait(loop());
     REQUIRE(actual == expected * num_loops);
 }
+
+template<CachedRequestOrPtr Req>
+auto
+resolve_request_loop(Req const& req, int expected)
+{
+    constexpr int num_loops = 1000;
+    cached_request_resolution_context ctx{};
+    auto loop = [&]() -> cppcoro::task<int> {
+        int total{};
+        for (auto i = 0; i < num_loops; ++i)
+        {
+            total += co_await resolve_request(ctx, req);
+        }
+        co_return total;
+    };
+    auto actual = cppcoro::sync_wait(loop());
+    REQUIRE(actual == expected * num_loops);
+}
+
+template<CachedRequest Req>
+requires(
+    Req::caching_level
+    == caching_level_type::
+        full) auto resolve_request_loop_full(Req const& req, int expected)
+{
+    constexpr int num_loops = 1000;
+    cached_request_resolution_context ctx{};
+    auto loop = [&]() -> cppcoro::task<int> {
+        ctx.reset_memory_cache();
+        int total{co_await resolve_request(ctx, req)};
+        sync_wait_write_disk_cache(ctx.get_service());
+        for (auto i = 1; i < num_loops; ++i)
+        {
+            ctx.reset_memory_cache();
+            total += co_await resolve_request(ctx, req);
+        }
+        co_return total;
+    };
+    auto actual = cppcoro::sync_wait(loop());
+    REQUIRE(actual == expected * num_loops);
+}
+
+} // namespace cradle
 
 #endif

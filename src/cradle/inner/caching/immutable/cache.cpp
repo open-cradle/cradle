@@ -19,7 +19,7 @@ immutable_cache::immutable_cache(immutable_cache_config config)
 void
 immutable_cache::reset(immutable_cache_config config)
 {
-    this->impl = std::make_unique<detail::immutable_cache>();
+    this->impl = std::make_unique<detail::immutable_cache_impl>();
     this->impl->config = std::move(config);
 }
 
@@ -45,8 +45,8 @@ get_cache_snapshot(immutable_cache& cache_object)
     for (auto const& [key, record] : cache.records)
     {
         immutable_cache_entry_snapshot entry{
-            lexical_cast<string>(*record->key),
-            record->state.load(std::memory_order_relaxed),
+            record->key->get_unique_hash(),
+            record->state,
             // is_initialized(data) ? some(data.ptr->type_info()) : none,
             record->size};
         // Put the entry's info the appropriate list depending on whether

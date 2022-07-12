@@ -1,11 +1,18 @@
-#ifndef CRADLE_TYPING_UTILTIES_CONCURRENCY_TESTING_H
-#define CRADLE_TYPING_UTILTIES_CONCURRENCY_TESTING_H
+#ifndef CRADLE_TESTS_INNER_SUPPORT_CONCURRENCY_TESTING_H
+#define CRADLE_TESTS_INNER_SUPPORT_CONCURRENCY_TESTING_H
 
 #include <chrono>
 #include <thread>
 #include <utility>
 
+#include <catch2/catch.hpp>
+
+#include <cradle/inner/service/internals.h>
+#include <cradle/inner/service/types.h>
+
 namespace cradle {
+
+struct inner_service_core;
 
 // Wait up to a second to see if a condition occurs (i.e., returns true).
 // Check once per millisecond to see if it occurs.
@@ -24,6 +31,17 @@ occurs_soon(Condition&& condition, int wait_time_in_ms = 1000)
             return false;
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
+}
+
+// Data is written to the disk cache in a background thread;
+// wait until all these write operations have completed.
+inline void
+sync_wait_write_disk_cache(inner_service_core& service)
+{
+    REQUIRE(occurs_soon([&] {
+        return service.inner_internals().disk_write_pool.get_tasks_total()
+               == 0;
+    }));
 }
 
 } // namespace cradle

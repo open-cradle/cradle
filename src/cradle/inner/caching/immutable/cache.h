@@ -14,7 +14,7 @@ namespace cradle {
 
 namespace detail {
 
-struct immutable_cache;
+struct immutable_cache_impl;
 
 } // namespace detail
 
@@ -52,7 +52,7 @@ struct immutable_cache
         return impl ? true : false;
     }
 
-    std::unique_ptr<detail::immutable_cache> impl;
+    std::unique_ptr<detail::immutable_cache_impl> impl;
 };
 
 enum class immutable_cache_entry_state

@@ -50,6 +50,13 @@ inner_service_core::inner_reset(inner_service_config const& config)
         .disk_write_pool = thread_pool(2)});
 }
 
+void
+inner_service_core::inner_reset_memory_cache(
+    immutable_cache_config const& config)
+{
+    impl_->reset_memory_cache(config);
+}
+
 cppcoro::task<std::string>
 read_file_contents(inner_service_core& core, file_path const& path)
 {
@@ -73,7 +80,7 @@ generic_disk_cached(
     id_interface const& id_key,
     std::function<cppcoro::task<blob>()> create_task)
 {
-    std::string key{boost::lexical_cast<std::string>(id_key)};
+    std::string key{id_key.get_unique_hash()};
     // Check the cache for an existing value.
     auto& cache = core.inner_internals().disk_cache;
     try

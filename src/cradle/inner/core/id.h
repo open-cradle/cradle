@@ -4,10 +4,13 @@
 #include <functional>
 #include <memory>
 #include <sstream>
+#include <string>
+#include <typeinfo>
 
 #include <boost/lexical_cast.hpp>
 
 #include <cradle/inner/core/hash.h>
+#include <cradle/inner/core/unique_hash.h>
 
 // This file implements the concept of IDs in CRADLE.
 
@@ -16,18 +19,7 @@ namespace cradle {
 // id_interface defines the interface required of all ID types.
 struct id_interface
 {
-    virtual ~id_interface()
-    {
-    }
-
-    // Create a standalone copy of the ID.
-    virtual id_interface*
-    clone() const = 0;
-
-    // Given another ID of the same type, set it equal to a standalone copy
-    // of this ID.
-    virtual void
-    deep_copy(id_interface* copy) const = 0;
+    virtual ~id_interface() = default;
 
     // Given another ID of the same type, return true iff it's equal to this
     // one.
@@ -39,16 +31,19 @@ struct id_interface
     virtual bool
     less_than(id_interface const& other) const = 0;
 
-    // Write a textual representation of the ID to the given ostream.
-    // The textual representation is intended for informational purposes only.
-    // It's not required to guarantee uniqueness. (In particular, it doesn't
-    // need to capture type information about the ID.)
-    virtual void
-    stream(std::ostream& o) const = 0;
-
-    // Generate a hash of the ID.
+    // Generate a hash of the ID. This need not be unique over co-existing
+    // objects.
     virtual size_t
     hash() const = 0;
+
+    // Get a hash value that is unique for this ID.
+    virtual std::string
+    get_unique_hash() const;
+
+    // Update hasher's hash according to this ID.
+    // Used in the get_unique_hash() implementation.
+    virtual void
+    update_hash(unique_hasher& hasher) const = 0;
 };
 
 // The following convert the interface of the ID operations into the usual form
@@ -71,16 +66,6 @@ operator!=(id_interface const& a, id_interface const& b)
 
 bool
 operator<(id_interface const& a, id_interface const& b);
-
-// The textual representation is intended for informational purposes only.
-// It's not required to guarantee uniqueness. (In particular, it doesn't
-// need to capture type information about the ID.)
-inline std::ostream&
-operator<<(std::ostream& o, id_interface const& id)
-{
-    id.stream(o);
-    return o;
-}
 
 // The following allow the use of IDs as keys in a map or unordered_map.
 // The IDs are stored separately as captured_ids in the mapped values and
@@ -124,6 +109,13 @@ struct captured_id
     }
     captured_id(captured_id const& other) = default;
     captured_id(captured_id&& other) noexcept = default;
+
+    // The aliasing constructor; ownership information shared with other
+    captured_id(std::shared_ptr<id_interface> const& other)
+        : id_{other, other.get()}
+    {
+    }
+
     captured_id&
     operator=(captured_id const& other)
         = default;
@@ -143,6 +135,11 @@ struct captured_id
     operator*() const
     {
         return *id_;
+    }
+    id_interface const*
+    operator->() const
+    {
+        return &*id_;
     }
     bool
     matches(id_interface const& id) const
@@ -181,14 +178,6 @@ struct id_ref : id_interface
     {
     }
 
-    id_interface*
-    clone() const override
-    {
-        id_ref* copy = new id_ref;
-        this->deep_copy(copy);
-        return copy;
-    }
-
     bool
     equals(id_interface const& other) const override
     {
@@ -203,32 +192,16 @@ struct id_ref : id_interface
         return *id_ < *other_id.id_;
     }
 
-    void
-    deep_copy(id_interface* copy) const override
-    {
-        auto& typed_copy = *static_cast<id_ref*>(copy);
-        if (ownership_)
-        {
-            typed_copy.ownership_ = ownership_;
-            typed_copy.id_ = id_;
-        }
-        else
-        {
-            typed_copy.ownership_.reset(id_->clone());
-            typed_copy.id_ = typed_copy.ownership_.get();
-        }
-    }
-
-    void
-    stream(std::ostream& o) const override
-    {
-        o << *id_;
-    }
-
     size_t
     hash() const override
     {
         return id_->hash();
+    }
+
+    void
+    update_hash(unique_hasher& hasher) const override
+    {
+        id_->update_hash(hasher);
     }
 
  private:
@@ -263,12 +236,6 @@ struct simple_id : id_interface
         return value_;
     }
 
-    id_interface*
-    clone() const override
-    {
-        return new simple_id(value_);
-    }
-
     bool
     equals(id_interface const& other) const override
     {
@@ -290,22 +257,16 @@ struct simple_id : id_interface
 #endif
     }
 
-    void
-    deep_copy(id_interface* copy) const override
-    {
-        *static_cast<simple_id*>(copy) = *this;
-    }
-
-    void
-    stream(std::ostream& o) const override
-    {
-        o << value_;
-    }
-
     size_t
     hash() const override
     {
         return invoke_hash(value_);
+    }
+
+    void
+    update_hash(unique_hasher& hasher) const override
+    {
+        update_unique_hash(hasher, value_);
     }
 
     Value value_;
@@ -328,7 +289,7 @@ make_captured_id(Value value)
 }
 
 // simple_id_by_reference is like simple_id but takes a pointer to the value.
-// The value is only copied if the ID is cloned or deep-copied.
+// The value is never copied.
 template<class Value>
 struct simple_id_by_reference : id_interface
 {
@@ -338,14 +299,6 @@ struct simple_id_by_reference : id_interface
 
     simple_id_by_reference(Value const* value) : value_(value), storage_()
     {
-    }
-
-    id_interface*
-    clone() const override
-    {
-        simple_id_by_reference* copy = new simple_id_by_reference;
-        this->deep_copy(copy);
-        return copy;
     }
 
     bool
@@ -364,32 +317,16 @@ struct simple_id_by_reference : id_interface
         return *value_ < *other_id.value_;
     }
 
-    void
-    deep_copy(id_interface* copy) const override
-    {
-        auto& typed_copy = *static_cast<simple_id_by_reference*>(copy);
-        if (storage_)
-        {
-            typed_copy.storage_ = this->storage_;
-            typed_copy.value_ = this->value_;
-        }
-        else
-        {
-            typed_copy.storage_.reset(new Value(*this->value_));
-            typed_copy.value_ = typed_copy.storage_.get();
-        }
-    }
-
-    void
-    stream(std::ostream& o) const override
-    {
-        o << *value_;
-    }
-
     size_t
     hash() const override
     {
         return invoke_hash(*value_);
+    }
+
+    void
+    update_hash(unique_hasher& hasher) const override
+    {
+        update_unique_hash(hasher, *value_);
     }
 
  private:
@@ -417,14 +354,6 @@ struct id_pair : id_interface
     {
     }
 
-    id_interface*
-    clone() const override
-    {
-        id_pair* copy = new id_pair;
-        this->deep_copy(copy);
-        return copy;
-    }
-
     bool
     equals(id_interface const& other) const override
     {
@@ -441,24 +370,17 @@ struct id_pair : id_interface
                    && id1_.less_than(other_id.id1_));
     }
 
-    void
-    deep_copy(id_interface* copy) const override
-    {
-        id_pair* typed_copy = static_cast<id_pair*>(copy);
-        id0_.deep_copy(&typed_copy->id0_);
-        id1_.deep_copy(&typed_copy->id1_);
-    }
-
-    void
-    stream(std::ostream& o) const override
-    {
-        o << "(" << id0_ << "," << id1_ << ")";
-    }
-
     size_t
     hash() const override
     {
         return id0_.hash() ^ id1_.hash();
+    }
+
+    void
+    update_hash(unique_hasher& hasher) const override
+    {
+        id0_.update_hash(hasher);
+        id1_.update_hash(hasher);
     }
 
  private:
@@ -497,11 +419,23 @@ struct null_id_type
 };
 static simple_id<null_id_type*> const null_id(nullptr);
 
+inline void
+update_unique_hash(unique_hasher& hasher, null_id_type* val)
+{
+    hasher.encode_type<null_id_type>();
+}
+
 // unit_id can be used when there is only possible identify.
 struct unit_id_type
 {
 };
 static simple_id<unit_id_type*> const unit_id(nullptr);
+
+inline void
+update_unique_hash(unique_hasher& hasher, unit_id_type* val)
+{
+    hasher.encode_type<unit_id_type>();
+}
 
 } // namespace cradle
 

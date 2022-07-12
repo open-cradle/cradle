@@ -3,7 +3,7 @@
 #include <cradle/inner/fs/utilities.h>
 #include <cradle/inner/service/core.h>
 
-using namespace cradle;
+namespace cradle {
 
 void
 init_test_inner_service(inner_service_core& core)
@@ -16,3 +16,16 @@ init_test_inner_service(inner_service_core& core)
         immutable_cache_config{0x40'00'00'00},
         disk_cache_config{cache_dir.string(), 0x40'00'00'00}});
 }
+
+cached_request_resolution_context::cached_request_resolution_context()
+{
+    init_test_inner_service(service);
+}
+
+void
+cached_request_resolution_context::reset_memory_cache()
+{
+    service.inner_reset_memory_cache(immutable_cache_config{0x40'00'00'00});
+}
+
+} // namespace cradle

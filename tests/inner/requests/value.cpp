@@ -4,14 +4,13 @@
 #include <sstream>
 
 #include <catch2/catch.hpp>
-#include <cradle/inner/requests/generic.h>
-
-#include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 
 #include "../introspection/tasklet_testing.h"
 #include "../support/core.h"
+#include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/core.h>
+#include <cradle/inner/service/request.h>
 
 using namespace cradle;
 
