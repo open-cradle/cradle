@@ -92,6 +92,9 @@ TEST_CASE("ISS POST", "[iss]")
             session.api_url, context_id, schema, object_data);
     };
 
+#if 0
+    // Measuring resolve_request() looks unfeasible due to the large
+    // overhead of especially the mock HTTP.
     BENCHMARK("resolve request x 10, uncached")
     {
         constexpr int num_loops = 10;
@@ -100,38 +103,20 @@ TEST_CASE("ISS POST", "[iss]")
             = cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_none));
         REQUIRE(id == expected_result(num_loops));
     };
+#endif
 
-    BENCHMARK("resolve request x 20, uncached")
+    // Fill cache for the memory-cached tests
     {
-        constexpr int num_loops = 20;
-        set_mock_script(mock_http, num_loops);
-        auto id
-            = cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_none));
-        REQUIRE(id == expected_result(num_loops));
-    };
-
-    BENCHMARK("resolve request, fill cache")
-    {
-        constexpr int num_loops = 2;
+        constexpr int num_loops = 1;
         set_mock_script(mock_http, num_loops);
         auto id
             = cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_mem));
         REQUIRE(id == expected_result(num_loops));
     };
 
-    BENCHMARK("resolve request x 10, memory cached")
+    BENCHMARK("resolve request x 1000, memory cached")
     {
-        constexpr int num_loops = 10;
-        set_mock_script(mock_http, num_loops);
-        auto id
-            = cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_mem));
-        REQUIRE(id == expected_result(num_loops));
-    };
-
-    BENCHMARK("resolve request x 20, memory cached")
-    {
-        constexpr int num_loops = 20;
-        set_mock_script(mock_http, num_loops);
+        constexpr int num_loops = 1000;
         auto id
             = cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_mem));
         REQUIRE(id == expected_result(num_loops));
