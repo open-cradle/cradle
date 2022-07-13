@@ -168,6 +168,7 @@ endmacro()
 
 # Enable a high level of compiler warnings and treat them as errors.
 if(IS_GCC OR IS_CLANG)
+    add_compile_options(-g)
     add_compile_options(-Wall -Werror -Wextra -pedantic)
     # Disable warnings that are too strict.
     # unused function parameters

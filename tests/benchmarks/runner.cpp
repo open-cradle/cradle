@@ -5,4 +5,4 @@
 
 auto the_logger = spdlog::stdout_color_mt("cradle");
 
-BENCHMARK_MAIN();
+// BENCHMARK_MAIN();

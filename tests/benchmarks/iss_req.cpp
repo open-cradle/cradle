@@ -1,6 +1,8 @@
 #include <cradle/thinknode/iss_req.h>
 
-#include <benchmark/benchmark.h>
+#include <iostream>
+
+//#include <benchmark/benchmark.h>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
 
@@ -141,9 +143,12 @@ TEST_CASE("ISS POST", "[iss]")
 }
 #endif
 
+int my_counter = 0;
+
 static void
-BM_resolve_request_uncached(benchmark::State& state)
+BM_resolve_request_uncached(int num_loops)
 {
+    std::cout << "BM_resolve_request_uncached(" << num_loops << ")\n";
     service_core service;
     init_test_service(service, true);
     auto& mock_http = enable_http_mocking(service);
@@ -161,18 +166,17 @@ BM_resolve_request_uncached(benchmark::State& state)
     //    auto req_mem{rq_post_iss_object<caching_level_type::memory>(
     //        session.api_url, context_id, schema, object_data)};
 
-    for (auto _ : state)
+    for (my_counter = 0; my_counter < 100000; ++my_counter)
     {
-        int num_loops = state.range(0);
         set_mock_script(mock_http, num_loops);
-        benchmark::DoNotOptimize(
-            cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_none)));
+        cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_none));
     }
 }
 
 static void
-BM_resolve_request_memory_cached(benchmark::State& state)
+BM_resolve_request_memory_cached(int num_loops)
 {
+    std::cout << "BM_resolve_request_memory_cached(" << num_loops << ")\n";
     service_core service;
     init_test_service(service, true);
     auto& mock_http = enable_http_mocking(service);
@@ -194,13 +198,21 @@ BM_resolve_request_memory_cached(benchmark::State& state)
     set_mock_script(mock_http, 1000);
     cppcoro::sync_wait(resolve_n_requests(1000, ctx, req_mem));
 
-    for (auto _ : state)
+    for (int i = 0; i < 100000; ++i)
     {
-        int num_loops = state.range(0);
         set_mock_script(mock_http, num_loops);
         cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_mem));
     }
 }
 
-BENCHMARK(BM_resolve_request_uncached)->Arg(10)->Arg(20);
-BENCHMARK(BM_resolve_request_memory_cached)->Arg(10)->Arg(20);
+// BENCHMARK(BM_resolve_request_uncached)->Arg(10)->Arg(20);
+// BENCHMARK(BM_resolve_request_memory_cached)->Arg(10)->Arg(20);
+
+int
+main()
+{
+    BM_resolve_request_uncached(10);
+    BM_resolve_request_uncached(20);
+    BM_resolve_request_memory_cached(10);
+    BM_resolve_request_memory_cached(20);
+}

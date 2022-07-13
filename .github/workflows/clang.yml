@@ -62,6 +62,7 @@ jobs:
       if: ${{ matrix.config == 'Release' }}
       run: |
         cmake --build build --config Release --target benchmark_tests
+      timeout-minutes: 10
 
     - name: Unit test with coverage
       if: ${{ matrix.config == 'Debug' }}
