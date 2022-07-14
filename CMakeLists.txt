@@ -70,6 +70,7 @@ conan_cmake_configure(
         lz4/1.9.3
         fmt/7.1.3
         cereal/1.3.2
+        benchmark/1.6.1
     OPTIONS
         boost:without_chrono=True
         boost:without_container=True
@@ -148,6 +149,7 @@ find_package(spdlog REQUIRED)
 find_package(simdjson REQUIRED)
 find_package(lz4 REQUIRED)
 find_package(cereal REQUIRED)
+find_package(benchmark REQUIRED)
 
 # Add the given linker options on anything that gets linked.
 macro(add_link_options )
@@ -484,11 +486,13 @@ add_test(
         --build ${CMAKE_BINARY_DIR}
         --target integration_tests)
 
-file(GLOB_RECURSE test_srcs_benchmark CONFIGURE_DEPENDS "tests/benchmarks/*.cpp")
+file(GLOB_RECURSE test_srcs_benchmark CONFIGURE_DEPENDS
+    "tests/benchmarks/*.cpp")
 add_executable(benchmark_test_runner ${test_srcs_benchmark} tests/inner/support/core.cpp)
-target_include_directories(benchmark_test_runner PRIVATE
-    src/inner)
-target_link_libraries(benchmark_test_runner cradle_outer cradle_inner)
+# Seems redundant due to PUBLIC property on cradle_inner
+# target_include_directories(benchmark_test_runner PRIVATE
+#     src/inner)
+target_link_libraries(benchmark_test_runner cradle_outer cradle_inner benchmark::benchmark)
 
 add_custom_target(
     benchmark_tests

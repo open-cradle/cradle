@@ -1,5 +1,4 @@
-#define CATCH_CONFIG_ENABLE_BENCHMARKING
-#include <catch2/catch.hpp>
+#include <benchmark/benchmark.h>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
 #include <spdlog/spdlog.h>
@@ -48,101 +47,41 @@ create_triangular_tree<1>()
     return rq_function<level>(add, rq_value(2), rq_value(1));
 }
 
-TEST_CASE("create function request", "[function]")
+template<int H>
+void
+BM_create_thin_tree(benchmark::State& state)
 {
-    BENCHMARK("create thin tree H=2")
+    for (auto _ : state)
     {
-        return create_thin_tree<2>();
-    };
-
-    BENCHMARK("create thin tree H=4")
-    {
-        return create_thin_tree<4>();
-    };
-
-    BENCHMARK("create thin tree H=16")
-    {
-        return create_thin_tree<16>();
-    };
-
-    BENCHMARK("create thin tree H=64")
-    {
-        return create_thin_tree<64>();
-    };
-
-    BENCHMARK("create △ tree H=2")
-    {
-        return create_triangular_tree<2>();
-    };
-
-    BENCHMARK("create △ tree H=4")
-    {
-        return create_triangular_tree<4>();
-    };
-
-    BENCHMARK("create △ tree H=6")
-    {
-        return create_triangular_tree<6>();
-    };
+        benchmark::DoNotOptimize(create_thin_tree<H>());
+    }
 }
 
 template<int H>
-auto
-resolve_loop_thin()
+void
+BM_create_triangular_tree(benchmark::State& state)
 {
-    auto expected = 2 + H;
-    resolve_request_loop(create_thin_tree<H>(), expected);
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(create_triangular_tree<H>());
+    }
 }
 
-template<int H>
-auto
-resolve_loop_triangular()
-{
-    int expected = (1 << (H - 1)) * 3;
-    resolve_request_loop(create_triangular_tree<H>(), expected);
-}
+BENCHMARK(BM_create_thin_tree<2>)
+    ->Name("BM_create_function_request_thin_tree H=2");
+BENCHMARK(BM_create_thin_tree<4>)
+    ->Name("BM_create_function_request_thin_tree H=4");
+BENCHMARK(BM_create_thin_tree<16>)
+    ->Name("BM_create_function_request_thin_tree H=16");
+BENCHMARK(BM_create_thin_tree<64>)
+    ->Name("BM_create_function_request_thin_tree H=64");
 
-TEST_CASE("resolve function request", "[function]")
-{
-
-    BENCHMARK("1000x resolve thin tree H=2")
-    {
-        resolve_loop_thin<2>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=4")
-    {
-        resolve_loop_thin<4>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=16")
-    {
-        resolve_loop_thin<16>();
-    };
-
-#ifndef _MSC_VER
-    // VS2019 internal compiler error
-    BENCHMARK("1000x resolve thin tree H=64")
-    {
-        resolve_loop_thin<64>();
-    };
-#endif
-
-    BENCHMARK("1000x resolve △ tree H=2")
-    {
-        return resolve_loop_triangular<2>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=4")
-    {
-        return resolve_loop_triangular<4>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=6")
-    {
-        return resolve_loop_triangular<6>();
-    };
-}
+BENCHMARK(BM_create_triangular_tree<2>)
+    ->Name("BM_create_function_request_tri_tree H=2");
+BENCHMARK(BM_create_triangular_tree<4>)
+    ->Name("BM_create_function_request_tri_tree H=4");
+BENCHMARK(BM_create_triangular_tree<6>)
+    ->Name("BM_create_function_request_tri_tree H=6");
 
 template<int H>
 auto
@@ -180,82 +119,38 @@ create_triangular_tree_up<1>()
     return rq_function_up<level>(add, rq_value_up(2), rq_value_up(1));
 }
 
-TEST_CASE("create function request in unique_ptr", "[function]")
+template<int H>
+void
+BM_create_thin_tree_up(benchmark::State& state)
 {
-    BENCHMARK("create thin tree H=2")
+    for (auto _ : state)
     {
-        return create_thin_tree_up<2>();
-    };
-
-    BENCHMARK("create thin tree H=4")
-    {
-        return create_thin_tree_up<4>();
-    };
-
-    // Taller trees tend to blow up the compilers.
-
-    BENCHMARK("create △ tree H=2")
-    {
-        return create_triangular_tree_up<2>();
-    };
-
-    BENCHMARK("create △ tree H=4")
-    {
-        return create_triangular_tree_up<4>();
-    };
-
-    BENCHMARK("create △ tree H=6")
-    {
-        return create_triangular_tree_up<6>();
-    };
+        benchmark::DoNotOptimize(create_thin_tree_up<H>());
+    }
 }
+
+BENCHMARK(BM_create_thin_tree_up<2>)
+    ->Name("BM_create_function_request_up_thin_tree_H2");
+BENCHMARK(BM_create_thin_tree_up<4>)
+    ->Name("BM_create_function_request_up_thin_tree_H4");
+// Taller trees tend to blow up the compilers.
 
 template<int H>
-auto
-resolve_loop_thin_up()
+void
+BM_create_triangular_tree_up(benchmark::State& state)
 {
-    auto expected = 2 + H;
-    resolve_request_loop(create_thin_tree_up<H>(), expected);
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(create_triangular_tree_up<H>());
+    }
 }
 
-template<int H>
-auto
-resolve_loop_triangular_up()
-{
-    int expected = (1 << (H - 1)) * 3;
-    resolve_request_loop(create_triangular_tree_up<H>(), expected);
-}
-
-TEST_CASE("resolve function request in unique_ptr", "[function]")
-{
-
-    BENCHMARK("1000x resolve thin tree H=2")
-    {
-        resolve_loop_thin_up<2>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=4")
-    {
-        resolve_loop_thin_up<4>();
-    };
-
-    // Taller trees tend to blow up the compilers.
-
-    BENCHMARK("1000x resolve △ tree H=2")
-    {
-        return resolve_loop_triangular_up<2>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=4")
-    {
-        return resolve_loop_triangular_up<4>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=6")
-    {
-        return resolve_loop_triangular_up<6>();
-    };
-}
+BENCHMARK(BM_create_triangular_tree_up<2>)
+    ->Name("BM_create_function_request_up_tri_tree H=2");
+BENCHMARK(BM_create_triangular_tree_up<4>)
+    ->Name("BM_create_function_request_up_tri_tree H=4");
+BENCHMARK(BM_create_triangular_tree_up<6>)
+    ->Name("BM_create_function_request_up_tri_tree H=6");
 
 template<int H>
 auto
@@ -273,6 +168,25 @@ create_thin_tree_sp<1>()
     auto constexpr level = caching_level_type::none;
     return rq_function_sp<level>(add, rq_value_sp(2), rq_value_sp(1));
 }
+
+template<int H>
+void
+BM_create_thin_tree_sp(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(create_thin_tree_sp<H>());
+    }
+}
+
+BENCHMARK(BM_create_thin_tree_sp<2>)
+    ->Name("BM_create_function_request_sp_thin_tree H=2");
+BENCHMARK(BM_create_thin_tree_sp<4>)
+    ->Name("BM_create_function_request_sp_thin_tree H=4");
+BENCHMARK(BM_create_thin_tree_sp<16>)
+    ->Name("BM_create_function_request_sp_thin_tree H=16");
+BENCHMARK(BM_create_thin_tree_sp<64>)
+    ->Name("BM_create_function_request_sp_thin_tree H=64");
 
 template<int H>
 auto
@@ -293,98 +207,22 @@ create_triangular_tree_sp<1>()
     return rq_function_sp<level>(add, rq_value_sp(2), rq_value_sp(1));
 }
 
-TEST_CASE("create function request in shared_ptr", "[function]")
-{
-    BENCHMARK("create thin tree H=2")
-    {
-        return create_thin_tree_sp<2>();
-    };
-
-    BENCHMARK("create thin tree H=4")
-    {
-        return create_thin_tree_sp<4>();
-    };
-
-    BENCHMARK("create thin tree H=16")
-    {
-        return create_thin_tree_sp<16>();
-    };
-
-    BENCHMARK("create thin tree H=64")
-    {
-        return create_thin_tree_sp<64>();
-    };
-
-    BENCHMARK("create △ tree H=2")
-    {
-        return create_triangular_tree_sp<2>();
-    };
-
-    BENCHMARK("create △ tree H=4")
-    {
-        return create_triangular_tree_sp<4>();
-    };
-
-    BENCHMARK("create △ tree H=6")
-    {
-        return create_triangular_tree_sp<6>();
-    };
-}
-
 template<int H>
-auto
-resolve_loop_thin_sp()
+void
+BM_create_triangular_tree_sp(benchmark::State& state)
 {
-    auto expected = 2 + H;
-    resolve_request_loop(create_thin_tree_sp<H>(), expected);
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(create_triangular_tree_sp<H>());
+    }
 }
 
-template<int H>
-auto
-resolve_loop_triangular_sp()
-{
-    int expected = (1 << (H - 1)) * 3;
-    resolve_request_loop(create_triangular_tree_sp<H>(), expected);
-}
-
-TEST_CASE("resolve function request in shared_ptr", "[function]")
-{
-
-    BENCHMARK("1000x resolve thin tree H=2")
-    {
-        resolve_loop_thin_sp<2>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=4")
-    {
-        resolve_loop_thin_sp<4>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=16")
-    {
-        resolve_loop_thin_sp<16>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=64")
-    {
-        resolve_loop_thin_sp<64>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=2")
-    {
-        return resolve_loop_triangular_sp<2>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=4")
-    {
-        return resolve_loop_triangular_sp<4>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=6")
-    {
-        return resolve_loop_triangular_sp<6>();
-    };
-}
+BENCHMARK(BM_create_triangular_tree_sp<2>)
+    ->Name("BM_create_function_request_sp_tri_tree H=2");
+BENCHMARK(BM_create_triangular_tree_sp<4>)
+    ->Name("BM_create_function_request_sp_tri_tree H=4");
+BENCHMARK(BM_create_triangular_tree_sp<6>)
+    ->Name("BM_create_function_request_sp_tri_tree H=6");
 
 template<int H>
 auto
@@ -410,6 +248,25 @@ create_thin_tree_mixed<2>()
     auto constexpr level = caching_level_type::none;
     return rq_function<level>(add, create_thin_tree_mixed<1>(), rq_value(1));
 }
+
+template<int H>
+void
+BM_create_thin_tree_mixed(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(create_thin_tree_mixed<H>());
+    }
+}
+
+BENCHMARK(BM_create_thin_tree_mixed<2>)
+    ->Name("BM_create_function_request_mixed_thin_tree H=2");
+BENCHMARK(BM_create_thin_tree_mixed<4>)
+    ->Name("BM_create_function_request_mixed_thin_tree H=4");
+BENCHMARK(BM_create_thin_tree_mixed<16>)
+    ->Name("BM_create_function_request_mixed_thin_tree H=16");
+BENCHMARK(BM_create_thin_tree_mixed<64>)
+    ->Name("BM_create_function_request_mixed_thin_tree H=64");
 
 template<int H>
 auto
@@ -439,98 +296,22 @@ create_triangular_tree_mixed<2>()
         create_triangular_tree_mixed<1>());
 }
 
-TEST_CASE("create mixed function request", "[function]")
-{
-    BENCHMARK("create thin tree H=2")
-    {
-        return create_thin_tree_mixed<2>();
-    };
-
-    BENCHMARK("create thin tree H=4")
-    {
-        return create_thin_tree_mixed<4>();
-    };
-
-    BENCHMARK("create thin tree H=16")
-    {
-        return create_thin_tree_mixed<16>();
-    };
-
-    BENCHMARK("create thin tree H=64")
-    {
-        return create_thin_tree_mixed<64>();
-    };
-
-    BENCHMARK("create △ tree H=2")
-    {
-        return create_triangular_tree_mixed<2>();
-    };
-
-    BENCHMARK("create △ tree H=4")
-    {
-        return create_triangular_tree_mixed<4>();
-    };
-
-    BENCHMARK("create △ tree H=6")
-    {
-        return create_triangular_tree_mixed<6>();
-    };
-}
-
 template<int H>
-auto
-resolve_loop_thin_mixed()
+void
+BM_create_triangular_tree_mixed(benchmark::State& state)
 {
-    auto expected = 2 + H;
-    resolve_request_loop(create_thin_tree_mixed<H>(), expected);
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(create_triangular_tree_mixed<H>());
+    }
 }
 
-template<int H>
-auto
-resolve_loop_triangular_mixed()
-{
-    int expected = (1 << (H - 1)) * 3;
-    resolve_request_loop(create_triangular_tree_mixed<H>(), expected);
-}
-
-TEST_CASE("resolve mixed function request", "[function]")
-{
-
-    BENCHMARK("1000x resolve thin tree H=2")
-    {
-        resolve_loop_thin_mixed<2>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=4")
-    {
-        resolve_loop_thin_mixed<4>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=16")
-    {
-        resolve_loop_thin_mixed<16>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=64")
-    {
-        resolve_loop_thin_mixed<64>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=2")
-    {
-        return resolve_loop_triangular_mixed<2>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=4")
-    {
-        return resolve_loop_triangular_mixed<4>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=6")
-    {
-        return resolve_loop_triangular_mixed<6>();
-    };
-}
+BENCHMARK(BM_create_triangular_tree_mixed<2>)
+    ->Name("BM_create_function_request_mixed_tri_tree H=2");
+BENCHMARK(BM_create_triangular_tree_mixed<4>)
+    ->Name("BM_create_function_request_mixed_tri_tree H=4");
+BENCHMARK(BM_create_triangular_tree_mixed<6>)
+    ->Name("BM_create_function_request_mixed_tri_tree H=6");
 
 template<caching_level_type level, int H>
 requires(H == 1) auto create_thin_tree_erased()
@@ -581,221 +362,328 @@ requires(H > 1) auto create_triangular_tree_erased_introspected()
         create_triangular_tree_erased_introspected<level, H - 1>());
 }
 
-TEST_CASE("create type-erased function request (uncached)", "[erased]")
+template<caching_level_type level, int H>
+void
+BM_create_thin_tree_erased(benchmark::State& state)
 {
-    auto constexpr level = caching_level_type::none;
-
-    BENCHMARK("create thin tree H=2")
+    for (auto _ : state)
     {
-        return create_thin_tree_erased<level, 2>();
-    };
-
-    BENCHMARK("create thin tree H=4")
-    {
-        return create_thin_tree_erased<level, 4>();
-    };
-
-    BENCHMARK("create thin tree H=16")
-    {
-        return create_thin_tree_erased<level, 16>();
-    };
-
-    BENCHMARK("create thin tree H=64")
-    {
-        return create_thin_tree_erased<level, 64>();
-    };
-
-    BENCHMARK("create △ tree H=2")
-    {
-        return create_triangular_tree_erased<level, 2>();
-    };
-
-    BENCHMARK("create △ tree H=4")
-    {
-        return create_triangular_tree_erased<level, 4>();
-    };
-
-    BENCHMARK("create △ tree H=6")
-    {
-        return create_triangular_tree_erased<level, 6>();
-    };
-}
-
-TEST_CASE("create type-erased function request (cached)", "[erased]")
-{
-    auto constexpr level = caching_level_type::memory;
-
-    BENCHMARK("create thin tree H=2")
-    {
-        return create_thin_tree_erased<level, 2>();
-    };
-
-    BENCHMARK("create thin tree H=4")
-    {
-        return create_thin_tree_erased<level, 4>();
-    };
-
-    BENCHMARK("create thin tree H=16")
-    {
-        return create_thin_tree_erased<level, 16>();
-    };
-
-    BENCHMARK("create thin tree H=64")
-    {
-        return create_thin_tree_erased<level, 64>();
-    };
-
-    BENCHMARK("create △ tree H=2")
-    {
-        return create_triangular_tree_erased<level, 2>();
-    };
-
-    BENCHMARK("create △ tree H=4")
-    {
-        return create_triangular_tree_erased<level, 4>();
-    };
-
-    BENCHMARK("create △ tree H=6")
-    {
-        return create_triangular_tree_erased<level, 6>();
-    };
-}
-
-TEST_CASE(
-    "create type-erased function request (cached, introspected)", "[erased]")
-{
-    auto constexpr level = caching_level_type::memory;
-
-    BENCHMARK("create △ tree H=4")
-    {
-        return create_triangular_tree_erased_introspected<level, 4>();
-    };
-
-    BENCHMARK("create △ tree H=6")
-    {
-        return create_triangular_tree_erased_introspected<level, 6>();
-    };
+        benchmark::DoNotOptimize(create_thin_tree_erased<level, H>());
+    }
 }
 
 template<caching_level_type level, int H>
-auto
-resolve_loop_thin_erased()
+void
+BM_create_triangular_tree_erased(benchmark::State& state)
 {
-    auto expected = 2 + H;
-    resolve_request_loop(create_thin_tree_erased<level, H>(), expected);
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(create_triangular_tree_erased<level, H>());
+    }
 }
+
+BENCHMARK(BM_create_thin_tree_erased<caching_level_type::none, 2>)
+    ->Name("BM_create_function_request_erased_uncached_thin_tree H=2");
+BENCHMARK(BM_create_thin_tree_erased<caching_level_type::none, 4>)
+    ->Name("BM_create_function_request_erased_uncached_thin_tree H=4");
+BENCHMARK(BM_create_thin_tree_erased<caching_level_type::none, 16>)
+    ->Name("BM_create_function_request_erased_uncached_thin_tree H=16");
+BENCHMARK(BM_create_thin_tree_erased<caching_level_type::none, 64>)
+    ->Name("BM_create_function_request_erased_uncached_thin_tree H=64");
+
+BENCHMARK(BM_create_triangular_tree_erased<caching_level_type::none, 2>)
+    ->Name("BM_create_function_request_erased_uncached_tri_tree H=2");
+BENCHMARK(BM_create_triangular_tree_erased<caching_level_type::none, 4>)
+    ->Name("BM_create_function_request_erased_uncached_tri_tree H=4");
+BENCHMARK(BM_create_triangular_tree_erased<caching_level_type::none, 6>)
+    ->Name("BM_create_function_request_erased_uncached_tri_tree H=6");
+
+BENCHMARK(BM_create_thin_tree_erased<caching_level_type::memory, 2>)
+    ->Name("BM_create_function_request_erased_cached_thin_tree H=2");
+BENCHMARK(BM_create_thin_tree_erased<caching_level_type::memory, 4>)
+    ->Name("BM_create_function_request_erased_cached_thin_tree H=4");
+BENCHMARK(BM_create_thin_tree_erased<caching_level_type::memory, 16>)
+    ->Name("BM_create_function_request_erased_cached_thin_tree H=16");
+BENCHMARK(BM_create_thin_tree_erased<caching_level_type::memory, 64>)
+    ->Name("BM_create_function_request_erased_cached_thin_tree H=64");
+
+BENCHMARK(BM_create_triangular_tree_erased<caching_level_type::memory, 2>)
+    ->Name("BM_create_function_request_erased_cached_tri_tree H=2");
+BENCHMARK(BM_create_triangular_tree_erased<caching_level_type::memory, 4>)
+    ->Name("BM_create_function_request_erased_cached_tri_tree H=4");
+BENCHMARK(BM_create_triangular_tree_erased<caching_level_type::memory, 6>)
+    ->Name("BM_create_function_request_erased_cached_tri_tree H=6");
 
 template<caching_level_type level, int H>
-auto
-resolve_loop_triangular_erased()
+void
+BM_create_tri_tree_erased_intrsp(benchmark::State& state)
 {
-    int expected = (1 << (H - 1)) * 3;
-    resolve_request_loop(create_triangular_tree_erased<level, H>(), expected);
-    return expected;
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(
+            create_triangular_tree_erased_introspected<level, H>());
+    }
 }
 
-TEST_CASE("resolve type-erased function request (uncached)", "[erased]")
-{
-    auto constexpr level = caching_level_type::none;
-
-    BENCHMARK("1000x resolve thin tree H=2")
-    {
-        resolve_loop_thin_erased<level, 2>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=4")
-    {
-        resolve_loop_thin_erased<level, 4>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=16")
-    {
-        resolve_loop_thin_erased<level, 16>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=64")
-    {
-        resolve_loop_thin_erased<level, 64>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=2")
-    {
-        return resolve_loop_triangular_erased<level, 2>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=4")
-    {
-        return resolve_loop_triangular_erased<level, 4>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=6")
-    {
-        return resolve_loop_triangular_erased<level, 6>();
-    };
-}
-
-TEST_CASE("resolve type-erased function request (memory-cached)", "[erased]")
-{
-    auto constexpr level = caching_level_type::memory;
-
-    BENCHMARK("1000x resolve thin tree H=2")
-    {
-        resolve_loop_thin_erased<level, 2>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=4")
-    {
-        resolve_loop_thin_erased<level, 4>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=16")
-    {
-        resolve_loop_thin_erased<level, 16>();
-    };
-
-    BENCHMARK("1000x resolve thin tree H=64")
-    {
-        resolve_loop_thin_erased<level, 64>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=2")
-    {
-        return resolve_loop_triangular_erased<level, 2>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=4")
-    {
-        return resolve_loop_triangular_erased<level, 4>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=6")
-    {
-        return resolve_loop_triangular_erased<level, 6>();
-    };
-}
+BENCHMARK(BM_create_tri_tree_erased_intrsp<caching_level_type::memory, 4>)
+    ->Name("BM_create_function_request_erased_cached_intrsp_tri_tree H=4");
+BENCHMARK(BM_create_tri_tree_erased_intrsp<caching_level_type::memory, 6>)
+    ->Name("BM_create_function_request_erased_cached_intrsp_tri_tree H=6");
 
 template<int H>
-auto
-resolve_loop_triangular_erased_full()
+void
+BM_resolve_thin_tree(benchmark::State& state)
 {
-    auto constexpr level = caching_level_type::full;
-    int expected = (1 << (H - 1)) * 3;
-    resolve_request_loop_full(
-        create_triangular_tree_erased<level, H>(), expected);
-    return expected;
+    for (auto _ : state)
+    {
+        resolve_request_loop(create_thin_tree<H>());
+    }
 }
 
-TEST_CASE("resolve type-erased function request (fully cached)", "[erased]")
+BENCHMARK(BM_resolve_thin_tree<2>)
+    ->Name("BM_resolve_function_request_thin_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree<4>)
+    ->Name("BM_resolve_function_request_thin_tree H=4")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree<16>)
+    ->Name("BM_resolve_function_request_thin_tree H=16")
+    ->Arg(1000);
+#ifndef _MSC_VER
+// VS2019 internal compiler error
+BENCHMARK(BM_resolve_thin_tree<64>)
+    ->Name("BM_resolve_function_request_thin_tree H=64")
+    ->Arg(1000);
+#endif
+
+template<int H>
+void
+BM_resolve_triangular_tree(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(create_triangular_tree<H>());
+    }
+}
+
+BENCHMARK(BM_resolve_triangular_tree<2>)
+    ->Name("BM_resolve_function_request_tri_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_triangular_tree<4>)
+    ->Name("BM_resolve_function_request_tri_tree H=4")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_triangular_tree<6>)
+    ->Name("BM_resolve_function_request_tri_tree H=6")
+    ->Arg(1000);
+
+template<int H>
+void
+BM_resolve_thin_tree_up(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(create_thin_tree_up<H>());
+    }
+}
+
+BENCHMARK(BM_resolve_thin_tree_up<2>)
+    ->Name("BM_resolve_function_request_up_thin_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_up<4>)
+    ->Name("BM_resolve_function_request_up_thin_tree H=4")
+    ->Arg(1000);
+// Taller trees tend to blow up the compilers.
+
+template<int H>
+void
+BM_resolve_triangular_tree_up(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(create_triangular_tree_up<H>());
+    }
+}
+
+BENCHMARK(BM_resolve_triangular_tree_up<2>)
+    ->Name("BM_resolve_function_request_up_tri_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_triangular_tree_up<4>)
+    ->Name("BM_resolve_function_request_up_tri_tree H=4")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_triangular_tree_up<6>)
+    ->Name("BM_resolve_function_request_up_tri_tree H=6")
+    ->Arg(1000);
+
+template<int H>
+void
+BM_resolve_thin_tree_sp(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(create_thin_tree_sp<H>());
+    }
+}
+
+BENCHMARK(BM_resolve_thin_tree_sp<2>)
+    ->Name("BM_resolve_function_request_sp_thin_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_sp<4>)
+    ->Name("BM_resolve_function_request_sp_thin_tree H=4")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_sp<16>)
+    ->Name("BM_resolve_function_request_sp_thin_tree H=16")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_sp<64>)
+    ->Name("BM_resolve_function_request_sp_thin_tree H=64")
+    ->Arg(1000);
+
+template<int H>
+void
+BM_resolve_triangular_tree_sp(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(create_triangular_tree_sp<H>());
+    }
+}
+
+BENCHMARK(BM_resolve_triangular_tree_sp<2>)
+    ->Name("BM_resolve_function_request_sp_tri_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_triangular_tree_sp<4>)
+    ->Name("BM_resolve_function_request_sp_tri_tree H=4")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_triangular_tree_sp<6>)
+    ->Name("BM_resolve_function_request_sp_tri_tree H=6")
+    ->Arg(1000);
+
+template<int H>
+void
+BM_resolve_thin_tree_mixed(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(create_thin_tree_mixed<H>());
+    }
+}
+
+BENCHMARK(BM_resolve_thin_tree_mixed<2>)
+    ->Name("BM_resolve_function_request_mixed_thin_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_mixed<4>)
+    ->Name("BM_resolve_function_request_mixed_thin_tree H=4")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_mixed<16>)
+    ->Name("BM_resolve_function_request_mixed_thin_tree H=16")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_mixed<64>)
+    ->Name("BM_resolve_function_request_mixed_thin_tree H=64")
+    ->Arg(1000);
+
+template<int H>
+void
+BM_resolve_triangular_tree_mixed(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(create_triangular_tree_mixed<H>());
+    }
+}
+
+BENCHMARK(BM_resolve_triangular_tree_mixed<2>)
+    ->Name("BM_resolve_function_request_mixed_tri_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_triangular_tree_mixed<4>)
+    ->Name("BM_resolve_function_request_mixed_tri_tree H=4")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_triangular_tree_mixed<6>)
+    ->Name("BM_resolve_function_request_mixed_tri_tree H=6")
+    ->Arg(1000);
+
+template<caching_level_type level, int H>
+void
+BM_resolve_thin_tree_erased(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(create_thin_tree_erased<level, H>());
+    }
+}
+
+BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::none, 2>)
+    ->Name("BM_resolve_function_request_erased_uncached_thin_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::none, 4>)
+    ->Name("BM_resolve_function_request_erased_uncached_thin_tree H=4")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::none, 16>)
+    ->Name("BM_resolve_function_request_erased_uncached_thin_tree H=16")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::none, 64>)
+    ->Name("BM_resolve_function_request_erased_uncached_thin_tree H=64")
+    ->Arg(1000);
+
+template<caching_level_type level, int H>
+void
+BM_resolve_tri_tree_erased(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(create_triangular_tree_erased<level, H>());
+    }
+}
+
+BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::none, 2>)
+    ->Name("BM_resolve_function_request_erased_uncached_tri_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::none, 4>)
+    ->Name("BM_resolve_function_request_erased_uncached_tri_tree H=4")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::none, 6>)
+    ->Name("BM_resolve_function_request_erased_uncached_tri_tree H=6")
+    ->Arg(1000);
+
+BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::memory, 2>)
+    ->Name("BM_resolve_function_request_erased_cached_thin_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::memory, 4>)
+    ->Name("BM_resolve_function_request_erased_cached_thin_tree H=4")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::memory, 16>)
+    ->Name("BM_resolve_function_request_erased_cached_thin_tree H=16")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::memory, 64>)
+    ->Name("BM_resolve_function_request_erased_cached_thin_tree H=64")
+    ->Arg(1000);
+
+BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory, 2>)
+    ->Name("BM_resolve_function_request_erased_cached_tri_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory, 4>)
+    ->Name("BM_resolve_function_request_erased_cached_tri_tree H=4")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory, 6>)
+    ->Name("BM_resolve_function_request_erased_cached_tri_tree H=6")
+    ->Arg(1000);
+
+template<int H>
+void
+BM_resolve_triangular_tree_erased_full(benchmark::State& state)
 {
     spdlog::set_level(spdlog::level::warn);
-
-    BENCHMARK("1000x resolve △ tree H=4")
+    for (auto _ : state)
     {
-        return resolve_loop_triangular_erased_full<4>();
-    };
-
-    BENCHMARK("1000x resolve △ tree H=6")
-    {
-        return resolve_loop_triangular_erased_full<6>();
-    };
+        resolve_request_loop_full(
+            create_triangular_tree_erased<caching_level_type::full, H>());
+    }
 }
+
+BENCHMARK(BM_resolve_triangular_tree_erased_full<2>)
+    ->Name("BM_resolve_function_request_erased_fully_cached_tri_tree H=2")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_triangular_tree_erased_full<4>)
+    ->Name("BM_resolve_function_request_erased_fully_cached_tri_tree H=4")
+    ->Arg(1000);
+BENCHMARK(BM_resolve_triangular_tree_erased_full<6>)
+    ->Name("BM_resolve_function_request_erased_fully_cached_tri_tree H=6")
+    ->Arg(1000);

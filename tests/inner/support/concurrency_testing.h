@@ -2,15 +2,30 @@
 #define CRADLE_TESTS_INNER_SUPPORT_CONCURRENCY_TESTING_H
 
 #include <chrono>
+#include <stdexcept>
+#include <string>
 #include <thread>
 #include <utility>
-
-#include <catch2/catch.hpp>
 
 #include <cradle/inner/service/internals.h>
 #include <cradle/inner/service/types.h>
 
 namespace cradle {
+
+struct assertion_error : public std::logic_error
+{
+    assertion_error() : std::logic_error("Assertion failed")
+    {
+    }
+
+    assertion_error(std::string const& what) : std::logic_error(what)
+    {
+    }
+
+    assertion_error(char const* what) : std::logic_error(what)
+    {
+    }
+};
 
 struct inner_service_core;
 
@@ -38,10 +53,13 @@ occurs_soon(Condition&& condition, int wait_time_in_ms = 1000)
 inline void
 sync_wait_write_disk_cache(inner_service_core& service)
 {
-    REQUIRE(occurs_soon([&] {
-        return service.inner_internals().disk_write_pool.get_tasks_total()
-               == 0;
-    }));
+    if (!occurs_soon([&] {
+            return service.inner_internals().disk_write_pool.get_tasks_total()
+                   == 0;
+        }))
+    {
+        throw assertion_error("Disk cache writes not finished in time");
+    }
 }
 
 } // namespace cradle

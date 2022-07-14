@@ -8,7 +8,7 @@ namespace cradle {
 
 template<UncachedRequest Req>
 auto
-call_resolve_by_ref_loop(Req const& req, int expected)
+call_resolve_by_ref_loop(Req const& req)
 {
     constexpr int num_loops = 1000;
     uncached_request_resolution_context ctx{};
@@ -20,13 +20,12 @@ call_resolve_by_ref_loop(Req const& req, int expected)
         }
         co_return total;
     };
-    auto actual = cppcoro::sync_wait(loop());
-    REQUIRE(actual == expected * num_loops);
+    cppcoro::sync_wait(loop());
 }
 
 template<UncachedRequestPtr Req>
 auto
-call_resolve_by_ptr_loop(Req const& req, int expected)
+call_resolve_by_ptr_loop(Req const& req)
 {
     constexpr int num_loops = 1000;
     uncached_request_resolution_context ctx{};
@@ -38,13 +37,12 @@ call_resolve_by_ptr_loop(Req const& req, int expected)
         }
         co_return total;
     };
-    auto actual = cppcoro::sync_wait(loop());
-    REQUIRE(actual == expected * num_loops);
+    cppcoro::sync_wait(loop());
 }
 
 template<UncachedRequestOrPtr Req>
 auto
-resolve_request_loop(Req const& req, int expected)
+resolve_request_loop(Req const& req)
 {
     constexpr int num_loops = 1000;
     uncached_request_resolution_context ctx{};
@@ -56,13 +54,12 @@ resolve_request_loop(Req const& req, int expected)
         }
         co_return total;
     };
-    auto actual = cppcoro::sync_wait(loop());
-    REQUIRE(actual == expected * num_loops);
+    cppcoro::sync_wait(loop());
 }
 
 template<CachedRequestOrPtr Req>
 auto
-resolve_request_loop(Req const& req, int expected)
+resolve_request_loop(Req const& req)
 {
     constexpr int num_loops = 1000;
     cached_request_resolution_context ctx{};
@@ -74,15 +71,13 @@ resolve_request_loop(Req const& req, int expected)
         }
         co_return total;
     };
-    auto actual = cppcoro::sync_wait(loop());
-    REQUIRE(actual == expected * num_loops);
+    cppcoro::sync_wait(loop());
 }
 
 template<CachedRequest Req>
 requires(
     Req::caching_level
-    == caching_level_type::
-        full) auto resolve_request_loop_full(Req const& req, int expected)
+    == caching_level_type::full) auto resolve_request_loop_full(Req const& req)
 {
     constexpr int num_loops = 1000;
     cached_request_resolution_context ctx{};
@@ -97,8 +92,7 @@ requires(
         }
         co_return total;
     };
-    auto actual = cppcoro::sync_wait(loop());
-    REQUIRE(actual == expected * num_loops);
+    cppcoro::sync_wait(loop());
 }
 
 } // namespace cradle

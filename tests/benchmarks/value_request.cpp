@@ -1,5 +1,4 @@
-#define CATCH_CONFIG_ENABLE_BENCHMARKING
-#include <catch2/catch.hpp>
+#include <benchmark/benchmark.h>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
 
@@ -11,62 +10,92 @@
 
 using namespace cradle;
 
-TEST_CASE("value request", "[value]")
+static void
+BM_create_value_request(benchmark::State& state)
 {
-    using Value = int;
-
-    BENCHMARK("create request")
+    for (auto _ : state)
     {
-        return cradle::rq_value(Value(42));
-    };
-
-    BENCHMARK("1000x resolve()")
-    {
-        call_resolve_by_ref_loop(rq_value(42), 42);
-    };
-
-    BENCHMARK("1000x resolve_request")
-    {
-        resolve_request_loop(rq_value(42), 42);
-    };
+        benchmark::DoNotOptimize(cradle::rq_value(42));
+    }
 }
+BENCHMARK(BM_create_value_request);
 
-TEST_CASE("value request in unique_ptr", "[value]")
+static void
+BM_create_value_request_up(benchmark::State& state)
 {
-    using Value = int;
-
-    BENCHMARK("create request")
+    for (auto _ : state)
     {
-        return cradle::rq_value_up(Value(42));
-    };
-
-    BENCHMARK("1000x resolve()")
-    {
-        call_resolve_by_ptr_loop(rq_value_up(42), 42);
-    };
-
-    BENCHMARK("1000x resolve_request")
-    {
-        resolve_request_loop(rq_value_up(42), 42);
-    };
+        benchmark::DoNotOptimize(cradle::rq_value_up(42));
+    }
 }
+BENCHMARK(BM_create_value_request_up);
 
-TEST_CASE("value request in shared_ptr", "[value]")
+static void
+BM_create_value_request_sp(benchmark::State& state)
 {
-    using Value = int;
-
-    BENCHMARK("create request")
+    for (auto _ : state)
     {
-        return cradle::rq_value_sp(Value(42));
-    };
-
-    BENCHMARK("1000x resolve()")
-    {
-        call_resolve_by_ptr_loop(rq_value_sp(42), 42);
-    };
-
-    BENCHMARK("1000x resolve_request")
-    {
-        resolve_request_loop(rq_value_sp(42), 42);
-    };
+        benchmark::DoNotOptimize(cradle::rq_value_sp(42));
+    }
 }
+BENCHMARK(BM_create_value_request_sp);
+
+static void
+BM_call_value_request_resolve(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        call_resolve_by_ref_loop(rq_value(42));
+    }
+}
+BENCHMARK(BM_call_value_request_resolve)->Arg(1000);
+
+static void
+BM_call_value_request_up_resolve(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        call_resolve_by_ptr_loop(rq_value_up(42));
+    }
+}
+BENCHMARK(BM_call_value_request_up_resolve)->Arg(1000);
+
+static void
+BM_call_value_request_sp_resolve(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        call_resolve_by_ptr_loop(rq_value_sp(42));
+    }
+}
+BENCHMARK(BM_call_value_request_sp_resolve)->Arg(1000);
+
+static void
+BM_resolve_value_request(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(rq_value(42));
+    }
+}
+BENCHMARK(BM_resolve_value_request)->Arg(1000);
+
+static void
+BM_resolve_value_request_up(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(rq_value_up(42));
+    }
+}
+BENCHMARK(BM_resolve_value_request_up)->Arg(1000);
+
+static void
+BM_resolve_value_request_sp(benchmark::State& state)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(rq_value_sp(42));
+    }
+}
+BENCHMARK(BM_resolve_value_request_sp)->Arg(1000);
