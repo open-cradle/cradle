@@ -64,7 +64,7 @@ resolve_n_requests(int n, thinknode_request_context& ctx, Req const& req)
 TEST_CASE("ISS POST", "[iss]")
 {
     service_core service;
-    init_test_service(service, true);
+    init_test_service(service);
     auto& mock_http = enable_http_mocking(service);
 
     thinknode_session session;
