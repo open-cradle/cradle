@@ -217,15 +217,15 @@ if(IS_MSVC)
     add_definitions(/DWIN32_LEAN_AND_MEAN /DVC_EXTRALEAN /DNORASTEROPS /DOEMRESOURCE /DNOATOM /DNOCLIPBOARD /DNOCOLOR /DNOCTRLMGR /DNODRAWTEXT /DNOGDI /DNOKERNEL /DNOMINMAX /DNOSOUND /DNOKANJI /DNOHELP /DNOPROFILER /DNODEFERWINDOWPOS /DNOMCX)
 endif()
 
+# Ensure that add_test() has effect.
+enable_testing()
+
 if((IS_GCC OR IS_CLANG) AND GPROF_PROFILING)
     message(STATUS "Enabling CPU profiling using gprof")
     add_compile_options(-pg)
     string(APPEND CMAKE_EXE_LINKER_FLAGS " -pg")
-endif()
-
-# Set build options for instrumenting test coverage.
-enable_testing()
-if(IS_CLANG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+elseif(IS_CLANG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # Set build options for instrumenting test coverage.
     message(STATUS "Enabling gcov support")
     add_compile_options(-DLLVM_USE_LINKER=gold -fprofile-instr-generate
                         -fcoverage-mapping)

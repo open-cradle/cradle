@@ -435,10 +435,7 @@ void
 BM_resolve_thin_tree(benchmark::State& state)
 {
     uncached_request_resolution_context ctx{};
-    for (auto _ : state)
-    {
-        resolve_request_loop(ctx, create_thin_tree<H>());
-    }
+    BM_resolve_request(state, ctx, create_thin_tree<H>());
 }
 
 BENCHMARK(BM_resolve_thin_tree<2>)
@@ -462,10 +459,7 @@ void
 BM_resolve_triangular_tree(benchmark::State& state)
 {
     uncached_request_resolution_context ctx{};
-    for (auto _ : state)
-    {
-        resolve_request_loop(ctx, create_triangular_tree<H>());
-    }
+    BM_resolve_request(state, ctx, create_triangular_tree<H>());
 }
 
 BENCHMARK(BM_resolve_triangular_tree<2>)
@@ -483,10 +477,7 @@ void
 BM_resolve_thin_tree_up(benchmark::State& state)
 {
     uncached_request_resolution_context ctx{};
-    for (auto _ : state)
-    {
-        resolve_request_loop(ctx, create_thin_tree_up<H>());
-    }
+    BM_resolve_request(state, ctx, create_thin_tree_up<H>());
 }
 
 BENCHMARK(BM_resolve_thin_tree_up<2>)
@@ -502,10 +493,7 @@ void
 BM_resolve_triangular_tree_up(benchmark::State& state)
 {
     uncached_request_resolution_context ctx{};
-    for (auto _ : state)
-    {
-        resolve_request_loop(ctx, create_triangular_tree_up<H>());
-    }
+    BM_resolve_request(state, ctx, create_triangular_tree_up<H>());
 }
 
 BENCHMARK(BM_resolve_triangular_tree_up<2>)
@@ -523,10 +511,7 @@ void
 BM_resolve_thin_tree_sp(benchmark::State& state)
 {
     uncached_request_resolution_context ctx{};
-    for (auto _ : state)
-    {
-        resolve_request_loop(ctx, create_thin_tree_sp<H>());
-    }
+    BM_resolve_request(state, ctx, create_thin_tree_sp<H>());
 }
 
 BENCHMARK(BM_resolve_thin_tree_sp<2>)
@@ -547,10 +532,7 @@ void
 BM_resolve_triangular_tree_sp(benchmark::State& state)
 {
     uncached_request_resolution_context ctx{};
-    for (auto _ : state)
-    {
-        resolve_request_loop(ctx, create_triangular_tree_sp<H>());
-    }
+    BM_resolve_request(state, ctx, create_triangular_tree_sp<H>());
 }
 
 BENCHMARK(BM_resolve_triangular_tree_sp<2>)
@@ -568,10 +550,7 @@ void
 BM_resolve_thin_tree_mixed(benchmark::State& state)
 {
     uncached_request_resolution_context ctx{};
-    for (auto _ : state)
-    {
-        resolve_request_loop(ctx, create_thin_tree_mixed<H>());
-    }
+    BM_resolve_request(state, ctx, create_thin_tree_mixed<H>());
 }
 
 BENCHMARK(BM_resolve_thin_tree_mixed<2>)
@@ -592,10 +571,7 @@ void
 BM_resolve_triangular_tree_mixed(benchmark::State& state)
 {
     uncached_request_resolution_context ctx{};
-    for (auto _ : state)
-    {
-        resolve_request_loop(ctx, create_triangular_tree_mixed<H>());
-    }
+    BM_resolve_request(state, ctx, create_triangular_tree_mixed<H>());
 }
 
 BENCHMARK(BM_resolve_triangular_tree_mixed<2>)
@@ -613,10 +589,7 @@ void
 BM_resolve_thin_tree_erased(benchmark::State& state)
 {
     request_resolution_context<level> ctx{};
-    for (auto _ : state)
-    {
-        resolve_request_loop(ctx, create_thin_tree_erased<level, H>());
-    }
+    BM_resolve_request(state, ctx, create_thin_tree_erased<level, H>());
 }
 
 BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::none, 2>)
@@ -637,10 +610,7 @@ void
 BM_resolve_tri_tree_erased(benchmark::State& state)
 {
     request_resolution_context<level> ctx{};
-    for (auto _ : state)
-    {
-        resolve_request_loop(ctx, create_triangular_tree_erased<level, H>());
-    }
+    BM_resolve_request(state, ctx, create_triangular_tree_erased<level, H>());
 }
 
 BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::none, 2>)
@@ -680,13 +650,12 @@ template<int H>
 void
 BM_resolve_triangular_tree_erased_full(benchmark::State& state)
 {
-    cached_request_resolution_context ctx{};
     spdlog::set_level(spdlog::level::warn);
-    for (auto _ : state)
-    {
-        resolve_request_loop_full(
-            ctx, create_triangular_tree_erased<caching_level_type::full, H>());
-    }
+    cached_request_resolution_context ctx{};
+    BM_resolve_request(
+        state,
+        ctx,
+        create_triangular_tree_erased<caching_level_type::full, H>());
 }
 
 BENCHMARK(BM_resolve_triangular_tree_erased_full<2>)

@@ -1,13 +1,15 @@
 #ifndef CRADLE_TESTS_BENCHMARKS_SUPPORT_H
 #define CRADLE_TESTS_BENCHMARKS_SUPPORT_H
 
+#include <benchmark/benchmark.h>
+
 #include "../inner/support/concurrency_testing.h"
 #include <cradle/inner/service/request.h>
 
 namespace cradle {
 
 template<UncachedRequest Req>
-auto
+void
 call_resolve_by_ref_loop(Req const& req)
 {
     constexpr int num_loops = 1000;
@@ -24,7 +26,7 @@ call_resolve_by_ref_loop(Req const& req)
 }
 
 template<UncachedRequestPtr Req>
-auto
+void
 call_resolve_by_ptr_loop(Req const& req)
 {
     constexpr int num_loops = 1000;
@@ -41,10 +43,10 @@ call_resolve_by_ptr_loop(Req const& req)
 }
 
 template<typename Ctx, RequestOrPtr Req>
-requires(MatchingContextRequest<
-         Ctx,
-         typename Req::
-             element_type>) auto resolve_request_loop(Ctx& ctx, Req const& req)
+requires(
+    Req::element_type::caching_level
+    != caching_level_type::
+        full) void resolve_request_loop(Ctx& ctx, Req const& req)
 {
     constexpr int num_loops = 1000;
     auto loop = [&]() -> cppcoro::task<int> {
@@ -59,7 +61,7 @@ requires(MatchingContextRequest<
 }
 
 template<CachedRequest Req>
-requires(Req::caching_level == caching_level_type::full) auto resolve_request_loop_full(
+requires(Req::caching_level == caching_level_type::full) void resolve_request_loop(
     cached_request_resolution_context& ctx, Req const& req)
 {
     constexpr int num_loops = 1000;
@@ -75,6 +77,16 @@ requires(Req::caching_level == caching_level_type::full) auto resolve_request_lo
         co_return total;
     };
     cppcoro::sync_wait(loop());
+}
+
+template<typename Ctx, RequestOrPtr Req>
+requires(MatchingContextRequest<Ctx, typename Req::element_type>) void BM_resolve_request(
+    benchmark::State& state, Ctx& ctx, Req const& req)
+{
+    for (auto _ : state)
+    {
+        resolve_request_loop(ctx, req);
+    }
 }
 
 } // namespace cradle
