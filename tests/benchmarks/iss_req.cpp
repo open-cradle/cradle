@@ -100,7 +100,7 @@ BM_resolve_thinknode_request(benchmark::State& state)
         session.api_url, context_id, schema, object_data)};
 
     // Fill the memory cache if used
-    if (caching_level != caching_level_type::none)
+    if constexpr (caching_level != caching_level_type::none)
     {
         set_mock_script(mock_http, 1);
         cppcoro::sync_wait(resolve_n_requests(1, ctx, req));
@@ -108,8 +108,8 @@ BM_resolve_thinknode_request(benchmark::State& state)
 
     for (auto _ : state)
     {
-        int num_loops = state.range(0);
-        if (caching_level == caching_level_type::none)
+        int num_loops = static_cast<int>(state.range(0));
+        if constexpr (caching_level == caching_level_type::none)
         {
             state.PauseTiming();
             set_mock_script(mock_http, state.range(0));
