@@ -40,29 +40,13 @@ call_resolve_by_ptr_loop(Req const& req)
     cppcoro::sync_wait(loop());
 }
 
-template<UncachedRequestOrPtr Req>
-auto
-resolve_request_loop(Req const& req)
+template<typename Ctx, RequestOrPtr Req>
+requires(MatchingContextRequest<
+         Ctx,
+         typename Req::
+             element_type>) auto resolve_request_loop(Ctx& ctx, Req const& req)
 {
     constexpr int num_loops = 1000;
-    uncached_request_resolution_context ctx{};
-    auto loop = [&]() -> cppcoro::task<int> {
-        int total{};
-        for (auto i = 0; i < num_loops; ++i)
-        {
-            total += co_await resolve_request(ctx, req);
-        }
-        co_return total;
-    };
-    cppcoro::sync_wait(loop());
-}
-
-template<CachedRequestOrPtr Req>
-auto
-resolve_request_loop(Req const& req)
-{
-    constexpr int num_loops = 1000;
-    cached_request_resolution_context ctx{};
     auto loop = [&]() -> cppcoro::task<int> {
         int total{};
         for (auto i = 0; i < num_loops; ++i)
@@ -75,12 +59,10 @@ resolve_request_loop(Req const& req)
 }
 
 template<CachedRequest Req>
-requires(
-    Req::caching_level
-    == caching_level_type::full) auto resolve_request_loop_full(Req const& req)
+requires(Req::caching_level == caching_level_type::full) auto resolve_request_loop_full(
+    cached_request_resolution_context& ctx, Req const& req)
 {
     constexpr int num_loops = 1000;
-    cached_request_resolution_context ctx{};
     auto loop = [&]() -> cppcoro::task<int> {
         ctx.reset_memory_cache();
         int total{co_await resolve_request(ctx, req)};

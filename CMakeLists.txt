@@ -18,6 +18,9 @@ if(LOCAL_DOCKER_TESTING)
     add_compile_options(-DLOCAL_DOCKER_TESTING)
 endif()
 
+set(GPROF_PROFILING OFF CACHE BOOL
+    "Enable CPU profiling using gprof")
+
 # Detect the compiler.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(IS_CLANG true)
@@ -212,6 +215,12 @@ endif()
 # due to the use of precompiled hearders.
 if(IS_MSVC)
     add_definitions(/DWIN32_LEAN_AND_MEAN /DVC_EXTRALEAN /DNORASTEROPS /DOEMRESOURCE /DNOATOM /DNOCLIPBOARD /DNOCOLOR /DNOCTRLMGR /DNODRAWTEXT /DNOGDI /DNOKERNEL /DNOMINMAX /DNOSOUND /DNOKANJI /DNOHELP /DNOPROFILER /DNODEFERWINDOWPOS /DNOMCX)
+endif()
+
+if((IS_GCC OR IS_CLANG) AND GPROF_PROFILING)
+    message(STATUS "Enabling CPU profiling using gprof")
+    add_compile_options(-pg)
+    string(APPEND CMAKE_EXE_LINKER_FLAGS " -pg")
 endif()
 
 # Set build options for instrumenting test coverage.

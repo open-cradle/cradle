@@ -434,9 +434,10 @@ template<int H>
 void
 BM_resolve_thin_tree(benchmark::State& state)
 {
+    uncached_request_resolution_context ctx{};
     for (auto _ : state)
     {
-        resolve_request_loop(create_thin_tree<H>());
+        resolve_request_loop(ctx, create_thin_tree<H>());
     }
 }
 
@@ -460,9 +461,10 @@ template<int H>
 void
 BM_resolve_triangular_tree(benchmark::State& state)
 {
+    uncached_request_resolution_context ctx{};
     for (auto _ : state)
     {
-        resolve_request_loop(create_triangular_tree<H>());
+        resolve_request_loop(ctx, create_triangular_tree<H>());
     }
 }
 
@@ -480,9 +482,10 @@ template<int H>
 void
 BM_resolve_thin_tree_up(benchmark::State& state)
 {
+    uncached_request_resolution_context ctx{};
     for (auto _ : state)
     {
-        resolve_request_loop(create_thin_tree_up<H>());
+        resolve_request_loop(ctx, create_thin_tree_up<H>());
     }
 }
 
@@ -498,9 +501,10 @@ template<int H>
 void
 BM_resolve_triangular_tree_up(benchmark::State& state)
 {
+    uncached_request_resolution_context ctx{};
     for (auto _ : state)
     {
-        resolve_request_loop(create_triangular_tree_up<H>());
+        resolve_request_loop(ctx, create_triangular_tree_up<H>());
     }
 }
 
@@ -518,9 +522,10 @@ template<int H>
 void
 BM_resolve_thin_tree_sp(benchmark::State& state)
 {
+    uncached_request_resolution_context ctx{};
     for (auto _ : state)
     {
-        resolve_request_loop(create_thin_tree_sp<H>());
+        resolve_request_loop(ctx, create_thin_tree_sp<H>());
     }
 }
 
@@ -541,9 +546,10 @@ template<int H>
 void
 BM_resolve_triangular_tree_sp(benchmark::State& state)
 {
+    uncached_request_resolution_context ctx{};
     for (auto _ : state)
     {
-        resolve_request_loop(create_triangular_tree_sp<H>());
+        resolve_request_loop(ctx, create_triangular_tree_sp<H>());
     }
 }
 
@@ -561,9 +567,10 @@ template<int H>
 void
 BM_resolve_thin_tree_mixed(benchmark::State& state)
 {
+    uncached_request_resolution_context ctx{};
     for (auto _ : state)
     {
-        resolve_request_loop(create_thin_tree_mixed<H>());
+        resolve_request_loop(ctx, create_thin_tree_mixed<H>());
     }
 }
 
@@ -584,9 +591,10 @@ template<int H>
 void
 BM_resolve_triangular_tree_mixed(benchmark::State& state)
 {
+    uncached_request_resolution_context ctx{};
     for (auto _ : state)
     {
-        resolve_request_loop(create_triangular_tree_mixed<H>());
+        resolve_request_loop(ctx, create_triangular_tree_mixed<H>());
     }
 }
 
@@ -604,9 +612,10 @@ template<caching_level_type level, int H>
 void
 BM_resolve_thin_tree_erased(benchmark::State& state)
 {
+    request_resolution_context<level> ctx{};
     for (auto _ : state)
     {
-        resolve_request_loop(create_thin_tree_erased<level, H>());
+        resolve_request_loop(ctx, create_thin_tree_erased<level, H>());
     }
 }
 
@@ -627,9 +636,10 @@ template<caching_level_type level, int H>
 void
 BM_resolve_tri_tree_erased(benchmark::State& state)
 {
+    request_resolution_context<level> ctx{};
     for (auto _ : state)
     {
-        resolve_request_loop(create_triangular_tree_erased<level, H>());
+        resolve_request_loop(ctx, create_triangular_tree_erased<level, H>());
     }
 }
 
@@ -670,11 +680,12 @@ template<int H>
 void
 BM_resolve_triangular_tree_erased_full(benchmark::State& state)
 {
+    cached_request_resolution_context ctx{};
     spdlog::set_level(spdlog::level::warn);
     for (auto _ : state)
     {
         resolve_request_loop_full(
-            create_triangular_tree_erased<caching_level_type::full, H>());
+            ctx, create_triangular_tree_erased<caching_level_type::full, H>());
     }
 }
 

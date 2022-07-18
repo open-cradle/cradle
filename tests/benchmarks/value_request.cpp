@@ -73,9 +73,10 @@ BENCHMARK(BM_call_value_request_sp_resolve)->Arg(1000);
 static void
 BM_resolve_value_request(benchmark::State& state)
 {
+    uncached_request_resolution_context ctx;
     for (auto _ : state)
     {
-        resolve_request_loop(rq_value(42));
+        resolve_request_loop(ctx, rq_value(42));
     }
 }
 BENCHMARK(BM_resolve_value_request)->Arg(1000);
@@ -83,9 +84,10 @@ BENCHMARK(BM_resolve_value_request)->Arg(1000);
 static void
 BM_resolve_value_request_up(benchmark::State& state)
 {
+    uncached_request_resolution_context ctx;
     for (auto _ : state)
     {
-        resolve_request_loop(rq_value_up(42));
+        resolve_request_loop(ctx, rq_value_up(42));
     }
 }
 BENCHMARK(BM_resolve_value_request_up)->Arg(1000);
@@ -93,9 +95,10 @@ BENCHMARK(BM_resolve_value_request_up)->Arg(1000);
 static void
 BM_resolve_value_request_sp(benchmark::State& state)
 {
+    uncached_request_resolution_context ctx;
     for (auto _ : state)
     {
-        resolve_request_loop(rq_value_sp(42));
+        resolve_request_loop(ctx, rq_value_sp(42));
     }
 }
 BENCHMARK(BM_resolve_value_request_sp)->Arg(1000);
