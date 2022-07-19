@@ -3,6 +3,7 @@
 
 #include <tuple>
 
+#include <cereal/types/string.hpp>
 #include <cppcoro/task.hpp>
 
 #include <cradle/thinknode/request.h>

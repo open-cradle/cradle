@@ -42,39 +42,36 @@ call_resolve_by_ptr_loop(Req const& req)
     cppcoro::sync_wait(loop());
 }
 
+// The purpose of the loop is to bring the sync_wait() overhead down to
+// amortized zero. However, each time the same request is resolved, meaning
+// - Any calculations cached inside the request itself (e.g., its hash), are
+// not measured
+// - Each equals() will immediately return true, so is also not really measured
 template<typename Ctx, RequestOrPtr Req>
-requires(
-    Req::element_type::caching_level
-    != caching_level_type::
-        full) void resolve_request_loop(Ctx& ctx, Req const& req)
+requires(MatchingContextRequest<Ctx, typename Req::element_type>) void resolve_request_loop(
+    benchmark::State& state, Ctx& ctx, Req const& req, int num_loops = 1000)
 {
-    constexpr int num_loops = 1000;
-    auto loop = [&]() -> cppcoro::task<int> {
-        int total{};
-        for (auto i = 0; i < num_loops; ++i)
+    constexpr auto caching_level = Req::element_type::caching_level;
+    auto loop = [&]() -> cppcoro::task<void> {
+        if constexpr (caching_level == caching_level_type::full)
         {
-            total += co_await resolve_request(ctx, req);
-        }
-        co_return total;
-    };
-    cppcoro::sync_wait(loop());
-}
-
-template<CachedRequest Req>
-requires(Req::caching_level == caching_level_type::full) void resolve_request_loop(
-    cached_request_resolution_context& ctx, Req const& req)
-{
-    constexpr int num_loops = 1000;
-    auto loop = [&]() -> cppcoro::task<int> {
-        ctx.reset_memory_cache();
-        int total{co_await resolve_request(ctx, req)};
-        sync_wait_write_disk_cache(ctx.get_service());
-        for (auto i = 1; i < num_loops; ++i)
-        {
+            state.PauseTiming();
             ctx.reset_memory_cache();
-            total += co_await resolve_request(ctx, req);
+            benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
+            sync_wait_write_disk_cache(ctx.get_service());
+            state.ResumeTiming();
         }
-        co_return total;
+        for (int i = 0; i < num_loops; ++i)
+        {
+            if constexpr (caching_level == caching_level_type::full)
+            {
+                state.PauseTiming();
+                ctx.reset_memory_cache();
+                state.ResumeTiming();
+            }
+            benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
+        }
+        co_return;
     };
     cppcoro::sync_wait(loop());
 }
@@ -85,8 +82,16 @@ requires(MatchingContextRequest<Ctx, typename Req::element_type>) void BM_resolv
 {
     for (auto _ : state)
     {
-        resolve_request_loop(ctx, req);
+        resolve_request_loop(state, ctx, req);
     }
+}
+
+// 1000 inner loops bring the sync_wait() overhead down to amortized zero.
+// The reported "us" should be interpreted as "ns" for one resolve.
+inline void
+thousand_loops(benchmark::internal::Benchmark* b)
+{
+    b->Arg(1000)->Unit(benchmark::kMicrosecond);
 }
 
 } // namespace cradle
