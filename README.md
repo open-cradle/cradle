@@ -9,6 +9,40 @@
 
 CRADLE acts as a local proxy for Thinknode
 
+
+## Branch `reproduce-hangup`
+
+The `reproduce-hangup` branch contains a reproduction scenario for a hangup
+in Clang release builds, which seems to be due to a cppcoro bug.
+The hangup was also observed once in a GCC release build on Github Actions.
+
+To reproduce on Ubuntu (after doing the usual setup described below):
+
+```shell
+export CXX=`which clang++-14`
+cmake -Bbuild-release-clang -DCMAKE_BUILD_TYPE=Release .
+cmake --build build-release-clang -j 16 --target benchmark_test_runner
+./build-release-clang/benchmark_test_runner
+```
+
+Despite the name, this test uses no benchmarking framework;
+it just runs a tight "resolve request" loop.
+Thanks to the bug fix in our cppcoro branch, it will finish.
+
+Now undo our fix:
+
+```shell
+cd build-release-clang/_deps/fetched_cppcoro-src
+git checkout b88ca45f1fe606f6ba83c37253a9515a2cb38166
+cd -
+cmake --build build-release-clang -j 16 --target benchmark_test_runner
+./build-release-clang/benchmark_test_runner
+```
+
+After undoing our cppcoro bug fix, the test will very likely hang;
+this can easily be observed by running `top` and seeing CPU usage being 200%.
+
+
 ## Build Requirements
 
 ### Supported OSs and C++ Compilers
