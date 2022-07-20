@@ -27,6 +27,7 @@ requires(Req::caching_level == caching_level_type::memory)
     return req.resolve(ctx);
 }
 
+// TODO optimize for same_as<Req::value_type, blob>
 template<typename Ctx, typename Req>
 requires(
     CachedContextRequest<Ctx, Req>&& Req::caching_level
@@ -37,15 +38,12 @@ requires(
     using Value = typename Req::value_type;
     inner_service_core& core{ctx.get_service()};
     id_interface const& key{*req.get_captured_id()};
-    auto value_to_blob = [](Value x) -> blob {
+    auto create_blob_task = [&]() -> cppcoro::task<blob> {
+        Value value = co_await req.resolve(ctx);
         std::stringstream ss;
         cereal::BinaryOutputArchive oarchive(ss);
-        oarchive(x);
-        return make_blob(ss.str());
-    };
-    auto create_blob_task = [&]() {
-        return cppcoro::make_task(
-            cppcoro::fmap(value_to_blob, req.resolve(ctx)));
+        oarchive(value);
+        co_return make_blob(ss.str());
     };
     blob x = co_await disk_cached<blob>(core, key, create_blob_task);
     auto data = reinterpret_cast<char const*>(x.data());
@@ -96,6 +94,8 @@ requires IntrospectiveContextRequest<Ctx, Req>
     co_return res;
 }
 
+// Returns a reference to the shared_task stored in the memory cache.
+// Not copying shared_task's looks like a worthwhile optimization.
 template<typename Ctx, typename Req>
 requires(CachedContextRequest<Ctx, Req> && !Req::introspective) cppcoro::
     shared_task<typename Req::value_type> const& resolve_request_cached(
@@ -112,6 +112,7 @@ requires(CachedContextRequest<Ctx, Req> && !Req::introspective) cppcoro::
     return ptr.task();
 }
 
+// Returns the shared_task by value.
 template<typename Ctx, typename Req>
 requires(CachedContextRequest<Ctx, Req>&& Req::introspective)
     cppcoro::shared_task<typename Req::value_type> resolve_request_cached(
@@ -141,7 +142,6 @@ resolve_request(Ctx& ctx, Req const& req)
     return req.resolve(ctx);
 }
 
-// Not copying shared_task's looks like a worthwhile optimization.
 template<typename Ctx, typename Req>
 requires(CachedContextRequest<Ctx, Req> && !Req::introspective)
     cppcoro::shared_task<typename Req::value_type> const& resolve_request(
