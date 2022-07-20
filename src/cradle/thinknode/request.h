@@ -125,7 +125,7 @@ class thinknode_request_mixin : public Base, public id_interface
         auto uuid_diff = this->get_uuid() <=> other.get_uuid();
         if (uuid_diff != 0)
         {
-            return uuid_diff < 0 ? -1 : 1;
+            return uuid_diff < 0;
         }
         args_comparator cmp;
         return this->compare(cmp, other) < 0;
