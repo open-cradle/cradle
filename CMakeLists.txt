@@ -53,6 +53,9 @@ if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake")
 endif()
 include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
 
+# The latest fmt/7.1.3 revision in ConanCenter doesn't work
+set(ENV{CONAN_REVISIONS_ENABLED} 1)
+
 # Invoke Conan.
 conan_cmake_configure(
     REQUIRES
@@ -71,7 +74,7 @@ conan_cmake_configure(
         spdlog/1.8.2
         simdjson/0.9.1
         lz4/1.9.3
-        fmt/7.1.3
+        "fmt/7.1.3#1bb67a725d1eab1311a58551b9972893"
         cereal/1.3.2
         benchmark/1.6.1
     OPTIONS
