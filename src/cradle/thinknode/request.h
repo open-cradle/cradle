@@ -4,10 +4,9 @@
 #include <compare>
 #include <memory>
 #include <optional>
-#include <typeindex>
-#include <typeinfo>
 #include <utility>
 
+#include <cereal/archives/binary.hpp>
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/core/hash.h>
@@ -41,48 +40,54 @@ class request_hasher
 
 struct args_comparator
 {
-    void
+    int
     operator()()
     {
-        value_ = 0;
+        return 0;
     }
 
     template<typename Arg0, typename... Args>
-    requires(std::three_way_comparable<Arg0>) void
+    requires(std::three_way_comparable<Arg0>) int
     operator()(Arg0&& lhs_arg0, Arg0&& rhs_arg0, Args&&... args)
     {
+        int result;
         auto diff = lhs_arg0 <=> rhs_arg0;
         if (diff != 0)
         {
-            value_ = diff < 0 ? -1 : diff == 0 ? 0 : 1;
+            result = diff < 0 ? -1 : 1;
         }
         else
         {
-            operator()(std::forward<Args>(args)...);
+            result = operator()(std::forward<Args>(args)...);
         }
+        return result;
     }
 
     template<typename Arg0, typename... Args>
-    requires(!std::three_way_comparable<Arg0>) void
+    requires(!std::three_way_comparable<Arg0>) int
     operator()(Arg0&& lhs_arg0, Arg0&& rhs_arg0, Args&&... args)
     {
+        int result;
         if (lhs_arg0 < rhs_arg0)
         {
-            value_ = -1;
+            result = -1;
         }
         else if (rhs_arg0 < lhs_arg0)
         {
-            value_ = 1;
+            result = 1;
         }
         else
         {
-            operator()(std::forward<Args>(args)...);
+            result = operator()(std::forward<Args>(args)...);
         }
+        return result;
     }
-
-    int value_;
 };
 
+// A request's identity is a combination of:
+// - The identity of its class: Base::get_uuid()
+// - Its arguments, enumerated in Base::serialize() and Base::compare()
+// Most of the functions in this mixin express that identity.
 template<typename Base>
 class thinknode_request_mixin : public Base, public id_interface
 {
@@ -102,13 +107,12 @@ class thinknode_request_mixin : public Base, public id_interface
         {
             return true;
         }
-        if (get_function_type_index() != other.get_function_type_index())
+        if (this->get_uuid() != other.get_uuid())
         {
             return false;
         }
         args_comparator cmp;
-        this->compare(cmp, other);
-        return cmp.value_ == 0;
+        return this->compare(cmp, other) == 0;
     }
 
     bool
@@ -118,15 +122,13 @@ class thinknode_request_mixin : public Base, public id_interface
         {
             return false;
         }
-        auto this_type_index = get_function_type_index();
-        auto other_type_index = other.get_function_type_index();
-        if (this_type_index != other_type_index)
+        auto uuid_diff = this->get_uuid() <=> other.get_uuid();
+        if (uuid_diff != 0)
         {
-            return this_type_index < other_type_index;
+            return uuid_diff < 0;
         }
         args_comparator cmp;
-        this->compare(cmp, other);
-        return cmp.value_ < 0;
+        return this->compare(cmp, other) < 0;
     }
 
     bool
@@ -151,23 +153,23 @@ class thinknode_request_mixin : public Base, public id_interface
         if (!hash_)
         {
             detail::request_hasher hasher;
+            hasher(this->get_uuid());
             const_cast<thinknode_request_mixin*>(this)->serialize(hasher);
             hash_ = hasher.get_value();
         }
         return *hash_;
     }
 
+    // Maybe refactor and cache this hash value too?
     void
     update_hash(unique_hasher& hasher) const override
     {
-        // TODO
-    }
-
-    std::type_index
-    get_function_type_index() const
-    {
-        // The typeid() is evaluated at compile time
-        return std::type_index(typeid(Base));
+        std::stringstream ss;
+        cereal::BinaryOutputArchive oarchive{ss};
+        oarchive(this->get_uuid());
+        oarchive(*this); // Calling Base::serialize()
+        auto s{ss.str()};
+        hasher.encode_value(s.begin(), s.end());
     }
 
  private:
@@ -176,6 +178,7 @@ class thinknode_request_mixin : public Base, public id_interface
 
 } // namespace detail
 
+// TODO add a type-erased version
 template<caching_level_type level, typename Base>
 class thinknode_request_container
 {

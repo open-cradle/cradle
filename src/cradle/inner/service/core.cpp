@@ -51,10 +51,30 @@ inner_service_core::inner_reset(inner_service_config const& config)
 }
 
 void
+inner_service_core::inner_reset_memory_cache()
+{
+    inner_reset_memory_cache(immutable_cache_config{0x40'00'00'00});
+}
+
+void
 inner_service_core::inner_reset_memory_cache(
     immutable_cache_config const& config)
 {
     impl_->reset_memory_cache(config);
+}
+
+void
+inner_service_core::inner_reset_disk_cache()
+{
+    disk_cache_config dc_config;
+    dc_config.size_limit = 0x1'00'00'00'00;
+    inner_reset_disk_cache(dc_config);
+}
+
+void
+inner_service_core::inner_reset_disk_cache(disk_cache_config const& config)
+{
+    impl_->reset_disk_cache(config);
 }
 
 cppcoro::task<std::string>

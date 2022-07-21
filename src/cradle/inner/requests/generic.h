@@ -29,6 +29,13 @@ concept Request = requires
     std::same_as<decltype(T::caching_level), caching_level_type>;
 };
 
+// unique_ptr<Request> or shared_ptr<Request>
+template<typename T>
+concept RequestPtr = Request<typename T::element_type>;
+
+template<typename T>
+concept RequestOrPtr = Request<T> || RequestPtr<T>;
+
 template<typename T>
 concept UncachedRequest
     = Request<T>&& T::caching_level == caching_level_type::none;

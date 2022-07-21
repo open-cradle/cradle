@@ -18,6 +18,9 @@ if(LOCAL_DOCKER_TESTING)
     add_compile_options(-DLOCAL_DOCKER_TESTING)
 endif()
 
+set(GPROF_PROFILING OFF CACHE BOOL
+    "Enable CPU profiling using gprof")
+
 # Detect the compiler.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(IS_CLANG true)
@@ -65,11 +68,12 @@ conan_cmake_configure(
         zlib/1.2.12
         bzip2/1.0.8
         yaml-cpp/0.6.3
-        spdlog/1.8.2
+        spdlog/1.10.0
         simdjson/0.9.1
         lz4/1.9.3
-        fmt/7.1.3
+        fmt/8.1.1
         cereal/1.3.2
+        benchmark/1.6.1
     OPTIONS
         boost:without_chrono=True
         boost:without_container=True
@@ -148,6 +152,7 @@ find_package(spdlog REQUIRED)
 find_package(simdjson REQUIRED)
 find_package(lz4 REQUIRED)
 find_package(cereal REQUIRED)
+find_package(benchmark REQUIRED)
 
 # Add the given linker options on anything that gets linked.
 macro(add_link_options )
@@ -212,9 +217,15 @@ if(IS_MSVC)
     add_definitions(/DWIN32_LEAN_AND_MEAN /DVC_EXTRALEAN /DNORASTEROPS /DOEMRESOURCE /DNOATOM /DNOCLIPBOARD /DNOCOLOR /DNOCTRLMGR /DNODRAWTEXT /DNOGDI /DNOKERNEL /DNOMINMAX /DNOSOUND /DNOKANJI /DNOHELP /DNOPROFILER /DNODEFERWINDOWPOS /DNOMCX)
 endif()
 
-# Set build options for instrumenting test coverage.
+# Ensure that add_test() has effect.
 enable_testing()
-if(IS_CLANG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+
+if((IS_GCC OR IS_CLANG) AND GPROF_PROFILING)
+    message(STATUS "Enabling CPU profiling using gprof")
+    add_compile_options(-pg)
+    string(APPEND CMAKE_EXE_LINKER_FLAGS " -pg")
+elseif(IS_CLANG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # Set build options for instrumenting test coverage.
     message(STATUS "Enabling gcov support")
     add_compile_options(-DLLVM_USE_LINKER=gold -fprofile-instr-generate
                         -fcoverage-mapping)
@@ -484,11 +495,13 @@ add_test(
         --build ${CMAKE_BINARY_DIR}
         --target integration_tests)
 
-file(GLOB_RECURSE test_srcs_benchmark CONFIGURE_DEPENDS "tests/benchmarks/*.cpp")
+file(GLOB_RECURSE test_srcs_benchmark CONFIGURE_DEPENDS
+    "tests/benchmarks/*.cpp")
 add_executable(benchmark_test_runner ${test_srcs_benchmark} tests/inner/support/core.cpp)
-target_include_directories(benchmark_test_runner PRIVATE
-    src/inner)
-target_link_libraries(benchmark_test_runner cradle_outer cradle_inner)
+# Seems redundant due to PUBLIC property on cradle_inner
+# target_include_directories(benchmark_test_runner PRIVATE
+#     src/inner)
+target_link_libraries(benchmark_test_runner cradle_outer cradle_inner benchmark::benchmark)
 
 add_custom_target(
     benchmark_tests

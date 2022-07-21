@@ -1,13 +1,12 @@
-#include <cradle/thinknode/iss_req.h>
-
-#define CATCH_CONFIG_ENABLE_BENCHMARKING
-#include <catch2/catch.hpp>
+#include <benchmark/benchmark.h>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
+#include <spdlog/spdlog.h>
 
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/service/core.h>
 #include <cradle/inner/service/request.h>
+#include <cradle/thinknode/iss_req.h>
 #include <cradle/typing/encodings/msgpack.h>
 #include <cradle/typing/io/mock_http.h>
 #include <cradle/typing/service/core.h>
@@ -17,6 +16,30 @@
 #include "support.h"
 
 using namespace cradle;
+
+template<caching_level_type caching_level>
+static void
+BM_create_thinknode_request(benchmark::State& state)
+{
+    string api_url{"https://mgh.thinknode.io/api/v1.0"};
+    string context_id{"123"};
+    auto schema{
+        make_thinknode_type_info_with_string_type(thinknode_string_type())};
+    auto object_data{make_blob("payload")};
+
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(rq_post_iss_object<caching_level>(
+            api_url, context_id, schema, object_data));
+    }
+}
+
+BENCHMARK(BM_create_thinknode_request<caching_level_type::none>)
+    ->Name("BM_create_thinknode_request_uncached");
+BENCHMARK(BM_create_thinknode_request<caching_level_type::memory>)
+    ->Name("BM_create_thinknode_request_memory_cached");
+BENCHMARK(BM_create_thinknode_request<caching_level_type::full>)
+    ->Name("BM_create_thinknode_request_fully_cached");
 
 static void
 set_mock_script(mock_http_session& mock_http, int num_loops)
@@ -38,35 +61,13 @@ set_mock_script(mock_http_session& mock_http, int num_loops)
     mock_http.set_script(script);
 }
 
-static string
-expected_result(int num_loops)
-{
-    string result;
-    for (int i = 0; i < num_loops; ++i)
-    {
-        result += "def";
-    }
-    return result;
-}
-
-template<Request Req>
-cppcoro::task<string>
-resolve_n_requests(int n, thinknode_request_context& ctx, Req const& req)
-{
-    string result;
-    for (int i = 0; i < n; ++i)
-    {
-        result += co_await resolve_request(ctx, req);
-    }
-    co_return result;
-}
-
-TEST_CASE("ISS POST", "[iss]")
+template<caching_level_type caching_level, bool storing = false>
+void
+BM_resolve_thinknode_request(benchmark::State& state)
 {
     service_core service;
-    init_test_service(service, true);
+    init_test_service(service);
     auto& mock_http = enable_http_mocking(service);
-
     thinknode_session session;
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
     session.access_token = "xyz";
@@ -75,65 +76,83 @@ TEST_CASE("ISS POST", "[iss]")
     auto schema{
         make_thinknode_type_info_with_string_type(thinknode_string_type())};
     auto object_data{make_blob("payload")};
-    auto req_none{rq_post_iss_object<caching_level_type::none>(
-        session.api_url, context_id, schema, object_data)};
-    auto req_mem{rq_post_iss_object<caching_level_type::memory>(
+    auto req{rq_post_iss_object<caching_level>(
         session.api_url, context_id, schema, object_data)};
 
-    BENCHMARK("create request, uncached")
+    // Suppress output about disk cache hits
+    if constexpr (caching_level == caching_level_type::full)
     {
-        return rq_post_iss_object<caching_level_type::none>(
-            session.api_url, context_id, schema, object_data);
-    };
+        spdlog::set_level(spdlog::level::warn);
+    }
 
-    BENCHMARK("create request, memory cached")
-    {
-        return rq_post_iss_object<caching_level_type::memory>(
-            session.api_url, context_id, schema, object_data);
+    // Fill the appropriate cache if any
+    auto init = [&]() -> cppcoro::task<void> {
+        if constexpr (caching_level != caching_level_type::none)
+        {
+            set_mock_script(mock_http, 1);
+            benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
+            if constexpr (caching_level == caching_level_type::full)
+            {
+                sync_wait_write_disk_cache(ctx.get_service());
+            }
+        }
+        co_return;
     };
+    cppcoro::sync_wait(init());
 
-    BENCHMARK("resolve request x 10, uncached")
+    int num_loops = static_cast<int>(state.range(0));
+    for (auto _ : state)
     {
-        constexpr int num_loops = 10;
-        set_mock_script(mock_http, num_loops);
-        auto id
-            = cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_none));
-        REQUIRE(id == expected_result(num_loops));
-    };
-
-    BENCHMARK("resolve request x 20, uncached")
-    {
-        constexpr int num_loops = 20;
-        set_mock_script(mock_http, num_loops);
-        auto id
-            = cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_none));
-        REQUIRE(id == expected_result(num_loops));
-    };
-
-    BENCHMARK("resolve request, fill cache")
-    {
-        constexpr int num_loops = 2;
-        set_mock_script(mock_http, num_loops);
-        auto id
-            = cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_mem));
-        REQUIRE(id == expected_result(num_loops));
-    };
-
-    BENCHMARK("resolve request x 10, memory cached")
-    {
-        constexpr int num_loops = 10;
-        set_mock_script(mock_http, num_loops);
-        auto id
-            = cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_mem));
-        REQUIRE(id == expected_result(num_loops));
-    };
-
-    BENCHMARK("resolve request x 20, memory cached")
-    {
-        constexpr int num_loops = 20;
-        set_mock_script(mock_http, num_loops);
-        auto id
-            = cppcoro::sync_wait(resolve_n_requests(num_loops, ctx, req_mem));
-        REQUIRE(id == expected_result(num_loops));
-    };
+        auto loop = [&]() -> cppcoro::task<void> {
+            for (int i = 0; i < num_loops; ++i)
+            {
+                constexpr bool need_mock_script
+                    = caching_level == caching_level_type::none || storing;
+                constexpr bool need_empty_memory_cache
+                    = caching_level == caching_level_type::full || storing;
+                constexpr bool need_empty_disk_cache
+                    = caching_level == caching_level_type::full && storing;
+                if constexpr (
+                    need_mock_script || need_empty_memory_cache
+                    || need_empty_disk_cache)
+                {
+                    state.PauseTiming();
+                    if constexpr (need_mock_script)
+                    {
+                        set_mock_script(mock_http, 1);
+                    }
+                    if constexpr (need_empty_memory_cache)
+                    {
+                        service.inner_reset_memory_cache();
+                    }
+                    if constexpr (need_empty_disk_cache)
+                    {
+                        service.inner_reset_disk_cache();
+                    }
+                    state.ResumeTiming();
+                }
+                benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
+            }
+            co_return;
+        };
+        cppcoro::sync_wait(loop());
+    }
 }
+
+// It is doubtful whether the "uncached" testcase measures anything useful,
+// but it allows comparing against the "store to cache" ones.
+BENCHMARK(BM_resolve_thinknode_request<caching_level_type::none>)
+    ->Name("BM_resolve_thinknode_request_uncached")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_thinknode_request<caching_level_type::memory, true>)
+    ->Name("BM_resolve_thinknode_request_store_to_mem_cache")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_thinknode_request<caching_level_type::memory, false>)
+    ->Name("BM_resolve_thinknode_request_load_from_mem_cache")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_thinknode_request<caching_level_type::full, true>)
+    ->Name("BM_resolve_thinknode_request_store_to_disk_cache")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_thinknode_request<caching_level_type::full, false>)
+    ->Name("BM_resolve_thinknode_request_load_from_disk_cache")
+    ->Apply(thousand_loops);

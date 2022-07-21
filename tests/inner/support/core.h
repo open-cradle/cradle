@@ -83,6 +83,22 @@ struct cached_request_resolution_context : public context_intf
     reset_memory_cache();
 };
 
+template<caching_level_type level>
+struct request_resolution_context_struct
+{
+    using type = cached_request_resolution_context;
+};
+
+template<>
+struct request_resolution_context_struct<caching_level_type::none>
+{
+    using type = uncached_request_resolution_context;
+};
+
+template<caching_level_type level>
+using request_resolution_context =
+    typename request_resolution_context_struct<level>::type;
+
 } // namespace cradle
 
 #endif

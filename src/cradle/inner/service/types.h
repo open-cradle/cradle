@@ -28,7 +28,16 @@ struct inner_service_core
     inner_reset(inner_service_config const& config);
 
     void
+    inner_reset_memory_cache();
+
+    void
     inner_reset_memory_cache(immutable_cache_config const& config);
+
+    void
+    inner_reset_disk_cache();
+
+    void
+    inner_reset_disk_cache(disk_cache_config const& config);
 
     detail::inner_service_core_internals&
     inner_internals()

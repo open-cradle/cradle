@@ -111,7 +111,7 @@ disk_cached(
 }
 
 void
-init_test_service(service_core& core, bool single_threaded_http)
+init_test_service(service_core& core)
 {
     auto cache_dir = file_path("service_disk_cache");
 
@@ -122,7 +122,7 @@ init_test_service(service_core& core, bool single_threaded_http)
         service_disk_cache_config(some(cache_dir.string()), 0x40'00'00'00),
         2,
         2,
-        single_threaded_http ? 1 : 2));
+        2));
 }
 
 mock_http_session&

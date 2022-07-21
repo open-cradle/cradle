@@ -54,3 +54,4 @@ jobs:
       if: ${{ matrix.config == 'Release' }}
       run: |
         cmake --build build --config Release --target benchmark_tests
+      timeout-minutes: 20

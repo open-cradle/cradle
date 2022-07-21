@@ -127,6 +127,10 @@ class function_request_impl : public function_request_intf<Value>
     bool
     equals(function_request_impl const& other) const
     {
+        if (this == &other)
+        {
+            return true;
+        }
         return get_function_type_index() == other.get_function_type_index()
                && args_ == other.args_;
     }
@@ -134,6 +138,10 @@ class function_request_impl : public function_request_intf<Value>
     bool
     less_than(function_request_impl const& other) const
     {
+        if (this == &other)
+        {
+            return false;
+        }
         auto this_type_index = get_function_type_index();
         auto other_type_index = other.get_function_type_index();
         if (this_type_index != other_type_index)

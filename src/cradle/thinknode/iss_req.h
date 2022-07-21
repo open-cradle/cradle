@@ -3,19 +3,22 @@
 
 #include <tuple>
 
+#include <cereal/types/string.hpp>
 #include <cppcoro/task.hpp>
 
+#include <cradle/inner/requests/cereal.h>
 #include <cradle/thinknode/request.h>
 #include <cradle/typing/encodings/msgpack.h>
 
 namespace cradle {
 
+// The identity of a request object is formed by:
+// - The get_uuid() value, defining the class
+// - The values passed to serialize() (and to compare())
 class my_post_iss_object_request_base
 {
  public:
     using value_type = std::string;
-    // Tuple of arguments passed to archive()
-    using tuple_type = std::tuple<std::string, std::string, std::string, blob>;
 
     my_post_iss_object_request_base(
         std::string api_url,
@@ -26,12 +29,23 @@ class my_post_iss_object_request_base
     cppcoro::task<std::string>
     resolve(thinknode_request_context const& ctx) const;
 
+    // Return a string that uniquely identifies this class and its current
+    // implementation. When the class's behaviour changes, then so should
+    // this string.
+    std::string
+    get_uuid() const
+    {
+        return "my_post_iss_object_request";
+    }
+
     std::string
     get_introspection_title() const
     {
         return "my_post_iss_object_request";
     }
 
+    // Used when (de-)serializing this object (planned),
+    // and for calculating its hashes.
     template<typename Archive>
     void
     serialize(Archive& archive)
@@ -39,11 +53,17 @@ class my_post_iss_object_request_base
         archive(api_url_, context_id_, url_type_string_, object_data_);
     }
 
-    template<typename Cmp>
-    void
-    compare(Cmp& cmp, my_post_iss_object_request_base const& other) const
+    // Compares against another request object, returning <0, 0, or >0.
+    // The values passed to comparator are the same as in serialize();
+    // it would be nice if we could somehow get rid of this duplication.
+    template<typename Comparator>
+    int
+    compare(
+        Comparator& comparator,
+        my_post_iss_object_request_base const& other) const
     {
-        cmp(api_url_,
+        return comparator(
+            api_url_,
             other.api_url_,
             context_id_,
             other.context_id_,
@@ -54,8 +74,6 @@ class my_post_iss_object_request_base
     }
 
  private:
-    // id depends on these, plus something unique for this class
-    // These also form the data to be (de-)serialized
     std::string api_url_;
     std::string context_id_;
     // Or a request that can calculate url_type_string_ from schema and
