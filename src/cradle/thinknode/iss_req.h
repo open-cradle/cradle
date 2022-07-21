@@ -20,6 +20,10 @@ class my_post_iss_object_request_base
  public:
     using value_type = std::string;
 
+    my_post_iss_object_request_base()
+    {
+    }
+
     my_post_iss_object_request_base(
         std::string api_url,
         std::string context_id,
@@ -118,6 +122,28 @@ rq_post_iss_object(
         std::move(context_id),
         std::move(schema),
         std::move(msgpack_data)};
+}
+
+template<caching_level_type level>
+using my_post_iss_object_request_erased = thinknode_request_erased<
+    level,
+    my_post_iss_object_request_base::value_type>;
+
+template<caching_level_type level>
+auto
+rq_post_iss_object_erased(
+    std::string api_url,
+    std::string context_id,
+    thinknode_type_info schema,
+    blob object_data)
+{
+    // TODO find a better way to pass Base's type
+    return my_post_iss_object_request_erased<level>{
+        my_post_iss_object_request_base(),
+        std::move(api_url),
+        std::move(context_id),
+        std::move(schema),
+        std::move(object_data)};
 }
 
 } // namespace cradle
