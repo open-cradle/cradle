@@ -140,7 +140,18 @@ BM_resolve_thinknode_request_impl(
                     need_mock_script || need_empty_memory_cache
                     || need_empty_disk_cache)
                 {
-                    state.PauseTiming();
+                    // Some scenarios are problematic for some reason
+                    // (huge CPU times, only one iteration).
+                    // Not stopping and resuming timing gives some improvement.
+                    constexpr bool problematic
+                        = caching_level == caching_level_type::none
+                          || (caching_level == caching_level_type::memory
+                              && storing);
+                    constexpr bool pause_timing = !problematic;
+                    if constexpr (pause_timing)
+                    {
+                        state.PauseTiming();
+                    }
                     if constexpr (need_mock_script)
                     {
                         set_mock_script(mock_http, 1);
@@ -153,7 +164,10 @@ BM_resolve_thinknode_request_impl(
                     {
                         service.inner_reset_disk_cache();
                     }
-                    state.ResumeTiming();
+                    if constexpr (pause_timing)
+                    {
+                        state.ResumeTiming();
+                    }
                 }
                 benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
             }
@@ -178,8 +192,6 @@ BM_resolve_thinknode_request(benchmark::State& state)
         create_request, state);
 }
 
-// It is doubtful whether the "uncached" testcase measures anything useful,
-// but it allows comparing against the "store to cache" ones.
 BENCHMARK(BM_resolve_thinknode_request<caching_level_type::none>)
     ->Name("BM_resolve_thinknode_request_uncached")
     ->Apply(thousand_loops);
@@ -211,8 +223,6 @@ BM_resolve_thinknode_request_erased(benchmark::State& state)
         create_request, state);
 }
 
-// It is doubtful whether the "uncached" testcase measures anything useful,
-// but it allows comparing against the "store to cache" ones.
 BENCHMARK(BM_resolve_thinknode_request_erased<caching_level_type::none>)
     ->Name("BM_resolve_thinknode_request_erased_uncached")
     ->Apply(thousand_loops);
