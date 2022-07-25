@@ -49,6 +49,13 @@ class value_request
         co_return value_;
     }
 
+    template<typename Archive>
+    void
+    serialize(Archive& archive)
+    {
+        archive(value_);
+    }
+
  private:
     Value value_;
 };

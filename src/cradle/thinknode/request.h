@@ -237,7 +237,7 @@ class thinknode_request_container
     }
 
     cppcoro::task<value_type>
-    resolve(thinknode_request_context const& ctx) const
+    resolve(thinknode_request_context& ctx) const
     {
         return impl_->resolve(ctx);
     }
@@ -260,7 +260,7 @@ class thinknode_request_intf : public id_interface
     virtual ~thinknode_request_intf() = default;
 
     virtual cppcoro::task<Value>
-    resolve(thinknode_request_context const& ctx) const = 0;
+    resolve(thinknode_request_context& ctx) const = 0;
 };
 
 template<typename Base>
@@ -277,7 +277,7 @@ class thinknode_request_impl
     }
 
     cppcoro::task<value_type>
-    resolve(thinknode_request_context const& ctx) const override
+    resolve(thinknode_request_context& ctx) const override
     {
         return static_cast<Base const*>(this)->resolve(ctx);
     }
@@ -415,7 +415,7 @@ class thinknode_request_erased
     }
 
     cppcoro::task<Value>
-    resolve(thinknode_request_context const& ctx) const
+    resolve(thinknode_request_context& ctx) const
     {
         return impl_->resolve(ctx);
     }

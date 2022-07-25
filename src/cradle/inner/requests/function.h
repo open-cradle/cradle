@@ -328,6 +328,14 @@ class function_request_erased
         return title_;
     }
 
+    // TODO find a better way to serialize function_request_erased
+    template<typename Archive>
+    void
+    serialize(Archive& archive)
+    {
+        archive(captured_id_);
+    }
+
  private:
     inline static int next_id_{};
     int obj_id_;

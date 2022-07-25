@@ -7,15 +7,27 @@
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/requests/cereal.h>
+#include <cradle/inner/requests/value.h>
+#include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/request.h>
 #include <cradle/typing/encodings/msgpack.h>
 
 namespace cradle {
 
-// The identity of a request object is formed by:
-// - The get_uuid() value, defining the class
-// - The values passed to serialize() (and to compare())
-class my_post_iss_object_request_base
+cppcoro::task<std::string>
+resolve_my_post_iss_object_request(
+    thinknode_request_context& ctx,
+    std::string const& api_url,
+    std::string const& context_id,
+    std::string const& url_type_string,
+    blob const& object_data);
+
+template<Request ObjectDataRequest>
+requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
+    // The identity of a request object is formed by:
+    // - The get_uuid() value, defining the class
+    // - The values passed to serialize() (and to compare())
+    class my_post_iss_object_request_base
 {
  public:
     using value_type = std::string;
@@ -24,10 +36,21 @@ class my_post_iss_object_request_base
         std::string api_url,
         std::string context_id,
         thinknode_type_info schema,
-        blob object_data);
+        ObjectDataRequest object_data_request)
+        : api_url_{api_url},
+          context_id_{std::move(context_id)},
+          url_type_string_{get_url_type_string(api_url, schema)},
+          object_data_request_{std::move(object_data_request)}
+    {
+    }
 
     cppcoro::task<std::string>
-    resolve(thinknode_request_context const& ctx) const;
+    resolve(thinknode_request_context& ctx) const
+    {
+        auto object_data = co_await object_data_request_.resolve(ctx);
+        co_return co_await resolve_my_post_iss_object_request(
+            ctx, api_url_, context_id_, url_type_string_, object_data);
+    }
 
     // Return a string that uniquely identifies this class and its current
     // implementation. When the class's behaviour changes, then so should
@@ -50,7 +73,7 @@ class my_post_iss_object_request_base
     void
     serialize(Archive& archive)
     {
-        archive(api_url_, context_id_, url_type_string_, object_data_);
+        archive(api_url_, context_id_, url_type_string_, object_data_request_);
     }
 
     // Compares against another request object, returning <0, 0, or >0.
@@ -69,8 +92,8 @@ class my_post_iss_object_request_base
             other.context_id_,
             url_type_string_,
             other.url_type_string_,
-            object_data_,
-            other.object_data_);
+            object_data_request_,
+            other.object_data_request_);
     }
 
  private:
@@ -79,12 +102,29 @@ class my_post_iss_object_request_base
     // Or a request that can calculate url_type_string_ from schema and
     // api_url? It's now always evaluated and maybe the value is not needed.
     std::string url_type_string_;
-    blob object_data_;
+    ObjectDataRequest object_data_request_;
 };
 
-template<caching_level_type level>
-using my_post_iss_object_request
-    = thinknode_request_container<level, my_post_iss_object_request_base>;
+template<caching_level_type level, Request ObjectDataRequest>
+using my_post_iss_object_request = thinknode_request_container<
+    level,
+    my_post_iss_object_request_base<ObjectDataRequest>>;
+
+// Create a request to post an ISS object, where the data are retrieved
+// by resolving another request, and return the request's ID.
+template<caching_level_type level, Request ObjectDataRequest>
+requires(std::same_as<typename ObjectDataRequest::value_type, blob>) auto rq_post_iss_object(
+    std::string api_url,
+    std::string context_id,
+    thinknode_type_info schema,
+    ObjectDataRequest object_data_request)
+{
+    return my_post_iss_object_request<level, ObjectDataRequest>{
+        std::move(api_url),
+        std::move(context_id),
+        std::move(schema),
+        std::move(object_data_request)};
+}
 
 // Create a request to post an ISS object from a raw blob of data
 // (e.g. encoded in MessagePack format), and return its ID.
@@ -96,11 +136,12 @@ rq_post_iss_object(
     thinknode_type_info schema,
     blob object_data)
 {
-    return my_post_iss_object_request<level>{
+    using ObjectDataRequest = value_request<blob>;
+    return rq_post_iss_object<level, ObjectDataRequest>(
         std::move(api_url),
         std::move(context_id),
         std::move(schema),
-        std::move(object_data)};
+        rq_value(object_data));
 }
 
 // Create a request to post an ISS object and return its ID.
@@ -112,18 +153,35 @@ rq_post_iss_object(
     thinknode_type_info schema,
     dynamic data)
 {
-    blob msgpack_data = value_to_msgpack_blob(data);
-    return my_post_iss_object_request<level>{
+    using ObjectDataRequest = value_request<blob>;
+    return rq_post_iss_object<level, ObjectDataRequest>(
         std::move(api_url),
         std::move(context_id),
         std::move(schema),
-        std::move(msgpack_data)};
+        rq_value(value_to_msgpack_blob(data)));
 }
 
-template<caching_level_type level>
+template<caching_level_type level, Request ObjectDataRequest>
 using my_post_iss_object_request_erased = thinknode_request_erased<
     level,
-    my_post_iss_object_request_base::value_type>;
+    typename my_post_iss_object_request_base<ObjectDataRequest>::value_type>;
+
+template<caching_level_type level, Request ObjectDataRequest>
+requires(std::same_as<typename ObjectDataRequest::value_type, blob>) auto rq_post_iss_object_erased(
+    std::string api_url,
+    std::string context_id,
+    thinknode_type_info schema,
+    ObjectDataRequest object_data_request)
+{
+    using impl_type = thinknode_request_impl<
+        my_post_iss_object_request_base<ObjectDataRequest>>;
+    return my_post_iss_object_request_erased<level, ObjectDataRequest>{
+        std::make_shared<impl_type>(
+            std::move(api_url),
+            std::move(context_id),
+            std::move(schema),
+            std::move(object_data_request))};
+}
 
 template<caching_level_type level>
 auto
@@ -133,13 +191,12 @@ rq_post_iss_object_erased(
     thinknode_type_info schema,
     blob object_data)
 {
-    using impl_type = thinknode_request_impl<my_post_iss_object_request_base>;
-    return my_post_iss_object_request_erased<level>{
-        std::make_shared<impl_type>(
-            std::move(api_url),
-            std::move(context_id),
-            std::move(schema),
-            std::move(object_data))};
+    using ObjectDataRequest = value_request<blob>;
+    return rq_post_iss_object_erased<level, ObjectDataRequest>(
+        std::move(api_url),
+        std::move(context_id),
+        std::move(schema),
+        rq_value(object_data));
 }
 
 } // namespace cradle
