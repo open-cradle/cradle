@@ -20,10 +20,6 @@ class my_post_iss_object_request_base
  public:
     using value_type = std::string;
 
-    my_post_iss_object_request_base()
-    {
-    }
-
     my_post_iss_object_request_base(
         std::string api_url,
         std::string context_id,
@@ -137,13 +133,13 @@ rq_post_iss_object_erased(
     thinknode_type_info schema,
     blob object_data)
 {
-    // TODO find a better way to pass Base's type
+    using impl_type = thinknode_request_impl<my_post_iss_object_request_base>;
     return my_post_iss_object_request_erased<level>{
-        my_post_iss_object_request_base(),
-        std::move(api_url),
-        std::move(context_id),
-        std::move(schema),
-        std::move(object_data)};
+        std::make_shared<impl_type>(
+            std::move(api_url),
+            std::move(context_id),
+            std::move(schema),
+            std::move(object_data))};
 }
 
 } // namespace cradle

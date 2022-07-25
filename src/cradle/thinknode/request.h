@@ -369,13 +369,10 @@ class thinknode_request_erased
     // Or depend on Base::get_introspection_title() presence
     static constexpr bool introspective = true;
 
-    template<typename Base, typename... Args>
-    requires(std::same_as<typename Base::value_type, Value>)
-        thinknode_request_erased(Base&& unused, Args... args)
+    thinknode_request_erased(
+        std::shared_ptr<thinknode_request_intf<Value>> const& impl)
+        : impl_{impl}
     {
-        using impl_type = thinknode_request_impl<Base>;
-        auto impl{std::make_shared<impl_type>(std::move(args)...)};
-        impl_ = impl;
         if constexpr (caching_level != caching_level_type::none)
         {
             captured_id_ = captured_id{impl};
