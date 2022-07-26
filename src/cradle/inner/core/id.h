@@ -37,14 +37,22 @@ struct id_interface
     hash() const = 0;
 
     // Get a hash value that is unique for this ID.
+    // TODO unify get_unique_hash() and update_hash()
     virtual std::string
     get_unique_hash() const;
 
     // Update hasher's hash according to this ID.
-    // Used in the get_unique_hash() implementation.
+    // Used in the get_unique_hash() implementation and elsewhere.
     virtual void
     update_hash(unique_hasher& hasher) const = 0;
 };
+
+template<>
+inline std::size_t
+invoke_hash(id_interface const& x)
+{
+    return x.hash();
+}
 
 // The following convert the interface of the ID operations into the usual form
 // that one would expect, as free functions.

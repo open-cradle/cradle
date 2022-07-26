@@ -7,6 +7,7 @@
 #include <typeinfo>
 #include <utility>
 
+#include <cereal/types/memory.hpp>
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/core/hash.h>
@@ -197,7 +198,7 @@ class function_request_impl : public function_request_intf<Value>
     void
     update_hash(unique_hasher& hasher) const override
     {
-        hasher.using_lambda();
+        // TODO don't use Function's type for persistent storage
         hasher.encode_type<Function>();
         std::apply(
             [&hasher](auto&&... args) {
@@ -328,12 +329,11 @@ class function_request_erased
         return title_;
     }
 
-    // TODO find a better way to serialize function_request_erased
     template<typename Archive>
     void
     serialize(Archive& archive)
     {
-        archive(captured_id_);
+        archive(impl_);
     }
 
  private:

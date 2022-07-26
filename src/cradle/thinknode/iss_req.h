@@ -6,7 +6,6 @@
 #include <cereal/types/string.hpp>
 #include <cppcoro/task.hpp>
 
-#include <cradle/inner/requests/cereal.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/request.h>

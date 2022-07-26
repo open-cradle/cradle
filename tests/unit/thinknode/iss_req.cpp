@@ -167,11 +167,16 @@ TEST_CASE("ISS POST - blob, fully cached", "[requests]")
     thinknode_request_context ctx{service, session, tasklet};
     string context_id{"123"};
 
+    auto make_blob_function
+        = [](std::string const& payload) { return make_blob(payload); };
+    auto make_blob_request = rq_function_erased<caching_level_type::full>(
+        make_blob_function, rq_value(std::string("payload")));
+
     auto req{rq_post_iss_object<caching_level_type::full>(
         session.api_url,
         context_id,
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
-        make_blob("payload"))};
+        make_blob_request)};
 
     // Resolve using HTTP, storing result in both caches
     auto id0 = cppcoro::sync_wait(resolve_request(ctx, req));

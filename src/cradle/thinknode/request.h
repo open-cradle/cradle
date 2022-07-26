@@ -164,12 +164,9 @@ class thinknode_request_mixin : public Base, public id_interface
     void
     update_hash(unique_hasher& hasher) const override
     {
-        std::stringstream ss;
-        cereal::BinaryOutputArchive oarchive{ss};
-        oarchive(this->get_uuid());
-        oarchive(*this); // Calling Base::serialize()
-        auto s{ss.str()};
-        hasher.encode_value(s.begin(), s.end());
+        unique_functor functor{hasher};
+        functor(this->get_uuid());
+        const_cast<thinknode_request_mixin*>(this)->serialize(functor);
     }
 
  private:
@@ -346,12 +343,9 @@ class thinknode_request_impl
     void
     update_hash(unique_hasher& hasher) const override
     {
-        std::stringstream ss;
-        cereal::BinaryOutputArchive oarchive{ss};
-        oarchive(this->get_uuid());
-        oarchive(*static_cast<Base const*>(this)); // Calling Base::serialize()
-        auto s{ss.str()};
-        hasher.encode_value(s.begin(), s.end());
+        unique_functor functor{hasher};
+        functor(this->get_uuid());
+        const_cast<thinknode_request_impl*>(this)->serialize(functor);
     }
 
  private:
