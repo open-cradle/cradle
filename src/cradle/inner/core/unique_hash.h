@@ -3,11 +3,14 @@
 
 #include <cassert>
 #include <concepts>
+#include <cstddef>
 #include <cstring>
 #include <string>
 #include <typeinfo>
 
 #include <picosha2.h>
+
+#include <cradle/inner/core/type_definitions.h>
 
 namespace cradle {
 
@@ -18,9 +21,7 @@ namespace cradle {
 class unique_hasher
 {
  public:
-    unique_hasher()
-    {
-    }
+    using byte_t = picosha2::byte_t;
 
     template<typename T>
     void
@@ -31,24 +32,32 @@ class unique_hasher
         // From https://en.cppreference.com/w/cpp/types/type_info/name
         // The returned string can be identical for several types and change
         // between invocations of the same program.
+        // Maybe replace with type traits yielding a 1-byte value?
         const char* name = typeid(T).name();
         impl_.process(name, name + strlen(name));
     }
 
-    template<typename Iter>
     void
-    encode_value(Iter begin, Iter end)
+    encode_bytes(byte_t const* begin, byte_t const* end)
     {
         assert(!finished_);
         impl_.process(begin, end);
     }
 
-    // Indicates that the hash depends on one or more lambda functions, that
-    // might change e.g. when the program is rebuilt.
     void
-    using_lambda()
+    encode_bytes(std::byte const* begin, std::byte const* end)
     {
-        using_lambda_ = true;
+        encode_bytes(
+            reinterpret_cast<byte_t const*>(begin),
+            reinterpret_cast<byte_t const*>(end));
+    }
+
+    void
+    encode_bytes(char const* begin, char const* end)
+    {
+        encode_bytes(
+            reinterpret_cast<byte_t const*>(begin),
+            reinterpret_cast<byte_t const*>(end));
     }
 
     std::string
@@ -66,7 +75,6 @@ class unique_hasher
 
     picosha2::hash256_one_by_one impl_;
     bool finished_{false};
-    bool using_lambda_{false};
 };
 
 template<typename T>
@@ -75,22 +83,39 @@ void
 update_unique_hash(unique_hasher& hasher, T val)
 {
     hasher.encode_type<T>();
-    char* p = reinterpret_cast<char*>(&val);
-    hasher.encode_value(p, p + sizeof(val));
+    char const* p = reinterpret_cast<char const*>(&val);
+    hasher.encode_bytes(p, p + sizeof(val));
 }
 
-inline void
-update_unique_hash(unique_hasher& hasher, std::string const& val)
+void
+update_unique_hash(unique_hasher& hasher, std::string const& val);
+
+void
+update_unique_hash(unique_hasher& hasher, blob const& val);
+
+// A wrapper around unique_hasher, transforming it into something that can be
+// passed to cereal's serialize().
+class unique_functor
 {
-    hasher.encode_type<std::string>();
-    const char* p = val.c_str();
-    hasher.encode_value(p, p + val.length());
-}
+ public:
+    unique_functor(unique_hasher& hasher) : hasher_(hasher)
+    {
+    }
 
-struct id_interface;
+    template<typename Arg0, typename... Args>
+    void
+    operator()(Arg0&& arg0, Args&&... args)
+    {
+        update_unique_hash(hasher_, std::forward<Arg0>(arg0));
+        if constexpr (sizeof...(args) > 0)
+        {
+            operator()(args...);
+        }
+    }
 
-std::string
-create_unique_hash(id_interface const& id);
+ private:
+    unique_hasher& hasher_;
+};
 
 } // namespace cradle
 

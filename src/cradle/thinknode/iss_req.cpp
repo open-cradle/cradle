@@ -1,32 +1,23 @@
-#include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/thinknode/utilities.h>
 
 namespace cradle {
 
-my_post_iss_object_request_base::my_post_iss_object_request_base(
-    std::string api_url,
-    std::string context_id,
-    thinknode_type_info schema,
-    blob object_data)
-    : api_url_{api_url},
-      context_id_{std::move(context_id)},
-      url_type_string_{get_url_type_string(api_url, schema)},
-      object_data_{std::move(object_data)}
-{
-}
-
-cppcoro::task<string>
-my_post_iss_object_request_base::resolve(
-    thinknode_request_context const& ctx) const
+cppcoro::task<std::string>
+resolve_my_post_iss_object_request(
+    thinknode_request_context& ctx,
+    std::string const& api_url,
+    std::string const& context_id,
+    std::string const& url_type_string,
+    blob const& object_data)
 {
     auto query = make_http_request(
         http_request_method::POST,
-        api_url_ + "/iss/" + url_type_string_ + "?context=" + context_id_,
+        api_url + "/iss/" + url_type_string + "?context=" + context_id,
         {{"Authorization", "Bearer " + ctx.session.access_token},
          {"Accept", "application/json"},
          {"Content-Type", "application/octet-stream"}},
-        object_data_);
+        object_data);
 
     auto response = co_await async_http_request(ctx, std::move(query));
 
