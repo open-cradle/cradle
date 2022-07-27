@@ -30,21 +30,21 @@ create_thin_tree<1>()
     return rq_function<level>(add, rq_value(2), rq_value(1));
 }
 
-template<int H>
+template<caching_level_type level, int H>
 auto
 create_triangular_tree()
 {
-    auto constexpr level = caching_level_type::none;
-    return rq_function<level>(
-        add, create_triangular_tree<H - 1>(), create_triangular_tree<H - 1>());
-}
-
-template<>
-auto
-create_triangular_tree<1>()
-{
-    auto constexpr level = caching_level_type::none;
-    return rq_function<level>(add, rq_value(2), rq_value(1));
+    if constexpr (H == 1)
+    {
+        return rq_function<level>(add, rq_value(2), rq_value(1));
+    }
+    else
+    {
+        return rq_function<level>(
+            add,
+            create_triangular_tree<level, H - 1>(),
+            create_triangular_tree<level, H - 1>());
+    }
 }
 
 template<int H>
@@ -63,7 +63,8 @@ BM_create_triangular_tree(benchmark::State& state)
 {
     for (auto _ : state)
     {
-        benchmark::DoNotOptimize(create_triangular_tree<H>());
+        benchmark::DoNotOptimize(
+            create_triangular_tree<caching_level_type::none, H>());
     }
 }
 
@@ -454,22 +455,32 @@ BENCHMARK(BM_resolve_thin_tree<64>)
     ->Apply(thousand_loops);
 #endif
 
-template<int H>
+template<caching_level_type level, int H>
 void
 BM_resolve_triangular_tree(benchmark::State& state)
 {
-    uncached_request_resolution_context ctx{};
-    BM_resolve_request(state, ctx, create_triangular_tree<H>());
+    request_resolution_context<level> ctx{};
+    BM_resolve_request(state, ctx, create_triangular_tree<level, H>());
 }
 
-BENCHMARK(BM_resolve_triangular_tree<2>)
-    ->Name("BM_resolve_function_request_tri_tree H=2")
+BENCHMARK(BM_resolve_triangular_tree<caching_level_type::none, 2>)
+    ->Name("BM_resolve_function_request_uncached_tri_tree H=2")
     ->Apply(thousand_loops);
-BENCHMARK(BM_resolve_triangular_tree<4>)
-    ->Name("BM_resolve_function_request_tri_tree H=4")
+BENCHMARK(BM_resolve_triangular_tree<caching_level_type::none, 4>)
+    ->Name("BM_resolve_function_request_uncached_tri_tree H=4")
     ->Apply(thousand_loops);
-BENCHMARK(BM_resolve_triangular_tree<6>)
-    ->Name("BM_resolve_function_request_tri_tree H=6")
+BENCHMARK(BM_resolve_triangular_tree<caching_level_type::none, 6>)
+    ->Name("BM_resolve_function_request_uncached_tri_tree H=6")
+    ->Apply(thousand_loops);
+
+BENCHMARK(BM_resolve_triangular_tree<caching_level_type::memory, 2>)
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=2")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_triangular_tree<caching_level_type::memory, 4>)
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=4")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_triangular_tree<caching_level_type::memory, 6>)
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=6")
     ->Apply(thousand_loops);
 
 template<int H>
@@ -624,26 +635,26 @@ BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::none, 6>)
     ->Apply(thousand_loops);
 
 BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::memory, 2>)
-    ->Name("BM_resolve_function_request_erased_cached_thin_tree H=2")
+    ->Name("BM_resolve_function_request_erased_mem_cached_thin_tree H=2")
     ->Apply(thousand_loops);
 BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::memory, 4>)
-    ->Name("BM_resolve_function_request_erased_cached_thin_tree H=4")
+    ->Name("BM_resolve_function_request_erased_mem_cached_thin_tree H=4")
     ->Apply(thousand_loops);
 BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::memory, 16>)
-    ->Name("BM_resolve_function_request_erased_cached_thin_tree H=16")
+    ->Name("BM_resolve_function_request_erased_mem_cached_thin_tree H=16")
     ->Apply(thousand_loops);
 BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::memory, 64>)
-    ->Name("BM_resolve_function_request_erased_cached_thin_tree H=64")
+    ->Name("BM_resolve_function_request_erased_mem_cached_thin_tree H=64")
     ->Apply(thousand_loops);
 
 BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory, 2>)
-    ->Name("BM_resolve_function_request_erased_cached_tri_tree H=2")
+    ->Name("BM_resolve_function_request_erased_mem_cached_tri_tree H=2")
     ->Apply(thousand_loops);
 BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory, 4>)
-    ->Name("BM_resolve_function_request_erased_cached_tri_tree H=4")
+    ->Name("BM_resolve_function_request_erased_mem_cached_tri_tree H=4")
     ->Apply(thousand_loops);
 BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory, 6>)
-    ->Name("BM_resolve_function_request_erased_cached_tri_tree H=6")
+    ->Name("BM_resolve_function_request_erased_mem_cached_tri_tree H=6")
     ->Apply(thousand_loops);
 
 template<int H>

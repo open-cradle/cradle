@@ -249,7 +249,7 @@ class function_request_impl : public function_request_intf<Value>
     bool
     equals(id_interface const& other) const override
     {
-        // TODO is the static_cast justified?
+        assert(dynamic_cast<function_request_impl const*>(&other));
         auto const& other_id
             = static_cast<function_request_impl const&>(other);
         return equals(other_id);
@@ -258,6 +258,7 @@ class function_request_impl : public function_request_intf<Value>
     bool
     less_than(id_interface const& other) const override
     {
+        assert(dynamic_cast<function_request_impl const*>(&other));
         auto const& other_id
             = static_cast<function_request_impl const&>(other);
         return less_than(other_id);
