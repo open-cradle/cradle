@@ -112,11 +112,13 @@ struct id_interface_pointer_hash
 struct captured_id
 {
     captured_id() = default;
+    captured_id(captured_id const& other) = default;
+    captured_id(captured_id&& other) noexcept = default;
+
+    // Taking ownership of id, which should have been created by new()
     explicit captured_id(id_interface* id) : id_{id}
     {
     }
-    captured_id(captured_id const& other) = default;
-    captured_id(captured_id&& other) noexcept = default;
 
     // The aliasing constructor; ownership information shared with other
     captured_id(std::shared_ptr<id_interface> const& other)

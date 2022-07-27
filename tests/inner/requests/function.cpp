@@ -124,6 +124,32 @@ TEST_CASE("evaluate function request - memory cached", "[requests]")
     REQUIRE(num_add_calls == 2);
 }
 
+TEST_CASE("evaluate function request (V+V)*S - uncached", "[requests]")
+{
+    int num_add_calls = 0;
+    auto add = create_adder(num_add_calls);
+    int num_mul_calls = 0;
+    auto mul = create_multiplier(num_mul_calls);
+    auto req{rq_function<caching_level_type::none>(
+        mul,
+        rq_function<caching_level_type::none>(add, rq_value(1), rq_value(2)),
+        rq_value_sp(3))};
+    test_resolve_uncached(req, 9, num_add_calls, &num_mul_calls);
+}
+
+TEST_CASE("evaluate function request (V+V)*S - memory cached", "[requests]")
+{
+    int num_add_calls = 0;
+    auto add = create_adder(num_add_calls);
+    int num_mul_calls = 0;
+    auto mul = create_multiplier(num_mul_calls);
+    auto inner{rq_function<caching_level_type::memory>(
+        add, rq_value(1), rq_value(2))};
+    auto req{
+        rq_function<caching_level_type::memory>(mul, inner, rq_value_sp(3))};
+    test_resolve_cached(req, 9, num_add_calls, &num_mul_calls);
+}
+
 TEST_CASE("evaluate erased function request V+V - uncached", "[requests]")
 {
     int num_add_calls{};

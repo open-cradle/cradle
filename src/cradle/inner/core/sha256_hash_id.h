@@ -45,6 +45,7 @@ struct sha256_hashed_id : id_interface
     hash() const override
     {
         return std::apply(
+            // TODO should be auto&&... args?
             [](auto... args) { return combine_hashes(invoke_hash(args)...); },
             args_);
     }
