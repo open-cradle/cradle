@@ -278,7 +278,7 @@ class function_request_impl : public function_request_intf<Value>
     void
     update_hash(unique_hasher& hasher) const override
     {
-        if (!unique_hash_.initialized)
+        if (!have_unique_hash_)
         {
             calc_unique_hash();
         }
@@ -302,6 +302,7 @@ class function_request_impl : public function_request_intf<Value>
     std::tuple<Args...> args_;
     mutable std::optional<size_t> hash_;
     mutable unique_hasher::result_t unique_hash_;
+    mutable bool have_unique_hash_{false};
 
     std::type_index
     get_function_type_index() const
@@ -322,6 +323,7 @@ class function_request_impl : public function_request_intf<Value>
             },
             args_);
         hasher.get_result(unique_hash_);
+        have_unique_hash_ = true;
     }
 };
 

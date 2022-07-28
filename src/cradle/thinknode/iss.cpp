@@ -1,6 +1,7 @@
 #include <cradle/thinknode/iss.h>
 
 #include <boost/tokenizer.hpp>
+#include <picosha2.h>
 
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/utilities/text.h>

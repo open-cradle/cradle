@@ -8,7 +8,7 @@
 #include <string>
 #include <typeinfo>
 
-#include <picosha2.h>
+#include <openssl/sha.h>
 
 #include <cradle/inner/core/type_definitions.h>
 
@@ -27,14 +27,18 @@ get_unique_string(id_interface const& id);
 class unique_hasher
 {
  public:
-    using byte_t = picosha2::byte_t;
-    static constexpr size_t result_size = 32;
+    using byte_t = unsigned char;
+    static constexpr size_t result_size = SHA256_DIGEST_LENGTH;
 
     struct result_t
     {
         byte_t bytes[result_size];
-        bool initialized{false};
     };
+
+    unique_hasher()
+    {
+        SHA256_Init(&ctx_);
+    }
 
     template<typename T>
     void
@@ -47,38 +51,47 @@ class unique_hasher
         // between invocations of the same program.
         // Maybe replace with type traits yielding a 1-byte value?
         const char* name = typeid(T).name();
-        impl_.process(name, name + strlen(name));
+        encode_bytes(name, strlen(name));
+    }
+
+    void
+    encode_bytes(void const* data, size_t len)
+    {
+        assert(!finished_);
+        SHA256_Update(&ctx_, data, len);
     }
 
     void
     encode_bytes(byte_t const* begin, byte_t const* end)
     {
-        assert(!finished_);
-        impl_.process(begin, end);
+        encode_bytes(begin, end - begin);
     }
 
     void
     encode_bytes(std::byte const* begin, std::byte const* end)
     {
-        encode_bytes(
-            reinterpret_cast<byte_t const*>(begin),
-            reinterpret_cast<byte_t const*>(end));
+        encode_bytes(begin, end - begin);
     }
 
     void
     encode_bytes(char const* begin, char const* end)
     {
-        encode_bytes(
-            reinterpret_cast<byte_t const*>(begin),
-            reinterpret_cast<byte_t const*>(end));
+        encode_bytes(begin, end - begin);
     }
 
     // Update from a partial hash.
     void
-    combine(result_t const& partial);
+    combine(result_t const& partial)
+    {
+        encode_bytes(partial.bytes, result_size);
+    }
 
     void
-    get_result(result_t& result);
+    get_result(result_t& result)
+    {
+        finish();
+        result = result_;
+    }
 
     std::string
     get_string();
@@ -87,7 +100,8 @@ class unique_hasher
     void
     finish();
 
-    picosha2::hash256_one_by_one impl_;
+    SHA256_CTX ctx_;
+    result_t result_;
     bool finished_{false};
 };
 
@@ -98,7 +112,7 @@ update_unique_hash(unique_hasher& hasher, T val)
 {
     hasher.encode_type<T>();
     char const* p = reinterpret_cast<char const*>(&val);
-    hasher.encode_bytes(p, p + sizeof(val));
+    hasher.encode_bytes(p, sizeof(val));
 }
 
 void

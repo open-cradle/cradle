@@ -270,10 +270,10 @@ else()
 endif()
 
 # Add the library for the inner core.
-file(GLOB_RECURSE srcs_outer CONFIGURE_DEPENDS
+file(GLOB_RECURSE srcs_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/inner/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/*.cpp")
-add_library(cradle_inner STATIC ${srcs_outer})
+add_library(cradle_inner STATIC ${srcs_inner})
 
 # Add the main library: everything outside the inner core.
 file(GLOB_RECURSE srcs_outer CONFIGURE_DEPENDS
@@ -305,7 +305,8 @@ target_link_libraries(cradle_inner PUBLIC
     spdlog::spdlog
     lz4::lz4
     cppcoro
-    cereal::cereal)
+    cereal::cereal
+    OpenSSL::OpenSSL)
 target_link_libraries(cradle_outer PUBLIC
     Boost::headers
     Catch2::Catch2
