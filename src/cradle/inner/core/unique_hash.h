@@ -14,6 +14,12 @@
 
 namespace cradle {
 
+struct id_interface;
+
+// Get a string that is unique for the given ID (based on its hash).
+std::string
+get_unique_string(id_interface const& id);
+
 // Creates a cryptographic-strength hash value that should prevent collisions
 // between different items written to the disk cache.
 // Collisions between values that happen to have the same bitwise
@@ -22,6 +28,13 @@ class unique_hasher
 {
  public:
     using byte_t = picosha2::byte_t;
+    static constexpr size_t result_size = 32;
+
+    struct result_t
+    {
+        byte_t bytes[result_size];
+        bool initialized{false};
+    };
 
     template<typename T>
     void
@@ -60,14 +73,15 @@ class unique_hasher
             reinterpret_cast<byte_t const*>(end));
     }
 
+    // Update from a partial hash.
+    void
+    combine(result_t const& partial);
+
+    void
+    get_result(result_t& result);
+
     std::string
-    get_string()
-    {
-        finish();
-        std::string res;
-        picosha2::get_hash_hex_string(impl_, res);
-        return res;
-    }
+    get_string();
 
  private:
     void
@@ -98,10 +112,6 @@ update_unique_hash(unique_hasher& hasher, blob const& val);
 class unique_functor
 {
  public:
-    unique_functor(unique_hasher& hasher) : hasher_(hasher)
-    {
-    }
-
     template<typename Arg0, typename... Args>
     void
     operator()(Arg0&& arg0, Args&&... args)
@@ -113,8 +123,14 @@ class unique_functor
         }
     }
 
+    void
+    get_result(unique_hasher::result_t& result)
+    {
+        hasher_.get_result(result);
+    }
+
  private:
-    unique_hasher& hasher_;
+    unique_hasher hasher_;
 };
 
 } // namespace cradle

@@ -1,15 +1,6 @@
 #include <cradle/inner/core/id.h>
-#include <cradle/inner/core/unique_hash.h>
 
 namespace cradle {
-
-std::string
-id_interface::get_unique_hash() const
-{
-    unique_hasher hasher;
-    update_hash(hasher);
-    return hasher.get_string();
-}
 
 inline bool
 types_match(id_interface const& a, id_interface const& b)

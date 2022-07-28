@@ -1,6 +1,7 @@
 #include <cradle/inner/caching/immutable/cache.h>
 
 #include <cradle/inner/caching/immutable/internals.h>
+#include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/utilities/text.h>
 
 using std::string;
@@ -45,7 +46,7 @@ get_cache_snapshot(immutable_cache& cache_object)
     for (auto const& [key, record] : cache.records)
     {
         immutable_cache_entry_snapshot entry{
-            record->key->get_unique_hash(),
+            get_unique_string(*record->key),
             record->state,
             // is_initialized(data) ? some(data.ptr->type_info()) : none,
             record->size};

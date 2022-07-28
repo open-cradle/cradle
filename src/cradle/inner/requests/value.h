@@ -40,6 +40,12 @@ class value_request
         return value_;
     }
 
+    void
+    update_hash(unique_hasher& hasher) const
+    {
+        update_unique_hash(hasher, value_);
+    }
+
     // VS2019 build fails with
     // resolve(UncachedContext auto& ctx) const
     template<UncachedContext Ctx>
@@ -118,13 +124,11 @@ hash_value(std::shared_ptr<value_request<Value>> const& req)
     return invoke_hash(req->get_value());
 }
 
-class unique_hasher;
-
 template<typename Value>
 void
 update_unique_hash(unique_hasher& hasher, value_request<Value> const& req)
 {
-    update_unique_hash(hasher, req.get_value());
+    req.update_hash(hasher);
 }
 
 template<typename Value>
@@ -132,7 +136,7 @@ void
 update_unique_hash(
     unique_hasher& hasher, std::unique_ptr<value_request<Value>> const& req)
 {
-    update_unique_hash(hasher, req->get_value());
+    req->update_hash(hasher);
 }
 
 template<typename Value>
@@ -140,7 +144,7 @@ void
 update_unique_hash(
     unique_hasher& hasher, std::shared_ptr<value_request<Value>> const& req)
 {
-    update_unique_hash(hasher, req->get_value());
+    req->update_hash(hasher);
 }
 
 } // namespace cradle

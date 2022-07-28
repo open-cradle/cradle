@@ -110,12 +110,6 @@ class function_request_cached
         return id_->hash();
     }
 
-    std::string
-    get_unique_hash() const
-    {
-        return id_->get_unique_hash();
-    }
-
     void
     update_hash(unique_hasher& hasher) const
     {
@@ -281,26 +275,14 @@ class function_request_impl : public function_request_intf<Value>
         return *hash_;
     }
 
-    std::string
-    get_unique_hash() const override
-    {
-        if (unique_hash_.empty())
-        {
-            unique_hash_ = id_interface::get_unique_hash();
-        }
-        return unique_hash_;
-    }
-
     void
     update_hash(unique_hasher& hasher) const override
     {
-        // TODO don't use Function's type for persistent storage
-        hasher.encode_type<Function>();
-        std::apply(
-            [&hasher](auto&&... args) {
-                (update_unique_hash(hasher, args), ...);
-            },
-            args_);
+        if (!unique_hash_.initialized)
+        {
+            calc_unique_hash();
+        }
+        hasher.combine(unique_hash_);
     }
 
     cppcoro::task<Value>
@@ -319,13 +301,27 @@ class function_request_impl : public function_request_intf<Value>
     Function function_;
     std::tuple<Args...> args_;
     mutable std::optional<size_t> hash_;
-    mutable std::string unique_hash_;
+    mutable unique_hasher::result_t unique_hash_;
 
     std::type_index
     get_function_type_index() const
     {
         // The typeid() is evaluated at compile time
         return std::type_index(typeid(Function));
+    }
+
+    void
+    calc_unique_hash() const
+    {
+        unique_hasher hasher;
+        // TODO don't use Function's type for persistent storage
+        hasher.encode_type<Function>();
+        std::apply(
+            [&hasher](auto&&... args) {
+                (update_unique_hash(hasher, args), ...);
+            },
+            args_);
+        hasher.get_result(unique_hash_);
     }
 };
 

@@ -160,17 +160,28 @@ class thinknode_request_mixin : public Base, public id_interface
         return *hash_;
     }
 
-    // Maybe refactor and cache this hash value too?
     void
     update_hash(unique_hasher& hasher) const override
     {
-        unique_functor functor{hasher};
-        functor(this->get_uuid());
-        const_cast<thinknode_request_mixin*>(this)->serialize(functor);
+        if (!unique_hash_.initialized)
+        {
+            calc_unique_hash();
+        }
+        hasher.combine(unique_hash_);
     }
 
  private:
     mutable std::optional<size_t> hash_;
+    mutable unique_hasher::result_t unique_hash_;
+
+    void
+    calc_unique_hash() const
+    {
+        unique_functor functor;
+        functor(this->get_uuid());
+        const_cast<thinknode_request_mixin*>(this)->serialize(functor);
+        functor.get_result(unique_hash_);
+    }
 };
 
 } // namespace detail
@@ -339,17 +350,28 @@ class thinknode_request_impl
         return *hash_;
     }
 
-    // Maybe refactor and cache this hash value too?
     void
     update_hash(unique_hasher& hasher) const override
     {
-        unique_functor functor{hasher};
-        functor(this->get_uuid());
-        const_cast<thinknode_request_impl*>(this)->serialize(functor);
+        if (!unique_hash_.initialized)
+        {
+            calc_unique_hash();
+        }
+        hasher.combine(unique_hash_);
     }
 
  private:
     mutable std::optional<size_t> hash_;
+    mutable unique_hasher::result_t unique_hash_;
+
+    void
+    calc_unique_hash() const
+    {
+        unique_functor functor;
+        functor(this->get_uuid());
+        const_cast<thinknode_request_impl*>(this)->serialize(functor);
+        functor.get_result(unique_hash_);
+    }
 };
 
 template<caching_level_type level, typename Value>

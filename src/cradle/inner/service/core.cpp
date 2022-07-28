@@ -100,7 +100,7 @@ generic_disk_cached(
     id_interface const& id_key,
     std::function<cppcoro::task<blob>()> create_task)
 {
-    std::string key{id_key.get_unique_hash()};
+    std::string key{get_unique_string(id_key)};
     // Check the cache for an existing value.
     auto& cache = core.inner_internals().disk_cache;
     try
