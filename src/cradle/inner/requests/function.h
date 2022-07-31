@@ -55,6 +55,12 @@ class function_request_uncached
     std::tuple<Args...> args_;
 };
 
+// TODO does function_request_cached have any advantages over
+// function_request_erased?
+// - args_ are duplicated in id_
+// - id_ contains a shared_ptr
+// TODO cannot disk cache because Function cannot be part of a persistent
+// identity
 template<caching_level_type level, class Function, class... Args>
 class function_request_cached
 {
@@ -72,6 +78,42 @@ class function_request_cached
           function_{std::move(function)},
           args_{std::move(args)...}
     {
+    }
+
+    template<caching_level_type level1, class Function1, class... Args1>
+    bool
+    equals(function_request_cached<level1, Function1, Args1...> const& other)
+        const
+    {
+        if constexpr (level != level1)
+        {
+            return false;
+        }
+        return *id_ == *other.id_;
+    }
+
+    template<caching_level_type level1, class Function1, class... Args1>
+    bool
+    less_than(function_request_cached<level1, Function1, Args1...> const&
+                  other) const
+    {
+        if constexpr (level != level1)
+        {
+            return level < level1;
+        }
+        return *id_ < *other.id_;
+    }
+
+    size_t
+    hash() const
+    {
+        return id_->hash();
+    }
+
+    void
+    update_hash(unique_hasher& hasher) const
+    {
+        id_->update_hash(hasher);
     }
 
     captured_id const&
@@ -100,6 +142,52 @@ class function_request_cached
     Function function_;
     std::tuple<Args...> args_;
 };
+
+template<
+    caching_level_type level0,
+    class Function0,
+    class... Args0,
+    caching_level_type level1,
+    class Function1,
+    class... Args1>
+bool
+operator==(
+    function_request_cached<level0, Function0, Args0...> const& lhs,
+    function_request_cached<level1, Function1, Args1...> const& rhs)
+{
+    return lhs.equals(rhs);
+}
+
+template<
+    caching_level_type level0,
+    class Function0,
+    class... Args0,
+    caching_level_type level1,
+    class Function1,
+    class... Args1>
+bool
+operator<(
+    function_request_cached<level0, Function0, Args0...> const& lhs,
+    function_request_cached<level1, Function1, Args1...> const& rhs)
+{
+    return lhs.less_than(rhs);
+}
+
+template<caching_level_type level, class Function, class... Args>
+size_t
+hash_value(function_request_cached<level, Function, Args...> const& req)
+{
+    return req.hash();
+}
+
+template<caching_level_type level, class Function, class... Args>
+void
+update_unique_hash(
+    unique_hasher& hasher,
+    function_request_cached<level, Function, Args...> const& req)
+{
+    req.update_hash(hasher);
+}
 
 template<typename Value>
 class function_request_intf : public id_interface
@@ -155,6 +243,7 @@ class function_request_impl : public function_request_intf<Value>
     bool
     equals(id_interface const& other) const override
     {
+        assert(dynamic_cast<function_request_impl const*>(&other));
         auto const& other_id
             = static_cast<function_request_impl const&>(other);
         return equals(other_id);
@@ -163,6 +252,7 @@ class function_request_impl : public function_request_intf<Value>
     bool
     less_than(id_interface const& other) const override
     {
+        assert(dynamic_cast<function_request_impl const*>(&other));
         auto const& other_id
             = static_cast<function_request_impl const&>(other);
         return less_than(other_id);
@@ -185,26 +275,14 @@ class function_request_impl : public function_request_intf<Value>
         return *hash_;
     }
 
-    std::string
-    get_unique_hash() const override
-    {
-        if (unique_hash_.empty())
-        {
-            unique_hash_ = id_interface::get_unique_hash();
-        }
-        return unique_hash_;
-    }
-
     void
     update_hash(unique_hasher& hasher) const override
     {
-        // TODO don't use Function's type for persistent storage
-        hasher.encode_type<Function>();
-        std::apply(
-            [&hasher](auto&&... args) {
-                (update_unique_hash(hasher, args), ...);
-            },
-            args_);
+        if (!have_unique_hash_)
+        {
+            calc_unique_hash();
+        }
+        hasher.combine(unique_hash_);
     }
 
     cppcoro::task<Value>
@@ -223,13 +301,29 @@ class function_request_impl : public function_request_intf<Value>
     Function function_;
     std::tuple<Args...> args_;
     mutable std::optional<size_t> hash_;
-    mutable std::string unique_hash_;
+    mutable unique_hasher::result_t unique_hash_;
+    mutable bool have_unique_hash_{false};
 
     std::type_index
     get_function_type_index() const
     {
         // The typeid() is evaluated at compile time
         return std::type_index(typeid(Function));
+    }
+
+    void
+    calc_unique_hash() const
+    {
+        unique_hasher hasher;
+        // TODO don't use Function's type for persistent storage
+        hasher.encode_type<Function>();
+        std::apply(
+            [&hasher](auto&&... args) {
+                (update_unique_hash(hasher, args), ...);
+            },
+            args_);
+        hasher.get_result(unique_hash_);
+        have_unique_hash_ = true;
     }
 };
 
@@ -279,6 +373,7 @@ class function_request_erased
         return obj_id_;
     }
 
+    // TODO shouldn't this be a template function?
     bool
     equals(function_request_erased const& other) const
     {

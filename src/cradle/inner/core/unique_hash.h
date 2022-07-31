@@ -8,11 +8,17 @@
 #include <string>
 #include <typeinfo>
 
-#include <picosha2.h>
+#include <openssl/sha.h>
 
 #include <cradle/inner/core/type_definitions.h>
 
 namespace cradle {
+
+struct id_interface;
+
+// Get a string that is unique for the given ID (based on its hash).
+std::string
+get_unique_string(id_interface const& id);
 
 // Creates a cryptographic-strength hash value that should prevent collisions
 // between different items written to the disk cache.
@@ -21,7 +27,18 @@ namespace cradle {
 class unique_hasher
 {
  public:
-    using byte_t = picosha2::byte_t;
+    using byte_t = unsigned char;
+    static constexpr size_t result_size = SHA256_DIGEST_LENGTH;
+
+    struct result_t
+    {
+        byte_t bytes[result_size];
+    };
+
+    unique_hasher()
+    {
+        SHA256_Init(&ctx_);
+    }
 
     template<typename T>
     void
@@ -34,46 +51,57 @@ class unique_hasher
         // between invocations of the same program.
         // Maybe replace with type traits yielding a 1-byte value?
         const char* name = typeid(T).name();
-        impl_.process(name, name + strlen(name));
+        encode_bytes(name, strlen(name));
+    }
+
+    void
+    encode_bytes(void const* data, size_t len)
+    {
+        assert(!finished_);
+        SHA256_Update(&ctx_, data, len);
     }
 
     void
     encode_bytes(byte_t const* begin, byte_t const* end)
     {
-        assert(!finished_);
-        impl_.process(begin, end);
+        encode_bytes(begin, end - begin);
     }
 
     void
     encode_bytes(std::byte const* begin, std::byte const* end)
     {
-        encode_bytes(
-            reinterpret_cast<byte_t const*>(begin),
-            reinterpret_cast<byte_t const*>(end));
+        encode_bytes(begin, end - begin);
     }
 
     void
     encode_bytes(char const* begin, char const* end)
     {
-        encode_bytes(
-            reinterpret_cast<byte_t const*>(begin),
-            reinterpret_cast<byte_t const*>(end));
+        encode_bytes(begin, end - begin);
+    }
+
+    // Update from a partial hash.
+    void
+    combine(result_t const& partial)
+    {
+        encode_bytes(partial.bytes, result_size);
+    }
+
+    void
+    get_result(result_t& result)
+    {
+        finish();
+        result = result_;
     }
 
     std::string
-    get_string()
-    {
-        finish();
-        std::string res;
-        picosha2::get_hash_hex_string(impl_, res);
-        return res;
-    }
+    get_string();
 
  private:
     void
     finish();
 
-    picosha2::hash256_one_by_one impl_;
+    SHA256_CTX ctx_;
+    result_t result_;
     bool finished_{false};
 };
 
@@ -84,7 +112,7 @@ update_unique_hash(unique_hasher& hasher, T val)
 {
     hasher.encode_type<T>();
     char const* p = reinterpret_cast<char const*>(&val);
-    hasher.encode_bytes(p, p + sizeof(val));
+    hasher.encode_bytes(p, sizeof(val));
 }
 
 void
@@ -98,10 +126,6 @@ update_unique_hash(unique_hasher& hasher, blob const& val);
 class unique_functor
 {
  public:
-    unique_functor(unique_hasher& hasher) : hasher_(hasher)
-    {
-    }
-
     template<typename Arg0, typename... Args>
     void
     operator()(Arg0&& arg0, Args&&... args)
@@ -113,8 +137,14 @@ class unique_functor
         }
     }
 
+    void
+    get_result(unique_hasher::result_t& result)
+    {
+        hasher_.get_result(result);
+    }
+
  private:
-    unique_hasher& hasher_;
+    unique_hasher hasher_;
 };
 
 } // namespace cradle

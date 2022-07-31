@@ -15,7 +15,9 @@ update_unique_hash(unique_hasher& hasher, Value const& value)
 {
     auto natively_encoded = write_natively_encoded_value(to_dynamic(value));
     // TODO prefix with something denoting "natively encoded"
-    hasher.encode_bytes(&*natively_encoded.begin(), &*natively_encoded.end());
+    auto begin = &*natively_encoded.begin();
+    auto end = begin + natively_encoded.size();
+    hasher.encode_bytes(begin, end);
 }
 
 } // namespace cradle

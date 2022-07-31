@@ -36,13 +36,7 @@ struct id_interface
     virtual size_t
     hash() const = 0;
 
-    // Get a hash value that is unique for this ID.
-    // TODO unify get_unique_hash() and update_hash()
-    virtual std::string
-    get_unique_hash() const;
-
     // Update hasher's hash according to this ID.
-    // Used in the get_unique_hash() implementation and elsewhere.
     virtual void
     update_hash(unique_hasher& hasher) const = 0;
 };
@@ -112,11 +106,13 @@ struct id_interface_pointer_hash
 struct captured_id
 {
     captured_id() = default;
+    captured_id(captured_id const& other) = default;
+    captured_id(captured_id&& other) noexcept = default;
+
+    // Taking ownership of id, which should have been created by new()
     explicit captured_id(id_interface* id) : id_{id}
     {
     }
-    captured_id(captured_id const& other) = default;
-    captured_id(captured_id&& other) noexcept = default;
 
     // The aliasing constructor; ownership information shared with other
     captured_id(std::shared_ptr<id_interface> const& other)
