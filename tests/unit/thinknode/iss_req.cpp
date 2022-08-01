@@ -169,8 +169,8 @@ TEST_CASE("ISS POST - blob, fully cached", "[requests]")
 
     auto make_blob_function
         = [](std::string const& payload) { return make_blob(payload); };
-    auto make_blob_request = rq_function_erased<caching_level_type::full>(
-        make_blob_function, rq_value(std::string("payload")));
+    auto make_blob_request = rq_function_erased_uuid<caching_level_type::full>(
+        "uuid", make_blob_function, rq_value(std::string("payload")));
 
     auto req{rq_post_iss_object<caching_level_type::full>(
         session.api_url,

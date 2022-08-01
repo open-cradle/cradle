@@ -1,6 +1,7 @@
 #ifndef CRADLE_INNER_REQUESTS_FUNCTION_H
 #define CRADLE_INNER_REQUESTS_FUNCTION_H
 
+#include <cassert>
 #include <memory>
 #include <optional>
 #include <typeindex>
@@ -207,8 +208,9 @@ template<typename Value, class Function, class... Args>
 class function_request_impl : public function_request_intf<Value>
 {
  public:
-    function_request_impl(Function function, Args... args)
-        : function_{std::move(function)},
+    function_request_impl(std::string uuid, Function function, Args... args)
+        : uuid_{std::move(uuid)},
+          function_{std::move(function)},
           args_{std::move(args)...}
     {
     }
@@ -298,6 +300,7 @@ class function_request_impl : public function_request_intf<Value>
     }
 
  private:
+    std::string uuid_;
     Function function_;
     std::tuple<Args...> args_;
     mutable std::optional<size_t> hash_;
@@ -315,8 +318,11 @@ class function_request_impl : public function_request_intf<Value>
     calc_unique_hash() const
     {
         unique_hasher hasher;
-        // TODO don't use Function's type for persistent storage
-        hasher.encode_type<Function>();
+        // TODO if Function's type is implied for all non-top requests,
+        // we don't have to encode its uuid here, just in
+        // get_unique_string()?!
+        assert(!uuid_.empty());
+        update_unique_hash(hasher, uuid_);
         std::apply(
             [&hasher](auto&&... args) {
                 (update_unique_hash(hasher, args), ...);
@@ -338,13 +344,12 @@ class function_request_erased
     static constexpr bool introspective = introspective_;
 
     template<typename Function, typename... Args>
-    requires(!introspective)
-        function_request_erased(Function function, Args... args)
-        : obj_id_(next_id_++)
+    requires(!introspective) function_request_erased(
+        std::string uuid, Function function, Args... args)
     {
         auto impl{
             std::make_shared<function_request_impl<Value, Function, Args...>>(
-                std::move(function), std::move(args)...)};
+                std::move(uuid), std::move(function), std::move(args)...)};
         impl_ = impl;
         if constexpr (caching_level != caching_level_type::none)
         {
@@ -354,23 +359,17 @@ class function_request_erased
 
     template<typename Function, typename... Args>
     requires(introspective) function_request_erased(
-        std::string const& title, Function function, Args... args)
-        : obj_id_(next_id_++), title_{title}
+        std::string uuid, std::string title, Function function, Args... args)
+        : title_{std::move(title)}
     {
         auto impl{
             std::make_shared<function_request_impl<Value, Function, Args...>>(
-                std::move(function), std::move(args)...)};
+                std::move(uuid), std::move(function), std::move(args)...)};
         impl_ = impl;
         if constexpr (caching_level != caching_level_type::none)
         {
             captured_id_ = captured_id{impl};
         }
-    }
-
-    int
-    obj_id() const
-    {
-        return obj_id_;
     }
 
     // TODO shouldn't this be a template function?
@@ -432,8 +431,6 @@ class function_request_erased
     }
 
  private:
-    inline static int next_id_{};
-    int obj_id_;
     std::string title_;
     std::shared_ptr<function_request_intf<Value>> impl_;
     captured_id captured_id_;
@@ -540,34 +537,49 @@ requires(level != caching_level_type::none) auto rq_function_sp(
 }
 
 template<caching_level_type level, class Function, class... Args>
-auto
-rq_function_erased(Function function, Args... args)
+requires(level != caching_level_type::full) auto rq_function_erased(
+    Function function, Args... args)
 {
     using value_type = std::
         invoke_result_t<Function, typename Args::element_type::value_type...>;
     return function_request_erased<level, value_type, false>{
-        std::move(function), std::move(args)...};
+        "", std::move(function), std::move(args)...};
 }
 
 template<caching_level_type level, class Function, class... Args>
 auto
-rq_function_erased_intrsp(
-    std::string const& title, Function function, Args... args)
+rq_function_erased_uuid(std::string uuid, Function function, Args... args)
+{
+    using value_type = std::
+        invoke_result_t<Function, typename Args::element_type::value_type...>;
+    assert(!uuid.empty());
+    return function_request_erased<level, value_type, false>{
+        std::move(uuid), std::move(function), std::move(args)...};
+}
+
+template<caching_level_type level, class Function, class... Args>
+requires(level != caching_level_type::full) auto rq_function_erased_intrsp(
+    std::string title, Function function, Args... args)
 {
     using value_type = std::
         invoke_result_t<Function, typename Args::element_type::value_type...>;
     return function_request_erased<level, value_type, true>{
-        title, std::move(function), std::move(args)...};
+        "", std::move(title), std::move(function), std::move(args)...};
 }
 
 template<caching_level_type level, class Function, class... Args>
 auto
-rq_function_erased_intrsp(std::string&& title, Function function, Args... args)
+rq_function_erased_uuid_intrsp(
+    std::string uuid, std::string title, Function function, Args... args)
 {
     using value_type = std::
         invoke_result_t<Function, typename Args::element_type::value_type...>;
+    assert(!uuid.empty());
     return function_request_erased<level, value_type, true>{
-        std::move(title), std::move(function), std::move(args)...};
+        std::move(uuid),
+        std::move(title),
+        std::move(function),
+        std::move(args)...};
 }
 
 } // namespace cradle

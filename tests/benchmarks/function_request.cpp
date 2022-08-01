@@ -328,18 +328,39 @@ requires(H > 1) auto create_thin_tree_erased()
 }
 
 template<caching_level_type level, int H>
-requires(H == 1) auto create_triangular_tree_erased()
+requires(
+    level != caching_level_type::full) auto create_triangular_tree_erased()
 {
-    return rq_function_erased<level>(add, rq_value(2), rq_value(1));
+    if constexpr (H == 1)
+    {
+        return rq_function_erased<level>(add, rq_value(2), rq_value(1));
+    }
+    else
+    {
+        return rq_function_erased<level>(
+            add,
+            create_triangular_tree_erased<level, H - 1>(),
+            create_triangular_tree_erased<level, H - 1>());
+    }
 }
 
 template<caching_level_type level, int H>
-requires(H > 1) auto create_triangular_tree_erased()
+requires(
+    level == caching_level_type::full) auto create_triangular_tree_erased()
 {
-    return rq_function_erased<level>(
-        add,
-        create_triangular_tree_erased<level, H - 1>(),
-        create_triangular_tree_erased<level, H - 1>());
+    if constexpr (H == 1)
+    {
+        return rq_function_erased_uuid<level>(
+            "add_uuid", add, rq_value(2), rq_value(1));
+    }
+    else
+    {
+        return rq_function_erased_uuid<level>(
+            "add_uuid",
+            add,
+            create_triangular_tree_erased<level, H - 1>(),
+            create_triangular_tree_erased<level, H - 1>());
+    }
 }
 
 template<caching_level_type level, int H>
