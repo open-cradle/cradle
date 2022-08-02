@@ -6,6 +6,8 @@
 #include <optional>
 #include <vector>
 
+#include <cereal/types/memory.hpp>
+
 #include <boost/cstdint.hpp>
 
 namespace cradle {
@@ -44,6 +46,14 @@ struct blob
     size() const
     {
         return size_;
+    }
+
+    // cereal support
+    template<typename Archive>
+    void
+    serialize(Archive& archive)
+    {
+        archive(size_, data_);
     }
 
  private:

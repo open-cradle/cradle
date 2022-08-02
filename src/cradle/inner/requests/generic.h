@@ -61,6 +61,10 @@ concept CachedRequest
 };
 
 template<typename Req>
+concept FullyCachedRequest
+    = CachedRequest<Req>&& Req::caching_level == caching_level_type::full;
+
+template<typename Req>
 concept IntrospectiveRequest
     = CachedRequest<Req>&& Req::introspective&& requires(Req const& req)
 {
@@ -120,6 +124,10 @@ concept UncachedContextRequest = UncachedContext<Ctx>&& UncachedRequest<Req>&&
 template<typename Ctx, typename Req>
 concept CachedContextRequest = CachedContext<Ctx>&& CachedRequest<Req>&&
     MatchingContextRequest<Ctx, Req>;
+
+template<typename Ctx, typename Req>
+concept FullyCachedContextRequest = CachedContext<Ctx>&&
+    FullyCachedRequest<Req>&& MatchingContextRequest<Ctx, Req>;
 
 template<typename Ctx, typename Req>
 concept IntrospectiveContextRequest = IntrospectiveContext<Ctx>&&
