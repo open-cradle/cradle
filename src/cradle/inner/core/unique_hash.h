@@ -27,8 +27,13 @@ struct id_interface;
 //   collisions cannot happen. (typing/core/unique_hash.h hashes dynamics,
 //   taking types into account.)
 //
-// TODO restrict this function's interface so that it accepts only id's
-// that are captured_id's belonging to uuid-carrying requests.
+// id should be one of:
+// - A captured_id belonging to a fully-cached request (so carrying a uuid
+//   at least in that request, possibly more in subrequests); or
+// - A sha256_hashed_id calculated for an old-style Thinknode request
+//
+// An optimization for the first case could be to base the ultimate hash
+// value only on the top request's uuid, but it doesn't seem worthwhile.
 std::string
 get_unique_string(id_interface const& id);
 

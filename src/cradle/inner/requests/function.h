@@ -318,9 +318,6 @@ class function_request_impl : public function_request_intf<Value>
     calc_unique_hash() const
     {
         unique_hasher hasher;
-        // TODO if Function's type is implied for all non-top requests,
-        // we don't have to encode its uuid here, just in
-        // get_unique_string()?!
         assert(!uuid_.empty());
         update_unique_hash(hasher, uuid_);
         std::apply(
