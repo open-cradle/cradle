@@ -44,71 +44,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 include(cmake/version.cmake)
 
-# Download/include CMake/Conan integration.
-if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake")
-    message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
-    file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/0.18.1/conan.cmake"
-                  "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake"
-                  TLS_VERIFY ON)
-endif()
-include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
-
-# Invoke Conan.
-conan_cmake_configure(
-    REQUIRES
-        boost/1.77.0
-        catch2/2.13.9
-        nlohmann_json/3.9.1
-        msgpack/3.3.0
-        libcurl/7.75.0
-        openssl/1.1.1j
-        sqlite3/3.35.2
-        fakeit/2.0.7
-        websocketpp/0.8.2
-        zlib/1.2.12
-        bzip2/1.0.8
-        yaml-cpp/0.6.3
-        spdlog/1.10.0
-        simdjson/0.9.1
-        lz4/1.9.3
-        fmt/8.1.1
-        cereal/1.3.2
-        benchmark/1.6.1
-    OPTIONS
-        boost:without_chrono=True
-        boost:without_container=True
-        boost:without_context=True
-        boost:without_contract=True
-        boost:without_coroutine=True
-        boost:without_fiber=True
-        boost:without_filesystem=True
-        boost:without_graph=True
-        boost:without_graph_parallel=True
-        boost:without_iostreams=True
-        boost:without_json=True
-        boost:without_locale=True
-        boost:without_log=True
-        boost:without_mpi=True
-        boost:without_nowide=True
-        boost:without_serialization=True
-        boost:without_stacktrace=True
-        boost:without_test=True
-        boost:without_thread=True
-        boost:without_timer=True
-        boost:without_type_erasure=True
-        boost:without_wave=True
-        fakeit:integration=catch
-        *:shared=False
-    GENERATORS cmake_find_package)
-
-conan_cmake_autodetect(settings)
-
-conan_cmake_install(
-    PATH_OR_REFERENCE .
-    BUILD missing
-    REMOTE conancenter
-    SETTINGS ${settings})
-
 include(FetchContent)
 
 # The cppcoro detection logic seems broken for GCC 10.x (at least in CI), so
@@ -136,14 +71,13 @@ FetchContent_MakeAvailable(fetched_thread_pool)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}")
 
-find_package(Boost REQUIRED)
+find_package(Boost COMPONENTS program_options date_time exception REQUIRED)
 find_package(Catch2 REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(msgpack REQUIRED)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(SQLite3 REQUIRED)
-find_package(fakeit REQUIRED)
 find_package(websocketpp REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(BZip2 REQUIRED)
@@ -297,7 +231,7 @@ target_sources(cradle_outer PRIVATE ${generated_headers} ${generated_srcs}
     "${CMAKE_CURRENT_BINARY_DIR}/generated/src/cradle/version_info.hpp")
 
 target_link_libraries(cradle_inner PUBLIC
-    Boost::headers
+    ${Boost_LIBRARIES}
     Catch2::Catch2
     SQLite::SQLite3
     ZLIB::ZLIB
@@ -306,35 +240,32 @@ target_link_libraries(cradle_inner PUBLIC
     lz4::lz4
     cppcoro
     cereal::cereal
-    OpenSSL::OpenSSL)
+    OpenSSL::SSL)
 target_link_libraries(cradle_outer PUBLIC
-    Boost::headers
+    ${Boost_LIBRARIES}
     Catch2::Catch2
     nlohmann_json::nlohmann_json
-    msgpack::msgpack
+    msgpackc msgpackc-cxx
     CURL::libcurl
-    OpenSSL::OpenSSL
-    fakeit::fakeit
+    OpenSSL::SSL
     websocketpp::websocketpp
     ZLIB::ZLIB
     BZip2::BZip2
-    yaml-cpp::yaml-cpp
+    yaml-cpp
     spdlog::spdlog
     simdjson::simdjson
     cppcoro
     cereal::cereal)
-target_compile_definitions(
-    cradle_inner PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
-target_compile_definitions(
-    cradle_outer PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 target_include_directories(cradle_inner PUBLIC
     src
-    src/third-party)
+    src/third-party
+    ${Boost_INCLUDE_DIRS})
 target_include_directories(cradle_outer PUBLIC
     include
     ${generated_include_dir}/src
     src
-    src/third-party)
+    src/third-party
+    ${Boost_INCLUDE_DIRS})
 
 # Set up the deployment directory.
 set(deploy_dir "${CMAKE_CURRENT_BINARY_DIR}/deploy")

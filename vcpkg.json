@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
+  "name": "cradle",
+  "version": "0.1.0",
+  "builtin-baseline": "48369f2a2aa00f7311ca8417cfd0fbda4bcc41e9",
+  "dependencies": [
+    "boost",
+    "catch2",
+    "nlohmann-json",
+    "msgpack",
+    "curl",
+    "openssl",
+    "sqlite3",
+    "websocketpp",
+    "zlib",
+    "bzip2",
+    "yaml-cpp",
+    "spdlog",
+    "simdjson",
+    "lz4",
+    "fmt",
+    "cereal",
+    "benchmark"
+  ],
+  "overrides": [
+    {
+      "name": "openssl",
+      "version-string": "1.1.1j"
+    },
+    {
+      "name": "catch2",
+      "version": "2.13.8"
+    }
+  ]
+}
