@@ -6,6 +6,7 @@
 
 #include "../support/concurrency_testing.h"
 #include "../support/core.h"
+#include "../support/request.h"
 #include <cradle/inner/service/core.h>
 #include <cradle/inner/service/request.h>
 
@@ -301,4 +302,112 @@ TEST_CASE("evaluate erased function request V+V - fully cached", "[requests]")
     auto res21 = cppcoro::sync_wait(resolve_request(ctx, req_mem));
     REQUIRE(res21 == 7);
     REQUIRE(num_add_calls == 0);
+}
+
+TEST_CASE("evaluate function requests in parallel - uncached", "[requests]")
+{
+    static constexpr int num_requests = 7;
+    using Req = function_request_erased<caching_level_type::none, int, false>;
+    int num_add_calls{};
+    auto add{create_adder(num_add_calls)};
+    uncached_request_resolution_context ctx{};
+    std::vector<Req> requests;
+    for (int i = 0; i < num_requests; ++i)
+    {
+        requests.emplace_back(rq_function_erased<caching_level_type::none>(
+            add, rq_value(i), rq_value(i * 2)));
+    }
+
+    auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+
+    REQUIRE(res.size() == num_requests);
+    for (int i = 0; i < num_requests; ++i)
+    {
+        REQUIRE(res[i] == i * 3);
+    }
+    REQUIRE(num_add_calls == num_requests);
+}
+
+TEST_CASE(
+    "evaluate function requests in parallel - memory cached", "[requests]")
+{
+    static constexpr int num_requests = 7;
+    using Req
+        = function_request_erased<caching_level_type::memory, int, false>;
+    int num_add_calls{};
+    auto add{create_adder(num_add_calls)};
+    cached_request_resolution_context ctx{};
+    std::vector<Req> requests;
+    for (int i = 0; i < num_requests; ++i)
+    {
+        requests.emplace_back(rq_function_erased<caching_level_type::memory>(
+            add, rq_value(i), rq_value(i * 2)));
+    }
+
+    auto res0 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+
+    REQUIRE(res0.size() == num_requests);
+    for (int i = 0; i < num_requests; ++i)
+    {
+        REQUIRE(res0[i] == i * 3);
+    }
+    REQUIRE(num_add_calls == num_requests);
+
+    auto res1 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+
+    REQUIRE(res1.size() == num_requests);
+    for (int i = 0; i < num_requests; ++i)
+    {
+        REQUIRE(res1[i] == i * 3);
+    }
+    REQUIRE(num_add_calls == num_requests);
+}
+
+TEST_CASE("evaluate function requests in parallel - disk cached", "[requests]")
+{
+    static constexpr int num_requests = 7;
+    using Req = function_request_erased<caching_level_type::full, int, false>;
+    int num_add_calls{};
+    auto add{create_adder(num_add_calls)};
+    cached_request_resolution_context ctx{};
+    std::vector<Req> requests;
+    for (int i = 0; i < num_requests; ++i)
+    {
+        std::ostringstream os;
+        os << "uuid " << i;
+        requests.emplace_back(
+            rq_function_erased_uuid<caching_level_type::full>(
+                os.str(), add, rq_value(i), rq_value(i * 2)));
+    }
+
+    auto res0 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+    sync_wait_write_disk_cache(ctx.get_service());
+
+    REQUIRE(res0.size() == num_requests);
+    for (int i = 0; i < num_requests; ++i)
+    {
+        REQUIRE(res0[i] == i * 3);
+    }
+    REQUIRE(num_add_calls == num_requests);
+    auto ic0 = get_summary_info(ctx.get_cache());
+    REQUIRE(ic0.entry_count == num_requests);
+    auto dc0
+        = ctx.get_service().inner_internals().disk_cache.get_summary_info();
+    REQUIRE(dc0.entry_count == num_requests);
+
+    ctx.reset_memory_cache();
+    REQUIRE(get_summary_info(ctx.get_cache()).entry_count == 0);
+    auto res1 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+
+    REQUIRE(res1.size() == num_requests);
+    for (int i = 0; i < num_requests; ++i)
+    {
+        REQUIRE(res1[i] == i * 3);
+    }
+    REQUIRE(num_add_calls == num_requests);
+    auto ic1 = get_summary_info(ctx.get_cache());
+    REQUIRE(ic1.entry_count == num_requests);
+    auto dc1
+        = ctx.get_service().inner_internals().disk_cache.get_summary_info();
+    REQUIRE(dc1.entry_count == num_requests);
 }
