@@ -192,10 +192,8 @@ retrieve_immutable(
         std::move(function_name));
 }
 
-namespace uncached {
-
 cppcoro::task<blob>
-retrieve_immutable_blob(
+retrieve_immutable_blob_uncached(
     thinknode_request_context ctx, string context_id, string immutable_id)
 {
     auto query = make_get_request(
@@ -206,8 +204,6 @@ retrieve_immutable_blob(
     auto response = co_await async_http_request(ctx, query);
     co_return response.body;
 }
-
-} // namespace uncached
 
 cppcoro::shared_task<blob>
 retrieve_immutable_blob(
@@ -220,8 +216,7 @@ retrieve_immutable_blob(
     auto cache_key = make_captured_sha256_hashed_id(
         function_name, ctx.session.api_url, immutable_id);
     auto create_task = [=]() {
-        return uncached::retrieve_immutable_blob(
-            ctx, context_id, immutable_id);
+        return retrieve_immutable_blob_uncached(ctx, context_id, immutable_id);
     };
     return make_shared_task_for_cacheable<blob>(
         ctx.service,

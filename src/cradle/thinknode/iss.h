@@ -26,6 +26,10 @@ cppcoro::shared_task<dynamic>
 retrieve_immutable(
     thinknode_request_context ctx, string context_id, string immutable_id);
 
+cppcoro::task<blob>
+retrieve_immutable_blob_uncached(
+    thinknode_request_context ctx, string context_id, string immutable_id);
+
 // Retrieve an immutable object as a raw blob of data (e.g. in MessagePack
 // format).
 cppcoro::shared_task<blob>

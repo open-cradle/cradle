@@ -81,7 +81,7 @@ struct arg_type_struct<
 // TODO cannot disk cache because Function cannot be part of a persistent
 // identity
 template<
-    caching_level_type level,
+    caching_level_type Level,
     typename Value,
     typename Function,
     typename... Args>
@@ -91,7 +91,7 @@ class function_request_cached
     using element_type = function_request_cached;
     using value_type = Value;
 
-    static constexpr caching_level_type caching_level = level;
+    static constexpr caching_level_type caching_level = Level;
     static constexpr bool introspective = false;
 
     function_request_cached(Function function, Args... args)
@@ -103,15 +103,15 @@ class function_request_cached
     }
 
     template<
-        caching_level_type level1,
+        caching_level_type Level1,
         typename Value1,
         typename Function1,
         typename... Args1>
     bool
-    equals(function_request_cached<level1, Value1, Function1, Args1...> const&
+    equals(function_request_cached<Level1, Value1, Function1, Args1...> const&
                other) const
     {
-        if constexpr (level != level1)
+        if constexpr (Level != Level1)
         {
             return false;
         }
@@ -119,18 +119,18 @@ class function_request_cached
     }
 
     template<
-        caching_level_type level1,
+        caching_level_type Level1,
         typename Value1,
         typename Function1,
         typename... Args1>
     bool
     less_than(
-        function_request_cached<level1, Value1, Function1, Args1...> const&
+        function_request_cached<Level1, Value1, Function1, Args1...> const&
             other) const
     {
-        if constexpr (level != level1)
+        if constexpr (Level != Level1)
         {
-            return level < level1;
+            return Level < Level1;
         }
         return *id_ < *other.id_;
     }
@@ -173,92 +173,92 @@ class function_request_cached
 };
 
 template<
-    caching_level_type level,
+    caching_level_type Level,
     typename Value,
     typename Function,
     typename... Args>
 struct arg_type_struct<
-    function_request_cached<level, Value, Function, Args...>>
+    function_request_cached<Level, Value, Function, Args...>>
 {
     using value_type = Value;
 };
 
 template<
-    caching_level_type level,
+    caching_level_type Level,
     typename Value,
     typename Function,
     typename... Args>
 struct arg_type_struct<
-    std::unique_ptr<function_request_cached<level, Value, Function, Args...>>>
+    std::unique_ptr<function_request_cached<Level, Value, Function, Args...>>>
 {
     using value_type = Value;
 };
 
 template<
-    caching_level_type level,
+    caching_level_type Level,
     typename Value,
     typename Function,
     typename... Args>
 struct arg_type_struct<
-    std::shared_ptr<function_request_cached<level, Value, Function, Args...>>>
+    std::shared_ptr<function_request_cached<Level, Value, Function, Args...>>>
 {
     using value_type = Value;
 };
 
 template<
-    caching_level_type level0,
+    caching_level_type Level0,
     typename Value0,
     typename Function0,
     typename... Args0,
-    caching_level_type level1,
+    caching_level_type Level1,
     typename Value1,
     typename Function1,
     typename... Args1>
 bool
 operator==(
-    function_request_cached<level0, Value0, Function0, Args0...> const& lhs,
-    function_request_cached<level1, Value1, Function1, Args1...> const& rhs)
+    function_request_cached<Level0, Value0, Function0, Args0...> const& lhs,
+    function_request_cached<Level1, Value1, Function1, Args1...> const& rhs)
 {
     return lhs.equals(rhs);
 }
 
 template<
-    caching_level_type level0,
+    caching_level_type Level0,
     typename Value0,
     typename Function0,
     typename... Args0,
-    caching_level_type level1,
+    caching_level_type Level1,
     typename Value1,
     typename Function1,
     typename... Args1>
 bool
 operator<(
-    function_request_cached<level0, Value0, Function0, Args0...> const& lhs,
-    function_request_cached<level1, Value1, Function1, Args1...> const& rhs)
+    function_request_cached<Level0, Value0, Function0, Args0...> const& lhs,
+    function_request_cached<Level1, Value1, Function1, Args1...> const& rhs)
 {
     return lhs.less_than(rhs);
 }
 
 template<
-    caching_level_type level,
+    caching_level_type Level,
     typename Value,
     typename Function,
     typename... Args>
 size_t
-hash_value(function_request_cached<level, Value, Function, Args...> const& req)
+hash_value(function_request_cached<Level, Value, Function, Args...> const& req)
 {
     return req.hash();
 }
 
 template<
-    caching_level_type level,
+    caching_level_type Level,
     typename Value,
     typename Function,
     typename... Args>
 void
 update_unique_hash(
     unique_hasher& hasher,
-    function_request_cached<level, Value, Function, Args...> const& req)
+    function_request_cached<Level, Value, Function, Args...> const& req)
 {
     req.update_hash(hasher);
 }
@@ -278,9 +278,11 @@ class function_request_intf : public id_interface
 // TODO how can we deserialize these objects? Creator needs to
 // provide all template arguments.
 // TODO don't we need a serialize() member function?
-template<typename Value, typename Function, typename... Args>
+template<typename Value, bool AsCoro, typename Function, typename... Args>
 class function_request_impl : public function_request_intf<Value>
 {
+    static constexpr bool func_is_coro = AsCoro;
+
  public:
     // uuid is allowed to be empty if caching level is not full
     function_request_impl(std::string uuid, Function function, Args... args)
@@ -365,13 +367,25 @@ class function_request_impl : public function_request_intf<Value>
     cppcoro::task<Value>
     resolve(context_intf& ctx) const override
     {
-        // The "func=function_" is a workaround to prevent a gcc-10 internal
-        // compiler error in release builds.
-        co_return co_await std::apply(
-            [&, func = function_](auto&&... args) -> cppcoro::task<Value> {
-                co_return func((co_await resolve_request(ctx, args))...);
-            },
-            args_);
+        if constexpr (!func_is_coro)
+        {
+            // The "func=function_" is a workaround to prevent a gcc-10
+            // internal compiler error in release builds.
+            co_return co_await std::apply(
+                [&, func = function_](auto&&... args) -> cppcoro::task<Value> {
+                    co_return func((co_await resolve_request(ctx, args))...);
+                },
+                args_);
+        }
+        else
+        {
+            co_return co_await std::apply(
+                [&](auto&&... args) -> cppcoro::task<Value> {
+                    co_return co_await function_(
+                        ctx, (co_await resolve_request(ctx, args))...);
+                },
+                args_);
+        }
     }
 
  private:
@@ -405,23 +419,28 @@ class function_request_impl : public function_request_intf<Value>
     }
 };
 
-template<caching_level_type level, typename Value, bool introspective_>
+// This class supports two kinds of functions:
+// (0) Plain function: res = function(args...)
+// (1) Coroutine needing context: res = co_await function(ctx, args...)
+//
+// TODO consider turning level, Intrsp, AsCoro into policies
+template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
 class function_request_erased
 {
  public:
     using element_type = function_request_erased;
     using value_type = Value;
 
-    static constexpr caching_level_type caching_level = level;
-    static constexpr bool introspective = introspective_;
+    static constexpr caching_level_type caching_level = Level;
+    static constexpr bool introspective = Intrsp;
 
     template<typename Function, typename... Args>
     requires(!introspective) function_request_erased(
         std::string uuid, Function function, Args... args)
     {
-        auto impl{
-            std::make_shared<function_request_impl<Value, Function, Args...>>(
-                std::move(uuid), std::move(function), std::move(args)...)};
+        auto impl{std::make_shared<
+            function_request_impl<Value, AsCoro, Function, Args...>>(
+            std::move(uuid), std::move(function), std::move(args)...)};
         impl_ = impl;
         if constexpr (caching_level != caching_level_type::none)
         {
@@ -434,9 +453,9 @@ class function_request_erased
         std::string uuid, std::string title, Function function, Args... args)
         : title_{std::move(title)}
     {
-        auto impl{
-            std::make_shared<function_request_impl<Value, Function, Args...>>(
-                std::move(uuid), std::move(function), std::move(args)...)};
+        auto impl{std::make_shared<
+            function_request_impl<Value, AsCoro, Function, Args...>>(
+            std::move(uuid), std::move(function), std::move(args)...)};
         impl_ = impl;
         if constexpr (caching_level != caching_level_type::none)
         {
@@ -508,24 +527,26 @@ class function_request_erased
     captured_id captured_id_;
 };
 
-template<caching_level_type level, typename Value, bool introspective_>
-struct arg_type_struct<function_request_erased<level, Value, introspective_>>
+template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
+struct arg_type_struct<function_request_erased<Level, Value, Intrsp, AsCoro>>
 {
     using value_type = Value;
 };
 
 template<
-    caching_level_type lhs_level,
-    caching_level_type rhs_level,
+    caching_level_type LhsLevel,
+    caching_level_type RhsLevel,
     typename Value,
-    bool lhs_intrsp,
-    bool rhs_intrsp>
+    bool LhsIntrsp,
+    bool RhsIntrsp,
+    bool LhsCoro,
+    bool RhsCoro>
 bool
 operator==(
-    function_request_erased<lhs_level, Value, lhs_intrsp> const& lhs,
-    function_request_erased<rhs_level, Value, rhs_intrsp> const& rhs)
+    function_request_erased<LhsLevel, Value, LhsIntrsp, LhsCoro> const& lhs,
+    function_request_erased<RhsLevel, Value, RhsIntrsp, RhsCoro> const& rhs)
 {
-    if constexpr (lhs_level != rhs_level)
+    if constexpr (LhsLevel != RhsLevel)
     {
         return false;
     }
@@ -533,145 +554,201 @@ operator==(
 }
 
 template<
-    caching_level_type lhs_level,
-    caching_level_type rhs_level,
+    caching_level_type LhsLevel,
+    caching_level_type RhsLevel,
     typename Value,
-    bool lhs_intrsp,
-    bool rhs_intrsp>
+    bool LhsIntrsp,
+    bool RhsIntrsp,
+    bool LhsCoro,
+    bool RhsCoro>
 bool
 operator<(
-    function_request_erased<lhs_level, Value, lhs_intrsp> const& lhs,
-    function_request_erased<rhs_level, Value, rhs_intrsp> const& rhs)
+    function_request_erased<LhsLevel, Value, LhsIntrsp, LhsCoro> const& lhs,
+    function_request_erased<RhsLevel, Value, RhsIntrsp, RhsCoro> const& rhs)
 {
-    if constexpr (lhs_level != rhs_level)
+    if constexpr (LhsLevel != RhsLevel)
     {
-        return lhs_level < rhs_level;
+        return LhsLevel < RhsLevel;
     }
     return lhs.less_than(rhs);
 }
 
-template<caching_level_type level, typename Value, bool intrsp>
+template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
 size_t
-hash_value(function_request_erased<level, Value, intrsp> const& req)
+hash_value(function_request_erased<Level, Value, Intrsp, AsCoro> const& req)
 {
     return req.hash();
 }
 
-template<caching_level_type level, typename Value, bool intrsp>
+template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
 void
 update_unique_hash(
     unique_hasher& hasher,
-    function_request_erased<level, Value, intrsp> const& req)
+    function_request_erased<Level, Value, Intrsp, AsCoro> const& req)
 {
     req.update_hash(hasher);
 }
 
-template<caching_level_type level, typename Function, typename... Args>
-requires(level == caching_level_type::none) auto rq_function(
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level == caching_level_type::none) auto rq_function(
     Function function, Args... args)
 {
-    using value_type = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_uncached<value_type, Function, Args...>{
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
+    return function_request_uncached<Value, Function, Args...>{
         std::move(function), std::move(args)...};
 }
 
-template<caching_level_type level, typename Function, typename... Args>
-requires(level != caching_level_type::none) auto rq_function(
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level != caching_level_type::none) auto rq_function(
     Function function, Args... args)
 {
-    using value_type = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_cached<level, value_type, Function, Args...>{
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
+    return function_request_cached<Level, Value, Function, Args...>{
         std::move(function), std::move(args)...};
 }
 
 template<
     typename Value,
-    caching_level_type level,
+    caching_level_type Level,
     typename Function,
     typename... Args>
-requires(level != caching_level_type::none) auto rq_function(
+requires(Level != caching_level_type::none) auto rq_function(
     Function function, Args... args)
 {
-    return function_request_cached<level, Value, Function, Args...>{
+    return function_request_cached<Level, Value, Function, Args...>{
         std::move(function), std::move(args)...};
 }
 
-template<caching_level_type level, typename Function, typename... Args>
-requires(level == caching_level_type::none) auto rq_function_up(
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level == caching_level_type::none) auto rq_function_up(
     Function function, Args... args)
 {
-    using value_type = std::invoke_result_t<Function, arg_type<Args>...>;
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return std::make_unique<
-        function_request_uncached<value_type, Function, Args...>>(
+        function_request_uncached<Value, Function, Args...>>(
         std::move(function), std::move(args)...);
 }
 
-template<caching_level_type level, typename Function, typename... Args>
-requires(level != caching_level_type::none) auto rq_function_up(
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level != caching_level_type::none) auto rq_function_up(
     Function function, Args... args)
 {
-    using value_type = std::invoke_result_t<Function, arg_type<Args>...>;
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return std::make_unique<
-        function_request_cached<level, value_type, Function, Args...>>(
+        function_request_cached<Level, Value, Function, Args...>>(
         std::move(function), std::move(args)...);
 }
 
-template<caching_level_type level, typename Function, typename... Args>
-requires(level == caching_level_type::none) auto rq_function_sp(
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level == caching_level_type::none) auto rq_function_sp(
     Function function, Args... args)
 {
-    using value_type = std::invoke_result_t<Function, arg_type<Args>...>;
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return std::make_shared<
-        function_request_uncached<value_type, Function, Args...>>(
+        function_request_uncached<Value, Function, Args...>>(
         std::move(function), std::move(args)...);
 }
 
-template<caching_level_type level, typename Function, typename... Args>
-requires(level != caching_level_type::none) auto rq_function_sp(
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level != caching_level_type::none) auto rq_function_sp(
     Function function, Args... args)
 {
-    using value_type = std::invoke_result_t<Function, arg_type<Args>...>;
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return std::make_shared<
-        function_request_cached<level, value_type, Function, Args...>>(
+        function_request_cached<Level, Value, Function, Args...>>(
         std::move(function), std::move(args)...);
 }
 
-template<caching_level_type level, typename Function, typename... Args>
-requires(level != caching_level_type::full) auto rq_function_erased(
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level != caching_level_type::full) auto rq_function_erased(
     Function function, Args... args)
 {
-    using value_type = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_erased<level, value_type, false>{
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
+    return function_request_erased<Level, Value, false, false>{
         "", std::move(function), std::move(args)...};
 }
 
-template<caching_level_type level, typename Function, typename... Args>
+template<
+    caching_level_type Level,
+    typename Value,
+    typename Function,
+    typename... Args>
+requires(Level != caching_level_type::full) auto rq_function_erased_coro(
+    Function function, Args... args)
+{
+    return function_request_erased<Level, Value, false, true>{
+        "", std::move(function), std::move(args)...};
+}
+
+template<caching_level_type Level, typename Function, typename... Args>
 auto
 rq_function_erased_uuid(std::string uuid, Function function, Args... args)
 {
-    using value_type = std::invoke_result_t<Function, arg_type<Args>...>;
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     assert(!uuid.empty());
-    return function_request_erased<level, value_type, false>{
+    return function_request_erased<Level, Value, false, false>{
         std::move(uuid), std::move(function), std::move(args)...};
 }
 
-template<caching_level_type level, typename Function, typename... Args>
-requires(level != caching_level_type::full) auto rq_function_erased_intrsp(
+template<
+    caching_level_type Level,
+    typename Value,
+    typename Function,
+    typename... Args>
+auto
+rq_function_erased_coro_uuid(std::string uuid, Function function, Args... args)
+{
+    assert(!uuid.empty());
+    return function_request_erased<Level, Value, false, true>{
+        std::move(uuid), std::move(function), std::move(args)...};
+}
+
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level != caching_level_type::full) auto rq_function_erased_intrsp(
     std::string title, Function function, Args... args)
 {
-    using value_type = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_erased<level, value_type, true>{
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
+    return function_request_erased<Level, Value, true, false>{
         "", std::move(title), std::move(function), std::move(args)...};
 }
 
-template<caching_level_type level, typename Function, typename... Args>
+template<
+    caching_level_type Level,
+    typename Value,
+    typename Function,
+    typename... Args>
+requires(Level != caching_level_type::full) auto rq_function_erased_coro_intrsp(
+    std::string title, Function function, Args... args)
+{
+    return function_request_erased<Level, Value, true, true>{
+        "", std::move(title), std::move(function), std::move(args)...};
+}
+
+template<caching_level_type Level, typename Function, typename... Args>
 auto
 rq_function_erased_uuid_intrsp(
     std::string uuid, std::string title, Function function, Args... args)
 {
-    using value_type = std::invoke_result_t<Function, arg_type<Args>...>;
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     assert(!uuid.empty());
-    return function_request_erased<level, value_type, true>{
+    return function_request_erased<Level, Value, true, false>{
+        std::move(uuid),
+        std::move(title),
+        std::move(function),
+        std::move(args)...};
+}
+
+template<
+    caching_level_type Level,
+    typename Value,
+    typename Function,
+    typename... Args>
+auto
+rq_function_erased_coro_uuid_intrsp(
+    std::string uuid, std::string title, Function function, Args... args)
+{
+    assert(!uuid.empty());
+    return function_request_erased<Level, Value, true, true>{
         std::move(uuid),
         std::move(title),
         std::move(function),

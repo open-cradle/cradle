@@ -6,6 +6,7 @@
 #include <cereal/types/string.hpp>
 #include <cppcoro/task.hpp>
 
+#include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/request.h>
@@ -191,12 +192,15 @@ rq_post_iss_object_erased(
         rq_value(object_data));
 }
 
+// Differences to retrieve_immutable_blob_uncached():
+// - Context is type-erased, like the request
+// - Additional api_url argument passed by the framework
 cppcoro::task<blob>
-resolve_my_retrieve_immutable_object_request(
-    thinknode_request_context& ctx,
-    std::string const& api_url,
-    std::string const& context_id,
-    std::string const& immutable_id);
+retrieve_immutable_blob_uncached_erased(
+    context_intf& ctx,
+    std::string api_url,
+    std::string context_id,
+    std::string immutable_id);
 
 template<Request ImmutableIdRequest>
 requires(std::same_as<
@@ -220,8 +224,8 @@ requires(std::same_as<
     resolve(thinknode_request_context& ctx) const
     {
         auto immutable_id = co_await immutable_id_request_.resolve(ctx);
-        co_return co_await resolve_my_retrieve_immutable_object_request(
-            ctx, api_url_, context_id_, immutable_id);
+        co_return co_await retrieve_immutable_blob_uncached(
+            ctx, context_id_, immutable_id);
     }
 
     std::string
@@ -279,6 +283,7 @@ requires(std::same_as<typename ImmutableIdRequest::value_type, std::string>) aut
         std::move(immutable_id_request))};
 }
 
+// Implementation using my_retrieve_immutable_object_request_base and mixin
 template<caching_level_type level>
 auto
 rq_retrieve_immutable_object(
@@ -286,6 +291,25 @@ rq_retrieve_immutable_object(
 {
     return rq_retrieve_immutable_object<level>(
         std::move(api_url), std::move(context_id), rq_value(immutable_id));
+}
+
+// Implementation using function_request_erased, not needing
+// class my_retrieve_immutable_object_request_base
+template<caching_level_type level>
+auto
+rq_retrieve_immutable_object_func(
+    std::string api_url, std::string context_id, std::string immutable_id)
+{
+    using value_type = blob;
+    std::string uuid{"my_retrieve_immutable_object_request"};
+    std::string title{"my_retrieve_immutable_object_request"};
+    return rq_function_erased_coro_uuid_intrsp<level, value_type>(
+        std::move(uuid),
+        std::move(title),
+        retrieve_immutable_blob_uncached_erased,
+        std::move(api_url),
+        std::move(context_id),
+        rq_value(immutable_id));
 }
 
 } // namespace cradle

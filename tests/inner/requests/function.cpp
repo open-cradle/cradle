@@ -22,6 +22,15 @@ create_adder(int& num_calls)
 }
 
 auto
+create_adder_coro(int& num_calls)
+{
+    return [&](auto& ctx, int a, int b) -> cppcoro::task<int> {
+        num_calls += 1;
+        co_return a + b;
+    };
+}
+
+auto
 create_multiplier(int& num_calls)
 {
     return [&](int a, int b) {
@@ -295,10 +304,12 @@ TEST_CASE("evaluate erased function request V+V - fully cached", "[requests]")
     REQUIRE(num_add_calls == 0);
 }
 
-TEST_CASE("evaluate function requests in parallel - uncached", "[requests]")
+TEST_CASE(
+    "evaluate function requests in parallel - uncached function", "[requests]")
 {
     static constexpr int num_requests = 7;
-    using Req = function_request_erased<caching_level_type::none, int, false>;
+    using Req
+        = function_request_erased<caching_level_type::none, int, false, false>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     uncached_request_resolution_context ctx{};
@@ -320,11 +331,46 @@ TEST_CASE("evaluate function requests in parallel - uncached", "[requests]")
 }
 
 TEST_CASE(
+    "evaluate function requests in parallel - uncached coroutine",
+    "[requests]")
+{
+    static constexpr int num_requests = 7;
+    using Value = int;
+    using Req = function_request_erased<
+        caching_level_type::none,
+        Value,
+        false,
+        true>;
+    int num_add_calls{};
+    auto add{create_adder_coro(num_add_calls)};
+    uncached_request_resolution_context ctx{};
+    std::vector<Req> requests;
+    for (int i = 0; i < num_requests; ++i)
+    {
+        requests.emplace_back(
+            rq_function_erased_coro<caching_level_type::none, Value>(
+                add, i, i * 2));
+    }
+
+    auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+
+    REQUIRE(res.size() == num_requests);
+    for (int i = 0; i < num_requests; ++i)
+    {
+        REQUIRE(res[i] == i * 3);
+    }
+    REQUIRE(num_add_calls == num_requests);
+}
+
+TEST_CASE(
     "evaluate function requests in parallel - memory cached", "[requests]")
 {
     static constexpr int num_requests = 7;
-    using Req
-        = function_request_erased<caching_level_type::memory, int, false>;
+    using Req = function_request_erased<
+        caching_level_type::memory,
+        int,
+        false,
+        false>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     cached_request_resolution_context ctx{};
@@ -357,7 +403,8 @@ TEST_CASE(
 TEST_CASE("evaluate function requests in parallel - disk cached", "[requests]")
 {
     static constexpr int num_requests = 7;
-    using Req = function_request_erased<caching_level_type::full, int, false>;
+    using Req
+        = function_request_erased<caching_level_type::full, int, false, false>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     cached_request_resolution_context ctx{};
