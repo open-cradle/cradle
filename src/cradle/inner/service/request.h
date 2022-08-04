@@ -146,6 +146,14 @@ requires(CachedContextRequest<Ctx, Req>&& Req::introspective)
     return shared_task;
 }
 
+// If second arg is a request, one of the following templates will subsume
+template<typename Ctx, typename Val>
+cppcoro::task<Val>
+resolve_request(Ctx& ctx, Val const& val)
+{
+    co_return val;
+}
+
 template<typename Ctx, typename Req>
 requires UncachedContextRequest<Ctx, Req> auto
 resolve_request(Ctx& ctx, Req const& req)

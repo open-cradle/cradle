@@ -67,6 +67,24 @@ class value_request
 };
 
 template<typename Value>
+struct arg_type_struct<value_request<Value>>
+{
+    using value_type = Value;
+};
+
+template<typename Value>
+struct arg_type_struct<std::unique_ptr<value_request<Value>>>
+{
+    using value_type = Value;
+};
+
+template<typename Value>
+struct arg_type_struct<std::shared_ptr<value_request<Value>>>
+{
+    using value_type = Value;
+};
+
+template<typename Value>
 auto
 rq_value(Value&& value)
 {

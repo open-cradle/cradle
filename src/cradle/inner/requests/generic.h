@@ -133,6 +133,26 @@ template<typename Ctx, typename Req>
 concept IntrospectiveContextRequest = IntrospectiveContext<Ctx>&&
     IntrospectiveRequest<Req>&& MatchingContextRequest<Ctx, Req>;
 
+// Primary template, used for non-request types; should be specialized for each
+// kind of request
+//
+// It would be convenient if we could use concepts here:
+//    template<RequestOrPtr Req>
+//    struct arg_type_struct
+//    {
+//        using value_type = typename Req::element_type::value_type;
+//    };
+// but compilers say no.
+template<typename T>
+struct arg_type_struct
+{
+    using value_type = T;
+};
+
+// Yields the type of an argument to an rq_function-like call
+template<typename T>
+using arg_type = typename arg_type_struct<T>::value_type;
+
 class context_intf
 {
  public:

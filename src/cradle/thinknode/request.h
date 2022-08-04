@@ -299,6 +299,7 @@ class thinknode_request_impl
         {
             return true;
         }
+        // TODO compare classes like function_request_impl does, not uuid's
         if (this->get_uuid() != other.get_uuid())
         {
             return false;
