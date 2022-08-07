@@ -7,14 +7,13 @@
 
 namespace cradle {
 
-// TODO is this a primary template that should be declared _before_ any
-// specialization?
+// This should be the least-special, last-resort definition.
+// Only for dynamic's?
 template<typename Value>
 void
 update_unique_hash(unique_hasher& hasher, Value const& value)
 {
     auto natively_encoded = write_natively_encoded_value(to_dynamic(value));
-    // TODO prefix with something denoting "natively encoded"
     auto begin = &*natively_encoded.begin();
     auto end = begin + natively_encoded.size();
     hasher.encode_bytes(begin, end);

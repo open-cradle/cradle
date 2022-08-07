@@ -1,3 +1,6 @@
+#include <cassert>
+
+#include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/thinknode/utilities.h>
 
@@ -22,6 +25,20 @@ resolve_my_post_iss_object_request(
     auto response = co_await async_http_request(ctx, std::move(query));
 
     co_return from_dynamic<id_response>(parse_json_response(response)).id;
+}
+
+cppcoro::task<blob>
+retrieve_immutable_blob_uncached_erased(
+    context_intf& ctx,
+    std::string api_url,
+    std::string context_id,
+    std::string immutable_id)
+{
+    assert(dynamic_cast<thinknode_request_context*>(&ctx));
+    return retrieve_immutable_blob_uncached(
+        static_cast<thinknode_request_context&>(ctx),
+        std::move(context_id),
+        std::move(immutable_id));
 }
 
 } // namespace cradle

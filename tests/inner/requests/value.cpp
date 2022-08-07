@@ -8,6 +8,7 @@
 
 #include "../introspection/tasklet_testing.h"
 #include "../support/core.h"
+#include "../support/request.h"
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/core.h>
 #include <cradle/inner/service/request.h>
@@ -33,4 +34,23 @@ TEST_CASE("evaluate value request", "[requests]")
     auto res = cppcoro::sync_wait(resolve_request(ctx, req));
 
     REQUIRE(res == 87);
+}
+
+TEST_CASE("evaluate value requests in parallel", "[requests]")
+{
+    static constexpr int num_requests = 7;
+    uncached_request_resolution_context ctx{};
+    std::vector<value_request<int>> requests;
+    for (int i = 0; i < num_requests; ++i)
+    {
+        requests.emplace_back(rq_value(i * 3));
+    }
+
+    auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+
+    REQUIRE(res.size() == num_requests);
+    for (int i = 0; i < num_requests; ++i)
+    {
+        REQUIRE(res[i] == i * 3);
+    }
 }

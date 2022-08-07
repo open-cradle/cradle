@@ -6,7 +6,6 @@
 #include <cstddef>
 #include <cstring>
 #include <string>
-#include <typeinfo>
 
 #include <openssl/sha.h>
 
@@ -17,6 +16,24 @@ namespace cradle {
 struct id_interface;
 
 // Get a string that is unique for the given ID (based on its hash).
+// The primary purpose of these strings is to act as keys in the disk cache.
+// That cache can contain items for all kinds of requests, including
+// old-style Thinknode ones, and maybe even more.
+//
+// Preventing collisions is important.
+// - Collisions between different types of requests will not appear assuming
+//   their hash includes a uuid.
+// - The number and types of a request's arguments are fixed, so also there
+//   collisions cannot happen. (typing/core/unique_hash.h hashes dynamics,
+//   taking types into account.)
+//
+// id should be one of:
+// - A captured_id belonging to a fully-cached request (so carrying a uuid
+//   at least in that request, possibly more in subrequests); or
+// - A sha256_hashed_id calculated for an old-style Thinknode request
+//
+// An optimization for the first case could be to base the ultimate hash
+// value only on the top request's uuid, but it doesn't seem worthwhile.
 std::string
 get_unique_string(id_interface const& id);
 
@@ -38,20 +55,6 @@ class unique_hasher
     unique_hasher()
     {
         SHA256_Init(&ctx_);
-    }
-
-    template<typename T>
-    void
-    encode_type()
-    {
-        assert(!finished_);
-        // TODO need unique type name
-        // From https://en.cppreference.com/w/cpp/types/type_info/name
-        // The returned string can be identical for several types and change
-        // between invocations of the same program.
-        // Maybe replace with type traits yielding a 1-byte value?
-        const char* name = typeid(T).name();
-        encode_bytes(name, strlen(name));
     }
 
     void
@@ -110,7 +113,6 @@ requires std::integral<T> || std::floating_point<T>
 void
 update_unique_hash(unique_hasher& hasher, T val)
 {
-    hasher.encode_type<T>();
     char const* p = reinterpret_cast<char const*>(&val);
     hasher.encode_bytes(p, sizeof(val));
 }

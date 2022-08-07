@@ -27,11 +27,8 @@ requires(Req::caching_level == caching_level_type::memory)
     return req.resolve(ctx);
 }
 
-// TODO optimize for same_as<Req::value_type, blob>
 template<typename Ctx, typename Req>
-requires(
-    CachedContextRequest<Ctx, Req>&& Req::caching_level
-    == caching_level_type::full)
+requires(FullyCachedContextRequest<Ctx, Req>)
     cppcoro::task<typename Req::value_type> resolve_disk_cached(
         Ctx& ctx, Req const& req)
 {
@@ -53,6 +50,20 @@ requires(
     Value res;
     iarchive(res);
     co_return res;
+}
+
+// Subsuming the concepts from the previous template
+template<typename Ctx, typename Req>
+requires(FullyCachedContextRequest<Ctx, Req>&&
+             std::same_as<typename Req::value_type, blob>)
+    cppcoro::task<blob> resolve_disk_cached(Ctx& ctx, Req const& req)
+{
+    inner_service_core& core{ctx.get_service()};
+    id_interface const& key{*req.get_captured_id()};
+    auto create_blob_task = [&]() -> cppcoro::task<blob> {
+        co_return co_await req.resolve(ctx);
+    };
+    return disk_cached<blob>(core, key, create_blob_task);
 }
 
 template<typename Ctx, typename Req>
@@ -133,6 +144,14 @@ requires(CachedContextRequest<Ctx, Req>&& Req::introspective)
             ctx, req, shared_task, *tasklet);
     }
     return shared_task;
+}
+
+// If second arg is a request, one of the following templates will subsume
+template<typename Ctx, typename Val>
+cppcoro::task<Val>
+resolve_request(Ctx& ctx, Val const& val)
+{
+    co_return val;
 }
 
 template<typename Ctx, typename Req>

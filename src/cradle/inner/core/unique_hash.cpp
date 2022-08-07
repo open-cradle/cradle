@@ -41,7 +41,6 @@ unique_hasher::finish()
 void
 update_unique_hash(unique_hasher& hasher, std::string const& val)
 {
-    hasher.encode_type<std::string>();
     update_unique_hash(hasher, val.size());
     hasher.encode_bytes(val.data(), val.size());
 }
@@ -49,7 +48,6 @@ update_unique_hash(unique_hasher& hasher, std::string const& val)
 void
 update_unique_hash(unique_hasher& hasher, blob const& val)
 {
-    hasher.encode_type<blob>();
     update_unique_hash(hasher, val.size());
     hasher.encode_bytes(val.data(), val.size());
 }

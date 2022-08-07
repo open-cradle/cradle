@@ -30,6 +30,15 @@ reduce_memory_cache_size_no_lock(
     }
 }
 
+immutable_cache_info
+get_summary_info(immutable_cache_impl& cache)
+{
+    std::scoped_lock<std::mutex> lock(cache.mutex);
+    immutable_cache_info info;
+    info.entry_count = cache.records.size();
+    return info;
+}
+
 } // namespace detail
 
 } // namespace cradle

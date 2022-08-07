@@ -81,6 +81,9 @@ void
 reduce_memory_cache_size_no_lock(
     immutable_cache_impl& cache, uint64_t desired_size);
 
+immutable_cache_info
+get_summary_info(immutable_cache_impl& cache);
+
 } // namespace detail
 } // namespace cradle
 

@@ -426,7 +426,6 @@ static simple_id<null_id_type*> const null_id(nullptr);
 inline void
 update_unique_hash(unique_hasher& hasher, null_id_type* val)
 {
-    hasher.encode_type<null_id_type>();
 }
 
 // unit_id can be used when there is only possible identify.
@@ -438,7 +437,6 @@ static simple_id<unit_id_type*> const unit_id(nullptr);
 inline void
 update_unique_hash(unique_hasher& hasher, unit_id_type* val)
 {
-    hasher.encode_type<unit_id_type>();
 }
 
 } // namespace cradle

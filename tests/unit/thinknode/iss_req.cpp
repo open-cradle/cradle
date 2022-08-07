@@ -169,8 +169,8 @@ TEST_CASE("ISS POST - blob, fully cached", "[requests]")
 
     auto make_blob_function
         = [](std::string const& payload) { return make_blob(payload); };
-    auto make_blob_request = rq_function_erased<caching_level_type::full>(
-        make_blob_function, rq_value(std::string("payload")));
+    auto make_blob_request = rq_function_erased_uuid<caching_level_type::full>(
+        "uuid", make_blob_function, rq_value(std::string("payload")));
 
     auto req{rq_post_iss_object<caching_level_type::full>(
         session.api_url,
@@ -194,4 +194,59 @@ TEST_CASE("ISS POST - blob, fully cached", "[requests]")
     // Resolve using disk cache
     auto id2 = cppcoro::sync_wait(resolve_request(ctx, req));
     REQUIRE(id2 == "def");
+}
+
+void
+test_retrieve_immutable_object(auto CreateReq)
+{
+    service_core service;
+    init_test_service(service);
+    thinknode_session session;
+    session.api_url = "https://mgh.thinknode.io/api/v1.0";
+    session.access_token = "xyz";
+    auto tasklet = create_tasklet_tracker("my_pool", "my_title");
+    thinknode_request_context ctx{service, session, tasklet};
+    string context_id{"123"};
+    string immutable_id{"abc"};
+    auto expected{make_blob(std::string("payload"))};
+    auto& mock_http = enable_http_mocking(service);
+    mock_http.set_script(
+        {{make_get_request(
+              "https://mgh.thinknode.io/api/v1.0/iss/immutable/"
+              "abc?context=123",
+              {{"Authorization", "Bearer xyz"},
+               {"Accept", "application/octet-stream"}}),
+          make_http_200_response("payload")}});
+    auto req{CreateReq(session.api_url, context_id, immutable_id)};
+
+    // Resolve using HTTP, storing result in both caches
+    auto blob0 = cppcoro::sync_wait(resolve_request(ctx, req));
+    REQUIRE(blob0 == expected);
+    REQUIRE(mock_http.is_complete());
+    REQUIRE(mock_http.is_in_order());
+
+    // Resolve using memory cache
+    auto blob1 = cppcoro::sync_wait(resolve_request(ctx, req));
+    REQUIRE(blob1 == expected);
+
+    sync_wait_write_disk_cache(service);
+    service.inner_reset_memory_cache(immutable_cache_config{0x40'00'00'00});
+
+    // Resolve using disk cache
+    auto blob2 = cppcoro::sync_wait(resolve_request(ctx, req));
+    REQUIRE(blob2 == expected);
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT - class, fully cached", "[requests]")
+{
+    // Using my_retrieve_immutable_object_request_base and mixin
+    test_retrieve_immutable_object(
+        rq_retrieve_immutable_object<caching_level_type::full>);
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT - function, fully cached", "[requests]")
+{
+    // Using function_request_erased
+    test_retrieve_immutable_object(
+        rq_retrieve_immutable_object_func<caching_level_type::full>);
 }

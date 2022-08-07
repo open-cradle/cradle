@@ -65,4 +65,11 @@ get_cache_snapshot(immutable_cache& cache_object)
     return snapshot;
 }
 
+// Get summary information about the cache.
+immutable_cache_info
+get_summary_info(immutable_cache& cache)
+{
+    return detail::get_summary_info(*cache.impl);
+}
+
 } // namespace cradle

@@ -25,6 +25,12 @@ struct immutable_cache_config
     size_t unused_size_limit;
 };
 
+struct immutable_cache_info
+{
+    // The number of entries currently stored in the cache.
+    size_t entry_count;
+};
+
 struct immutable_cache
 {
     // The default constructor creates an invalid cache that must be
@@ -104,6 +110,10 @@ struct immutable_cache_snapshot
 // Get a snapshot of the contents of an immutable memory cache.
 immutable_cache_snapshot
 get_cache_snapshot(immutable_cache& cache);
+
+// Get summary information about the cache.
+immutable_cache_info
+get_summary_info(immutable_cache& cache);
 
 // Clear unused entries from the cache.
 void

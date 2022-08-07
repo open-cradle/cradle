@@ -19,15 +19,14 @@ auto
 create_thin_tree()
 {
     auto constexpr level = caching_level_type::none;
-    return rq_function<level>(add, create_thin_tree<H - 1>(), rq_value(1));
-}
-
-template<>
-auto
-create_thin_tree<1>()
-{
-    auto constexpr level = caching_level_type::none;
-    return rq_function<level>(add, rq_value(2), rq_value(1));
+    if constexpr (H == 1)
+    {
+        return rq_function<level>(add, 2, 1);
+    }
+    else
+    {
+        return rq_function<level>(add, create_thin_tree<H - 1>(), 1);
+    }
 }
 
 template<caching_level_type level, int H>
@@ -36,7 +35,7 @@ create_triangular_tree()
 {
     if constexpr (H == 1)
     {
-        return rq_function<level>(add, rq_value(2), rq_value(1));
+        return rq_function<level>(add, 2, 1);
     }
     else
     {
@@ -89,16 +88,15 @@ auto
 create_thin_tree_up()
 {
     auto constexpr level = caching_level_type::none;
-    return rq_function_up<level>(
-        add, create_thin_tree_up<H - 1>(), rq_value_up(1));
-}
-
-template<>
-auto
-create_thin_tree_up<1>()
-{
-    auto constexpr level = caching_level_type::none;
-    return rq_function_up<level>(add, rq_value_up(2), rq_value_up(1));
+    if constexpr (H == 1)
+    {
+        return rq_function_up<level>(add, rq_value_up(2), rq_value_up(1));
+    }
+    else
+    {
+        return rq_function_up<level>(
+            add, create_thin_tree_up<H - 1>(), rq_value_up(1));
+    }
 }
 
 template<int H>
@@ -106,18 +104,17 @@ auto
 create_triangular_tree_up()
 {
     auto constexpr level = caching_level_type::none;
-    return rq_function_up<level>(
-        add,
-        create_triangular_tree_up<H - 1>(),
-        create_triangular_tree_up<H - 1>());
-}
-
-template<>
-auto
-create_triangular_tree_up<1>()
-{
-    auto constexpr level = caching_level_type::none;
-    return rq_function_up<level>(add, rq_value_up(2), rq_value_up(1));
+    if constexpr (H == 1)
+    {
+        return rq_function_up<level>(add, rq_value_up(2), rq_value_up(1));
+    }
+    else
+    {
+        return rq_function_up<level>(
+            add,
+            create_triangular_tree_up<H - 1>(),
+            create_triangular_tree_up<H - 1>());
+    }
 }
 
 template<int H>
@@ -158,16 +155,15 @@ auto
 create_thin_tree_sp()
 {
     auto constexpr level = caching_level_type::none;
-    return rq_function_sp<level>(
-        add, create_thin_tree_sp<H - 1>(), rq_value_sp(1));
-}
-
-template<>
-auto
-create_thin_tree_sp<1>()
-{
-    auto constexpr level = caching_level_type::none;
-    return rq_function_sp<level>(add, rq_value_sp(2), rq_value_sp(1));
+    if constexpr (H == 1)
+    {
+        return rq_function_sp<level>(add, rq_value_sp(2), rq_value_sp(1));
+    }
+    else
+    {
+        return rq_function_sp<level>(
+            add, create_thin_tree_sp<H - 1>(), rq_value_sp(1));
+    }
 }
 
 template<int H>
@@ -194,18 +190,17 @@ auto
 create_triangular_tree_sp()
 {
     auto constexpr level = caching_level_type::none;
-    return rq_function_sp<level>(
-        add,
-        create_triangular_tree_sp<H - 1>(),
-        create_triangular_tree_sp<H - 1>());
-}
-
-template<>
-auto
-create_triangular_tree_sp<1>()
-{
-    auto constexpr level = caching_level_type::none;
-    return rq_function_sp<level>(add, rq_value_sp(2), rq_value_sp(1));
+    if constexpr (H == 1)
+    {
+        return rq_function_sp<level>(add, rq_value_sp(2), rq_value_sp(1));
+    }
+    else
+    {
+        return rq_function_sp<level>(
+            add,
+            create_triangular_tree_sp<H - 1>(),
+            create_triangular_tree_sp<H - 1>());
+    }
 }
 
 template<int H>
@@ -230,24 +225,18 @@ auto
 create_thin_tree_mixed()
 {
     auto constexpr level = caching_level_type::none;
-    return rq_function_sp<level>(
-        add, create_thin_tree_mixed<H - 1>(), rq_value(1));
-}
-
-template<>
-auto
-create_thin_tree_mixed<1>()
-{
-    auto constexpr level = caching_level_type::none;
-    return rq_function<level>(add, rq_value(2), rq_value(1));
-}
-
-template<>
-auto
-create_thin_tree_mixed<2>()
-{
-    auto constexpr level = caching_level_type::none;
-    return rq_function<level>(add, create_thin_tree_mixed<1>(), rq_value(1));
+    if constexpr (H == 1)
+    {
+        return rq_function<level>(add, 2, 1);
+    }
+    else if constexpr (H == 2)
+    {
+        return rq_function<level>(add, create_thin_tree_mixed<H - 1>(), 1);
+    }
+    else
+    {
+        return rq_function_sp<level>(add, create_thin_tree_mixed<H - 1>(), 1);
+    }
 }
 
 template<int H>
@@ -274,27 +263,22 @@ auto
 create_triangular_tree_mixed()
 {
     auto constexpr level = caching_level_type::none;
-    auto subreq{create_triangular_tree_mixed<H - 1>()};
-    return rq_function_sp<level>(add, subreq, subreq);
-}
-
-template<>
-auto
-create_triangular_tree_mixed<1>()
-{
-    auto constexpr level = caching_level_type::none;
-    return rq_function<level>(add, rq_value(2), rq_value(1));
-}
-
-template<>
-auto
-create_triangular_tree_mixed<2>()
-{
-    auto constexpr level = caching_level_type::none;
-    return rq_function<level>(
-        add,
-        create_triangular_tree_mixed<1>(),
-        create_triangular_tree_mixed<1>());
+    if constexpr (H == 1)
+    {
+        return rq_function<level>(add, 2, 1);
+    }
+    else if constexpr (H == 2)
+    {
+        return rq_function<level>(
+            add,
+            create_triangular_tree_mixed<H - 1>(),
+            create_triangular_tree_mixed<H - 1>());
+    }
+    else
+    {
+        auto subreq{create_triangular_tree_mixed<H - 1>()};
+        return rq_function_sp<level>(add, subreq, subreq);
+    }
 }
 
 template<int H>
@@ -315,52 +299,75 @@ BENCHMARK(BM_create_triangular_tree_mixed<6>)
     ->Name("BM_create_function_request_mixed_tri_tree H=6");
 
 template<caching_level_type level, int H>
-requires(H == 1) auto create_thin_tree_erased()
+auto
+create_thin_tree_erased()
 {
-    return rq_function_erased<level>(add, rq_value(2), rq_value(1));
+    if constexpr (H == 1)
+    {
+        return rq_function_erased<level>(add, 2, 1);
+    }
+    else
+    {
+        return rq_function_erased<level>(
+            add, create_thin_tree_erased<level, H - 1>(), 1);
+    }
 }
 
 template<caching_level_type level, int H>
-requires(H > 1) auto create_thin_tree_erased()
+requires(
+    level != caching_level_type::full) auto create_triangular_tree_erased()
 {
-    return rq_function_erased<level>(
-        add, create_thin_tree_erased<level, H - 1>(), rq_value(1));
+    if constexpr (H == 1)
+    {
+        return rq_function_erased<level>(add, 2, 1);
+    }
+    else
+    {
+        return rq_function_erased<level>(
+            add,
+            create_triangular_tree_erased<level, H - 1>(),
+            create_triangular_tree_erased<level, H - 1>());
+    }
 }
 
 template<caching_level_type level, int H>
-requires(H == 1) auto create_triangular_tree_erased()
+requires(
+    level == caching_level_type::full) auto create_triangular_tree_erased()
 {
-    return rq_function_erased<level>(add, rq_value(2), rq_value(1));
+    if constexpr (H == 1)
+    {
+        return rq_function_erased_uuid<level>("add_uuid", add, 2, 1);
+    }
+    else
+    {
+        return rq_function_erased_uuid<level>(
+            "add_uuid",
+            add,
+            create_triangular_tree_erased<level, H - 1>(),
+            create_triangular_tree_erased<level, H - 1>());
+    }
 }
 
 template<caching_level_type level, int H>
-requires(H > 1) auto create_triangular_tree_erased()
+auto
+create_triangular_tree_erased_introspected()
 {
-    return rq_function_erased<level>(
-        add,
-        create_triangular_tree_erased<level, H - 1>(),
-        create_triangular_tree_erased<level, H - 1>());
-}
-
-template<caching_level_type level, int H>
-requires(H == 1) auto create_triangular_tree_erased_introspected()
-{
-    std::string title{"add 2+1"};
-    return rq_function_erased_intrsp<level>(
-        title, add, rq_value(2), rq_value(1));
-}
-
-template<caching_level_type level, int H>
-requires(H > 1) auto create_triangular_tree_erased_introspected()
-{
-    std::stringstream ss;
-    ss << "add H" << H;
-    std::string title{ss.str()};
-    return rq_function_erased_intrsp<level>(
-        title,
-        add,
-        create_triangular_tree_erased_introspected<level, H - 1>(),
-        create_triangular_tree_erased_introspected<level, H - 1>());
+    if constexpr (H == 1)
+    {
+        std::string title{"add 2+1"};
+        return rq_function_erased_intrsp<level>(title, add, 2, 1);
+    }
+    else
+    {
+        std::stringstream ss;
+        ss << "add H" << H;
+        std::string title{ss.str()};
+        return rq_function_erased_intrsp<level>(
+            title,
+            add,
+            create_triangular_tree_erased_introspected<level, H - 1>(),
+            create_triangular_tree_erased_introspected<level, H - 1>());
+    }
 }
 
 template<caching_level_type level, int H>
