@@ -18,7 +18,8 @@ template<class T>
 auto
 some(T&& x)
 {
-    return std::optional<std::remove_reference_t<T>>(std::forward<T>(x));
+    return std::optional<std::remove_const_t<std::remove_reference_t<T>>>(
+        std::forward<T>(x));
 }
 
 typedef std::vector<boost::uint8_t> byte_vector;
