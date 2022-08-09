@@ -17,6 +17,7 @@
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/core.h>
+#include <cradle/inner/service/request.h>
 
 namespace cradle {
 
@@ -752,6 +753,45 @@ rq_function_erased_coro_uuid_intrsp(
         std::move(uuid),
         std::move(title),
         std::move(function),
+        std::move(args)...};
+}
+
+template<
+    typename Value,
+    caching_level_type Level,
+    bool AsCoro,
+    bool Introspected,
+    typename Function>
+struct function_props
+{
+    using value_type = Value;
+    static constexpr caching_level_type level = Level;
+    static constexpr bool func_is_coro = AsCoro;
+    static constexpr bool introspected = Introspected;
+    Function function_;
+    std::string uuid_; // Empty if unused
+    std::string title_; // Used only if introspected
+
+    function_props(Function function, std::string uuid, std::string title)
+        : function_(std::move(function)),
+          uuid_(std::move(uuid)),
+          title_(std::move(title))
+    {
+    }
+};
+
+template<typename Props, typename... Args>
+auto
+rq_function_with_props(Props props, Args... args)
+{
+    return function_request_erased<
+        Props::level,
+        typename Props::value_type,
+        Props::introspected,
+        Props::func_is_coro>{
+        std::move(props.uuid_),
+        std::move(props.title_),
+        std::move(props.function_),
         std::move(args)...};
 }
 
