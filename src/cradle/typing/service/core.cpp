@@ -77,18 +77,26 @@ http_connection_for_thread(service_core& core)
 }
 
 cppcoro::task<http_response>
+internal_async_http_request(
+    service_core& core, http_request request, tasklet_tracker* tasklet)
+{
+    tasklet_run tasklet_run(tasklet);
+    null_check_in check_in;
+    null_progress_reporter reporter;
+    co_return http_connection_for_thread(core).perform_request(
+        check_in, reporter, request);
+}
+
+cppcoro::task<http_response>
 async_http_request(
     service_core& core, http_request request, tasklet_tracker* client)
 {
     std::ostringstream s;
     s << "HTTP: " << request.method << " " << request.url;
     auto tasklet = create_tasklet_tracker("HTTP", s.str(), client);
-    co_await core.internals().http_pool.schedule();
-    tasklet_run tasklet_run(tasklet);
-    null_check_in check_in;
-    null_progress_reporter reporter;
-    co_return http_connection_for_thread(core).perform_request(
-        check_in, reporter, request);
+    co_return co_await schedule_on(
+        core.internals().http_pool,
+        internal_async_http_request(core, std::move(request), tasklet));
 }
 
 template<>
