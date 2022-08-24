@@ -103,8 +103,11 @@ struct immutable_cache_snapshot
     // necessary
     std::vector<immutable_cache_entry_snapshot> pending_eviction;
 
+    bool
+    operator==(immutable_cache_snapshot const& other) const;
+
     auto
-    operator<=>(immutable_cache_snapshot const& other) const = default;
+    operator<=>(immutable_cache_snapshot const& other) const;
 };
 
 // Get a snapshot of the contents of an immutable memory cache.

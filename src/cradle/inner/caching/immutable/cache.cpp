@@ -1,5 +1,6 @@
-#include <cradle/inner/caching/immutable/cache.h>
+#include <algorithm>
 
+#include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/caching/immutable/internals.h>
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/utilities/text.h>
@@ -70,6 +71,54 @@ immutable_cache_info
 get_summary_info(immutable_cache& cache)
 {
     return detail::get_summary_info(*cache.impl);
+}
+
+// Helper struct to compare two immutable_cache_snapshot objects
+// (that have an unordered nature).
+struct sorted_snapshot
+{
+    explicit sorted_snapshot(immutable_cache_snapshot const& unsorted);
+
+    auto
+    operator<=>(sorted_snapshot const& other) const = default;
+
+ private:
+    std::vector<immutable_cache_entry_snapshot> in_use;
+    std::vector<immutable_cache_entry_snapshot> pending_eviction;
+
+    void
+    sort();
+};
+
+sorted_snapshot::sorted_snapshot(immutable_cache_snapshot const& unsorted)
+    : in_use(unsorted.in_use), pending_eviction(unsorted.pending_eviction)
+{
+    sort();
+}
+
+void
+sorted_snapshot::sort()
+{
+    auto comparator = [](immutable_cache_entry_snapshot const& a,
+                         immutable_cache_entry_snapshot const& b) {
+        return a.key < b.key;
+    };
+    std::sort(in_use.begin(), in_use.end(), comparator);
+    std::sort(pending_eviction.begin(), pending_eviction.end(), comparator);
+}
+
+bool
+immutable_cache_snapshot::operator==(
+    immutable_cache_snapshot const& other) const
+{
+    return sorted_snapshot(*this) == sorted_snapshot(other);
+}
+
+auto
+immutable_cache_snapshot::operator<=>(
+    immutable_cache_snapshot const& other) const
+{
+    return sorted_snapshot(*this) <=> sorted_snapshot(other);
 }
 
 } // namespace cradle
