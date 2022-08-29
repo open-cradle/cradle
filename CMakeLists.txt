@@ -65,10 +65,10 @@ conan_cmake_configure(
         zlib/1.2.12
         bzip2/1.0.8
         yaml-cpp/0.6.3
-        spdlog/1.8.2
+        spdlog/1.10.0
         simdjson/0.9.1
         lz4/1.9.3
-        fmt/7.1.3
+        fmt/8.1.1
     OPTIONS
         boost:without_chrono=True
         boost:without_container=True
