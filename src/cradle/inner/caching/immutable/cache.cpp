@@ -63,6 +63,7 @@ get_cache_snapshot(immutable_cache& cache_object)
             snapshot.in_use.push_back(std::move(entry));
         }
     }
+    snapshot.total_size_eviction_list = cache.eviction_list.total_size;
     return snapshot;
 }
 

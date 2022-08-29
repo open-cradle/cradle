@@ -26,6 +26,7 @@ reduce_memory_cache_size_no_lock(
         auto data_size = record->size;
         cache.records.erase(&*record->key);
         cache.eviction_list.records.pop_front();
+        assert(cache.eviction_list.total_size >= data_size);
         cache.eviction_list.total_size -= data_size;
     }
 }
