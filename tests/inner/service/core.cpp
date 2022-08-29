@@ -128,8 +128,8 @@ TEST_CASE("Crash when purging eviction list", "[crash]")
     do_the_test(true, false);
 }
 
-// For now, this test fails.
-TEST_CASE("Consistent total_size when purging eviction list", "[fail]")
+TEST_CASE(
+    "Consistent total_size when purging eviction list", "[inner][service]")
 {
     do_the_test(false, true);
 }
