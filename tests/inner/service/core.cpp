@@ -72,8 +72,8 @@ eval_tasks(
 
     // The records have been deleted, but a reference to record0's key still
     // exists and will be passed to generic_disk_cached() when task0 is
-    // evaluated. The usual result will be a crash.
-    // valgrind will pinpoint the problem.
+    // evaluated. The framework must ensure it has captured the reference
+    // somewhere or a crash will occur.
     auto res0 = co_await task0;
     REQUIRE(res0 == make_blob("42"));
 }
@@ -101,7 +101,7 @@ do_the_test(bool clear_key0, bool test_snapshots)
     captured_id key1{make_captured_id(1)};
     auto task1{fully_cached<blob>(core, key1, create_task01)};
 
-    auto create_task2 = [](id_interface const&) -> cppcoro::task<blob> {
+    auto create_task2 = [](captured_id const&) -> cppcoro::task<blob> {
         co_return make_blob("43");
     };
     {
@@ -122,8 +122,7 @@ do_the_test(bool clear_key0, bool test_snapshots)
 
 } // namespace
 
-// For now, this test leads to a crash.
-TEST_CASE("Crash when purging eviction list", "[crash]")
+TEST_CASE("Clear eviction list during task evaluation", "[inner][service]")
 {
     do_the_test(true, false);
 }

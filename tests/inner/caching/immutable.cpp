@@ -52,7 +52,7 @@ TEST_CASE("basic immutable cache usage", "[immutable_cache]")
     bool p_needed_creation = false;
     auto p_key = make_captured_id(0);
     immutable_cache_ptr<int> p(
-        cache, p_key, [&](detail::immutable_cache_impl&, id_interface const&) {
+        cache, p_key, [&](detail::immutable_cache_impl&, captured_id const&) {
             p_needed_creation = true;
             return test_task(*cache.impl, *p_key, 42);
         });
@@ -74,7 +74,7 @@ TEST_CASE("basic immutable cache usage", "[immutable_cache]")
     bool q_needed_creation = false;
     auto q_key = make_captured_id(1);
     auto q = std::make_unique<immutable_cache_ptr<int>>(
-        cache, q_key, [&](detail::immutable_cache_impl&, id_interface const&) {
+        cache, q_key, [&](detail::immutable_cache_impl&, captured_id const&) {
             q_needed_creation = true;
             return test_task(*cache.impl, *q_key, 112);
         });
@@ -103,7 +103,7 @@ TEST_CASE("basic immutable cache usage", "[immutable_cache]")
     bool r_needed_creation = false;
     auto r_key = make_captured_id(0);
     immutable_cache_ptr<int> r(
-        cache, r_key, [&](detail::immutable_cache_impl&, id_interface const&) {
+        cache, r_key, [&](detail::immutable_cache_impl&, captured_id const&) {
             r_needed_creation = true;
             return test_task(*cache.impl, *r_key, 42);
         });
@@ -221,7 +221,7 @@ TEST_CASE("immutable cache LRU eviction", "[immutable_cache]")
     bool p_needed_creation = false;
     auto p_key = make_captured_id(1);
     auto p = std::make_unique<immutable_cache_ptr<std::string>>(
-        cache, p_key, [&](detail::immutable_cache_impl&, id_interface const&) {
+        cache, p_key, [&](detail::immutable_cache_impl&, captured_id const&) {
             p_needed_creation = true;
             return one_kb_string_task(*cache.impl, *p_key, 'a');
         });
@@ -232,7 +232,7 @@ TEST_CASE("immutable cache LRU eviction", "[immutable_cache]")
     bool q_needed_creation = false;
     auto q_key = make_captured_id(2);
     auto q = std::make_unique<immutable_cache_ptr<std::string>>(
-        cache, q_key, [&](detail::immutable_cache_impl&, id_interface const&) {
+        cache, q_key, [&](detail::immutable_cache_impl&, captured_id const&) {
             q_needed_creation = true;
             return one_kb_string_task(*cache.impl, *q_key, 'b');
         });
@@ -248,7 +248,7 @@ TEST_CASE("immutable cache LRU eviction", "[immutable_cache]")
     bool r_needed_creation = false;
     auto r_key = make_captured_id(1);
     immutable_cache_ptr<std::string> r(
-        cache, r_key, [&](detail::immutable_cache_impl&, id_interface const&) {
+        cache, r_key, [&](detail::immutable_cache_impl&, captured_id const&) {
             r_needed_creation = true;
             return one_kb_string_task(*cache.impl, *r_key, 'a');
         });
@@ -260,7 +260,7 @@ TEST_CASE("immutable cache LRU eviction", "[immutable_cache]")
     bool s_needed_creation = false;
     auto s_key = make_captured_id(2);
     immutable_cache_ptr<std::string> s(
-        cache, s_key, [&](detail::immutable_cache_impl&, id_interface const&) {
+        cache, s_key, [&](detail::immutable_cache_impl&, captured_id const&) {
             s_needed_creation = true;
             return one_kb_string_task(*cache.impl, *s_key, 'b');
         });

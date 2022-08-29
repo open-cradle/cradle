@@ -15,36 +15,39 @@
 
 namespace cradle {
 
+// This could be a coroutine.
 template<typename Value>
 cppcoro::task<Value>
 disk_cached(
     inner_service_core& core,
-    id_interface const& key,
+    captured_id key,
     std::function<cppcoro::task<Value>()> create_task);
 
 template<>
 cppcoro::task<blob>
 disk_cached(
     inner_service_core& core,
-    id_interface const& key,
+    captured_id key,
     std::function<cppcoro::task<blob>()> create_task);
 
+// This function is a coroutine so takes `key` by value.
+// The `cache` lifetime is assumed to exceed the coroutine's one.
 template<class Value>
 cppcoro::shared_task<Value>
 cache_task_wrapper(
     detail::immutable_cache_impl& cache,
-    id_interface const& key,
+    captured_id key,
     cppcoro::task<Value> task)
 {
     try
     {
         Value value = co_await task;
-        record_immutable_cache_value(cache, key, deep_sizeof(value));
+        record_immutable_cache_value(cache, *key, deep_sizeof(value));
         co_return value;
     }
     catch (...)
     {
-        record_immutable_cache_failure(cache, key);
+        record_immutable_cache_failure(cache, *key);
         throw;
     }
 }
@@ -54,7 +57,7 @@ auto
 wrap_task_creator(CreateTask&& create_task)
 {
     return [create_task = std::forward<CreateTask>(create_task)](
-               detail::immutable_cache_impl& cache, id_interface const& key) {
+               detail::immutable_cache_impl& cache, captured_id const& key) {
         return cache_task_wrapper<Value>(cache, key, create_task(key));
     };
 }
@@ -78,10 +81,10 @@ fully_cached(
 {
     // cached() will ensure that a captured id_interface object exists
     // equalling `key`; it will pass a reference to that object to the lambda.
-    // It may be a different object from `key`: `key` may no longer exist when
-    // the lambda is called.
+    // With the current implementation, `key` and `key1` refer to the same
+    // id_interface object, but this has not always been so.
     return cached<Value>(
-        core, key, [&core, task_creator](id_interface const& key1) {
+        core, key, [&core, task_creator](captured_id const& key1) {
             return disk_cached<Value>(core, key1, std::move(task_creator));
         });
 }

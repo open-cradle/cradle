@@ -91,11 +91,12 @@ async_http_request(
         check_in, reporter, request);
 }
 
+// This is a coroutine so takes key by value.
 template<>
 cppcoro::task<dynamic>
 disk_cached(
     inner_service_core& core,
-    id_interface const& key,
+    captured_id key,
     std::function<cppcoro::task<dynamic>()> create_task)
 {
     auto dynamic_to_blob = [](dynamic x) -> blob {

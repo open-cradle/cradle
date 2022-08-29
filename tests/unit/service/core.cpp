@@ -41,14 +41,14 @@ TEST_CASE("small value disk caching", "[service][core]")
     };
 
     {
-        auto key = make_id("id_12");
+        auto key = make_captured_id("id_12");
         auto result = disk_cached<dynamic>(
             core, key, [&] { return counted_task(12); });
         REQUIRE(cppcoro::sync_wait(result) == dynamic(integer(12)));
         REQUIRE(execution_count == 1);
     }
     {
-        auto key = make_id("id_42");
+        auto key = make_captured_id("id_42");
         auto result = disk_cached<dynamic>(
             core, key, [&] { return counted_task(42); });
         REQUIRE(cppcoro::sync_wait(result) == dynamic(integer(42)));
@@ -59,7 +59,7 @@ TEST_CASE("small value disk caching", "[service][core]")
     sync_wait_write_disk_cache(core);
     // Now redo the 'id_12' task to see that it's not actually rerun.
     {
-        auto key = make_id("id_12");
+        auto key = make_captured_id("id_12");
         auto result = disk_cached<dynamic>(
             core, key, [&] { return counted_task(12); });
         REQUIRE(cppcoro::sync_wait(result) == dynamic(integer(12)));
@@ -88,7 +88,7 @@ TEST_CASE("large value disk caching", "[service][core]")
     };
 
     {
-        auto key = make_id("id_12");
+        auto key = make_captured_id("id_12");
         auto result = disk_cached<dynamic>(
             core, key, [&] { return counted_task(12); });
         REQUIRE(
@@ -97,7 +97,7 @@ TEST_CASE("large value disk caching", "[service][core]")
         REQUIRE(execution_count == 1);
     }
     {
-        auto key = make_id("id_42");
+        auto key = make_captured_id("id_42");
         auto result = disk_cached<dynamic>(
             core, key, [&] { return counted_task(42); });
         REQUIRE(
@@ -110,7 +110,7 @@ TEST_CASE("large value disk caching", "[service][core]")
     sync_wait_write_disk_cache(core);
     // Now redo the 'id_12' task to see that it's not actually rerun.
     {
-        auto key = make_id("id_12");
+        auto key = make_captured_id("id_12");
         auto result = disk_cached<dynamic>(
             core, key, [&] { return counted_task(12); });
         REQUIRE(
@@ -133,7 +133,7 @@ TEST_CASE("cached tasks", "[service][core]")
 
     {
         auto result = cached<integer>(
-            core, make_captured_id(12), [&](id_interface const&) {
+            core, make_captured_id(12), [&](captured_id const&) {
                 return counted_task(12);
             });
         REQUIRE(cppcoro::sync_wait(result) == integer(12));
@@ -141,7 +141,7 @@ TEST_CASE("cached tasks", "[service][core]")
     }
     {
         auto result = cached<integer>(
-            core, make_captured_id(42), [&](id_interface const&) {
+            core, make_captured_id(42), [&](captured_id const&) {
                 return counted_task(42);
             });
         REQUIRE(cppcoro::sync_wait(result) == integer(42));
@@ -150,7 +150,7 @@ TEST_CASE("cached tasks", "[service][core]")
     // Now redo the '12' task to see that it's not actually rerun.
     {
         auto result = cached<integer>(
-            core, make_captured_id(12), [&](id_interface const&) {
+            core, make_captured_id(12), [&](captured_id const&) {
                 return counted_task(12);
             });
         REQUIRE(cppcoro::sync_wait(result) == integer(12));
@@ -173,7 +173,7 @@ TEST_CASE("lazily generated cached tasks", "[service][core]")
         auto result = cached<integer>(
             core,
             make_captured_id(12),
-            [&](id_interface const&) -> cppcoro::task<integer> {
+            [&](captured_id const&) -> cppcoro::task<integer> {
                 return counted_task(12);
             });
         REQUIRE(cppcoro::sync_wait(result) == integer(12));
@@ -183,7 +183,7 @@ TEST_CASE("lazily generated cached tasks", "[service][core]")
         auto result = cached<integer>(
             core,
             make_captured_id(42),
-            [&](id_interface const&) -> cppcoro::task<integer> {
+            [&](captured_id const&) -> cppcoro::task<integer> {
                 return counted_task(42);
             });
         REQUIRE(cppcoro::sync_wait(result) == integer(42));
@@ -194,7 +194,7 @@ TEST_CASE("lazily generated cached tasks", "[service][core]")
         auto result = cached<integer>(
             core,
             make_captured_id(12),
-            [&](id_interface const&) -> cppcoro::task<integer> {
+            [&](captured_id const&) -> cppcoro::task<integer> {
                 return counted_task(12);
             });
         REQUIRE(cppcoro::sync_wait(result) == integer(12));
