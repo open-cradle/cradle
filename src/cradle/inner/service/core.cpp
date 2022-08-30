@@ -94,13 +94,14 @@ blob_to_string(blob const& x)
     return os.str();
 }
 
+// This is a coroutine so takes id_key by value.
 cppcoro::task<blob>
 generic_disk_cached(
     inner_service_core& core,
-    id_interface const& id_key,
+    captured_id id_key,
     std::function<cppcoro::task<blob>()> create_task)
 {
-    std::string key{get_unique_string(id_key)};
+    std::string key{get_unique_string(*id_key)};
     // Check the cache for an existing value.
     auto& cache = core.inner_internals().disk_cache;
     try
@@ -227,7 +228,7 @@ template<>
 cppcoro::task<blob>
 disk_cached(
     inner_service_core& core,
-    id_interface const& key,
+    captured_id key,
     std::function<cppcoro::task<blob>()> create_task)
 {
     return detail::generic_disk_cached(core, key, std::move(create_task));

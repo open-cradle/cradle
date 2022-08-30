@@ -44,7 +44,7 @@ struct immutable_cache_record
     // of data associated with this record.
     std::any task;
 
-    // the size of the data (if it's ready)
+    // The size of the data if it's ready, or 0 if loading
     std::size_t size = 0;
 };
 

@@ -19,15 +19,16 @@ void
 reduce_memory_cache_size_no_lock(
     immutable_cache_impl& cache, uint64_t desired_size)
 {
-    // while (!cache.eviction_list.records.empty()
-    //        && cache.eviction_list.total_size > desired_size)
-    // {
-    //     auto const& record = cache.eviction_list.records.front();
-    //     auto data_size = record->size;
-    //     cache.records.erase(&*record->key);
-    //     cache.eviction_list.records.pop_front();
-    //     cache.eviction_list.total_size -= data_size;
-    // }
+    while (!cache.eviction_list.records.empty()
+           && cache.eviction_list.total_size > desired_size)
+    {
+        auto const& record = cache.eviction_list.records.front();
+        auto data_size = record->size;
+        cache.records.erase(&*record->key);
+        cache.eviction_list.records.pop_front();
+        assert(cache.eviction_list.total_size >= data_size);
+        cache.eviction_list.total_size -= data_size;
+    }
 }
 
 immutable_cache_info

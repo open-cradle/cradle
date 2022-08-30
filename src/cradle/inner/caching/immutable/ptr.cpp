@@ -13,8 +13,14 @@ record_immutable_cache_value(
     if (i != cache.records.end())
     {
         detail::immutable_cache_record& record = *i->second;
+        assert(record.state == immutable_cache_entry_state::LOADING);
         record.state = immutable_cache_entry_state::READY;
         record.size = size;
+        auto& list = cache.eviction_list;
+        if (record.eviction_list_iterator != list.records.end())
+        {
+            list.total_size += size;
+        }
     }
 }
 
@@ -77,14 +83,14 @@ acquire_cache_record(
         record->eviction_list_iterator = cache.eviction_list.records.end();
         record->key = key;
         record->ref_count = 0;
-        record->task = create_task(cache, *(record->key));
+        record->task = create_task(cache, key);
         i = cache.records.emplace(&*record->key, std::move(record)).first;
     }
     immutable_cache_record* record = i->second.get();
     // TODO: Better (optional) retry logic.
     if (record->state == immutable_cache_entry_state::FAILED)
     {
-        record->task = create_task(cache, *(record->key));
+        record->task = create_task(cache, key);
         record->state = immutable_cache_entry_state::LOADING;
     }
     acquire_cache_record_no_lock(record);
@@ -99,6 +105,8 @@ add_to_eviction_list(
     assert(record->eviction_list_iterator == list.records.end());
     record->eviction_list_iterator
         = list.records.insert(list.records.end(), record);
+    // If record->state is LOADING, record->size will be 0, and total_size
+    // should be updated on the LOADING -> READY transition.
     list.total_size += record->size;
 }
 

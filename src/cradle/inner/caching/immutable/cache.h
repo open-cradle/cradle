@@ -103,8 +103,15 @@ struct immutable_cache_snapshot
     // necessary
     std::vector<immutable_cache_entry_snapshot> pending_eviction;
 
+    // Total size of the cache entries on the eviction list.
+    // The size of a cache entry in LOADING state counts as zero.
+    size_t total_size_eviction_list{0};
+
+    bool
+    operator==(immutable_cache_snapshot const& other) const;
+
     auto
-    operator<=>(immutable_cache_snapshot const& other) const = default;
+    operator<=>(immutable_cache_snapshot const& other) const;
 };
 
 // Get a snapshot of the contents of an immutable memory cache.

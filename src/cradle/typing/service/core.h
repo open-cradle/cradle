@@ -57,14 +57,14 @@ template<>
 cppcoro::task<dynamic>
 disk_cached(
     inner_service_core& core,
-    id_interface const& key,
+    captured_id key,
     std::function<cppcoro::task<dynamic>()> create_task);
 
 template<class Value>
 cppcoro::task<Value>
 disk_cached(
     inner_service_core& core,
-    id_interface const& key,
+    captured_id key,
     std::function<cppcoro::task<Value>()> create_task)
 {
     return cppcoro::make_task(cppcoro::fmap(

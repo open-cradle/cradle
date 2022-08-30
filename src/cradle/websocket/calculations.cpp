@@ -77,7 +77,7 @@ perform_lambda_calc(
     auto await_guard
         = tasklet_await(ctx.get_tasklet(), function_name, *cache_key);
     co_return co_await cached<dynamic>(
-        ctx.service, cache_key, [&](id_interface const&) {
+        ctx.service, cache_key, [&](captured_id const&) {
             return uncached::perform_lambda_calc(
                 ctx, function, std::move(args));
         });

@@ -16,7 +16,7 @@ namespace cradle {
 struct immutable_cache;
 
 using create_task_function = function_view<std::any(
-    detail::immutable_cache_impl& cache, id_interface const& key)>;
+    detail::immutable_cache_impl& cache, captured_id const& key)>;
 
 namespace detail {
 

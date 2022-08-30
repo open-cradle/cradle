@@ -34,7 +34,7 @@ requires(FullyCachedContextRequest<Ctx, Req>)
 {
     using Value = typename Req::value_type;
     inner_service_core& core{ctx.get_service()};
-    id_interface const& key{*req.get_captured_id()};
+    captured_id const& key{req.get_captured_id()};
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
         Value value = co_await req.resolve(ctx);
         std::stringstream ss;
@@ -59,19 +59,21 @@ requires(FullyCachedContextRequest<Ctx, Req>&&
     cppcoro::task<blob> resolve_disk_cached(Ctx& ctx, Req const& req)
 {
     inner_service_core& core{ctx.get_service()};
-    id_interface const& key{*req.get_captured_id()};
+    captured_id const& key{req.get_captured_id()};
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
         co_return co_await req.resolve(ctx);
     };
     return disk_cached<blob>(core, key, create_blob_task);
 }
 
+// This function, being a coroutine, takes key by value.
+// The caller should ensure that cache, ctx and req outlive the coroutine.
 template<typename Ctx, typename Req>
 requires CachedContextRequest<Ctx, Req>
     cppcoro::shared_task<typename Req::value_type>
     resolve_request_on_memory_cache_miss(
         detail::immutable_cache_impl& cache,
-        id_interface const& key,
+        captured_id key,
         Ctx& ctx,
         Req const& req)
 {
@@ -79,12 +81,12 @@ requires CachedContextRequest<Ctx, Req>
     try
     {
         auto value = co_await resolve_disk_cached(ctx, req);
-        record_immutable_cache_value(cache, key, deep_sizeof(value));
+        record_immutable_cache_value(cache, *key, deep_sizeof(value));
         co_return value;
     }
     catch (...)
     {
-        record_immutable_cache_failure(cache, key);
+        record_immutable_cache_failure(cache, *key);
         throw;
     }
 }
@@ -116,7 +118,7 @@ requires(CachedContextRequest<Ctx, Req> && !Req::introspective) cppcoro::
         ctx.get_cache(),
         req.get_captured_id(),
         [&](detail::immutable_cache_impl& internal_cache,
-            id_interface const& key) {
+            captured_id const& key) {
             return resolve_request_on_memory_cache_miss<Ctx, Req>(
                 internal_cache, key, ctx, req);
         }};
@@ -133,7 +135,7 @@ requires(CachedContextRequest<Ctx, Req>&& Req::introspective)
         ctx.get_cache(),
         req.get_captured_id(),
         [&](detail::immutable_cache_impl& internal_cache,
-            id_interface const& key) {
+            captured_id const& key) {
             return resolve_request_on_memory_cache_miss<Ctx, Req>(
                 internal_cache, key, ctx, req);
         }};
