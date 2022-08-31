@@ -129,7 +129,7 @@ requires(CachedContextRequest<Ctx, Req> && !Req::introspective) cppcoro::
 
 // Returns the shared_task by value.
 template<typename Ctx, typename Req>
-requires(CachedContextRequest<Ctx, Req>&& Req::introspective)
+requires(CachedIntrospectiveContextRequest<Ctx, Req>)
     cppcoro::shared_task<typename Req::value_type> resolve_request_cached(
         Ctx& ctx, Req const& req)
 {

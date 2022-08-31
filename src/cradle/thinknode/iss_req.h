@@ -223,7 +223,7 @@ rq_post_iss_object_erased(
 // - Additional api_url argument passed by the framework
 cppcoro::task<blob>
 retrieve_immutable_blob_uncached_erased(
-    context_intf& ctx,
+    cached_introspected_context_intf& ctx,
     std::string api_url,
     std::string context_id,
     std::string immutable_id);

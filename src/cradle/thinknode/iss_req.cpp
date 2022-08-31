@@ -29,7 +29,7 @@ resolve_my_post_iss_object_request(
 
 cppcoro::task<blob>
 retrieve_immutable_blob_uncached_erased(
-    context_intf& ctx,
+    cached_introspected_context_intf& ctx,
     std::string api_url,
     std::string context_id,
     std::string immutable_id)

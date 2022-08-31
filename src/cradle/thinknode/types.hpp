@@ -31,7 +31,7 @@ struct immutable_cache;
 struct service_core;
 class tasklet_tracker;
 
-struct thinknode_request_context : public context_intf
+struct thinknode_request_context : public cached_introspected_context_intf
 {
     service_core& service;
     thinknode_session session;

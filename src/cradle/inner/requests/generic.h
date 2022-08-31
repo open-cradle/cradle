@@ -141,6 +141,10 @@ template<typename Ctx, typename Req>
 concept IntrospectiveContextRequest = IntrospectiveContext<Ctx>&&
     IntrospectiveRequest<Req>&& MatchingContextRequest<Ctx, Req>;
 
+template<typename Ctx, typename Req>
+concept CachedIntrospectiveContextRequest
+    = CachedContextRequest<Ctx, Req>&& IntrospectiveContextRequest<Ctx, Req>;
+
 // Primary template, used for non-request types; should be specialized for each
 // kind of request
 //
@@ -161,50 +165,62 @@ struct arg_type_struct
 template<typename T>
 using arg_type = typename arg_type_struct<T>::value_type;
 
+// Generic context interface, can be used for resolving any kind of request
 class context_intf
 {
  public:
     virtual ~context_intf() = default;
+};
 
-    // Only implemented in cached context
-    // TODO create cached_context_intf class
+// Context interface needed for resolving a cached request
+class cached_context_intf : public context_intf
+{
+ public:
     virtual inner_service_core&
     get_service()
         = 0;
 
-    // Only implemented in cached context
     virtual immutable_cache&
     get_cache()
         = 0;
+};
 
-    // Only implemented in cached context
+// Context interface needed for resolving an introspected request
+class introspected_context_intf : public context_intf
+{
+ public:
     virtual tasklet_tracker*
     get_tasklet()
         = 0;
 
-    // Only implemented in cached context
     virtual void
     push_tasklet(tasklet_tracker* tasklet)
         = 0;
 
-    // Only implemented in cached context
     virtual void
     pop_tasklet()
         = 0;
+};
+
+// Context interface needed for resolving a request that is both cached and
+// introspected
+class cached_introspected_context_intf : public cached_context_intf,
+                                         public introspected_context_intf
+{
 };
 
 class context_tasklet
 {
  public:
     context_tasklet(
-        context_intf& ctx,
+        introspected_context_intf& ctx,
         std::string const& pool_name,
         std::string const& title);
 
     ~context_tasklet();
 
  private:
-    context_intf* ctx_{nullptr};
+    introspected_context_intf* ctx_{nullptr};
 };
 
 } // namespace cradle

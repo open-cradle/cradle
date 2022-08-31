@@ -379,28 +379,39 @@ requires(Level != caching_level_type::none) auto rq_function_sp(
  * These classes intend to overcome the drawbacks of the earlier ones.
  */
 
-template<typename Value>
+template<RequestContext Ctx, typename Value>
 class function_request_intf : public id_interface
 {
  public:
+    using context_type = Ctx;
+
     virtual ~function_request_intf() = default;
 
     virtual request_uuid
     get_uuid() const = 0;
 
     virtual cppcoro::task<Value>
-    resolve(context_intf& ctx) const = 0;
+    resolve(Ctx& ctx) const = 0;
 };
 
 // - This class implements id_interface exactly like sha256_hashed_id
 // - The major advantage is that args_ need not be copied
-template<typename Value, bool AsCoro, typename Function, typename... Args>
-class function_request_impl : public function_request_intf<Value>
+// Only a small part of this class depends on the context type, so there will
+// be object code duplication if multiple instantiations exist differing in
+// the context (i.e., introspected + caching level) only.
+template<
+    typename Value,
+    typename Intf,
+    bool AsCoro,
+    typename Function,
+    typename... Args>
+class function_request_impl : public Intf
 {
  public:
     static constexpr bool func_is_coro = AsCoro;
     using this_type = function_request_impl;
-    using base_type = function_request_intf<Value>;
+    using base_type = Intf;
+    using context_type = typename Intf::context_type;
 
     function_request_impl(request_uuid uuid, Function function, Args... args)
         : uuid_{std::move(uuid)},
@@ -498,7 +509,7 @@ class function_request_impl : public function_request_intf<Value>
     }
 
     cppcoro::task<Value>
-    resolve(context_intf& ctx) const override
+    resolve(context_type& ctx) const override
     {
         if constexpr (!func_is_coro)
         {
@@ -590,6 +601,43 @@ class function_request_impl : public function_request_intf<Value>
     }
 };
 
+// Defines the context_intf derived class needed for resolving a request
+// characterized by Intrsp and Level.
+// Primary template first, followed by the four partial specializations for
+// all (is request introspected?, is request cached?) combinations.
+template<bool Intrsp, caching_level_type Level>
+struct function_request_ctx_type;
+
+template<caching_level_type Level>
+struct function_request_ctx_type<false, Level>
+{
+    // Resolving a cached function request requires a cached context.
+    using type = cached_context_intf;
+};
+
+template<caching_level_type Level>
+struct function_request_ctx_type<true, Level>
+{
+    // Resolving a cached+introspected function request requires a
+    // cached+introspected context.
+    using type = cached_introspected_context_intf;
+};
+
+template<>
+struct function_request_ctx_type<false, caching_level_type::none>
+{
+    // An uncached function request can be resolved using any kind of context.
+    using type = context_intf;
+};
+
+template<>
+struct function_request_ctx_type<true, caching_level_type::none>
+{
+    // Resolving an introspected function request requires an introspected
+    // context.
+    using type = introspected_context_intf;
+};
+
 // This class supports two kinds of functions:
 // (0) Plain function: res = function(args...)
 // (1) Coroutine needing context: res = co_await function(ctx, args...)
@@ -601,6 +649,8 @@ class function_request_erased
  public:
     using element_type = function_request_erased;
     using value_type = Value;
+    using ctx_type = typename function_request_ctx_type<Intrsp, Level>::type;
+    using intf_type = function_request_intf<ctx_type, Value>;
 
     static constexpr caching_level_type caching_level = Level;
     static constexpr bool introspective = Intrsp;
@@ -609,13 +659,19 @@ class function_request_erased
     requires(!introspective) function_request_erased(
         request_uuid uuid, Function function, Args... args)
     {
-        if (caching_level == caching_level_type::full
-            && !uuid.disk_cacheable())
+        if constexpr (caching_level == caching_level_type::full)
         {
-            throw uuid_error("Real uuid needed for fully-cached request");
+            if (!uuid.disk_cacheable())
+            {
+                throw uuid_error("Real uuid needed for fully-cached request");
+            }
         }
-        auto impl{std::make_shared<
-            function_request_impl<Value, AsCoro, Function, Args...>>(
+        auto impl{std::make_shared<function_request_impl<
+            Value,
+            intf_type,
+            AsCoro,
+            Function,
+            Args...>>(
             std::move(uuid), std::move(function), std::move(args)...)};
         impl->register_instance(impl);
         impl_ = impl;
@@ -627,13 +683,19 @@ class function_request_erased
         request_uuid uuid, std::string title, Function function, Args... args)
         : title_{std::move(title)}
     {
-        if (caching_level == caching_level_type::full
-            && !uuid.disk_cacheable())
+        if constexpr (caching_level == caching_level_type::full)
         {
-            throw uuid_error("Real uuid needed for fully-cached request");
+            if (!uuid.disk_cacheable())
+            {
+                throw uuid_error("Real uuid needed for fully-cached request");
+            }
         }
-        auto impl{std::make_shared<
-            function_request_impl<Value, AsCoro, Function, Args...>>(
+        auto impl{std::make_shared<function_request_impl<
+            Value,
+            intf_type,
+            AsCoro,
+            Function,
+            Args...>>(
             std::move(uuid), std::move(function), std::move(args)...)};
         impl->register_instance(impl);
         impl_ = impl;
@@ -667,15 +729,8 @@ class function_request_erased
     }
 
     captured_id const&
-    get_captured_id() const
+    get_captured_id() const requires(caching_level != caching_level_type::none)
     {
-        if constexpr (caching_level == caching_level_type::none)
-        {
-            // TODO split this class into uncached/cached ones
-            // Could also pass cached_context_intf& to resolve() for cached
-            throw not_implemented_error(
-                "captured_id only available for cached function requests");
-        }
         return captured_id_;
     }
 
@@ -685,8 +740,9 @@ class function_request_erased
         return impl_->get_uuid();
     }
 
+    template<RequestContext Ctx>
     cppcoro::task<Value>
-    resolve(context_intf& ctx) const
+    resolve(Ctx& ctx) const
     {
         return impl_->resolve(ctx);
     }
@@ -731,7 +787,7 @@ class function_request_erased
 
  private:
     std::string title_;
-    std::shared_ptr<function_request_intf<Value>> impl_;
+    std::shared_ptr<intf_type> impl_;
     captured_id captured_id_;
 
     void

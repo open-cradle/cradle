@@ -4,7 +4,9 @@
 namespace cradle {
 
 context_tasklet::context_tasklet(
-    context_intf& ctx, std::string const& pool_name, std::string const& title)
+    introspected_context_intf& ctx,
+    std::string const& pool_name,
+    std::string const& title)
 {
     auto tasklet = create_tasklet_tracker(pool_name, title, ctx.get_tasklet());
     if (tasklet)
