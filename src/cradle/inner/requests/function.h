@@ -13,18 +13,36 @@
 #include <cereal/types/tuple.hpp>
 #include <cppcoro/task.hpp>
 
+#include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/id.h>
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/requests/cereal.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/service/core.h>
 #include <cradle/inner/service/request.h>
 
-#include <cradle/inner/requests/value.h> // TODO remove when no longer needed
-
 namespace cradle {
+
+/*
+ * The first part of this file defines the "original" function requests,
+ * that have no type erasure.
+ *
+ * They do have some drawbacks:
+ * - The request class reflects the entire request tree, and tends to grow
+ *   fast. Compilation times will become much slower, and compilers will
+ *   give up altogether when the tree has more than a few dozen requests.
+ * - class function_request_cached stores its arguments twice: once in the
+ *   request object itself, once in its captured_id member.
+ * - Type-erased objects have some overhead (due to accessing the "_impl"
+ *   object through a shared_ptr), but a function_request_cached object also
+ *   has a shared_ptr in its captured_id member.
+ * - Request identity (uuid) is not really supported.
+ *
+ * So normally the type-erased requests in function.h should be preferred.
+ */
 
 template<typename Value, typename Function, typename... Args>
 class function_request_uncached
@@ -41,11 +59,12 @@ class function_request_uncached
     {
     }
 
-    std::string
+    request_uuid
     get_uuid() const
     {
-        // TODO need uuid identifying function_?
-        return std::string();
+        // The uuid should cover function_, but C++ does not offer anything
+        // that can be used across application runs.
+        throw not_implemented_error();
     }
 
     template<UncachedContext Ctx>
@@ -87,18 +106,14 @@ struct arg_type_struct<
     using value_type = Value;
 };
 
-// TODO does function_request_cached have any advantages over
-// function_request_erased?
-// - args_ are duplicated in id_
-// - id_ contains a shared_ptr
-// TODO cannot disk cache because Function cannot be part of a persistent
-// identity
+// Due to absence of a usable uuid, these objects are suitable for memory
+// caching only, and cannot be disk cached.
 template<
     caching_level_type Level,
     typename Value,
     typename Function,
     typename... Args>
-class function_request_cached
+requires(Level != caching_level_type::full) class function_request_cached
 {
  public:
     using element_type = function_request_cached;
@@ -160,10 +175,12 @@ class function_request_cached
         id_->update_hash(hasher);
     }
 
-    std::string
+    request_uuid
     get_uuid() const
     {
-        return "TODO_uuid_function_request_cached";
+        // The uuid should cover function_, but C++ does not offer anything
+        // that can be used across application runs.
+        throw not_implemented_error();
     }
 
     captured_id const&
@@ -282,13 +299,93 @@ update_unique_hash(
     req.update_hash(hasher);
 }
 
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level == caching_level_type::none) auto rq_function(
+    Function function, Args... args)
+{
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
+    return function_request_uncached<Value, Function, Args...>{
+        std::move(function), std::move(args)...};
+}
+
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level != caching_level_type::none) auto rq_function(
+    Function function, Args... args)
+{
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
+    return function_request_cached<Level, Value, Function, Args...>{
+        std::move(function), std::move(args)...};
+}
+
+template<
+    typename Value,
+    caching_level_type Level,
+    typename Function,
+    typename... Args>
+requires(Level != caching_level_type::none) auto rq_function(
+    Function function, Args... args)
+{
+    return function_request_cached<Level, Value, Function, Args...>{
+        std::move(function), std::move(args)...};
+}
+
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level == caching_level_type::none) auto rq_function_up(
+    Function function, Args... args)
+{
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
+    return std::make_unique<
+        function_request_uncached<Value, Function, Args...>>(
+        std::move(function), std::move(args)...);
+}
+
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level != caching_level_type::none) auto rq_function_up(
+    Function function, Args... args)
+{
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
+    return std::make_unique<
+        function_request_cached<Level, Value, Function, Args...>>(
+        std::move(function), std::move(args)...);
+}
+
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level == caching_level_type::none) auto rq_function_sp(
+    Function function, Args... args)
+{
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
+    return std::make_shared<
+        function_request_uncached<Value, Function, Args...>>(
+        std::move(function), std::move(args)...);
+}
+
+template<caching_level_type Level, typename Function, typename... Args>
+requires(Level != caching_level_type::none) auto rq_function_sp(
+    Function function, Args... args)
+{
+    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
+    return std::make_shared<
+        function_request_cached<Level, Value, Function, Args...>>(
+        std::move(function), std::move(args)...);
+}
+
+/*
+ * The second part of this file defines the "type-erased" requests.
+ * The main request object (class function_request_erased) has a shared_ptr
+ * to a function_request_intf object; that object's full type
+ * (i.e., function_request_impl's template arguments) are known in
+ * function_request_erased's constructor only.
+ *
+ * These classes intend to overcome the drawbacks of the earlier ones.
+ */
+
 template<typename Value>
 class function_request_intf : public id_interface
 {
  public:
     virtual ~function_request_intf() = default;
 
-    virtual std::string
+    virtual request_uuid
     get_uuid() const = 0;
 
     virtual cppcoro::task<Value>
@@ -305,16 +402,12 @@ class function_request_impl : public function_request_intf<Value>
     using this_type = function_request_impl;
     using base_type = function_request_intf<Value>;
 
-    // uuid is allowed to be empty if caching level is not full
-    function_request_impl(std::string uuid, Function function, Args... args)
+    function_request_impl(request_uuid uuid, Function function, Args... args)
         : uuid_{std::move(uuid)},
           function_{std::move(function)},
           args_{std::move(args)...}
     {
-        // TODO consider decoupling uuid presence and serializable
-        // Or make "serializable" a property of class uuid.
-        bool serializable = !uuid_.empty();
-        if (serializable)
+        if (uuid_.serializable())
         {
             register_polymorphic_type<this_type, base_type>(uuid_);
         }
@@ -398,7 +491,7 @@ class function_request_impl : public function_request_intf<Value>
         hasher.combine(unique_hash_);
     }
 
-    std::string
+    request_uuid
     get_uuid() const override
     {
         return uuid_;
@@ -467,7 +560,7 @@ class function_request_impl : public function_request_intf<Value>
 
  private:
     static inline std::shared_ptr<function_request_impl> instance_;
-    std::string uuid_;
+    request_uuid uuid_;
     Function function_;
     std::tuple<Args...> args_;
     mutable std::optional<size_t> hash_;
@@ -485,7 +578,7 @@ class function_request_impl : public function_request_intf<Value>
     calc_unique_hash() const
     {
         unique_hasher hasher;
-        assert(!uuid_.empty());
+        assert(uuid_.disk_cacheable());
         update_unique_hash(hasher, uuid_);
         std::apply(
             [&hasher](auto&&... args) {
@@ -514,8 +607,13 @@ class function_request_erased
 
     template<typename Function, typename... Args>
     requires(!introspective) function_request_erased(
-        std::string uuid, Function function, Args... args)
+        request_uuid uuid, Function function, Args... args)
     {
+        if (caching_level == caching_level_type::full
+            && !uuid.disk_cacheable())
+        {
+            throw uuid_error("Real uuid needed for fully-cached request");
+        }
         auto impl{std::make_shared<
             function_request_impl<Value, AsCoro, Function, Args...>>(
             std::move(uuid), std::move(function), std::move(args)...)};
@@ -526,9 +624,14 @@ class function_request_erased
 
     template<typename Function, typename... Args>
     requires(introspective) function_request_erased(
-        std::string uuid, std::string title, Function function, Args... args)
+        request_uuid uuid, std::string title, Function function, Args... args)
         : title_{std::move(title)}
     {
+        if (caching_level == caching_level_type::full
+            && !uuid.disk_cacheable())
+        {
+            throw uuid_error("Real uuid needed for fully-cached request");
+        }
         auto impl{std::make_shared<
             function_request_impl<Value, AsCoro, Function, Args...>>(
             std::move(uuid), std::move(function), std::move(args)...)};
@@ -576,7 +679,7 @@ class function_request_erased
         return captured_id_;
     }
 
-    std::string
+    request_uuid
     get_uuid() const
     {
         return impl_->get_uuid();
@@ -704,82 +807,12 @@ update_unique_hash(
 }
 
 template<caching_level_type Level, typename Function, typename... Args>
-requires(Level == caching_level_type::none) auto rq_function(
-    Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_uncached<Value, Function, Args...>{
-        std::move(function), std::move(args)...};
-}
-
-template<caching_level_type Level, typename Function, typename... Args>
-requires(Level != caching_level_type::none) auto rq_function(
-    Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_cached<Level, Value, Function, Args...>{
-        std::move(function), std::move(args)...};
-}
-
-template<
-    typename Value,
-    caching_level_type Level,
-    typename Function,
-    typename... Args>
-requires(Level != caching_level_type::none) auto rq_function(
-    Function function, Args... args)
-{
-    return function_request_cached<Level, Value, Function, Args...>{
-        std::move(function), std::move(args)...};
-}
-
-template<caching_level_type Level, typename Function, typename... Args>
-requires(Level == caching_level_type::none) auto rq_function_up(
-    Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return std::make_unique<
-        function_request_uncached<Value, Function, Args...>>(
-        std::move(function), std::move(args)...);
-}
-
-template<caching_level_type Level, typename Function, typename... Args>
-requires(Level != caching_level_type::none) auto rq_function_up(
-    Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return std::make_unique<
-        function_request_cached<Level, Value, Function, Args...>>(
-        std::move(function), std::move(args)...);
-}
-
-template<caching_level_type Level, typename Function, typename... Args>
-requires(Level == caching_level_type::none) auto rq_function_sp(
-    Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return std::make_shared<
-        function_request_uncached<Value, Function, Args...>>(
-        std::move(function), std::move(args)...);
-}
-
-template<caching_level_type Level, typename Function, typename... Args>
-requires(Level != caching_level_type::none) auto rq_function_sp(
-    Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return std::make_shared<
-        function_request_cached<Level, Value, Function, Args...>>(
-        std::move(function), std::move(args)...);
-}
-
-template<caching_level_type Level, typename Function, typename... Args>
 requires(Level != caching_level_type::full) auto rq_function_erased(
     Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return function_request_erased<Level, Value, false, false>{
-        "", std::move(function), std::move(args)...};
+        request_uuid(), std::move(function), std::move(args)...};
 }
 
 template<
@@ -791,15 +824,14 @@ requires(Level != caching_level_type::full) auto rq_function_erased_coro(
     Function function, Args... args)
 {
     return function_request_erased<Level, Value, false, true>{
-        "", std::move(function), std::move(args)...};
+        request_uuid(), std::move(function), std::move(args)...};
 }
 
 template<caching_level_type Level, typename Function, typename... Args>
 auto
-rq_function_erased_uuid(std::string uuid, Function function, Args... args)
+rq_function_erased_uuid(request_uuid uuid, Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    assert(!uuid.empty());
     return function_request_erased<Level, Value, false, false>{
         std::move(uuid), std::move(function), std::move(args)...};
 }
@@ -810,9 +842,9 @@ template<
     typename Function,
     typename... Args>
 auto
-rq_function_erased_coro_uuid(std::string uuid, Function function, Args... args)
+rq_function_erased_coro_uuid(
+    request_uuid uuid, Function function, Args... args)
 {
-    assert(!uuid.empty());
     return function_request_erased<Level, Value, false, true>{
         std::move(uuid), std::move(function), std::move(args)...};
 }
@@ -823,7 +855,10 @@ requires(Level != caching_level_type::full) auto rq_function_erased_intrsp(
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return function_request_erased<Level, Value, true, false>{
-        "", std::move(title), std::move(function), std::move(args)...};
+        request_uuid(),
+        std::move(title),
+        std::move(function),
+        std::move(args)...};
 }
 
 template<
@@ -835,16 +870,18 @@ requires(Level != caching_level_type::full) auto rq_function_erased_coro_intrsp(
     std::string title, Function function, Args... args)
 {
     return function_request_erased<Level, Value, true, true>{
-        "", std::move(title), std::move(function), std::move(args)...};
+        request_uuid(),
+        std::move(title),
+        std::move(function),
+        std::move(args)...};
 }
 
 template<caching_level_type Level, typename Function, typename... Args>
 auto
 rq_function_erased_uuid_intrsp(
-    std::string uuid, std::string title, Function function, Args... args)
+    request_uuid uuid, std::string title, Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    assert(!uuid.empty());
     return function_request_erased<Level, Value, true, false>{
         std::move(uuid),
         std::move(title),
@@ -859,9 +896,8 @@ template<
     typename... Args>
 auto
 rq_function_erased_coro_uuid_intrsp(
-    std::string uuid, std::string title, Function function, Args... args)
+    request_uuid uuid, std::string title, Function function, Args... args)
 {
-    assert(!uuid.empty());
     return function_request_erased<Level, Value, true, true>{
         std::move(uuid),
         std::move(title),

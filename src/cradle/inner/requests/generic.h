@@ -12,6 +12,7 @@ namespace cradle {
 
 struct immutable_cache;
 struct inner_service_core;
+class request_uuid;
 class tasklet_tracker;
 
 enum class caching_level_type
@@ -33,7 +34,7 @@ concept Request = requires
     {
         req.get_uuid()
     }
-    ->std::convertible_to<std::string>;
+    ->std::convertible_to<request_uuid>;
 };
 
 // unique_ptr<Request> or shared_ptr<Request>

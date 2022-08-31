@@ -14,21 +14,6 @@
 
 namespace cradle {
 
-// TODO uuids depend on classes only, could be evaluated compile time?
-template<Request Req>
-std::string
-combined_uuid(std::string const& main_uuid, Req const& subreq)
-{
-    std::string res{main_uuid};
-    std::string sub_uuid{subreq.get_uuid()};
-    if (!sub_uuid.empty())
-    {
-        res += '/';
-        res += sub_uuid;
-    }
-    return res;
-}
-
 cppcoro::task<std::string>
 resolve_my_post_iss_object_request(
     thinknode_request_context& ctx,
@@ -67,14 +52,12 @@ requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
             ctx, api_url_, context_id_, url_type_string_, object_data);
     }
 
-    // Return a string that uniquely identifies this class and its current
-    // implementation. When the class's behaviour changes, then so should
-    // this string.
-    std::string
+    request_uuid
     get_uuid() const
     {
         return combined_uuid(
-            "my_post_iss_object_request", object_data_request_);
+            request_uuid("my_post_iss_object_request"),
+            object_data_request_.get_uuid());
     }
 
     std::string
@@ -271,12 +254,12 @@ requires(std::same_as<
             ctx, context_id_, immutable_id);
     }
 
-    std::string
+    request_uuid
     get_uuid() const
     {
         return combined_uuid(
-            "my_retrieve_immutable_object_request_base",
-            immutable_id_request_);
+            request_uuid("my_retrieve_immutable_object_request_base"),
+            immutable_id_request_.get_uuid());
     }
 
     std::string
@@ -373,7 +356,7 @@ rq_retrieve_immutable_object_func(
     std::string api_url, std::string context_id, std::string immutable_id)
 {
     using value_type = blob;
-    std::string uuid{"my_retrieve_immutable_object_func"};
+    request_uuid uuid{"my_retrieve_immutable_object_func"};
     std::string title{"my_retrieve_immutable_object_request"};
     return rq_function_erased_coro_uuid_intrsp<level, value_type>(
         std::move(uuid),

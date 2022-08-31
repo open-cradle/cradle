@@ -281,6 +281,8 @@ file(GLOB_RECURSE srcs_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/inner/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/*.cpp")
 add_library(cradle_inner STATIC ${srcs_inner})
+target_sources(cradle_inner PRIVATE
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/src/cradle/version_info.hpp")
 
 # Add the main library: everything outside the inner core.
 file(GLOB_RECURSE srcs_outer CONFIGURE_DEPENDS
@@ -300,8 +302,7 @@ if(IS_MSVC)
         SOURCE src/cradle/websocket/client.cpp
         APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4996 /wd4127 /wd4267 /wd4244")
 endif()
-target_sources(cradle_outer PRIVATE ${generated_headers} ${generated_srcs}
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/src/cradle/version_info.hpp")
+target_sources(cradle_outer PRIVATE ${generated_headers} ${generated_srcs})
 
 target_link_libraries(cradle_inner PUBLIC
     Boost::headers
@@ -335,6 +336,7 @@ target_compile_definitions(
 target_compile_definitions(
     cradle_outer PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 target_include_directories(cradle_inner PUBLIC
+    ${generated_include_dir}/src
     src
     src/third-party)
 target_include_directories(cradle_outer PUBLIC

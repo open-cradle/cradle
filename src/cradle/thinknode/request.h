@@ -251,7 +251,7 @@ class thinknode_request_container
         return captured_id_;
     }
 
-    std::string
+    request_uuid
     get_uuid() const
     {
         return impl_->get_uuid();
@@ -490,7 +490,7 @@ class thinknode_request_erased
         return captured_id_;
     }
 
-    std::string
+    request_uuid
     get_uuid() const
     {
         return impl_->get_uuid();

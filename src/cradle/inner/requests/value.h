@@ -10,6 +10,7 @@
 #include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/uuid.h>
 
 namespace cradle {
 
@@ -35,11 +36,11 @@ class value_request
     {
     }
 
-    std::string
+    request_uuid
     get_uuid() const
     {
         // Zero uuid information
-        return std::string();
+        return request_uuid();
     }
 
     Value

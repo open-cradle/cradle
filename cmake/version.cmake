@@ -46,7 +46,7 @@ string(JOIN "-" tag "${tag}")
 # Generate the C++ code to represent all this.
 set(cpp_code "\
 // AUTOMATICALLY GENERATED!! - See version.cmake.\n\
-#include <cradle/typing/utilities/git.h>\n\
+#include <cradle/inner/utilities/git.h>\n\
 static cradle::repository_info const version_info{\n\
   \"${commit_hash}\", ${is_dirty}, \"${tag}\", ${commits_since_tag} };\n\
 ")
