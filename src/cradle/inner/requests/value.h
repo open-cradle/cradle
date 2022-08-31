@@ -15,6 +15,7 @@ namespace cradle {
 
 /**
  * Request for an immediate value. No caching, no introspection.
+ * Satisfies concept UncachedRequest.
  */
 template<typename Value>
 class value_request
@@ -32,6 +33,13 @@ class value_request
 
     value_request(Value&& value) : value_{std::move(value)}
     {
+    }
+
+    std::string
+    get_uuid() const
+    {
+        // Zero uuid information
+        return std::string();
     }
 
     Value
@@ -54,6 +62,10 @@ class value_request
     {
         co_return value_;
     }
+
+ public:
+    // cereal interface
+    value_request() = default;
 
     template<typename Archive>
     void

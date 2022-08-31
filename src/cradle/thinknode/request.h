@@ -11,6 +11,7 @@
 
 #include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/id.h>
+#include <cradle/inner/requests/cereal.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/thinknode/types.hpp>
 
@@ -85,8 +86,8 @@ struct args_comparator
 };
 
 // A request's identity is a combination of:
-// - The identity of its class: Base::get_uuid()
-// - Its arguments, enumerated in Base::serialize() and Base::compare()
+// - The identity of its class, e.g. Base::get_uuid()
+// - Its arguments, e.g. Base's hash(), save(), load(), compare()
 // Most of the functions in this mixin express that identity.
 template<typename Base>
 class thinknode_request_mixin : public Base, public id_interface
@@ -100,48 +101,47 @@ class thinknode_request_mixin : public Base, public id_interface
     {
     }
 
+    // *this and other are the same type
     bool
     equals(thinknode_request_mixin const& other) const
     {
+        assert(this->get_uuid() == other.get_uuid());
         if (this == &other)
         {
             return true;
-        }
-        if (this->get_uuid() != other.get_uuid())
-        {
-            return false;
         }
         args_comparator cmp;
         return this->compare(cmp, other) == 0;
     }
 
+    // *this and other are the same type
     bool
     less_than(thinknode_request_mixin const& other) const
     {
+        assert(this->get_uuid() == other.get_uuid());
         if (this == &other)
         {
             return false;
-        }
-        auto uuid_diff = this->get_uuid() <=> other.get_uuid();
-        if (uuid_diff != 0)
-        {
-            return uuid_diff < 0;
         }
         args_comparator cmp;
         return this->compare(cmp, other) < 0;
     }
 
+    // The caller has verified that *this and other are the same type.
     bool
     equals(id_interface const& other) const override
     {
+        assert(dynamic_cast<thinknode_request_mixin const*>(&other));
         auto const& other_id
             = static_cast<thinknode_request_mixin const&>(other);
         return equals(other_id);
     }
 
+    // The caller has verified that *this and other are the same type.
     bool
     less_than(id_interface const& other) const override
     {
+        assert(dynamic_cast<thinknode_request_mixin const*>(&other));
         auto const& other_id
             = static_cast<thinknode_request_mixin const&>(other);
         return less_than(other_id);
@@ -154,7 +154,7 @@ class thinknode_request_mixin : public Base, public id_interface
         {
             detail::request_hasher hasher;
             hasher(this->get_uuid());
-            const_cast<thinknode_request_mixin*>(this)->serialize(hasher);
+            Base::hash(hasher);
             hash_ = hasher.get_value();
         }
         return *hash_;
@@ -170,6 +170,13 @@ class thinknode_request_mixin : public Base, public id_interface
         hasher.combine(unique_hash_);
     }
 
+ public:
+    // Interface for cereal
+
+    thinknode_request_mixin() : Base()
+    {
+    }
+
  private:
     mutable std::optional<size_t> hash_;
     mutable unique_hasher::result_t unique_hash_;
@@ -180,7 +187,7 @@ class thinknode_request_mixin : public Base, public id_interface
     {
         unique_functor functor;
         functor(this->get_uuid());
-        const_cast<thinknode_request_mixin*>(this)->serialize(functor);
+        Base::hash(functor);
         functor.get_result(unique_hash_);
         have_unique_hash_ = true;
     }
@@ -202,21 +209,19 @@ class thinknode_request_container
 
     template<typename... Args>
     thinknode_request_container(Args... args)
+        : impl_{std::make_shared<impl_type>(std::move(args)...)}
     {
-        auto impl{std::make_shared<impl_type>(std::move(args)...)};
-        impl_ = impl;
-        if constexpr (caching_level != caching_level_type::none)
-        {
-            captured_id_ = captured_id{impl};
-        }
+        init_captured_id();
     }
 
+    // *this and other are the same type
     bool
     equals(thinknode_request_container const& other) const
     {
         return impl_->equals(*other.impl_);
     }
 
+    // *this and other are the same type
     bool
     less_than(thinknode_request_container const& other) const
     {
@@ -246,6 +251,12 @@ class thinknode_request_container
         return captured_id_;
     }
 
+    std::string
+    get_uuid() const
+    {
+        return impl_->get_uuid();
+    }
+
     cppcoro::task<value_type>
     resolve(thinknode_request_context& ctx) const
     {
@@ -258,9 +269,45 @@ class thinknode_request_container
         return impl_->get_introspection_title();
     }
 
+ public:
+    // Interface for cereal
+
+    // Construct object, deserializing from a cereal archive
+    // TODO won't this conflict with the normal ctor?
+    template<typename Archive>
+    explicit thinknode_request_container(Archive& archive)
+    {
+        load(archive);
+    }
+
+    template<typename Archive>
+    void
+    save(Archive& archive) const
+    {
+        archive(
+            cereal::make_nvp("impl", impl_));
+    }
+
+    template<typename Archive>
+    void
+    load(Archive& archive)
+    {
+        archive(impl_);
+        init_captured_id();
+    }
+
  private:
     std::shared_ptr<impl_type> impl_;
     captured_id captured_id_;
+
+    void
+    init_captured_id()
+    {
+        if constexpr (caching_level != caching_level_type::none)
+        {
+            captured_id_ = captured_id{impl_};
+        }
+    }
 };
 
 template<typename Value>
@@ -269,6 +316,8 @@ class thinknode_request_intf : public id_interface
  public:
     virtual ~thinknode_request_intf() = default;
 
+    // TODO need to add get_uuid?
+
     virtual cppcoro::task<Value>
     resolve(thinknode_request_context& ctx) const = 0;
 };
@@ -276,14 +325,18 @@ class thinknode_request_intf : public id_interface
 template<typename Base>
 class thinknode_request_impl
     : public thinknode_request_intf<typename Base::value_type>,
-      Base
+      public Base
 {
  public:
     using value_type = typename Base::value_type;
+    using this_type = thinknode_request_impl;
+    using intf_type = thinknode_request_intf<value_type>;
 
+    // Not to be called when deserializing
     template<typename... Args>
     thinknode_request_impl(Args&&... args) : Base(std::move(args)...)
     {
+        register_polymorphic_type<this_type, intf_type>(this->get_uuid());
     }
 
     cppcoro::task<value_type>
@@ -292,6 +345,7 @@ class thinknode_request_impl
         return static_cast<Base const*>(this)->resolve(ctx);
     }
 
+    // *this and other are the same type
     bool
     equals(thinknode_request_impl const& other) const
     {
@@ -299,15 +353,11 @@ class thinknode_request_impl
         {
             return true;
         }
-        // TODO compare classes like function_request_impl does, not uuid's
-        if (this->get_uuid() != other.get_uuid())
-        {
-            return false;
-        }
         detail::args_comparator cmp;
         return this->compare(cmp, other) == 0;
     }
 
+    // *this and other are the same type
     bool
     less_than(thinknode_request_impl const& other) const
     {
@@ -315,26 +365,25 @@ class thinknode_request_impl
         {
             return false;
         }
-        auto uuid_diff = this->get_uuid() <=> other.get_uuid();
-        if (uuid_diff != 0)
-        {
-            return uuid_diff < 0;
-        }
         detail::args_comparator cmp;
         return this->compare(cmp, other) < 0;
     }
 
+    // Caller promises that *this and other are the same type.
     bool
     equals(id_interface const& other) const override
     {
+        assert(dynamic_cast<thinknode_request_impl const*>(&other));
         auto const& other_id
             = static_cast<thinknode_request_impl const&>(other);
         return equals(other_id);
     }
 
+    // Caller promises that *this and other are the same type.
     bool
     less_than(id_interface const& other) const override
     {
+        assert(dynamic_cast<thinknode_request_impl const*>(&other));
         auto const& other_id
             = static_cast<thinknode_request_impl const&>(other);
         return less_than(other_id);
@@ -347,7 +396,7 @@ class thinknode_request_impl
         {
             detail::request_hasher hasher;
             hasher(this->get_uuid());
-            const_cast<thinknode_request_impl*>(this)->serialize(hasher);
+            Base::hash(hasher);
             hash_ = hasher.get_value();
         }
         return *hash_;
@@ -364,6 +413,14 @@ class thinknode_request_impl
     }
 
  private:
+    // cereal interface. save() and load() are in Base.
+
+    friend class cereal::access;
+    thinknode_request_impl() : Base()
+    {
+    }
+
+ private:
     mutable std::optional<size_t> hash_;
     mutable unique_hasher::result_t unique_hash_;
     mutable bool have_unique_hash_{false};
@@ -373,7 +430,7 @@ class thinknode_request_impl
     {
         unique_functor functor;
         functor(this->get_uuid());
-        const_cast<thinknode_request_impl*>(this)->serialize(functor);
+        Base::hash(functor);
         functor.get_result(unique_hash_);
         have_unique_hash_ = true;
     }
@@ -388,16 +445,14 @@ class thinknode_request_erased
 
     static constexpr caching_level_type caching_level = level;
     // Or depend on Base::get_introspection_title() presence
-    static constexpr bool introspective = true;
+    static constexpr bool introspective = false;
 
+    // TODO title
     thinknode_request_erased(
         std::shared_ptr<thinknode_request_intf<Value>> const& impl)
         : impl_{impl}
     {
-        if constexpr (caching_level != caching_level_type::none)
-        {
-            captured_id_ = captured_id{impl};
-        }
+        init_captured_id();
     }
 
     bool
@@ -435,6 +490,12 @@ class thinknode_request_erased
         return captured_id_;
     }
 
+    std::string
+    get_uuid() const
+    {
+        return impl_->get_uuid();
+    }
+
     cppcoro::task<Value>
     resolve(thinknode_request_context& ctx) const
     {
@@ -447,10 +508,45 @@ class thinknode_request_erased
         return title_;
     }
 
+ public:
+    // cereal-related
+
+    // Construct object, deserializing from a cereal archive
+    template<typename Archive>
+    explicit thinknode_request_erased(Archive& archive)
+    {
+        load<Archive>(archive);
+    }
+
+    template<typename Archive>
+    void
+    save(Archive& archive) const
+    {
+        // TODO or impl_->save(archive) ?
+        archive(cereal::make_nvp("impl", impl_));
+    }
+
+    template<typename Archive>
+    void
+    load(Archive& archive)
+    {
+        archive(impl_);
+        init_captured_id();
+    }
+
  private:
-    std::string title_;
+    std::string title_{"TODO_title"};
     std::shared_ptr<thinknode_request_intf<Value>> impl_;
     captured_id captured_id_;
+
+    void
+    init_captured_id()
+    {
+        if constexpr (caching_level != caching_level_type::none)
+        {
+            captured_id_ = captured_id{impl_};
+        }
+    }
 };
 
 } // namespace cradle

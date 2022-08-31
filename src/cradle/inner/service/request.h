@@ -27,6 +27,8 @@ requires(Req::caching_level == caching_level_type::memory)
     return req.resolve(ctx);
 }
 
+// TODO The serialization algorithm should be a parameter.
+// Having ctx provide it looks logical but not easy.
 template<typename Ctx, typename Req>
 requires(FullyCachedContextRequest<Ctx, Req>)
     cppcoro::task<typename Req::value_type> resolve_disk_cached(

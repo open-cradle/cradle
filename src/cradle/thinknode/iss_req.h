@@ -14,6 +14,21 @@
 
 namespace cradle {
 
+// TODO uuids depend on classes only, could be evaluated compile time?
+template<Request Req>
+std::string
+combined_uuid(std::string const& main_uuid, Req const& subreq)
+{
+    std::string res{main_uuid};
+    std::string sub_uuid{subreq.get_uuid()};
+    if (!sub_uuid.empty())
+    {
+        res += '/';
+        res += sub_uuid;
+    }
+    return res;
+}
+
 cppcoro::task<std::string>
 resolve_my_post_iss_object_request(
     thinknode_request_context& ctx,
@@ -25,8 +40,8 @@ resolve_my_post_iss_object_request(
 template<Request ObjectDataRequest>
 requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
     // The identity of a request object is formed by:
-    // - The get_uuid() value, defining the class
-    // - The values passed to serialize() (and to compare())
+    // - The get_uuid() value, identifying the class
+    // - The runtime arguments: hash(), save(), load(), compare()
     class my_post_iss_object_request_base
 {
  public:
@@ -58,7 +73,8 @@ requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
     std::string
     get_uuid() const
     {
-        return "my_post_iss_object_request";
+        return combined_uuid(
+            "my_post_iss_object_request", object_data_request_);
     }
 
     std::string
@@ -67,17 +83,16 @@ requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
         return "my_post_iss_object_request";
     }
 
-    // Used when (de-)serializing this object (planned),
-    // and for calculating its hashes.
-    template<typename Archive>
+    // Update hasher for the runtime arguments of this request
+    template<typename Hasher>
     void
-    serialize(Archive& archive)
+    hash(Hasher& hasher) const
     {
-        archive(api_url_, context_id_, url_type_string_, object_data_request_);
+        hasher(api_url_, context_id_, url_type_string_, object_data_request_);
     }
 
     // Compares against another request object, returning <0, 0, or >0.
-    // The values passed to comparator are the same as in serialize();
+    // The values passed to comparator are the same as in hash();
     // it would be nice if we could somehow get rid of this duplication.
     template<typename Comparator>
     int
@@ -94,6 +109,33 @@ requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
             other.url_type_string_,
             object_data_request_,
             other.object_data_request_);
+    }
+
+ public:
+    // cereal-related
+
+    // Should be called (indirectly) from cereal::access only.
+    my_post_iss_object_request_base()
+    {
+    }
+
+    template<typename Archive>
+    void
+    save(Archive& archive) const
+    {
+        archive(
+            cereal::make_nvp("api_url", api_url_),
+            cereal::make_nvp("context_id", context_id_),
+            cereal::make_nvp("url_type_string", url_type_string_),
+            cereal::make_nvp("object_data_request", object_data_request_));
+    }
+
+    // TODO identical to hash(). Can we simplify?
+    template<typename Archive>
+    void
+    load(Archive& archive)
+    {
+        archive(api_url_, context_id_, url_type_string_, object_data_request_);
     }
 
  private:
@@ -167,6 +209,7 @@ requires(std::same_as<typename ObjectDataRequest::value_type, blob>) auto rq_pos
     thinknode_type_info schema,
     ObjectDataRequest object_data_request)
 {
+    // TODO get title in request object
     using erased_type = thinknode_request_erased<level, std::string>;
     using impl_type = thinknode_request_impl<
         my_post_iss_object_request_base<ObjectDataRequest>>;
@@ -231,20 +274,23 @@ requires(std::same_as<
     std::string
     get_uuid() const
     {
-        return "my_retrieve_immutable_object_request";
+        return combined_uuid(
+            "my_retrieve_immutable_object_request_base",
+            immutable_id_request_);
     }
 
     std::string
     get_introspection_title() const
     {
-        return "my_retrieve_immutable_object_request";
+        return title_;
     }
 
-    template<typename Archive>
+    // Defines the data members forming this object's state.
+    template<typename Hasher>
     void
-    serialize(Archive& archive)
+    hash(Hasher& hasher) const
     {
-        archive(api_url_, context_id_, immutable_id_request_);
+        hasher(api_url_, context_id_, immutable_id_request_);
     }
 
     template<typename Comparator>
@@ -262,10 +308,36 @@ requires(std::same_as<
             other.immutable_id_request_);
     }
 
+ public:
+    // cereal-related
+
+    // Should be called (indirectly) from cereal::access only.
+    my_retrieve_immutable_object_request_base()
+    {
+    }
+
+    template<typename Archive>
+    void
+    save(Archive& archive) const
+    {
+        archive(
+            cereal::make_nvp("api_url", api_url_),
+            cereal::make_nvp("context_id", context_id_),
+            cereal::make_nvp("immutable_id_request", immutable_id_request_));
+    }
+
+    template<typename Archive>
+    void
+    load(Archive& archive)
+    {
+        archive(api_url_, context_id_, immutable_id_request_);
+    }
+
  private:
     std::string api_url_;
     std::string context_id_;
     ImmutableIdRequest immutable_id_request_;
+    std::string title_{"my_retrieve_immutable_object_request"};
 };
 
 template<caching_level_type level, Request ImmutableIdRequest>
@@ -301,7 +373,7 @@ rq_retrieve_immutable_object_func(
     std::string api_url, std::string context_id, std::string immutable_id)
 {
     using value_type = blob;
-    std::string uuid{"my_retrieve_immutable_object_request"};
+    std::string uuid{"my_retrieve_immutable_object_func"};
     std::string title{"my_retrieve_immutable_object_request"};
     return rq_function_erased_coro_uuid_intrsp<level, value_type>(
         std::move(uuid),

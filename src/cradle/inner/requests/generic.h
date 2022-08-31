@@ -27,6 +27,13 @@ concept Request = requires
     std::same_as<typename T::element_type, T>;
     typename T::value_type;
     std::same_as<decltype(T::caching_level), caching_level_type>;
+}
+&&requires(T const& req)
+{
+    {
+        req.get_uuid()
+    }
+    ->std::convertible_to<std::string>;
 };
 
 // unique_ptr<Request> or shared_ptr<Request>

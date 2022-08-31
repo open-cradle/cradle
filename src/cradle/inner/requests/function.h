@@ -4,19 +4,25 @@
 #include <cassert>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <typeindex>
 #include <typeinfo>
 #include <utility>
 
 #include <cereal/types/memory.hpp>
+#include <cereal/types/tuple.hpp>
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/id.h>
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/core/unique_hash.h>
+#include <cradle/inner/requests/cereal.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/core.h>
+#include <cradle/inner/service/request.h>
+
+#include <cradle/inner/requests/value.h> // TODO remove when no longer needed
 
 namespace cradle {
 
@@ -33,6 +39,13 @@ class function_request_uncached
     function_request_uncached(Function function, Args... args)
         : function_{std::move(function)}, args_{std::move(args)...}
     {
+    }
+
+    std::string
+    get_uuid() const
+    {
+        // TODO need uuid identifying function_?
+        return std::string();
     }
 
     template<UncachedContext Ctx>
@@ -145,6 +158,12 @@ class function_request_cached
     update_hash(unique_hasher& hasher) const
     {
         id_->update_hash(hasher);
+    }
+
+    std::string
+    get_uuid() const
+    {
+        return "TODO_uuid_function_request_cached";
     }
 
     captured_id const&
@@ -269,29 +288,41 @@ class function_request_intf : public id_interface
  public:
     virtual ~function_request_intf() = default;
 
+    virtual std::string
+    get_uuid() const = 0;
+
     virtual cppcoro::task<Value>
     resolve(context_intf& ctx) const = 0;
 };
 
 // - This class implements id_interface exactly like sha256_hashed_id
 // - The major advantage is that args_ need not be copied
-// TODO how can we deserialize these objects? Creator needs to
-// provide all template arguments.
-// TODO don't we need a serialize() member function?
 template<typename Value, bool AsCoro, typename Function, typename... Args>
 class function_request_impl : public function_request_intf<Value>
 {
-    static constexpr bool func_is_coro = AsCoro;
-
  public:
+    static constexpr bool func_is_coro = AsCoro;
+    using this_type = function_request_impl;
+    using base_type = function_request_intf<Value>;
+
     // uuid is allowed to be empty if caching level is not full
     function_request_impl(std::string uuid, Function function, Args... args)
         : uuid_{std::move(uuid)},
           function_{std::move(function)},
           args_{std::move(args)...}
     {
+        // TODO consider decoupling uuid presence and serializable
+        // Or make "serializable" a property of class uuid.
+        bool serializable = !uuid_.empty();
+        if (serializable)
+        {
+            register_polymorphic_type<this_type, base_type>(uuid_);
+        }
     }
 
+    // *this and other are the same type, so their function types are
+    // identical, but the functions themselves might still be different
+    // (in which case the uuid's must be different, too).
     bool
     equals(function_request_impl const& other) const
     {
@@ -303,6 +334,7 @@ class function_request_impl : public function_request_intf<Value>
                && args_ == other.args_;
     }
 
+    // *this and other are the same type
     bool
     less_than(function_request_impl const& other) const
     {
@@ -319,6 +351,7 @@ class function_request_impl : public function_request_intf<Value>
         return args_ < other.args_;
     }
 
+    // Caller promises that *this and other are the same type.
     bool
     equals(id_interface const& other) const override
     {
@@ -328,6 +361,7 @@ class function_request_impl : public function_request_intf<Value>
         return equals(other_id);
     }
 
+    // Caller promises that *this and other are the same type.
     bool
     less_than(id_interface const& other) const override
     {
@@ -364,6 +398,12 @@ class function_request_impl : public function_request_intf<Value>
         hasher.combine(unique_hash_);
     }
 
+    std::string
+    get_uuid() const override
+    {
+        return uuid_;
+    }
+
     cppcoro::task<Value>
     resolve(context_intf& ctx) const override
     {
@@ -389,6 +429,44 @@ class function_request_impl : public function_request_intf<Value>
     }
 
  private:
+    // cereal-related
+
+    friend class cereal::access;
+    // Assumes instance_ was set
+    function_request_impl() : function_(instance_->function_)
+    {
+    }
+
+ public:
+    // It is kind of cheating, but at least it's some solution:
+    // function_ cannot be serialized, and somehow needs to be set when
+    // deserializing, if possible in a type-safe way.
+    // For the time being, objects of this class can be deserialized only
+    // when an instance was created before.
+    void
+    register_instance(std::shared_ptr<function_request_impl> const& instance)
+    {
+        assert(instance);
+        instance_ = instance;
+    }
+
+    template<typename Archive>
+    void
+    save(Archive& archive) const
+    {
+        archive(
+            cereal::make_nvp("uuid", uuid_), cereal::make_nvp("args", args_));
+    }
+
+    template<typename Archive>
+    void
+    load(Archive& archive)
+    {
+        archive(uuid_, args_);
+    }
+
+ private:
+    static inline std::shared_ptr<function_request_impl> instance_;
     std::string uuid_;
     Function function_;
     std::tuple<Args...> args_;
@@ -441,11 +519,9 @@ class function_request_erased
         auto impl{std::make_shared<
             function_request_impl<Value, AsCoro, Function, Args...>>(
             std::move(uuid), std::move(function), std::move(args)...)};
+        impl->register_instance(impl);
         impl_ = impl;
-        if constexpr (caching_level != caching_level_type::none)
-        {
-            captured_id_ = captured_id{impl};
-        }
+        init_captured_id();
     }
 
     template<typename Function, typename... Args>
@@ -456,11 +532,9 @@ class function_request_erased
         auto impl{std::make_shared<
             function_request_impl<Value, AsCoro, Function, Args...>>(
             std::move(uuid), std::move(function), std::move(args)...)};
+        impl->register_instance(impl);
         impl_ = impl;
-        if constexpr (caching_level != caching_level_type::none)
-        {
-            captured_id_ = captured_id{impl};
-        }
+        init_captured_id();
     }
 
     // TODO shouldn't this be a template function?
@@ -502,6 +576,12 @@ class function_request_erased
         return captured_id_;
     }
 
+    std::string
+    get_uuid() const
+    {
+        return impl_->get_uuid();
+    }
+
     cppcoro::task<Value>
     resolve(context_intf& ctx) const
     {
@@ -514,17 +594,51 @@ class function_request_erased
         return title_;
     }
 
+ public:
+    // Interface for cereal
+    function_request_erased() = default;
+
+    // Construct object, deserializing from a cereal archive
+    // Convenience constructor for when this is the "outer" object.
+    // Equivalent alternative:
+    //   function_request_erased<...> req;
+    //   req.load(archive)
+    template<typename Archive>
+    explicit function_request_erased(Archive& archive)
+    {
+        load(archive);
+    }
+
     template<typename Archive>
     void
-    serialize(Archive& archive)
+    save(Archive& archive) const
     {
-        archive(impl_);
+        archive(
+            cereal::make_nvp("impl", impl_),
+            cereal::make_nvp("title", title_));
+    }
+
+    template<typename Archive>
+    void
+    load(Archive& archive)
+    {
+        archive(impl_, title_);
+        init_captured_id();
     }
 
  private:
     std::string title_;
     std::shared_ptr<function_request_intf<Value>> impl_;
     captured_id captured_id_;
+
+    void
+    init_captured_id()
+    {
+        if constexpr (caching_level != caching_level_type::none)
+        {
+            captured_id_ = captured_id{impl_};
+        }
+    }
 };
 
 template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>

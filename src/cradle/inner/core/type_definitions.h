@@ -48,12 +48,35 @@ struct blob
         return size_;
     }
 
+ public:
     // cereal support
+    //
+    // A blob will typically contain binary data. cereal offers
+    // saveBinaryValue() and loadBinaryValue() that cause binary data to be
+    // stored as base64 in JSON and XML. JSON stores non-printable bytes
+    // as e.g. "\u0001" (500% overhead), so base64 (33% overhead) might be
+    // more efficient.
     template<typename Archive>
     void
-    serialize(Archive& archive)
+    save(Archive& archive) const
     {
-        archive(size_, data_);
+        archive(cereal::make_nvp("size", size_));
+        archive.saveBinaryValue(data(), size(), "blob");
+    }
+
+    template<typename Archive>
+    void
+    load(Archive& archive)
+    {
+        // It's somewhat redundant to serialize the size as it's implied by
+        // the base64 string, but the array passed to loadBinaryValue()
+        // must have the appropriate size.
+        archive(size_);
+        auto ptr = std::make_shared<std::vector<std::byte>>();
+        ptr->reserve(size_);
+        auto data = ptr->data();
+        archive.loadBinaryValue(data, size_);
+        data_ = std::shared_ptr<std::byte const>(std::move(ptr), data);
     }
 
  private:

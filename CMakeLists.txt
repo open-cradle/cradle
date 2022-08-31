@@ -191,6 +191,9 @@ elseif(IS_MSVC)
     add_definitions(/D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
     # Also suppress linker warnings about missing .pdb files that seem to inevitably creep in.
     add_link_options(/ignore:4099)
+    # "operator '|': deprecated between enumerations of different types"
+    # in cereal\external\rapidjson\document.h
+    add_compile_options(/wd5054)
 endif()
 
 # Use absolute paths for error messages.
@@ -198,6 +201,10 @@ if (IS_CLANG)
     add_compile_options(-fdiagnostics-absolute-paths)
 elseif(IS_MSVC)
     add_compile_options(/FC)
+endif()
+# Full backtrace in error messages.
+if(IS_GCC OR IS_CLANG)
+    add_compile_options(-ftemplate-backtrace-limit=0)
 endif()
 
 # Enable big objects on MSVC.

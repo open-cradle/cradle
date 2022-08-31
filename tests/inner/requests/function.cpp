@@ -257,8 +257,8 @@ TEST_CASE("evaluate erased function request V+V - fully cached", "[requests]")
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req_mem{rq_function_erased<caching_level_type::memory>(add, 6, 1)};
-    auto req_full{
-        rq_function_erased_uuid<caching_level_type::full>("uuid", add, 6, 1)};
+    auto req_full{rq_function_erased_uuid<caching_level_type::full>(
+        "uuid_6+1", add, 6, 1)};
 
     cached_request_resolution_context ctx;
     num_add_calls = 0;

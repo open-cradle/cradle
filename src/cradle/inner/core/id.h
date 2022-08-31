@@ -54,6 +54,7 @@ invoke_hash(id_interface const& x)
 inline bool
 operator==(id_interface const& a, id_interface const& b)
 {
+    // TODO name() could be identical for different types
     // Apparently it's faster to compare the name pointers for equality before
     // resorting to actually comparing the typeid objects themselves.
     return (typeid(a).name() == typeid(b).name() || typeid(a) == typeid(b))

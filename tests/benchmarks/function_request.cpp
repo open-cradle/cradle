@@ -336,12 +336,14 @@ requires(
 {
     if constexpr (H == 1)
     {
-        return rq_function_erased_uuid<level>("add_uuid", add, 2, 1);
+        return rq_function_erased_uuid<level>("uuid_2+1", add, 2, 1);
     }
     else
     {
+        std::ostringstream oss;
+        oss << "uuid_add_H=" << H;
         return rq_function_erased_uuid<level>(
-            "add_uuid",
+            oss.str(),
             add,
             create_triangular_tree_erased<level, H - 1>(),
             create_triangular_tree_erased<level, H - 1>());
