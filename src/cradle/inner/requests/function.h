@@ -108,6 +108,8 @@ struct arg_type_struct<
 
 // Due to absence of a usable uuid, these objects are suitable for memory
 // caching only, and cannot be disk cached.
+// (And even memory caching is not guaranteed to work, as it relies on
+// type_info::name() results being unique, and this may not be so.)
 template<
     caching_level_type Level,
     typename Value,
@@ -122,6 +124,9 @@ requires(Level != caching_level_type::full) class function_request_cached
     static constexpr caching_level_type caching_level = Level;
     static constexpr bool introspective = false;
 
+    // TODO type_info::name() "can be identical for several types"
+    // (But is there an alternative? C++ can correctly compare type_info or
+    // type_index values, but not map them onto a unique value.)
     function_request_cached(Function function, Args... args)
         : id_{make_captured_sha256_hashed_id(
             typeid(function).name(), args...)},
@@ -130,36 +135,16 @@ requires(Level != caching_level_type::full) class function_request_cached
     {
     }
 
-    template<
-        caching_level_type Level1,
-        typename Value1,
-        typename Function1,
-        typename... Args1>
+    // *this and other are the same type
     bool
-    equals(function_request_cached<Level1, Value1, Function1, Args1...> const&
-               other) const
+    equals(function_request_cached const& other) const
     {
-        if constexpr (Level != Level1)
-        {
-            return false;
-        }
         return *id_ == *other.id_;
     }
 
-    template<
-        caching_level_type Level1,
-        typename Value1,
-        typename Function1,
-        typename... Args1>
     bool
-    less_than(
-        function_request_cached<Level1, Value1, Function1, Args1...> const&
-            other) const
+    less_than(function_request_cached const& other) const
     {
-        if constexpr (Level != Level1)
-        {
-            return Level < Level1;
-        }
         return *id_ < *other.id_;
     }
 
@@ -241,36 +226,30 @@ struct arg_type_struct<
     using value_type = Value;
 };
 
+// Used for comparing subrequests, where the main requests have the same type;
+// so the subrequests have the same type too.
 template<
-    caching_level_type Level0,
-    typename Value0,
-    typename Function0,
-    typename... Args0,
-    caching_level_type Level1,
-    typename Value1,
-    typename Function1,
-    typename... Args1>
+    caching_level_type Level,
+    typename Value,
+    typename Function,
+    typename... Args>
 bool
 operator==(
-    function_request_cached<Level0, Value0, Function0, Args0...> const& lhs,
-    function_request_cached<Level1, Value1, Function1, Args1...> const& rhs)
+    function_request_cached<Level, Value, Function, Args...> const& lhs,
+    function_request_cached<Level, Value, Function, Args...> const& rhs)
 {
     return lhs.equals(rhs);
 }
 
 template<
-    caching_level_type Level0,
-    typename Value0,
-    typename Function0,
-    typename... Args0,
-    caching_level_type Level1,
-    typename Value1,
-    typename Function1,
-    typename... Args1>
+    caching_level_type Level,
+    typename Value,
+    typename Function,
+    typename... Args>
 bool
 operator<(
-    function_request_cached<Level0, Value0, Function0, Args0...> const& lhs,
-    function_request_cached<Level1, Value1, Function1, Args1...> const& rhs)
+    function_request_cached<Level, Value, Function, Args...> const& lhs,
+    function_request_cached<Level, Value, Function, Args...> const& rhs)
 {
     return lhs.less_than(rhs);
 }
@@ -379,6 +358,13 @@ requires(Level != caching_level_type::none) auto rq_function_sp(
  * These classes intend to overcome the drawbacks of the earlier ones.
  */
 
+/*
+ * The interface type exposing the functionality that function_request_erased
+ * requires outside its constructor.
+ *
+ * Ctx is the "minimum" context needed to resolve this request.
+ * E.g. a "cached" context can be used to resolve a non-cached request.
+ */
 template<RequestContext Ctx, typename Value>
 class function_request_intf : public id_interface
 {
@@ -394,11 +380,21 @@ class function_request_intf : public id_interface
     resolve(Ctx& ctx) const = 0;
 };
 
-// - This class implements id_interface exactly like sha256_hashed_id
-// - The major advantage is that args_ need not be copied
-// Only a small part of this class depends on the context type, so there will
-// be object code duplication if multiple instantiations exist differing in
-// the context (i.e., introspected + caching level) only.
+/*
+ * The actual type created by function_request_erased, but visible only in its
+ * constructor (and erased elsewhere).
+ *
+ * Intf is a function_request_intf instantiation.
+ *
+ * This class implements id_interface exactly like sha256_hashed_id. Pros:
+ * - args_ need not be copied
+ * - Not needing a (theoretically?) unreliable type_info::name() value
+ *
+ * Only a small part of this class depends on the context type, so there will
+ * be object code duplication if multiple instantiations exist differing in
+ * the context (i.e., introspected + caching level) only. Maybe this could be
+ * optimized if it becomes an issue.
+ */
 template<
     typename Value,
     typename Intf,
@@ -425,8 +421,9 @@ class function_request_impl : public Intf
     }
 
     // *this and other are the same type, so their function types are
-    // identical, but the functions themselves might still be different
-    // (in which case the uuid's must be different, too).
+    // identical, but the functions themselves might still be different.
+    // Likewise, argument types will be identical, but their values might
+    // differ.
     bool
     equals(function_request_impl const& other) const
     {
@@ -638,11 +635,19 @@ struct function_request_ctx_type<true, caching_level_type::none>
     using type = introspected_context_intf;
 };
 
-// This class supports two kinds of functions:
-// (0) Plain function: res = function(args...)
-// (1) Coroutine needing context: res = co_await function(ctx, args...)
-//
-// TODO consider turning level, Intrsp, AsCoro into policies
+/*
+ * A function request that erases function and arguments types
+ *
+ * This class supports two kinds of functions:
+ * (0) Plain function: res = function(args...)
+ * (1) Coroutine needing context: res = co_await function(ctx, args...)
+ *
+ * Intrsp is a template argument instead of being passed by value because of
+ * the overhead, in object size and execution time, when resolving an
+ * introspected request; see resolve_request_cached().
+ *
+ * TODO consider turning level, Intrsp, AsCoro into policies
+ */
 template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
 class function_request_erased
 {
@@ -656,30 +661,7 @@ class function_request_erased
     static constexpr bool introspective = Intrsp;
 
     template<typename Function, typename... Args>
-    requires(!introspective) function_request_erased(
-        request_uuid uuid, Function function, Args... args)
-    {
-        if constexpr (caching_level == caching_level_type::full)
-        {
-            if (!uuid.disk_cacheable())
-            {
-                throw uuid_error("Real uuid needed for fully-cached request");
-            }
-        }
-        auto impl{std::make_shared<function_request_impl<
-            Value,
-            intf_type,
-            AsCoro,
-            Function,
-            Args...>>(
-            std::move(uuid), std::move(function), std::move(args)...)};
-        impl->register_instance(impl);
-        impl_ = impl;
-        init_captured_id();
-    }
-
-    template<typename Function, typename... Args>
-    requires(introspective) function_request_erased(
+    function_request_erased(
         request_uuid uuid, std::string title, Function function, Args... args)
         : title_{std::move(title)}
     {
@@ -702,7 +684,7 @@ class function_request_erased
         init_captured_id();
     }
 
-    // TODO shouldn't this be a template function?
+    // *this and other are the same type
     bool
     equals(function_request_erased const& other) const
     {
@@ -806,43 +788,23 @@ struct arg_type_struct<function_request_erased<Level, Value, Intrsp, AsCoro>>
     using value_type = Value;
 };
 
-template<
-    caching_level_type LhsLevel,
-    caching_level_type RhsLevel,
-    typename Value,
-    bool LhsIntrsp,
-    bool RhsIntrsp,
-    bool LhsCoro,
-    bool RhsCoro>
+// Used for comparing subrequests, where the main requests have the same type;
+// so the subrequests have the same type too.
+template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
 bool
 operator==(
-    function_request_erased<LhsLevel, Value, LhsIntrsp, LhsCoro> const& lhs,
-    function_request_erased<RhsLevel, Value, RhsIntrsp, RhsCoro> const& rhs)
+    function_request_erased<Level, Value, Intrsp, AsCoro> const& lhs,
+    function_request_erased<Level, Value, Intrsp, AsCoro> const& rhs)
 {
-    if constexpr (LhsLevel != RhsLevel)
-    {
-        return false;
-    }
     return lhs.equals(rhs);
 }
 
-template<
-    caching_level_type LhsLevel,
-    caching_level_type RhsLevel,
-    typename Value,
-    bool LhsIntrsp,
-    bool RhsIntrsp,
-    bool LhsCoro,
-    bool RhsCoro>
+template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
 bool
 operator<(
-    function_request_erased<LhsLevel, Value, LhsIntrsp, LhsCoro> const& lhs,
-    function_request_erased<RhsLevel, Value, RhsIntrsp, RhsCoro> const& rhs)
+    function_request_erased<Level, Value, Intrsp, AsCoro> const& lhs,
+    function_request_erased<Level, Value, Intrsp, AsCoro> const& rhs)
 {
-    if constexpr (LhsLevel != RhsLevel)
-    {
-        return LhsLevel < RhsLevel;
-    }
     return lhs.less_than(rhs);
 }
 
@@ -868,7 +830,7 @@ requires(Level != caching_level_type::full) auto rq_function_erased(
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return function_request_erased<Level, Value, false, false>{
-        request_uuid(), std::move(function), std::move(args)...};
+        request_uuid(), "", std::move(function), std::move(args)...};
 }
 
 template<
@@ -880,7 +842,7 @@ requires(Level != caching_level_type::full) auto rq_function_erased_coro(
     Function function, Args... args)
 {
     return function_request_erased<Level, Value, false, true>{
-        request_uuid(), std::move(function), std::move(args)...};
+        request_uuid(), "", std::move(function), std::move(args)...};
 }
 
 template<caching_level_type Level, typename Function, typename... Args>
@@ -889,7 +851,7 @@ rq_function_erased_uuid(request_uuid uuid, Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return function_request_erased<Level, Value, false, false>{
-        std::move(uuid), std::move(function), std::move(args)...};
+        std::move(uuid), "", std::move(function), std::move(args)...};
 }
 
 template<
@@ -902,7 +864,7 @@ rq_function_erased_coro_uuid(
     request_uuid uuid, Function function, Args... args)
 {
     return function_request_erased<Level, Value, false, true>{
-        std::move(uuid), std::move(function), std::move(args)...};
+        std::move(uuid), "", std::move(function), std::move(args)...};
 }
 
 template<caching_level_type Level, typename Function, typename... Args>
