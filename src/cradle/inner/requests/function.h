@@ -635,6 +635,27 @@ struct function_request_ctx_type<true, caching_level_type::none>
     using type = introspected_context_intf;
 };
 
+// Request properties that would be identical between similar requests
+template<
+    caching_level_type Level,
+    bool AsCoro = false,
+    bool Introspected = false>
+struct request_props
+{
+    static constexpr caching_level_type level = Level;
+    static constexpr bool func_is_coro = AsCoro;
+    static constexpr bool introspected = Introspected;
+    request_uuid uuid_;
+    std::string title_; // Used only if introspected
+
+    request_props(
+        request_uuid uuid = request_uuid(), std::string title = std::string())
+        : uuid_(std::move(uuid)), title_(std::move(title))
+    {
+        assert(!(introspected && title_.empty()));
+    }
+};
+
 /*
  * A function request that erases function and arguments types
  *
@@ -642,32 +663,30 @@ struct function_request_ctx_type<true, caching_level_type::none>
  * (0) Plain function: res = function(args...)
  * (1) Coroutine needing context: res = co_await function(ctx, args...)
  *
- * Intrsp is a template argument instead of being passed by value because of
- * the overhead, in object size and execution time, when resolving an
- * introspected request; see resolve_request_cached().
- *
- * TODO consider turning level, Intrsp, AsCoro into policies
+ * Props::introspected is a template argument instead of being passed by value
+ * because of the overhead, in object size and execution time, when resolving
+ * an introspected request; see resolve_request_cached().
  */
-template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
+template<typename Value, typename Props>
 class function_request_erased
 {
  public:
+    static constexpr caching_level_type caching_level = Props::level;
+    static constexpr bool introspective = Props::introspected;
+
     using element_type = function_request_erased;
     using value_type = Value;
-    using ctx_type = typename function_request_ctx_type<Intrsp, Level>::type;
+    using ctx_type =
+        typename function_request_ctx_type<introspective, caching_level>::type;
     using intf_type = function_request_intf<ctx_type, Value>;
 
-    static constexpr caching_level_type caching_level = Level;
-    static constexpr bool introspective = Intrsp;
-
     template<typename Function, typename... Args>
-    function_request_erased(
-        request_uuid uuid, std::string title, Function function, Args... args)
-        : title_{std::move(title)}
+    function_request_erased(Props props, Function function, Args... args)
+        : title_{std::move(props.title_)}
     {
         if constexpr (caching_level == caching_level_type::full)
         {
-            if (!uuid.disk_cacheable())
+            if (!props.uuid_.disk_cacheable())
             {
                 throw uuid_error("Real uuid needed for fully-cached request");
             }
@@ -675,10 +694,10 @@ class function_request_erased
         auto impl{std::make_shared<function_request_impl<
             Value,
             intf_type,
-            AsCoro,
+            Props::func_is_coro,
             Function,
             Args...>>(
-            std::move(uuid), std::move(function), std::move(args)...)};
+            std::move(props.uuid_), std::move(function), std::move(args)...)};
         impl->register_instance(impl);
         impl_ = impl;
         init_captured_id();
@@ -782,68 +801,46 @@ class function_request_erased
     }
 };
 
-template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
-struct arg_type_struct<function_request_erased<Level, Value, Intrsp, AsCoro>>
+template<typename Value, typename Props>
+struct arg_type_struct<function_request_erased<Value, Props>>
 {
     using value_type = Value;
 };
 
 // Used for comparing subrequests, where the main requests have the same type;
 // so the subrequests have the same type too.
-template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
+template<typename Value, typename Props>
 bool
 operator==(
-    function_request_erased<Level, Value, Intrsp, AsCoro> const& lhs,
-    function_request_erased<Level, Value, Intrsp, AsCoro> const& rhs)
+    function_request_erased<Value, Props> const& lhs,
+    function_request_erased<Value, Props> const& rhs)
 {
     return lhs.equals(rhs);
 }
 
-template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
+template<typename Value, typename Props>
 bool
 operator<(
-    function_request_erased<Level, Value, Intrsp, AsCoro> const& lhs,
-    function_request_erased<Level, Value, Intrsp, AsCoro> const& rhs)
+    function_request_erased<Value, Props> const& lhs,
+    function_request_erased<Value, Props> const& rhs)
 {
     return lhs.less_than(rhs);
 }
 
-template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
+template<typename Value, typename Props>
 size_t
-hash_value(function_request_erased<Level, Value, Intrsp, AsCoro> const& req)
+hash_value(function_request_erased<Value, Props> const& req)
 {
     return req.hash();
 }
 
-template<caching_level_type Level, typename Value, bool Intrsp, bool AsCoro>
+template<typename Value, typename Props>
 void
 update_unique_hash(
-    unique_hasher& hasher,
-    function_request_erased<Level, Value, Intrsp, AsCoro> const& req)
+    unique_hasher& hasher, function_request_erased<Value, Props> const& req)
 {
     req.update_hash(hasher);
 }
-
-// Request properties that would be identical between similar requests
-template<
-    caching_level_type Level,
-    bool AsCoro = false,
-    bool Introspected = false>
-struct request_props
-{
-    static constexpr caching_level_type level = Level;
-    static constexpr bool func_is_coro = AsCoro;
-    static constexpr bool introspected = Introspected;
-    request_uuid uuid_;
-    std::string title_; // Used only if introspected
-
-    request_props(
-        request_uuid uuid = request_uuid(), std::string title = std::string())
-        : uuid_(std::move(uuid)), title_(std::move(title))
-    {
-        assert(!(introspected && title_.empty()));
-    }
-};
 
 // Creates a type-erased request for a non-coroutine function
 template<typename Props, typename Function, typename... Args>
@@ -851,15 +848,8 @@ requires(!Props::func_is_coro) auto rq_function_erased(
     Props props, Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_erased<
-        Props::level,
-        Value,
-        Props::introspected,
-        Props::func_is_coro>{
-        std::move(props.uuid_),
-        std::move(props.title_),
-        std::move(function),
-        std::move(args)...};
+    return function_request_erased<Value, Props>{
+        std::move(props), std::move(function), std::move(args)...};
 }
 
 // Creates a type-erased request for a function that is a coroutine.
@@ -868,15 +858,8 @@ template<typename Value, typename Props, typename Function, typename... Args>
 requires(Props::func_is_coro) auto rq_function_erased_coro(
     Props props, Function function, Args... args)
 {
-    return function_request_erased<
-        Props::level,
-        Value,
-        Props::introspected,
-        Props::func_is_coro>{
-        std::move(props.uuid_),
-        std::move(props.title_),
-        std::move(function),
-        std::move(args)...};
+    return function_request_erased<Value, Props>{
+        std::move(props), std::move(function), std::move(args)...};
 }
 
 } // namespace cradle

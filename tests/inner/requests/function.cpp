@@ -311,12 +311,9 @@ TEST_CASE(
     "evaluate function requests in parallel - uncached function", "[requests]")
 {
     static constexpr int num_requests = 7;
+    using Value = int;
     using Props = request_props<caching_level_type::none>;
-    using Req = function_request_erased<
-        Props::level,
-        int,
-        Props::introspected,
-        Props::func_is_coro>;
+    using Req = function_request_erased<Value, Props>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     uncached_request_resolution_context ctx{};
@@ -343,11 +340,7 @@ TEST_CASE(
     static constexpr int num_requests = 7;
     using Value = int;
     using Props = request_props<caching_level_type::none, true, false>;
-    using Req = function_request_erased<
-        Props::level,
-        Value,
-        Props::introspected,
-        Props::func_is_coro>;
+    using Req = function_request_erased<Value, Props>;
     int num_add_calls{};
     auto add{create_adder_coro(num_add_calls)};
     uncached_request_resolution_context ctx{};
@@ -374,11 +367,7 @@ TEST_CASE(
     static constexpr int num_requests = 7;
     using Value = int;
     using Props = request_props<caching_level_type::memory>;
-    using Req = function_request_erased<
-        Props::level,
-        Value,
-        Props::introspected,
-        Props::func_is_coro>;
+    using Req = function_request_erased<Value, Props>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     cached_request_resolution_context ctx{};
@@ -412,11 +401,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", "[requests]")
     static constexpr int num_requests = 7;
     using Value = int;
     using Props = request_props<caching_level_type::full>;
-    using Req = function_request_erased<
-        Props::level,
-        Value,
-        Props::introspected,
-        Props::func_is_coro>;
+    using Req = function_request_erased<Value, Props>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     cached_request_resolution_context ctx{};

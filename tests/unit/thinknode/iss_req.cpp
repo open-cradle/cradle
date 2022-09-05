@@ -349,11 +349,8 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", "[cereal]")
     auto req{rq_retrieve_immutable_object_func<caching_level_type::full>(
         "https://mgh.thinknode.io/api/v1.0", "123", "abc")};
     auto deserialize = [](cereal::JSONInputArchive& iarchive) {
-        return function_request_erased<
-            caching_level_type::full,
-            blob,
-            true,
-            true>(iarchive);
+        using Props = request_props<caching_level_type::full, true, true>;
+        return function_request_erased<blob, Props>(iarchive);
     };
     test_serialize_thinknode_request(
         req,
