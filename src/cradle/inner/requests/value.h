@@ -1,7 +1,6 @@
 #ifndef CRADLE_INNER_REQUESTS_VALUE_H
 #define CRADLE_INNER_REQUESTS_VALUE_H
 
-#include <concepts>
 #include <memory>
 #include <utility>
 
@@ -118,16 +117,24 @@ rq_value_sp(Value&& value)
     return std::make_shared<value_request<Value>>(std::forward<Value>(value));
 }
 
-// For memory cache, ordered map
+// operator==() and operator<() are used:
+// - For memory cache, ordered map (currently not selected)
+// - When a value request is an argument to another request
+//
+// Value should support operator==() and operator<(), but not necessarily all
+// comparison operators demanded by the std::equality_comparable and
+// std::totally_ordered concepts.
+// The comparison operators that it does implement should comprise a
+// consistent ordering relation.
 template<typename Value>
-requires std::equality_comparable<Value> bool
+bool
 operator==(value_request<Value> const& lhs, value_request<Value> const& rhs)
 {
     return lhs.get_value() == rhs.get_value();
 }
 
 template<typename Value>
-requires std::totally_ordered<Value> bool
+bool
 operator<(value_request<Value> const& lhs, value_request<Value> const& rhs)
 {
     return lhs.get_value() < rhs.get_value();
