@@ -91,10 +91,9 @@ make_post_iss_request_request()
     uuid << "uuid_payload_" << static_cast<int>(Level);
     auto make_blob_function
         = [](std::string const& payload) { return make_blob(payload); };
-    auto make_blob_request = rq_function_erased_uuid<Level>(
-        request_uuid(uuid.str()),
-        make_blob_function,
-        rq_value(std::string("payload")));
+    request_props<Level> props{request_uuid(uuid.str())};
+    auto make_blob_request = rq_function_erased(
+        props, make_blob_function, rq_value(std::string("payload")));
     return rq_post_iss_object<Level>(
         "https://mgh.thinknode.io/api/v1.0",
         "123",
@@ -122,10 +121,9 @@ make_post_iss_request_erased_request()
 {
     auto make_blob_function
         = [](std::string const& payload) { return make_blob(payload); };
-    auto make_blob_request = rq_function_erased_uuid<Level>(
-        request_uuid("uuid_100"),
-        make_blob_function,
-        rq_value(std::string("payload")));
+    request_props<Level> props{request_uuid("uuid_100")};
+    auto make_blob_request = rq_function_erased(
+        props, make_blob_function, rq_value(std::string("payload")));
     return rq_post_iss_object_erased<Level>(
         "https://mgh.thinknode.io/api/v1.0",
         "123",

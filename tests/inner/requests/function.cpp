@@ -158,107 +158,110 @@ TEST_CASE("evaluate function request (V+V)*S - memory cached", "[requests]")
 
 TEST_CASE("evaluate erased function request V+V - uncached", "[requests]")
 {
+    request_props<caching_level_type::none> props;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    auto req{rq_function_erased<caching_level_type::none>(add, 6, 1)};
+    auto req{rq_function_erased(props, add, 6, 1)};
     test_resolve_uncached(req, 7, num_add_calls);
 }
 
 TEST_CASE("evaluate erased function request V+U - uncached", "[requests]")
 {
+    request_props<caching_level_type::none> props;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    auto req{
-        rq_function_erased<caching_level_type::none>(add, 6, rq_value_up(1))};
+    auto req{rq_function_erased(props, add, 6, rq_value_up(1))};
     test_resolve_uncached(req, 7, num_add_calls);
 }
 
 TEST_CASE("evaluate erased function request V+S - uncached", "[requests]")
 {
+    request_props<caching_level_type::none> props;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    auto req{
-        rq_function_erased<caching_level_type::none>(add, 6, rq_value_sp(1))};
+    auto req{rq_function_erased(props, add, 6, rq_value_sp(1))};
     test_resolve_uncached(req, 7, num_add_calls);
 }
 
 TEST_CASE("evaluate erased function request S+V - uncached", "[requests]")
 {
+    request_props<caching_level_type::none> props;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    auto req{
-        rq_function_erased<caching_level_type::none>(add, rq_value_sp(6), 1)};
+    auto req{rq_function_erased(props, add, rq_value_sp(6), 1)};
     test_resolve_uncached(req, 7, num_add_calls);
 }
 
 TEST_CASE("evaluate erased function request (V+V)*S - uncached", "[requests]")
 {
+    request_props<caching_level_type::none> props;
     int num_add_calls = 0;
     auto add = create_adder(num_add_calls);
     int num_mul_calls = 0;
     auto mul = create_multiplier(num_mul_calls);
-    auto req{rq_function_erased<caching_level_type::none>(
-        mul,
-        rq_function_erased<caching_level_type::none>(add, 1, 2),
-        rq_value_sp(3))};
+    auto req{rq_function_erased(
+        props, mul, rq_function_erased(props, add, 1, 2), rq_value_sp(3))};
     test_resolve_uncached(req, 9, num_add_calls, &num_mul_calls);
 }
 
 TEST_CASE("evaluate erased function request V+V - memory cached", "[requests]")
 {
+    request_props<caching_level_type::memory> props;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    auto req{rq_function_erased<caching_level_type::memory>(add, 6, 1)};
+    auto req{rq_function_erased(props, add, 6, 1)};
     test_resolve_cached(req, 7, num_add_calls);
 }
 
 TEST_CASE("evaluate erased function request V+U - memory cached", "[requests]")
 {
+    request_props<caching_level_type::memory> props;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    auto req{rq_function_erased<caching_level_type::memory>(
-        add, 6, rq_value_up(1))};
+    auto req{rq_function_erased(props, add, 6, rq_value_up(1))};
     test_resolve_cached(req, 7, num_add_calls);
 }
 
 TEST_CASE("evaluate erased function request V+S - memory cached", "[requests]")
 {
+    request_props<caching_level_type::memory> props;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    auto req{rq_function_erased<caching_level_type::memory>(
-        add, 6, rq_value_sp(1))};
+    auto req{rq_function_erased(props, add, 6, rq_value_sp(1))};
     test_resolve_cached(req, 7, num_add_calls);
 }
 
 TEST_CASE("evaluate erased function request S+V - memory cached", "[requests]")
 {
+    request_props<caching_level_type::memory> props;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    auto req{rq_function_erased<caching_level_type::memory>(
-        add, rq_value_sp(6), 1)};
+    auto req{rq_function_erased(props, add, rq_value_sp(6), 1)};
     test_resolve_cached(req, 7, num_add_calls);
 }
 
 TEST_CASE(
     "evaluate erased function request (V+V)*S - memory cached", "[requests]")
 {
+    request_props<caching_level_type::memory> props;
     int num_add_calls = 0;
     auto add = create_adder(num_add_calls);
     int num_mul_calls = 0;
     auto mul = create_multiplier(num_mul_calls);
-    auto inner{rq_function_erased<caching_level_type::memory>(add, 1, 2)};
-    auto req{rq_function_erased<caching_level_type::memory>(
-        mul, inner, rq_value_sp(3))};
+    auto inner{rq_function_erased(props, add, 1, 2)};
+    auto req{rq_function_erased(props, mul, inner, rq_value_sp(3))};
     test_resolve_cached(req, 9, num_add_calls, &num_mul_calls);
 }
 
 TEST_CASE("evaluate erased function request V+V - fully cached", "[requests]")
 {
+    request_props<caching_level_type::memory> props_mem;
+    request_props<caching_level_type::full> props_full{
+        request_uuid("uuid_6_1")};
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    auto req_mem{rq_function_erased<caching_level_type::memory>(add, 6, 1)};
-    auto req_full{rq_function_erased_uuid<caching_level_type::full>(
-        request_uuid("uuid_6_1"), add, 6, 1)};
+    auto req_mem{rq_function_erased(props_mem, add, 6, 1)};
+    auto req_full{rq_function_erased(props_full, add, 6, 1)};
 
     cached_request_resolution_context ctx;
     num_add_calls = 0;
@@ -308,16 +311,19 @@ TEST_CASE(
     "evaluate function requests in parallel - uncached function", "[requests]")
 {
     static constexpr int num_requests = 7;
-    using Req
-        = function_request_erased<caching_level_type::none, int, false, false>;
+    using Props = request_props<caching_level_type::none>;
+    using Req = function_request_erased<
+        Props::level,
+        int,
+        Props::introspected,
+        Props::func_is_coro>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     uncached_request_resolution_context ctx{};
     std::vector<Req> requests;
     for (int i = 0; i < num_requests; ++i)
     {
-        requests.emplace_back(
-            rq_function_erased<caching_level_type::none>(add, i, i * 2));
+        requests.emplace_back(rq_function_erased(Props(), add, i, i * 2));
     }
 
     auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
@@ -336,11 +342,12 @@ TEST_CASE(
 {
     static constexpr int num_requests = 7;
     using Value = int;
+    using Props = request_props<caching_level_type::none, true, false>;
     using Req = function_request_erased<
-        caching_level_type::none,
+        Props::level,
         Value,
-        false,
-        true>;
+        Props::introspected,
+        Props::func_is_coro>;
     int num_add_calls{};
     auto add{create_adder_coro(num_add_calls)};
     uncached_request_resolution_context ctx{};
@@ -348,8 +355,7 @@ TEST_CASE(
     for (int i = 0; i < num_requests; ++i)
     {
         requests.emplace_back(
-            rq_function_erased_coro<caching_level_type::none, Value>(
-                add, i, i * 2));
+            rq_function_erased_coro<Value>(Props(), add, i, i * 2));
     }
 
     auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
@@ -366,19 +372,20 @@ TEST_CASE(
     "evaluate function requests in parallel - memory cached", "[requests]")
 {
     static constexpr int num_requests = 7;
+    using Value = int;
+    using Props = request_props<caching_level_type::memory>;
     using Req = function_request_erased<
-        caching_level_type::memory,
-        int,
-        false,
-        false>;
+        Props::level,
+        Value,
+        Props::introspected,
+        Props::func_is_coro>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     cached_request_resolution_context ctx{};
     std::vector<Req> requests;
     for (int i = 0; i < num_requests; ++i)
     {
-        requests.emplace_back(
-            rq_function_erased<caching_level_type::memory>(add, i, i * 2));
+        requests.emplace_back(rq_function_erased(Props(), add, i, i * 2));
     }
 
     auto res0 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
@@ -403,8 +410,13 @@ TEST_CASE(
 TEST_CASE("evaluate function requests in parallel - disk cached", "[requests]")
 {
     static constexpr int num_requests = 7;
-    using Req
-        = function_request_erased<caching_level_type::full, int, false, false>;
+    using Value = int;
+    using Props = request_props<caching_level_type::full>;
+    using Req = function_request_erased<
+        Props::level,
+        Value,
+        Props::introspected,
+        Props::func_is_coro>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     cached_request_resolution_context ctx{};
@@ -414,8 +426,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", "[requests]")
         std::ostringstream os;
         os << "uuid " << i;
         requests.emplace_back(
-            rq_function_erased_uuid<caching_level_type::full>(
-                request_uuid(os.str()), add, i, i * 2));
+            rq_function_erased(Props(request_uuid(os.str())), add, i, i * 2));
     }
 
     auto res0 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));

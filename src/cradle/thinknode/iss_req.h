@@ -348,23 +348,24 @@ rq_retrieve_immutable_object(
         std::move(api_url), std::move(context_id), rq_value(immutable_id));
 }
 
+template<caching_level_type Level>
+using thinknode_request_props = request_props<Level, true, true>;
+
 // Implementation using function_request_erased, not needing
 // class my_retrieve_immutable_object_request_base
-template<caching_level_type level>
+template<caching_level_type Level>
 auto
 rq_retrieve_immutable_object_func(
     std::string api_url, std::string context_id, std::string immutable_id)
 {
-    using value_type = blob;
-    request_uuid uuid{"my_retrieve_immutable_object_func"};
-    std::string title{"my_retrieve_immutable_object_request"};
-    return rq_function_erased_coro_uuid_intrsp<level, value_type>(
-        std::move(uuid),
-        std::move(title),
+    request_uuid uuid{"rq_retrieve_immutable_object_func"};
+    std::string title{"retrieve_immutable_object"};
+    return rq_function_erased_coro<blob>(
+        thinknode_request_props<Level>(std::move(uuid), std::move(title)),
         retrieve_immutable_blob_uncached_erased,
         std::move(api_url),
         std::move(context_id),
-        rq_value(immutable_id));
+        rq_value(std::move(immutable_id)));
 }
 
 } // namespace cradle

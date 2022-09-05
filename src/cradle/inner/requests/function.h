@@ -824,101 +824,57 @@ update_unique_hash(
     req.update_hash(hasher);
 }
 
-template<caching_level_type Level, typename Function, typename... Args>
-requires(Level != caching_level_type::full) auto rq_function_erased(
-    Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_erased<Level, Value, false, false>{
-        request_uuid(), "", std::move(function), std::move(args)...};
-}
-
+// Request properties that would be identical between similar requests
 template<
     caching_level_type Level,
-    typename Value,
-    typename Function,
-    typename... Args>
-requires(Level != caching_level_type::full) auto rq_function_erased_coro(
-    Function function, Args... args)
+    bool AsCoro = false,
+    bool Introspected = false>
+struct request_props
 {
-    return function_request_erased<Level, Value, false, true>{
-        request_uuid(), "", std::move(function), std::move(args)...};
-}
+    static constexpr caching_level_type level = Level;
+    static constexpr bool func_is_coro = AsCoro;
+    static constexpr bool introspected = Introspected;
+    request_uuid uuid_;
+    std::string title_; // Used only if introspected
 
-template<caching_level_type Level, typename Function, typename... Args>
-auto
-rq_function_erased_uuid(request_uuid uuid, Function function, Args... args)
+    request_props(
+        request_uuid uuid = request_uuid(), std::string title = std::string())
+        : uuid_(std::move(uuid)), title_(std::move(title))
+    {
+        assert(!(introspected && title_.empty()));
+    }
+};
+
+// Creates a type-erased request for a non-coroutine function
+template<typename Props, typename Function, typename... Args>
+requires(!Props::func_is_coro) auto rq_function_erased(
+    Props props, Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_erased<Level, Value, false, false>{
-        std::move(uuid), "", std::move(function), std::move(args)...};
-}
-
-template<
-    caching_level_type Level,
-    typename Value,
-    typename Function,
-    typename... Args>
-auto
-rq_function_erased_coro_uuid(
-    request_uuid uuid, Function function, Args... args)
-{
-    return function_request_erased<Level, Value, false, true>{
-        std::move(uuid), "", std::move(function), std::move(args)...};
-}
-
-template<caching_level_type Level, typename Function, typename... Args>
-requires(Level != caching_level_type::full) auto rq_function_erased_intrsp(
-    std::string title, Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_erased<Level, Value, true, false>{
-        request_uuid(),
-        std::move(title),
+    return function_request_erased<
+        Props::level,
+        Value,
+        Props::introspected,
+        Props::func_is_coro>{
+        std::move(props.uuid_),
+        std::move(props.title_),
         std::move(function),
         std::move(args)...};
 }
 
-template<
-    caching_level_type Level,
-    typename Value,
-    typename Function,
-    typename... Args>
-requires(Level != caching_level_type::full) auto rq_function_erased_coro_intrsp(
-    std::string title, Function function, Args... args)
+// Creates a type-erased request for a function that is a coroutine.
+// Value cannot be derived in this case so must be explicitly specified.
+template<typename Value, typename Props, typename Function, typename... Args>
+requires(Props::func_is_coro) auto rq_function_erased_coro(
+    Props props, Function function, Args... args)
 {
-    return function_request_erased<Level, Value, true, true>{
-        request_uuid(),
-        std::move(title),
-        std::move(function),
-        std::move(args)...};
-}
-
-template<caching_level_type Level, typename Function, typename... Args>
-auto
-rq_function_erased_uuid_intrsp(
-    request_uuid uuid, std::string title, Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_erased<Level, Value, true, false>{
-        std::move(uuid),
-        std::move(title),
-        std::move(function),
-        std::move(args)...};
-}
-
-template<
-    caching_level_type Level,
-    typename Value,
-    typename Function,
-    typename... Args>
-auto
-rq_function_erased_coro_uuid_intrsp(
-    request_uuid uuid, std::string title, Function function, Args... args)
-{
-    return function_request_erased<Level, Value, true, true>{
-        std::move(uuid),
-        std::move(title),
+    return function_request_erased<
+        Props::level,
+        Value,
+        Props::introspected,
+        Props::func_is_coro>{
+        std::move(props.uuid_),
+        std::move(props.title_),
         std::move(function),
         std::move(args)...};
 }
