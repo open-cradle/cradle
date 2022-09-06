@@ -12,7 +12,13 @@ request_uuid::get_git_version()
     if (git_version_.empty())
     {
         git_version_ = ::version_info.commit_object_name;
-        // TODO do something with local modifications?
+        if (::version_info.dirty)
+        {
+            // If there are local modifications, it becomes the user's
+            // responsibility to manually remove outdated files like the
+            // disk cache.
+            git_version_ += "-dirty";
+        }
     }
     return git_version_;
 }
@@ -37,17 +43,12 @@ request_uuid::combine(std::string const& base, std::string const& version)
     return base + '+' + version;
 }
 
-// TODO uuids depend on classes only, could be evaluated compile time?
 request_uuid
 combined_uuid(request_uuid const& main_uuid, request_uuid const& sub_uuid)
 {
     std::string main{main_uuid.str()};
     std::string sub{sub_uuid.str()};
-    if (main.empty())
-    {
-        // TODO Is this valid?
-        return sub_uuid;
-    }
+    assert(!main.empty());
     if (sub.empty())
     {
         return main_uuid;

@@ -719,7 +719,6 @@ class function_request_erased
     size_t
     hash() const
     {
-        // TODO combine with caching_level?
         return impl_->hash();
     }
 

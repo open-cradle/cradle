@@ -239,7 +239,9 @@ test_serialize_post_iss(auto const& req, std::string const& filename)
     // For the container-based requests, it's something horrible.
     using req_type = std::remove_cvref_t<decltype(req)>;
     auto deserialize = [](cereal::JSONInputArchive& iarchive) {
-        return req_type(iarchive);
+        req_type req1;
+        req1.load(iarchive);
+        return req1;
     };
     auto test_request
         = [](auto const& req1) { test_post_iss_request(req1, false); };
@@ -334,8 +336,9 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - class", "[cereal]")
     auto req{rq_retrieve_immutable_object<caching_level_type::full>(
         "https://mgh.thinknode.io/api/v1.0", "123", "abc")};
     auto deserialize = [](cereal::JSONInputArchive& iarchive) {
-        return thinknode_request_erased<caching_level_type::full, blob>(
-            iarchive);
+        thinknode_request_erased<caching_level_type::full, blob> req1;
+        req1.load(iarchive);
+        return req1;
     };
     test_serialize_thinknode_request(
         req,

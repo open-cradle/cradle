@@ -27,8 +27,31 @@ requires(Req::caching_level == caching_level_type::memory)
     return req.resolve(ctx);
 }
 
-// TODO The serialization algorithm should be a parameter.
-// Having ctx provide it looks logical but not easy.
+// Values are stored in the disk cache after serializing using cereal.
+// Supporting different serialization algorithms won't be easy.
+template<typename Value>
+blob
+serialize_value(Value const& value)
+{
+    std::stringstream ss;
+    cereal::BinaryOutputArchive oarchive(ss);
+    oarchive(value);
+    return make_blob(ss.str());
+}
+
+template<typename Value>
+Value
+deserialize_value(blob const& x)
+{
+    auto data = reinterpret_cast<char const*>(x.data());
+    std::stringstream is;
+    is.str(std::string(data, x.size()));
+    cereal::BinaryInputArchive iarchive(is);
+    Value res;
+    iarchive(res);
+    return res;
+}
+
 template<typename Ctx, typename Req>
 requires(FullyCachedContextRequest<Ctx, Req>)
     cppcoro::task<typename Req::value_type> resolve_disk_cached(
@@ -38,20 +61,10 @@ requires(FullyCachedContextRequest<Ctx, Req>)
     inner_service_core& core{ctx.get_service()};
     captured_id const& key{req.get_captured_id()};
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
-        Value value = co_await req.resolve(ctx);
-        std::stringstream ss;
-        cereal::BinaryOutputArchive oarchive(ss);
-        oarchive(value);
-        co_return make_blob(ss.str());
+        co_return serialize_value(co_await req.resolve(ctx));
     };
-    blob x = co_await disk_cached<blob>(core, key, create_blob_task);
-    auto data = reinterpret_cast<char const*>(x.data());
-    std::stringstream is;
-    is.str(std::string(data, x.size()));
-    cereal::BinaryInputArchive iarchive(is);
-    Value res;
-    iarchive(res);
-    co_return res;
+    co_return deserialize_value<Value>(
+        co_await disk_cached<blob>(core, key, create_blob_task));
 }
 
 // Subsuming the concepts from the previous template

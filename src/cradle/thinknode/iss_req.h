@@ -98,9 +98,7 @@ requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
     // cereal-related
 
     // Should be called (indirectly) from cereal::access only.
-    my_post_iss_object_request_base()
-    {
-    }
+    my_post_iss_object_request_base() = default;
 
     template<typename Archive>
     void
@@ -113,7 +111,7 @@ requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
             cereal::make_nvp("object_data_request", object_data_request_));
     }
 
-    // TODO identical to hash(). Can we simplify?
+    // Identical to hash()
     template<typename Archive>
     void
     load(Archive& archive)
@@ -192,7 +190,6 @@ requires(std::same_as<typename ObjectDataRequest::value_type, blob>) auto rq_pos
     thinknode_type_info schema,
     ObjectDataRequest object_data_request)
 {
-    // TODO get title in request object
     using erased_type = thinknode_request_erased<level, std::string>;
     using impl_type = thinknode_request_impl<
         my_post_iss_object_request_base<ObjectDataRequest>>;
@@ -265,7 +262,7 @@ requires(std::same_as<
     std::string
     get_introspection_title() const
     {
-        return title_;
+        return "my_retrieve_immutable_object_request";
     }
 
     // Defines the data members forming this object's state.
@@ -295,9 +292,7 @@ requires(std::same_as<
     // cereal-related
 
     // Should be called (indirectly) from cereal::access only.
-    my_retrieve_immutable_object_request_base()
-    {
-    }
+    my_retrieve_immutable_object_request_base() = default;
 
     template<typename Archive>
     void
@@ -320,7 +315,6 @@ requires(std::same_as<
     std::string api_url_;
     std::string context_id_;
     ImmutableIdRequest immutable_id_request_;
-    std::string title_{"my_retrieve_immutable_object_request"};
 };
 
 template<caching_level_type level, Request ImmutableIdRequest>

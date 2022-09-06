@@ -204,7 +204,6 @@ class thinknode_request_container
     using impl_type = detail::thinknode_request_mixin<Base>;
 
     static constexpr caching_level_type caching_level = level;
-    // Or depend on Base::get_introspection_title() presence
     static constexpr bool introspective = true;
 
     template<typename... Args>
@@ -272,13 +271,7 @@ class thinknode_request_container
  public:
     // Interface for cereal
 
-    // Construct object, deserializing from a cereal archive
-    // TODO won't this conflict with the normal ctor?
-    template<typename Archive>
-    explicit thinknode_request_container(Archive& archive)
-    {
-        load(archive);
-    }
+    thinknode_request_container() = default;
 
     template<typename Archive>
     void
@@ -315,8 +308,6 @@ class thinknode_request_intf : public id_interface
 {
  public:
     virtual ~thinknode_request_intf() = default;
-
-    // TODO need to add get_uuid?
 
     virtual cppcoro::task<Value>
     resolve(thinknode_request_context& ctx) const = 0;
@@ -447,7 +438,6 @@ class thinknode_request_erased
     // Or depend on Base::get_introspection_title() presence
     static constexpr bool introspective = false;
 
-    // TODO title
     thinknode_request_erased(
         std::shared_ptr<thinknode_request_intf<Value>> const& impl)
         : impl_{impl}
@@ -505,24 +495,18 @@ class thinknode_request_erased
     std::string
     get_introspection_title() const requires(introspective)
     {
-        return title_;
+        return impl_->get_introspection_title();
     }
 
  public:
     // cereal-related
 
-    // Construct object, deserializing from a cereal archive
-    template<typename Archive>
-    explicit thinknode_request_erased(Archive& archive)
-    {
-        load<Archive>(archive);
-    }
+    thinknode_request_erased() = default;
 
     template<typename Archive>
     void
     save(Archive& archive) const
     {
-        // TODO or impl_->save(archive) ?
         archive(cereal::make_nvp("impl", impl_));
     }
 
@@ -535,7 +519,6 @@ class thinknode_request_erased
     }
 
  private:
-    std::string title_{"TODO_title"};
     std::shared_ptr<thinknode_request_intf<Value>> impl_;
     captured_id captured_id_;
 
