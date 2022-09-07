@@ -8,6 +8,7 @@
 
 #include "../../inner/introspection/tasklet_testing.h"
 #include "../../inner/support/concurrency_testing.h"
+#include "../../inner/support/request.h"
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/requests/function.h>
@@ -85,15 +86,15 @@ make_post_iss_request_dynamic()
 // type-erased request
 template<caching_level_type Level>
 auto
-make_post_iss_request_request()
+make_post_iss_request_request(std::string payload = "payload")
 {
     std::ostringstream uuid;
-    uuid << "uuid_payload_" << static_cast<int>(Level);
+    uuid << "uuid_" << payload << "_" << static_cast<int>(Level);
     auto make_blob_function
         = [](std::string const& payload) { return make_blob(payload); };
     request_props<Level> props{request_uuid(uuid.str())};
-    auto make_blob_request = rq_function_erased(
-        props, make_blob_function, rq_value(std::string("payload")));
+    auto make_blob_request
+        = rq_function_erased(props, make_blob_function, rq_value(payload));
     return rq_post_iss_object<Level>(
         "https://mgh.thinknode.io/api/v1.0",
         "123",
@@ -131,28 +132,41 @@ make_post_iss_request_erased_request()
         make_blob_request);
 }
 
+// Test resolving a number of "post ISS object" requests in parallel
+// - results[i] is the result for requests[i]
+// - results[i] is the result for payloads[i] for i < payloads.size()
+// The values in payloads are unique; so
+// - requests.size() == results.size()
+// - payloads.size() <= results.size()
 template<typename Request>
 static void
-test_post_iss_request(
-    Request const& req, bool introspected, bool use_dynamic = false)
+test_post_iss_requests_parallel(
+    std::vector<Request> const& requests,
+    std::vector<blob> const& payloads,
+    std::vector<std::string> const& results,
+    bool introspected = false)
 {
     constexpr caching_level_type level = Request::caching_level;
     clean_tasklet_admin_fixture fixture;
     service_core service;
     init_test_service(service);
 
+    mock_http_script script;
+    for (unsigned i = 0; i < payloads.size(); ++i)
+    {
+        mock_http_exchange exchange{
+            make_http_request(
+                http_request_method::POST,
+                "https://mgh.thinknode.io/api/v1.0/iss/string?context=123",
+                {{"Authorization", "Bearer xyz"},
+                 {"Accept", "application/json"},
+                 {"Content-Type", "application/octet-stream"}},
+                payloads[i]),
+            make_http_200_response("{ \"id\": \"" + results[i] + "\" }")};
+        script.push_back(exchange);
+    }
     auto& mock_http = enable_http_mocking(service);
-    auto payload = use_dynamic ? value_to_msgpack_blob(dynamic("payload"))
-                               : make_blob("payload");
-    mock_http.set_script(
-        {{make_http_request(
-              http_request_method::POST,
-              "https://mgh.thinknode.io/api/v1.0/iss/string?context=123",
-              {{"Authorization", "Bearer xyz"},
-               {"Accept", "application/json"},
-               {"Content-Type", "application/octet-stream"}},
-              payload),
-          make_http_200_response("{ \"id\": \"def\" }")}});
+    mock_http.set_script(script);
 
     thinknode_session session;
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
@@ -164,12 +178,11 @@ test_post_iss_request(
     }
     thinknode_request_context ctx{service, session, tasklet};
 
-    // Resolve using task, storing result in configured caches
-    auto id0 = cppcoro::sync_wait(resolve_request(ctx, req));
-    REQUIRE(id0 == "def");
-    REQUIRE(mock_http.is_complete());
-    REQUIRE(mock_http.is_in_order());
+    auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
 
+    REQUIRE(res == results);
+    REQUIRE(mock_http.is_complete());
+    // Order unspecified so don't check mock_http.is_in_order()
     if (introspected)
     {
         auto infos = get_tasklet_infos(true);
@@ -189,8 +202,8 @@ test_post_iss_request(
     if constexpr (level >= caching_level_type::memory)
     {
         // Resolve using memory cache
-        auto id1 = cppcoro::sync_wait(resolve_request(ctx, req));
-        REQUIRE(id1 == "def");
+        auto res1 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+        REQUIRE(res1 == results);
     }
 
     if constexpr (level >= caching_level_type::full)
@@ -200,9 +213,24 @@ test_post_iss_request(
             immutable_cache_config{0x40'00'00'00});
 
         // Resolve using disk cache
-        auto id2 = cppcoro::sync_wait(resolve_request(ctx, req));
-        REQUIRE(id2 == "def");
+        auto res2 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+        REQUIRE(res2 == results);
     }
+}
+
+// Test a single "post ISS object" request
+template<typename Request>
+static void
+test_post_iss_request(
+    Request const& req, bool introspected, bool use_dynamic = false)
+{
+    std::vector<Request> requests = {req};
+    auto payload = use_dynamic ? value_to_msgpack_blob(dynamic("payload"))
+                               : make_blob("payload");
+    std::vector<blob> payloads = {payload};
+    std::vector<std::string> results = {"def"};
+
+    test_post_iss_requests_parallel(requests, payloads, results, introspected);
 }
 
 TEST_CASE("ISS POST - blob, uncached", "[requests]")
@@ -229,6 +257,37 @@ TEST_CASE("ISS POST - dynamic, uncached", "[requests]")
         make_post_iss_request_dynamic<caching_level_type::none>(),
         false,
         true);
+}
+
+TEST_CASE("ISS POST - fully cached, parallel", "[requests]")
+{
+    constexpr caching_level_type level = caching_level_type::full;
+    using Req = decltype(make_post_iss_request_request<level>());
+    std::vector<blob> payloads;
+    std::vector<Req> requests;
+    std::vector<std::string> results;
+    for (int i = 0; i < 7; ++i)
+    {
+        // 7 requests / results, but only
+        // 3 unique payloads / requests / results
+        int req_id = i % 3;
+        std::ostringstream ss_payload;
+        ss_payload << "payload_" << req_id;
+        auto payload = ss_payload.str();
+        if (req_id == i)
+        {
+            payloads.emplace_back(make_blob(payload));
+        }
+
+        requests.emplace_back(make_post_iss_request_request<level>(payload));
+
+        std::ostringstream ss_result;
+        ss_result << "result_" << req_id;
+        auto result = ss_result.str();
+        results.emplace_back(result);
+    }
+
+    test_post_iss_requests_parallel(requests, payloads, results);
 }
 
 static void
