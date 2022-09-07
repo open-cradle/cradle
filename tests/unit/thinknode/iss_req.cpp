@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <fstream>
+#include <iterator>
 #include <type_traits>
 
 #include <cereal/archives/json.hpp>
@@ -328,42 +330,75 @@ TEST_CASE("ISS POST serialization - erased, inner request", "[cereal]")
 
 template<typename Request>
 static void
-test_retrieve_immutable_object_req(Request const& req) requires(
-    Request::caching_level == caching_level_type::full)
+test_retrieve_immutable_object_parallel(
+    std::vector<Request> const& requests,
+    std::vector<std::string> const& object_ids,
+    std::vector<std::string> const& responses)
 {
+    constexpr caching_level_type level = Request::caching_level;
     service_core service;
     init_test_service(service);
+
+    mock_http_script script;
+    for (unsigned i = 0; i < object_ids.size(); ++i)
+    {
+        mock_http_exchange exchange{
+            make_get_request(
+                std::string("https://mgh.thinknode.io/api/v1.0/iss/immutable/")
+                    + object_ids[i] + "?context=123",
+                {{"Authorization", "Bearer xyz"},
+                 {"Accept", "application/octet-stream"}}),
+            make_http_200_response(responses[i])};
+        script.push_back(exchange);
+    }
+    auto& mock_http = enable_http_mocking(service);
+    mock_http.set_script(script);
+
     thinknode_session session;
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
     session.access_token = "xyz";
-    auto tasklet = create_tasklet_tracker("my_pool", "my_title");
+    tasklet_tracker* tasklet = nullptr;
     thinknode_request_context ctx{service, session, tasklet};
-    auto expected{make_blob(std::string("payload"))};
-    auto& mock_http = enable_http_mocking(service);
-    mock_http.set_script(
-        {{make_get_request(
-              "https://mgh.thinknode.io/api/v1.0/iss/immutable/"
-              "abc?context=123",
-              {{"Authorization", "Bearer xyz"},
-               {"Accept", "application/octet-stream"}}),
-          make_http_200_response("payload")}});
 
-    // Resolve using HTTP, storing result in both caches
-    auto blob0 = cppcoro::sync_wait(resolve_request(ctx, req));
-    REQUIRE(blob0 == expected);
+    auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+
+    std::vector<blob> results;
+    std::ranges::transform(
+        responses,
+        std::back_inserter(results),
+        [](std::string const& resp) -> blob { return make_blob(resp); });
+    REQUIRE(res == results);
     REQUIRE(mock_http.is_complete());
-    REQUIRE(mock_http.is_in_order());
+    // Order unspecified so don't check mock_http.is_in_order()
 
-    // Resolve using memory cache
-    auto blob1 = cppcoro::sync_wait(resolve_request(ctx, req));
-    REQUIRE(blob1 == expected);
+    if constexpr (level >= caching_level_type::memory)
+    {
+        // Resolve using memory cache
+        auto res1 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+        REQUIRE(res1 == results);
+    }
 
-    sync_wait_write_disk_cache(service);
-    service.inner_reset_memory_cache(immutable_cache_config{0x40'00'00'00});
+    if constexpr (level >= caching_level_type::full)
+    {
+        sync_wait_write_disk_cache(service);
+        service.inner_reset_memory_cache(
+            immutable_cache_config{0x40'00'00'00});
 
-    // Resolve using disk cache
-    auto blob2 = cppcoro::sync_wait(resolve_request(ctx, req));
-    REQUIRE(blob2 == expected);
+        // Resolve using disk cache
+        auto res2 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+        REQUIRE(res2 == results);
+    }
+}
+
+template<typename Request>
+static void
+test_retrieve_immutable_object_req(Request const& req)
+{
+    std::vector<Request> requests = {req};
+    std::vector<std::string> object_ids = {"abc"};
+    std::vector<std::string> responses = {"payload"};
+
+    test_retrieve_immutable_object_parallel(requests, object_ids, responses);
 }
 
 static void
@@ -388,6 +423,35 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT - function, fully cached", "[requests]")
     // Using function_request_erased
     test_retrieve_immutable_object(
         rq_retrieve_immutable_object_func<caching_level_type::full>);
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT - fully cached, parallel", "[requests]")
+{
+    constexpr caching_level_type level = caching_level_type::full;
+    using Req = thinknode_request_erased<level, blob>;
+    std::vector<std::string> object_ids;
+    std::vector<Req> requests;
+    std::vector<std::string> responses;
+    for (int i = 0; i < 7; ++i)
+    {
+        int req_id = i % 3;
+        std::ostringstream ss_object_id;
+        ss_object_id << "abc" << req_id;
+        auto object_id = ss_object_id.str();
+        if (req_id == i)
+        {
+            object_ids.push_back(object_id);
+        }
+
+        requests.push_back(rq_retrieve_immutable_object<level>(
+            "https://mgh.thinknode.io/api/v1.0", "123", object_id));
+
+        std::ostringstream ss_response;
+        ss_response << "payload_" << req_id;
+        auto response = ss_response.str();
+        responses.push_back(response);
+    }
+    test_retrieve_immutable_object_parallel(requests, object_ids, responses);
 }
 
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - class", "[cereal]")
