@@ -556,21 +556,27 @@ class function_request_impl : public Intf
     save(Archive& archive) const
     {
         assert(uuid_.serializable());
-        archive(
-            cereal::make_nvp("uuid", uuid_), cereal::make_nvp("args", args_));
+        // Trust archive to be save-only
+        const_cast<function_request_impl*>(this)->load_save(archive);
     }
 
     template<typename Archive>
     void
     load(Archive& archive)
     {
-        // Adding the make_nvp's allows changing the order of uuid and args
-        // in the JSON.
-        // TODO check others
-        // archive(uuid_, args_);
+        load_save(archive);
+        assert(uuid_.serializable());
+    }
+
+ private:
+    // Adding the make_nvp's allows changing the order of uuid and args
+    // in the JSON.
+    template<typename Archive>
+    void
+    load_save(Archive& archive)
+    {
         archive(
             cereal::make_nvp("uuid", uuid_), cereal::make_nvp("args", args_));
-        assert(uuid_.serializable());
     }
 
  private:

@@ -95,7 +95,7 @@ requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
     }
 
  public:
-    // cereal-related
+    // cereal-related interface
 
     // Should be called (indirectly) from cereal::access only.
     my_post_iss_object_request_base() = default;
@@ -104,19 +104,28 @@ requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
     void
     save(Archive& archive) const
     {
+        // Trust archive to be save-only
+        const_cast<my_post_iss_object_request_base*>(this)->load_save(archive);
+    }
+
+    // Identical to hash(), apart from the make_nvp's
+    template<typename Archive>
+    void
+    load(Archive& archive)
+    {
+        load_save(archive);
+    }
+
+ private:
+    template<typename Archive>
+    void
+    load_save(Archive& archive)
+    {
         archive(
             cereal::make_nvp("api_url", api_url_),
             cereal::make_nvp("context_id", context_id_),
             cereal::make_nvp("url_type_string", url_type_string_),
             cereal::make_nvp("object_data_request", object_data_request_));
-    }
-
-    // Identical to hash()
-    template<typename Archive>
-    void
-    load(Archive& archive)
-    {
-        archive(api_url_, context_id_, url_type_string_, object_data_request_);
     }
 
  private:

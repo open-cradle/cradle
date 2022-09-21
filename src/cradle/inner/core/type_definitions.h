@@ -71,11 +71,11 @@ struct blob
         // It's somewhat redundant to serialize the size as it's implied by
         // the base64 string, but the array passed to loadBinaryValue()
         // must have the appropriate size.
-        archive(size_);
+        archive(cereal::make_nvp("size", size_));
         auto ptr = std::make_shared<std::vector<std::byte>>();
         ptr->reserve(size_);
         auto data = ptr->data();
-        archive.loadBinaryValue(data, size_);
+        archive.loadBinaryValue(data, size_, "blob");
         data_ = std::shared_ptr<std::byte const>(std::move(ptr), data);
     }
 

@@ -499,7 +499,7 @@ class thinknode_request_erased
     }
 
  public:
-    // cereal-related
+    // cereal-related interface
 
     thinknode_request_erased() = default;
 
@@ -507,15 +507,24 @@ class thinknode_request_erased
     void
     save(Archive& archive) const
     {
-        archive(cereal::make_nvp("impl", impl_));
+        // Trust archive to be save-only
+        const_cast<thinknode_request_erased*>(this)->load_save(archive);
     }
 
     template<typename Archive>
     void
     load(Archive& archive)
     {
-        archive(impl_);
+        load_save(archive);
         init_captured_id();
+    }
+
+ private:
+    template<typename Archive>
+    void
+    load_save(Archive& archive)
+    {
+        archive(cereal::make_nvp("impl", impl_));
     }
 
  private:
