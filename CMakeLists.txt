@@ -284,8 +284,12 @@ file(GLOB_RECURSE srcs_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/*.cpp")
 add_library(cradle_inner STATIC ${srcs_inner})
 # TODO MSVC won't rebuild targets when version_info.hpp is regenerated
-target_sources(cradle_inner PRIVATE
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/src/cradle/version_info.hpp")
+set(version_info_file "${CMAKE_CURRENT_BINARY_DIR}/generated/src/cradle/version_info.hpp")
+# cmake errors out when the version info file does not exist, even though it knows
+# how to generate it.
+if(EXISTS "${version_info_file}")
+target_sources(cradle_inner PRIVATE "${version_info_file}")
+endif()
 add_dependencies(cradle_inner version_info_hpp)
 
 # Add the main library: everything outside the inner core.
