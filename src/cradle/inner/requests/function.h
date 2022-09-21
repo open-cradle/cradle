@@ -555,6 +555,7 @@ class function_request_impl : public Intf
     void
     save(Archive& archive) const
     {
+        assert(uuid_.serializable());
         archive(
             cereal::make_nvp("uuid", uuid_), cereal::make_nvp("args", args_));
     }
@@ -563,7 +564,13 @@ class function_request_impl : public Intf
     void
     load(Archive& archive)
     {
-        archive(uuid_, args_);
+        // Adding the make_nvp's allows changing the order of uuid and args
+        // in the JSON.
+        // TODO check others
+        // archive(uuid_, args_);
+        archive(
+            cereal::make_nvp("uuid", uuid_), cereal::make_nvp("args", args_));
+        assert(uuid_.serializable());
     }
 
  private:

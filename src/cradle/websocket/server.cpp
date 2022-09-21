@@ -17,6 +17,8 @@
 #include <boost/crc.hpp>
 #endif
 
+#include <cereal/archives/json.hpp>
+
 #include <picosha2.h>
 
 #include <websocketpp/config/asio_no_tls.hpp>
@@ -43,6 +45,8 @@
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/introspection/tasklet.h>
+#include <cradle/inner/requests/function.h>
+#include <cradle/inner/service/request.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
 #include <cradle/inner/utilities/text.h>
@@ -50,6 +54,7 @@
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/iam.h>
 #include <cradle/thinknode/iss.h>
+#include <cradle/thinknode/iss_req.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/unique_hash.h>
 #include <cradle/typing/encodings/json.h>
@@ -1737,6 +1742,21 @@ process_message(websocket_server_impl& server, client_request request)
                     response));
             break;
         }
+        case client_message_content_tag::RESOLVE_REQUEST: {
+            auto const& rr = as_resolve_request(content);
+            std::istringstream is(rr.json_text);
+            cereal::JSONInputArchive iarchive(is);
+            using Props = request_props<caching_level_type::full, true, true>;
+            auto req{function_request_erased<blob, Props>(iarchive)};
+            auto ctx{make_thinknode_request_context(server, request)};
+            blob response = co_await resolve_request(ctx, req);
+            send_response(
+                server,
+                request,
+                make_server_message_content_with_resolve_request_response(
+                    response));
+            break;
+        }
         default:
         case client_message_content_tag::KILL: {
             break;
@@ -1842,6 +1862,33 @@ on_message(
     // tasklet_run. Force-finish here?
 }
 
+/**
+ * Creates a catalog of function requests that can be resolved via the
+ * "resolve request" Websocket request.
+ *
+ * The main thing is that when deserializing a request descriptor received
+ * via Websocket, a corresponding function request object must be created.
+ * In C++, this means that corresponding constructors must exist and able to
+ * be found.
+ * Otherwise, cereal will complain with "Trying to load an unregistered
+ * polymorphic type".
+ *
+ * Currently limited to Thinknode requests yielding a blob:
+ * - function_request_erased only
+ * - request_props<caching_level_type::full, true, true> so
+ *   - Fully cached
+ *   - Function is coroutine
+ *   - Introspected
+ * - Function result value (passed back across websocket) is blob
+ * - Resolution context is thinknode_request_context
+ */
+static void
+create_requests_catalog()
+{
+    rq_retrieve_immutable_object_func<caching_level_type::full>(
+        "sample URL", "sample context id", "sample immutable id");
+}
+
 static void
 initialize(websocket_server_impl& server, server_config const& config)
 {
@@ -1879,6 +1926,8 @@ initialize(websocket_server_impl& server, server_config const& config)
         spdlog::register_logger(combined_logger);
         spdlog::set_pattern("[%H:%M:%S:%e] [thread %t] %v");
     }
+
+    create_requests_catalog();
 }
 
 websocket_server::websocket_server(server_config const& config)

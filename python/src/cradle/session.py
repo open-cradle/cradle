@@ -109,3 +109,8 @@ class Session:
         """Receive a response for a started request (whatever its type)."""
         print('RECEIVE RESPONSE', file=sys.stderr)
         return self.impl.receive_response(command)
+
+    def resolve_request(self, req_data: cmd.Object) -> cmd.Object:  # blob
+        print('RESOLVE REQUEST', file=sys.stderr)
+        command = cmd.ResolveRequestCommand(self.context_id, req_data)
+        return self.impl.perform_command(command)

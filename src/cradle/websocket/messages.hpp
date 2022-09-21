@@ -266,6 +266,12 @@ struct introspection_status_request
     bool include_finished;
 };
 
+api(struct)
+struct resolve_request_request
+{
+    std::string json_text;
+};
+
 api(union)
 union client_message_content
 {
@@ -291,6 +297,7 @@ union client_message_content
     cradle::results_api_query local_results_api_query;
     cradle::introspection_control_request introspection_control;
     cradle::introspection_status_request introspection_status_query;
+    cradle::resolve_request_request resolve_request;
 };
 
 api(struct)
@@ -367,6 +374,7 @@ union server_message_content
     cradle::local_results_api_response local_results_api_response;
     nil_t introspection_control_response;
     cradle::introspection_status_response introspection_status_response;
+    cradle::blob resolve_request_response;
 };
 
 api(struct)
