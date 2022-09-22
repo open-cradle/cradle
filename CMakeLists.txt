@@ -260,7 +260,8 @@ if("${PREPROCESSOR_USAGE}" STREQUAL "Native")
         INPUT_FILES ${preprocessed_files})
     add_custom_target(preprocessing
         DEPENDS ${generated_srcs} ${generated_headers})
-    set(generated_include_dir ${CMAKE_CURRENT_BINARY_DIR}/generated)
+    set(generated_src_dirs
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/src)
 elseif("${PREPROCESSOR_USAGE}" STREQUAL "External")
     message(STATUS "Using externally preprocessed files in:")
     message(STATUS "  ${EXTERNALLY_PREPROCESSED_DIRECTORY}")
@@ -273,7 +274,9 @@ elseif("${PREPROCESSOR_USAGE}" STREQUAL "External")
         "${resolved_preprocessed_directory}/*.cpp")
     file(GLOB_RECURSE generated_headers
         "${resolved_preprocessed_directory}/*.hpp")
-    set(generated_include_dir ${resolved_preprocessed_directory})
+    set(generated_src_dirs
+        ${resolved_preprocessed_directory}/src
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/src)
 else()
     message(FATAL_ERROR "Invalid setting for PREPROCESSOR_USAGE")
 endif()
@@ -283,10 +286,9 @@ file(GLOB_RECURSE srcs_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/inner/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/*.cpp")
 add_library(cradle_inner STATIC ${srcs_inner})
-# TODO MSVC won't rebuild targets when version_info.hpp is regenerated
 set(version_info_file "${CMAKE_CURRENT_BINARY_DIR}/generated/src/cradle/version_info.hpp")
-# cmake errors out when the version info file does not exist, even though it knows
-# how to generate it.
+# Without the if, cmake errors out when the version info file does not exist,
+# even though it knows how to generate it.
 if(EXISTS "${version_info_file}")
 target_sources(cradle_inner PRIVATE "${version_info_file}")
 endif()
@@ -344,12 +346,12 @@ target_compile_definitions(
 target_compile_definitions(
     cradle_outer PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 target_include_directories(cradle_inner PUBLIC
-    ${generated_include_dir}/src
+    ${generated_src_dirs}
     src
     src/third-party)
 target_include_directories(cradle_outer PUBLIC
     include
-    ${generated_include_dir}/src
+    ${generated_src_dirs}
     src
     src/third-party)
 
@@ -360,7 +362,7 @@ file(MAKE_DIRECTORY ${deploy_dir})
 # Add the server.
 add_executable(server src/server.cpp)
 target_include_directories(server PRIVATE
-    ${generated_include_dir}/src
+    ${generated_src_dirs}
     src)
 target_link_libraries(server cradle_outer cradle_inner)
 add_custom_command(TARGET server POST_BUILD
@@ -371,7 +373,7 @@ add_custom_command(TARGET server POST_BUILD
 file(GLOB_RECURSE test_srcs_unit CONFIGURE_DEPENDS "tests/unit/*.cpp")
 add_executable(unit_test_runner tests/runner.cpp ${test_srcs_unit})
 target_include_directories(unit_test_runner PRIVATE
-    ${generated_include_dir}/src
+    ${generated_src_dirs}
     src)
 target_link_libraries(unit_test_runner cradle_outer cradle_inner)
 # Don't use precompiled headers for the test runner since it needs to include
@@ -441,7 +443,7 @@ add_test(
 file(GLOB_RECURSE test_srcs_external CONFIGURE_DEPENDS "tests/external/*.cpp")
 add_executable(external_test_runner tests/runner.cpp ${test_srcs_external})
 target_include_directories(external_test_runner PRIVATE
-    ${generated_include_dir}/src
+    ${generated_src_dirs}
     src)
 target_link_libraries(external_test_runner cradle_outer cradle_inner)
 
@@ -461,7 +463,7 @@ file(GLOB_RECURSE test_srcs_all CONFIGURE_DEPENDS
     "tests/inner/*.cpp" "tests/unit/*.cpp" "tests/external/*.cpp")
 add_executable(all_unit_tests_runner tests/runner.cpp ${test_srcs_all})
 target_include_directories(all_unit_tests_runner PRIVATE
-    ${generated_include_dir}/src
+    ${generated_src_dirs}
     src)
 target_link_libraries(all_unit_tests_runner cradle_outer cradle_inner)
 
