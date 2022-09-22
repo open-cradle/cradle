@@ -1742,6 +1742,16 @@ process_message(websocket_server_impl& server, client_request request)
                     response));
             break;
         }
+        case client_message_content_tag::REQUESTS_META_INFO_QUERY: {
+            std::string git_version = request_uuid::get_git_version();
+            auto response = make_requests_meta_info_response(git_version);
+            send_response(
+                server,
+                request,
+                make_server_message_content_with_requests_meta_info_response(
+                    response));
+            break;
+        }
         case client_message_content_tag::RESOLVE_REQUEST: {
             auto const& rr = as_resolve_request(content);
             std::istringstream is(rr.json_text);

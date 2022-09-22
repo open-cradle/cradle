@@ -287,6 +287,21 @@ class IntrospectionClearAdminCommand(Command):
         return None
 
 
+class QueryRequestsMetaInfoCommand(Command):
+    def name(self) -> str:
+        return 'query requests meta info'
+
+    def create_content(self) -> Content:
+        return \
+            {
+                'requests_meta_info_query': {
+                }
+            }
+
+    def decode_content(self, content: Content) -> Object:
+        return content['requests_meta_info_response']
+
+
 class ResolveRequestCommand(Command):
     def __init__(self, context_id: str, req_data: Object):
         super().__init__(context_id)

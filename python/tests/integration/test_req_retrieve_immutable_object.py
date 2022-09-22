@@ -1,25 +1,7 @@
-import subprocess
-
-
-# Should match generated/src/cradle/version_info.hpp
-def get_git_version():
-    completed = subprocess.run(
-        'git describe --tags --dirty --long'.split(' '),
-        stdout=subprocess.PIPE)
-    assert completed.returncode == 0
-    output = completed.stdout.decode().strip()
-    parts = output.split('-')
-    if parts[-1] == 'dirty':
-        result = parts[-2] + '-' + parts[-1]
-    else:
-        result = parts[-1]
-    return result
-
-
 def test_req_retrieve_immutable_object(session):
     # Request metadata
     uuid_base = 'rq_retrieve_immutable_object_func'
-    git_version = get_git_version()
+    git_version = session.query_requests_meta_info()['git_version']
     uuid = f'{uuid_base}+{git_version}'
     title = 'retrieve_immutable_object'
 

@@ -110,6 +110,9 @@ class request_uuid
         return str_ <=> other.str_;
     }
 
+    static std::string const&
+    get_git_version();
+
  public:
     // cereal interface
     template<typename Archive>
@@ -122,9 +125,6 @@ class request_uuid
  private:
     inline static std::string git_version_;
     std::string str_;
-
-    static std::string const&
-    get_git_version();
 
     void
     check_base(std::string const& base);

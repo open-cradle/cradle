@@ -110,6 +110,12 @@ class Session:
         print('RECEIVE RESPONSE', file=sys.stderr)
         return self.impl.receive_response(command)
 
+    def query_requests_meta_info(self) -> cmd.Object:
+        '''Retrieve info on the requests subsystem'''
+        print('QUERY REQUESTS META INFO', file=sys.stderr)
+        command = cmd.QueryRequestsMetaInfoCommand(self.context_id)
+        return self.impl.perform_command(command)
+
     def resolve_request(self, req_data: cmd.Object) -> cmd.Object:  # blob
         print('RESOLVE REQUEST', file=sys.stderr)
         command = cmd.ResolveRequestCommand(self.context_id, req_data)
