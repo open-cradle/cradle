@@ -322,6 +322,23 @@ TEST_CASE("ISS POST serialization - erased, blob", "[cereal]")
     test_serialize_post_iss(req, "iss_post_erased_blob.json");
 }
 
+TEST_CASE("ISS POST serialization - function, blob", "[cereal]")
+{
+    auto req{rq_post_iss_object_func<caching_level_type::full>(
+        "https://mgh.thinknode.io/api/v1.0",
+        "123",
+        make_thinknode_type_info_with_string_type(thinknode_string_type()),
+        make_blob("payload"))};
+    auto deserialize = [](cereal::JSONInputArchive& iarchive) {
+        using Props = request_props<caching_level_type::full, true, true>;
+        return function_request_erased<std::string, Props>(iarchive);
+    };
+    auto test_request
+        = [](auto const& req1) { test_post_iss_request(req1, false); };
+    test_serialize_thinknode_request(
+        req, deserialize, test_request, "iss_post_func_blob.json");
+}
+
 TEST_CASE("ISS POST serialization - erased, inner request", "[cereal]")
 {
     auto req{make_post_iss_request_erased_request<caching_level_type::full>()};

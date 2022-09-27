@@ -8,12 +8,14 @@ namespace cradle {
 
 cppcoro::task<std::string>
 resolve_my_post_iss_object_request(
-    thinknode_request_context& ctx,
+    cached_introspected_context_intf& ctx_intf,
     std::string const& api_url,
     std::string const& context_id,
     std::string const& url_type_string,
     blob const& object_data)
 {
+    assert(dynamic_cast<thinknode_request_context*>(&ctx_intf));
+    auto ctx{static_cast<thinknode_request_context&>(ctx_intf)};
     auto query = make_http_request(
         http_request_method::POST,
         api_url + "/iss/" + url_type_string + "?context=" + context_id,

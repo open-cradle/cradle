@@ -4,6 +4,7 @@ def test_req_retrieve_immutable_object(session):
     git_version = session.query_requests_meta_info()['git_version']
     uuid = f'{uuid_base}+{git_version}'
     title = 'retrieve_immutable_object'
+    result_type = 'blob'
 
     # Args
     url = 'https://mgh.thinknode.io/api/v1.0'
@@ -21,5 +22,5 @@ def test_req_retrieve_immutable_object(session):
                                   'id': 2147483649}},
          'title': title}
 
-    blob = session.resolve_request(req_data)
+    blob = session.resolve_request(result_type, req_data)
     assert blob == b'\x93\xa3abc\xa3def\xa3ghi'

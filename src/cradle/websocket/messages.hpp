@@ -269,6 +269,7 @@ struct introspection_status_request
 api(struct)
 struct resolve_request_request
 {
+    std::string result_type;
     std::string json_text;
 };
 
@@ -384,7 +385,7 @@ union server_message_content
     nil_t introspection_control_response;
     cradle::introspection_status_response introspection_status_response;
     cradle::requests_meta_info_response requests_meta_info_response;
-    cradle::blob resolve_request_response;
+    cradle::dynamic resolve_request_response;
 };
 
 api(struct)

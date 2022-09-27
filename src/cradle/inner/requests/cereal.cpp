@@ -36,7 +36,7 @@ uuid_registry::find(std::type_index key)
     }
     request_uuid const& res = it->second;
 #if LOGGING
-    std::cout << "  found " << res << "\n";
+    std::cout << "  found " << res.str() << "\n";
 #endif
     return res;
 }
@@ -54,7 +54,7 @@ uuid_registry::add_to_map(request_uuid const& uuid, std::type_index key)
         }
         else
         {
-            std::cout << "  WARNING previously defined as " << it->second
+            std::cout << "  WARNING previously defined as " << it->second.str()
                       << "\n";
         }
 #endif

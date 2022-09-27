@@ -116,7 +116,7 @@ class Session:
         command = cmd.QueryRequestsMetaInfoCommand(self.context_id)
         return self.impl.perform_command(command)
 
-    def resolve_request(self, req_data: cmd.Object) -> cmd.Object:  # blob
+    def resolve_request(self, result_type: str, req_data: cmd.Object) -> cmd.Object:  # blob
         print('RESOLVE REQUEST', file=sys.stderr)
-        command = cmd.ResolveRequestCommand(self.context_id, req_data)
+        command = cmd.ResolveRequestCommand(self.context_id, result_type, req_data)
         return self.impl.perform_command(command)

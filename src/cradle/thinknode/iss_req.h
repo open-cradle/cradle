@@ -14,9 +14,12 @@
 
 namespace cradle {
 
+template<caching_level_type Level>
+using thinknode_request_props = request_props<Level, true, true>;
+
 cppcoro::task<std::string>
 resolve_my_post_iss_object_request(
-    thinknode_request_context& ctx,
+    cached_introspected_context_intf& ctx_intf,
     std::string const& api_url,
     std::string const& context_id,
     std::string const& url_type_string,
@@ -224,6 +227,26 @@ rq_post_iss_object_erased(
         rq_value(object_data));
 }
 
+template<caching_level_type Level>
+auto
+rq_post_iss_object_func(
+    std::string api_url,
+    std::string context_id,
+    thinknode_type_info schema,
+    blob object_data)
+{
+    request_uuid uuid{"rq_post_iss_object_func"};
+    std::string title{"post_iss_object"};
+    std::string url_type_string{get_url_type_string(api_url, schema)};
+    return rq_function_erased_coro<std::string>(
+        thinknode_request_props<Level>(std::move(uuid), std::move(title)),
+        resolve_my_post_iss_object_request,
+        std::move(api_url),
+        std::move(context_id),
+        std::move(url_type_string),
+        std::move(object_data));
+}
+
 // Differences to retrieve_immutable_blob_uncached():
 // - Context is type-erased, like the request
 // - Additional api_url argument passed by the framework
@@ -350,9 +373,6 @@ rq_retrieve_immutable_object(
     return rq_retrieve_immutable_object<level>(
         std::move(api_url), std::move(context_id), rq_value(immutable_id));
 }
-
-template<caching_level_type Level>
-using thinknode_request_props = request_props<Level, true, true>;
 
 // Implementation using function_request_erased, not needing
 // class my_retrieve_immutable_object_request_base

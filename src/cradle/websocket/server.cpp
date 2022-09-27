@@ -1438,6 +1438,19 @@ make_thinknode_request_context(
         request.tasklet};
 }
 
+template<typename Value>
+static cppcoro::task<>
+resolve_thinknode_request(
+    dynamic& response,
+    thinknode_request_context& ctx,
+    cereal::JSONInputArchive& iarchive)
+{
+    using Props = request_props<caching_level_type::full, true, true>;
+    auto req{function_request_erased<Value, Props>(iarchive)};
+    Value value = co_await resolve_request(ctx, req);
+    to_dynamic(&response, value);
+}
+
 static cppcoro::task<>
 process_message(websocket_server_impl& server, client_request request)
 {
@@ -1756,10 +1769,26 @@ process_message(websocket_server_impl& server, client_request request)
             auto const& rr = as_resolve_request(content);
             std::istringstream is(rr.json_text);
             cereal::JSONInputArchive iarchive(is);
-            using Props = request_props<caching_level_type::full, true, true>;
-            auto req{function_request_erased<blob, Props>(iarchive)};
+            dynamic response;
             auto ctx{make_thinknode_request_context(server, request)};
-            blob response = co_await resolve_request(ctx, req);
+            auto tag{get_tag(parse_url_type_string(rr.result_type))};
+            switch (tag)
+            {
+                case thinknode_type_info_tag::BLOB_TYPE:
+                    co_await resolve_thinknode_request<blob>(
+                        response, ctx, iarchive);
+                    break;
+                case thinknode_type_info_tag::STRING_TYPE:
+                    co_await resolve_thinknode_request<std::string>(
+                        response, ctx, iarchive);
+                    break;
+                default: {
+                    std::ostringstream oss;
+                    oss << "cannot resolve request with tag " << tag;
+                    throw not_implemented_error(oss.str());
+                    break;
+                }
+            }
             send_response(
                 server,
                 request,
@@ -1897,6 +1926,8 @@ create_requests_catalog()
 {
     rq_retrieve_immutable_object_func<caching_level_type::full>(
         "sample URL", "sample context id", "sample immutable id");
+    rq_post_iss_object_func<caching_level_type::full>(
+        "sample URL", "sample context id", thinknode_type_info(), blob());
 }
 
 static void
