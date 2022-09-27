@@ -1924,10 +1924,12 @@ on_message(
 static void
 create_requests_catalog()
 {
+    auto sample_thinknode_info{
+        make_thinknode_type_info_with_nil_type(thinknode_nil_type())};
     rq_retrieve_immutable_object_func<caching_level_type::full>(
         "sample URL", "sample context id", "sample immutable id");
     rq_post_iss_object_func<caching_level_type::full>(
-        "sample URL", "sample context id", thinknode_type_info(), blob());
+        "sample URL", "sample context id", sample_thinknode_info, blob());
 }
 
 static void
