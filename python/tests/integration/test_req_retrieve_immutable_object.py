@@ -1,3 +1,6 @@
+import msgpack  # type: ignore
+
+
 def test_req_retrieve_immutable_object(session):
     # Request metadata
     uuid_base = 'rq_retrieve_immutable_object_func'
@@ -22,5 +25,7 @@ def test_req_retrieve_immutable_object(session):
                                   'id': 2147483649}},
          'title': title}
 
-    blob = session.resolve_request(result_type, req_data)
-    assert blob == b'\x93\xa3abc\xa3def\xa3ghi'
+    msgpack_encoded = session.resolve_request(result_type, req_data)
+    assert msgpack_encoded == b'\x93\xa3abc\xa3def\xa3ghi'
+    value = msgpack.unpackb(msgpack_encoded, use_list=False, raw=False)
+    assert value == ('abc', 'def', 'ghi')

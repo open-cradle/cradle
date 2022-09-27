@@ -18,7 +18,7 @@ template<caching_level_type Level>
 using thinknode_request_props = request_props<Level, true, true>;
 
 cppcoro::task<std::string>
-resolve_my_post_iss_object_request(
+post_iss_object_uncached_wrapper(
     cached_introspected_context_intf& ctx_intf,
     std::string const& api_url,
     std::string const& context_id,
@@ -51,7 +51,7 @@ requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
     resolve(thinknode_request_context& ctx) const
     {
         auto object_data = co_await object_data_request_.resolve(ctx);
-        co_return co_await resolve_my_post_iss_object_request(
+        co_return co_await post_iss_object_uncached_wrapper(
             ctx, api_url_, context_id_, url_type_string_, object_data);
     }
 
@@ -240,7 +240,7 @@ rq_post_iss_object_func(
     std::string url_type_string{get_url_type_string(api_url, schema)};
     return rq_function_erased_coro<std::string>(
         thinknode_request_props<Level>(std::move(uuid), std::move(title)),
-        resolve_my_post_iss_object_request,
+        post_iss_object_uncached_wrapper,
         std::move(api_url),
         std::move(context_id),
         std::move(url_type_string),
@@ -251,7 +251,7 @@ rq_post_iss_object_func(
 // - Context is type-erased, like the request
 // - Additional api_url argument passed by the framework
 cppcoro::task<blob>
-retrieve_immutable_blob_uncached_erased(
+retrieve_immutable_blob_uncached_wrapper(
     cached_introspected_context_intf& ctx,
     std::string api_url,
     std::string context_id,
@@ -385,10 +385,36 @@ rq_retrieve_immutable_object_func(
     std::string title{"retrieve_immutable_object"};
     return rq_function_erased_coro<blob>(
         thinknode_request_props<Level>(std::move(uuid), std::move(title)),
-        retrieve_immutable_blob_uncached_erased,
+        retrieve_immutable_blob_uncached_wrapper,
         std::move(api_url),
         std::move(context_id),
         rq_value(std::move(immutable_id)));
+}
+
+// In a "resolve request" situation, ctx will outlive the resolve process,
+// justifying passing it by reference.
+// api_url will be discarded; is this correct?
+cppcoro::task<std::map<std::string, std::string>>
+get_iss_object_metadata_uncached_wrapper(
+    cached_introspected_context_intf& ctx,
+    std::string api_url,
+    std::string context_id,
+    std::string object_id);
+
+template<caching_level_type Level>
+auto
+rq_get_iss_object_metadata_func(
+    std::string api_url, std::string context_id, std::string object_id)
+{
+    using value_type = std::map<std::string, std::string>;
+    request_uuid uuid{"rq_get_iss_object_metadata_func"};
+    std::string title{"get_iss_object_metadata"};
+    return rq_function_erased_coro<value_type>(
+        thinknode_request_props<Level>(std::move(uuid), std::move(title)),
+        get_iss_object_metadata_uncached_wrapper,
+        std::move(api_url),
+        std::move(context_id),
+        std::move(object_id));
 }
 
 } // namespace cradle

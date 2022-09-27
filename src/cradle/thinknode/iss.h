@@ -16,6 +16,10 @@ resolve_iss_object_to_immutable(
     string object_id,
     bool ignore_upgrades);
 
+cppcoro::task<std::map<string, string>>
+get_iss_object_metadata_uncached(
+    thinknode_request_context ctx, string context_id, string object_id);
+
 // Get the metadata for an ISS object.
 cppcoro::shared_task<std::map<string, string>>
 get_iss_object_metadata(
@@ -49,6 +53,13 @@ get_url_type_string(string const& api_url, thinknode_type_info const& schema);
 // Parse a schema in URL form.
 thinknode_type_info
 parse_url_type_string(string const& url_type);
+
+cppcoro::task<string>
+post_iss_object_uncached(
+    thinknode_request_context ctx,
+    string context_id,
+    string url_type_string,
+    blob object_data);
 
 // Post an ISS object and return its ID.
 cppcoro::shared_task<string>

@@ -18,6 +18,7 @@
 #endif
 
 #include <cereal/archives/json.hpp>
+#include <cereal/types/map.hpp>
 
 #include <picosha2.h>
 
@@ -1774,14 +1775,25 @@ process_message(websocket_server_impl& server, client_request request)
             auto tag{get_tag(parse_url_type_string(rr.result_type))};
             switch (tag)
             {
-                case thinknode_type_info_tag::BLOB_TYPE:
-                    co_await resolve_thinknode_request<blob>(
+                case thinknode_type_info_tag::BLOB_TYPE: {
+                    using value_type = blob;
+                    co_await resolve_thinknode_request<value_type>(
                         response, ctx, iarchive);
                     break;
-                case thinknode_type_info_tag::STRING_TYPE:
-                    co_await resolve_thinknode_request<std::string>(
+                }
+                case thinknode_type_info_tag::STRING_TYPE: {
+                    using value_type = std::string;
+                    co_await resolve_thinknode_request<value_type>(
                         response, ctx, iarchive);
                     break;
+                }
+                case thinknode_type_info_tag::MAP_TYPE: {
+                    // Currently limited to a single map type
+                    using value_type = std::map<std::string, std::string>;
+                    co_await resolve_thinknode_request<value_type>(
+                        response, ctx, iarchive);
+                    break;
+                }
                 default: {
                     std::ostringstream oss;
                     oss << "cannot resolve request with tag " << tag;
@@ -1912,13 +1924,14 @@ on_message(
  * Otherwise, cereal will complain with "Trying to load an unregistered
  * polymorphic type".
  *
- * Currently limited to Thinknode requests yielding a blob:
+ * Currently limited to a limited number of Thinknode requests:
  * - function_request_erased only
  * - request_props<caching_level_type::full, true, true> so
  *   - Fully cached
  *   - Function is coroutine
  *   - Introspected
- * - Function result value (passed back across websocket) is blob
+ * - Function result value (passed back across websocket) is one of several
+ *   types handled in a "switch(tag)" above
  * - Resolution context is thinknode_request_context
  */
 static void
@@ -1930,6 +1943,8 @@ create_requests_catalog()
         "sample URL", "sample context id", "sample immutable id");
     rq_post_iss_object_func<caching_level_type::full>(
         "sample URL", "sample context id", sample_thinknode_info, blob());
+    rq_get_iss_object_metadata_func<caching_level_type::full>(
+        "sample URL", "sample context id", "sample object id");
 }
 
 static void
