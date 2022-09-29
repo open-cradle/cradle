@@ -4,7 +4,6 @@ def test_req_get_iss_object_metadata(session):
     git_version = session.query_requests_meta_info()['git_version']
     uuid = f'{uuid_base}+{git_version}'
     title = 'get_iss_object_metadata'
-    result_type = 'map/string/string'
 
     # Args
     url = 'https://mgh.thinknode.io/api/v1.0'
@@ -21,7 +20,7 @@ def test_req_get_iss_object_metadata(session):
                                   'id': 2147483649}},
          'title': title}
 
-    metadata = session.resolve_request(result_type, req_data)
+    metadata = session.resolve_request(req_data)
     assert metadata['Content-Type'] == 'application/octet-stream'
     assert metadata['Thinknode-Reference-Id'] == object_id
     assert metadata['Thinknode-Size'] == '33'

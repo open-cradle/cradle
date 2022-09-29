@@ -9,7 +9,6 @@ def test_req_post_iss_object(session):
     git_version = session.query_requests_meta_info()['git_version']
     uuid = f'{uuid_base}+{git_version}'
     title = 'post_iss_object'
-    result_type = 'string'
 
     # Args
     url = 'https://mgh.thinknode.io/api/v1.0'
@@ -33,5 +32,5 @@ def test_req_post_iss_object(session):
                                   'id': 2147483649}},
          'title': title}
 
-    object_id = session.resolve_request(result_type, req_data)
+    object_id = session.resolve_request(req_data)
     assert object_id == '61e8256000c030b6c41dffee788df15f'

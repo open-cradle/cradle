@@ -18,7 +18,6 @@
 #endif
 
 #include <cereal/archives/json.hpp>
-#include <cereal/types/map.hpp>
 
 #include <picosha2.h>
 
@@ -65,6 +64,7 @@
 #include <cradle/typing/utilities/diff.hpp>
 #include <cradle/typing/utilities/logging.h>
 #include <cradle/websocket/calculations.h>
+#include <cradle/websocket/catalog.h>
 #include <cradle/websocket/introspection.h>
 #include <cradle/websocket/messages.hpp>
 
@@ -1439,19 +1439,6 @@ make_thinknode_request_context(
         request.tasklet};
 }
 
-template<typename Value>
-static cppcoro::task<>
-resolve_thinknode_request(
-    dynamic& response,
-    thinknode_request_context& ctx,
-    cereal::JSONInputArchive& iarchive)
-{
-    using Props = request_props<caching_level_type::full, true, true>;
-    auto req{function_request_erased<Value, Props>(iarchive)};
-    Value value = co_await resolve_request(ctx, req);
-    to_dynamic(&response, value);
-}
-
 static cppcoro::task<>
 process_message(websocket_server_impl& server, client_request request)
 {
@@ -1768,39 +1755,9 @@ process_message(websocket_server_impl& server, client_request request)
         }
         case client_message_content_tag::RESOLVE_REQUEST: {
             auto const& rr = as_resolve_request(content);
-            std::istringstream is(rr.json_text);
-            cereal::JSONInputArchive iarchive(is);
-            dynamic response;
             auto ctx{make_thinknode_request_context(server, request)};
-            auto tag{get_tag(parse_url_type_string(rr.result_type))};
-            switch (tag)
-            {
-                case thinknode_type_info_tag::BLOB_TYPE: {
-                    using value_type = blob;
-                    co_await resolve_thinknode_request<value_type>(
-                        response, ctx, iarchive);
-                    break;
-                }
-                case thinknode_type_info_tag::STRING_TYPE: {
-                    using value_type = std::string;
-                    co_await resolve_thinknode_request<value_type>(
-                        response, ctx, iarchive);
-                    break;
-                }
-                case thinknode_type_info_tag::MAP_TYPE: {
-                    // Currently limited to a single map type
-                    using value_type = std::map<std::string, std::string>;
-                    co_await resolve_thinknode_request<value_type>(
-                        response, ctx, iarchive);
-                    break;
-                }
-                default: {
-                    std::ostringstream oss;
-                    oss << "cannot resolve request with tag " << tag;
-                    throw not_implemented_error(oss.str());
-                    break;
-                }
-            }
+            dynamic response
+                = co_await resolve_serialized_request(ctx, rr.json_text);
             send_response(
                 server,
                 request,
@@ -1911,40 +1868,6 @@ on_message(
     }
     // TODO Resource leak if an exception occurs before tasklet captured by
     // tasklet_run. Force-finish here?
-}
-
-/**
- * Creates a catalog of function requests that can be resolved via the
- * "resolve request" Websocket request.
- *
- * The main thing is that when deserializing a request descriptor received
- * via Websocket, a corresponding function request object must be created.
- * In C++, this means that corresponding constructors must exist and able to
- * be found.
- * Otherwise, cereal will complain with "Trying to load an unregistered
- * polymorphic type".
- *
- * Currently limited to a limited number of Thinknode requests:
- * - function_request_erased only
- * - request_props<caching_level_type::full, true, true> so
- *   - Fully cached
- *   - Function is coroutine
- *   - Introspected
- * - Function result value (passed back across websocket) is one of several
- *   types handled in a "switch(tag)" above
- * - Resolution context is thinknode_request_context
- */
-static void
-create_requests_catalog()
-{
-    auto sample_thinknode_info{
-        make_thinknode_type_info_with_nil_type(thinknode_nil_type())};
-    rq_retrieve_immutable_object_func<caching_level_type::full>(
-        "sample URL", "sample context id", "sample immutable id");
-    rq_post_iss_object_func<caching_level_type::full>(
-        "sample URL", "sample context id", sample_thinknode_info, blob());
-    rq_get_iss_object_metadata_func<caching_level_type::full>(
-        "sample URL", "sample context id", "sample object id");
 }
 
 static void

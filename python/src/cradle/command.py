@@ -303,9 +303,8 @@ class QueryRequestsMetaInfoCommand(Command):
 
 
 class ResolveRequestCommand(Command):
-    def __init__(self, context_id: str, result_type: str, req_data: Object):
+    def __init__(self, context_id: str, req_data: Object):
         super().__init__(context_id)
-        self.result_type = result_type
         self.json_text = json.dumps(req_data)
 
     def name(self) -> str:
@@ -315,7 +314,6 @@ class ResolveRequestCommand(Command):
         return \
             {
                 'resolve_request': {
-                    'result_type': self.result_type,
                     'json_text': self.json_text
                 }
             }

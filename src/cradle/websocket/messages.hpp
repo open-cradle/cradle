@@ -269,7 +269,6 @@ struct introspection_status_request
 api(struct)
 struct resolve_request_request
 {
-    std::string result_type;
     std::string json_text;
 };
 
