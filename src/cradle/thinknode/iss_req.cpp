@@ -50,4 +50,20 @@ get_iss_object_metadata_uncached_wrapper(
         std::move(object_id));
 }
 
+cppcoro::task<std::string>
+resolve_iss_object_to_immutable_uncached_wrapper(
+    cached_introspected_context_intf& ctx,
+    std::string api_url,
+    std::string context_id,
+    std::string object_id,
+    bool ignore_upgrades)
+{
+    assert(dynamic_cast<thinknode_request_context*>(&ctx));
+    return resolve_iss_object_to_immutable_uncached(
+        static_cast<thinknode_request_context&>(ctx),
+        std::move(context_id),
+        std::move(object_id),
+        ignore_upgrades);
+}
+
 } // namespace cradle

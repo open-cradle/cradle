@@ -14,6 +14,11 @@
 
 namespace cradle {
 
+template<typename T, typename Value>
+concept FunctionArg
+    = (Request<T> && std::same_as<typename T::value_type, Value>)
+      || std::same_as<T, Value>;
+
 template<caching_level_type Level>
 using thinknode_request_props = request_props<Level, true, true>;
 
@@ -24,6 +29,34 @@ post_iss_object_uncached_wrapper(
     std::string const& context_id,
     std::string const& url_type_string,
     blob const& object_data);
+
+// Differences to retrieve_immutable_blob_uncached():
+// - Context is type-erased, like the request
+// - Additional api_url argument passed by the framework
+cppcoro::task<blob>
+retrieve_immutable_blob_uncached_wrapper(
+    cached_introspected_context_intf& ctx,
+    std::string api_url,
+    std::string context_id,
+    std::string immutable_id);
+
+// In a "resolve request" situation, ctx will outlive the resolve process,
+// justifying passing it by reference.
+// api_url will be discarded; is this correct?
+cppcoro::task<std::map<std::string, std::string>>
+get_iss_object_metadata_uncached_wrapper(
+    cached_introspected_context_intf& ctx,
+    std::string api_url,
+    std::string context_id,
+    std::string object_id);
+
+cppcoro::task<std::string>
+resolve_iss_object_to_immutable_uncached_wrapper(
+    cached_introspected_context_intf& ctx,
+    std::string api_url,
+    std::string context_id,
+    std::string object_id,
+    bool ignore_upgrades);
 
 template<Request ObjectDataRequest>
 requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
@@ -227,36 +260,6 @@ rq_post_iss_object_erased(
         rq_value(object_data));
 }
 
-template<caching_level_type Level>
-auto
-rq_post_iss_object_func(
-    std::string api_url,
-    std::string context_id,
-    thinknode_type_info schema,
-    blob object_data)
-{
-    request_uuid uuid{"rq_post_iss_object_func"};
-    std::string title{"post_iss_object"};
-    std::string url_type_string{get_url_type_string(api_url, schema)};
-    return rq_function_erased_coro<std::string>(
-        thinknode_request_props<Level>(std::move(uuid), std::move(title)),
-        post_iss_object_uncached_wrapper,
-        std::move(api_url),
-        std::move(context_id),
-        std::move(url_type_string),
-        std::move(object_data));
-}
-
-// Differences to retrieve_immutable_blob_uncached():
-// - Context is type-erased, like the request
-// - Additional api_url argument passed by the framework
-cppcoro::task<blob>
-retrieve_immutable_blob_uncached_wrapper(
-    cached_introspected_context_intf& ctx,
-    std::string api_url,
-    std::string context_id,
-    std::string immutable_id);
-
 template<Request ImmutableIdRequest>
 requires(std::same_as<
          typename ImmutableIdRequest::value_type,
@@ -374,12 +377,32 @@ rq_retrieve_immutable_object(
         std::move(api_url), std::move(context_id), rq_value(immutable_id));
 }
 
-// Implementation using function_request_erased, not needing
-// class my_retrieve_immutable_object_request_base
 template<caching_level_type Level>
 auto
+rq_post_iss_object_func(
+    std::string api_url,
+    std::string context_id,
+    thinknode_type_info schema,
+    blob object_data)
+{
+    request_uuid uuid{"rq_post_iss_object_func"};
+    std::string title{"post_iss_object"};
+    std::string url_type_string{get_url_type_string(api_url, schema)};
+    return rq_function_erased_coro<std::string>(
+        thinknode_request_props<Level>(std::move(uuid), std::move(title)),
+        post_iss_object_uncached_wrapper,
+        std::move(api_url),
+        std::move(context_id),
+        std::move(url_type_string),
+        std::move(object_data));
+}
+
+// Implementation using function_request_erased, not needing
+// class my_retrieve_immutable_object_request_base
+template<caching_level_type Level, FunctionArg<std::string> ImmutableId>
+auto
 rq_retrieve_immutable_object_func(
-    std::string api_url, std::string context_id, std::string immutable_id)
+    std::string api_url, std::string context_id, ImmutableId immutable_id)
 {
     request_uuid uuid{"rq_retrieve_immutable_object_func"};
     std::string title{"retrieve_immutable_object"};
@@ -388,23 +411,13 @@ rq_retrieve_immutable_object_func(
         retrieve_immutable_blob_uncached_wrapper,
         std::move(api_url),
         std::move(context_id),
-        rq_value(std::move(immutable_id)));
+        std::move(immutable_id));
 }
 
-// In a "resolve request" situation, ctx will outlive the resolve process,
-// justifying passing it by reference.
-// api_url will be discarded; is this correct?
-cppcoro::task<std::map<std::string, std::string>>
-get_iss_object_metadata_uncached_wrapper(
-    cached_introspected_context_intf& ctx,
-    std::string api_url,
-    std::string context_id,
-    std::string object_id);
-
-template<caching_level_type Level>
+template<caching_level_type Level, FunctionArg<std::string> ObjectId>
 auto
 rq_get_iss_object_metadata_func(
-    std::string api_url, std::string context_id, std::string object_id)
+    std::string api_url, std::string context_id, ObjectId object_id)
 {
     using value_type = std::map<std::string, std::string>;
     request_uuid uuid{"rq_get_iss_object_metadata_func"};
@@ -415,6 +428,26 @@ rq_get_iss_object_metadata_func(
         std::move(api_url),
         std::move(context_id),
         std::move(object_id));
+}
+
+template<caching_level_type Level, FunctionArg<std::string> ObjectId>
+auto
+rq_resolve_iss_object_to_immutable_func(
+    std::string api_url,
+    std::string context_id,
+    ObjectId object_id,
+    bool ignore_upgrades)
+{
+    using value_type = std::string;
+    request_uuid uuid{"rq_resolve_iss_object_to_immutable_func"};
+    std::string title{"resolve_iss_object_to_immutable"};
+    return rq_function_erased_coro<value_type>(
+        thinknode_request_props<Level>(std::move(uuid), std::move(title)),
+        resolve_iss_object_to_immutable_uncached_wrapper,
+        std::move(api_url),
+        std::move(context_id),
+        std::move(object_id),
+        ignore_upgrades);
 }
 
 } // namespace cradle

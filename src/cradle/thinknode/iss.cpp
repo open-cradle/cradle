@@ -14,10 +14,8 @@
 
 namespace cradle {
 
-namespace uncached {
-
 cppcoro::task<string>
-resolve_iss_object_to_immutable(
+resolve_iss_object_to_immutable_uncached(
     thinknode_request_context ctx,
     string context_id,
     string object_id,
@@ -44,7 +42,7 @@ resolve_iss_object_to_immutable(
             auto progression = long_poll_calculation_status(
                 ctx, context_id, response.headers["Thinknode-Reference-Id"]);
             co_await for_async(std::move(progression), [](auto status) {});
-            co_return co_await uncached::resolve_iss_object_to_immutable(
+            co_return co_await resolve_iss_object_to_immutable_uncached(
                 ctx,
                 std::move(context_id),
                 std::move(object_id),
@@ -64,8 +62,6 @@ resolve_iss_object_to_immutable(
     }
 }
 
-} // namespace uncached
-
 cppcoro::shared_task<string>
 resolve_iss_object_to_immutable(
     thinknode_request_context ctx,
@@ -80,7 +76,7 @@ resolve_iss_object_to_immutable(
         ignore_upgrades ? "n/a" : context_id,
         object_id);
     auto create_task = [=]() {
-        return uncached::resolve_iss_object_to_immutable(
+        return resolve_iss_object_to_immutable_uncached(
             ctx, context_id, object_id, ignore_upgrades);
     };
     return make_shared_task_for_cacheable<string>(

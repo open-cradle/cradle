@@ -8,6 +8,13 @@ namespace cradle {
 
 struct http_connection_interface;
 
+cppcoro::task<string>
+resolve_iss_object_to_immutable_uncached(
+    thinknode_request_context ctx,
+    string context_id,
+    string object_id,
+    bool ignore_upgrades);
+
 // Resolve an ISS object to an immutable ID.
 cppcoro::shared_task<string>
 resolve_iss_object_to_immutable(

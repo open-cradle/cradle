@@ -1,5 +1,6 @@
 #include <regex>
 #include <stdexcept>
+#include <string>
 
 #include <cereal/types/map.hpp>
 
@@ -74,17 +75,18 @@ resolve_serialized_request(
 void
 create_requests_catalog()
 {
+    using namespace std::string_literals;
     auto sample_thinknode_info{
         make_thinknode_type_info_with_nil_type(thinknode_nil_type())};
     register_dynamic_resolver(
         rq_retrieve_immutable_object_func<caching_level_type::full>(
-            "sample URL", "sample context id", "sample immutable id"));
+            "sample URL", "sample context id", "sample immutable id"s));
     register_dynamic_resolver(
         rq_post_iss_object_func<caching_level_type::full>(
             "sample URL", "sample context id", sample_thinknode_info, blob()));
     register_dynamic_resolver(
         rq_get_iss_object_metadata_func<caching_level_type::full>(
-            "sample URL", "sample context id", "sample object id"));
+            "sample URL", "sample context id", "sample object id"s));
 }
 
 } // namespace cradle
