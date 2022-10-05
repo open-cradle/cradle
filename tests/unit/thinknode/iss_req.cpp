@@ -23,6 +23,52 @@
 
 using namespace cradle;
 
+template<typename Value>
+Value
+identity(Value&& value)
+{
+    return std::forward<Value>(value);
+}
+
+// Creates a type-erased, uncached, request for an immediate value in Thinknode
+// context.
+// The request has no real uuid, meaning it cannot be serialized.
+// As it won't be cached, the absence of a uuid is no obstacle there.
+template<typename Value>
+auto
+rq_function_thinknode_value(Value&& value)
+{
+    using props_type = request_props<caching_level_type::none, false, false>;
+    return function_request_erased<Value, props_type>(
+        props_type(), identity<Value>, std::forward<Value>(value));
+}
+
+inline auto
+rq_function_thinknode_value(char const* const value)
+{
+    return rq_function_thinknode_value<std::string>(value);
+}
+
+template<typename Request>
+static auto
+deserialize_function(cereal::JSONInputArchive& iarchive)
+{
+    using value_type = typename Request::value_type;
+    using props_type = typename Request::props_type;
+    return function_request_erased<value_type, props_type>(iarchive);
+}
+
+template<typename Request>
+static auto
+deserialize_thinknode(cereal::JSONInputArchive& iarchive)
+{
+    constexpr auto caching_level = Request::caching_level;
+    using value_type = typename Request::value_type;
+    thinknode_request_erased<caching_level, value_type> req;
+    req.load(iarchive);
+    return req;
+}
+
 template<typename Request>
 static void
 test_serialize_thinknode_request(
@@ -329,14 +375,13 @@ TEST_CASE("ISS POST serialization - function, blob", "[cereal]")
         "123",
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
         make_blob("payload"))};
-    auto deserialize = [](cereal::JSONInputArchive& iarchive) {
-        using Props = request_props<caching_level_type::full, true, true>;
-        return function_request_erased<std::string, Props>(iarchive);
-    };
     auto test_request
         = [](auto const& req1) { test_post_iss_request(req1, false); };
     test_serialize_thinknode_request(
-        req, deserialize, test_request, "iss_post_func_blob.json");
+        req,
+        deserialize_function<decltype(req)>,
+        test_request,
+        "iss_post_func_blob.json");
 }
 
 TEST_CASE("ISS POST serialization - erased, inner request", "[cereal]")
@@ -419,11 +464,10 @@ test_retrieve_immutable_object_req(Request const& req)
 }
 
 static void
-test_retrieve_immutable_object(auto create_req)
+test_retrieve_immutable_object(auto create_req, auto immutable_id)
 {
     string api_url{"https://mgh.thinknode.io/api/v1.0"};
     string context_id{"123"};
-    string immutable_id{"abc"};
     auto req{create_req(api_url, context_id, immutable_id)};
     test_retrieve_immutable_object_req(req);
 }
@@ -432,15 +476,24 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT - class, fully cached", "[requests]")
 {
     // Using my_retrieve_immutable_object_request_base and mixin
     test_retrieve_immutable_object(
-        rq_retrieve_immutable_object<caching_level_type::full>);
+        rq_retrieve_immutable_object<caching_level_type::full>, "abc");
 }
 
-TEST_CASE("RETRIEVE IMMUTABLE OBJECT - function, fully cached", "[requests]")
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT - plain, fully cached", "[requests]")
 {
-    // Using function_request_erased
-    test_retrieve_immutable_object(rq_retrieve_immutable_object_func<
-                                   caching_level_type::full,
-                                   std::string>);
+    test_retrieve_immutable_object(
+        rq_retrieve_immutable_object_plain<caching_level_type::full>, "abc");
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT - subreq, fully cached", "[requests]")
+{
+    using immutable_id_props
+        = request_props<caching_level_type::none, false, false>;
+    test_retrieve_immutable_object(
+        rq_retrieve_immutable_object_subreq<
+            caching_level_type::full,
+            immutable_id_props>,
+        rq_function_thinknode_value("abc"));
 }
 
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT - fully cached, parallel", "[requests]")
@@ -476,30 +529,21 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - class", "[cereal]")
 {
     auto req{rq_retrieve_immutable_object<caching_level_type::full>(
         "https://mgh.thinknode.io/api/v1.0", "123", "abc")};
-    auto deserialize = [](cereal::JSONInputArchive& iarchive) {
-        thinknode_request_erased<caching_level_type::full, blob> req1;
-        req1.load(iarchive);
-        return req1;
-    };
     test_serialize_thinknode_request(
         req,
-        deserialize,
+        deserialize_thinknode<decltype(req)>,
         test_retrieve_immutable_object_req<decltype(req)>,
         "retrieve_immutable_class.json");
 }
 
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", "[cereal]")
 {
-    using namespace std::string_literals;
-    auto req{rq_retrieve_immutable_object_func<caching_level_type::full>(
-        "https://mgh.thinknode.io/api/v1.0", "123", "abc"s)};
-    auto deserialize = [](cereal::JSONInputArchive& iarchive) {
-        using Props = request_props<caching_level_type::full, true, true>;
-        return function_request_erased<blob, Props>(iarchive);
-    };
+    constexpr caching_level_type level = caching_level_type::full;
+    auto req{rq_retrieve_immutable_object_plain<level>(
+        "https://mgh.thinknode.io/api/v1.0", "123", "abc")};
     test_serialize_thinknode_request(
         req,
-        deserialize,
+        deserialize_function<decltype(req)>,
         test_retrieve_immutable_object_req<decltype(req)>,
         "retrieve_immutable_func.json");
 }
@@ -507,27 +551,19 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", "[cereal]")
 TEST_CASE(
     "RESOLVE ISS OBJECT TO IMMUTABLE serialization - function", "[cereal]")
 {
-    using value_type = std::string;
-    using namespace std::string_literals;
-    auto req{rq_resolve_iss_object_to_immutable_func<caching_level_type::full>(
-        "https://mgh.thinknode.io/api/v1.0", "123", "abc"s, true)};
-    auto deserialize = [](cereal::JSONInputArchive& iarchive) {
-        using Props = request_props<caching_level_type::full, true, true>;
-        return function_request_erased<value_type, Props>(iarchive);
-    };
+    auto req{
+        rq_resolve_iss_object_to_immutable_plain<caching_level_type::full>(
+            "https://mgh.thinknode.io/api/v1.0", "123", "abc", true)};
     auto test_request = [](auto const& req1) {};
     test_serialize_thinknode_request(
         req,
-        deserialize,
+        deserialize_function<decltype(req)>,
         test_request,
         "resolve_iss_object_to_immutable_func.json");
 }
 
-// TODO make this work
-#if 0
-TEST_CASE("Composite request serialization - function", "[X]")
+TEST_CASE("Composite request serialization", "[cereal]")
 {
-    using value_type = blob;
     constexpr auto level = caching_level_type::full;
     std::string const api_url{"https://mgh.thinknode.io/api/v1.0"};
     std::string const context_id{"123"};
@@ -536,20 +572,15 @@ TEST_CASE("Composite request serialization - function", "[X]")
         context_id,
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
         make_blob("payload"))};
-    auto req1{rq_resolve_iss_object_to_immutable_func<level>(
+    auto req1{rq_resolve_iss_object_to_immutable_subreq<level>(
         api_url, context_id, req0, true)};
-    auto req2{rq_retrieve_immutable_object_func<level>(
-        api_url, context_id, req1)};
-    auto deserialize = [](cereal::JSONInputArchive& iarchive) {
-        using Props = request_props<level, true, true>;
-        return function_request_erased<value_type, Props>(iarchive);
-    };
+    auto req2{
+        rq_retrieve_immutable_object_subreq<level>(api_url, context_id, req1)};
     auto test_request
         = [](auto const& req1) { };
     test_serialize_thinknode_request(
         req2,
-        deserialize,
+        deserialize_function<decltype(req2)>,
         test_request,
-        "composite_func.json");
+        "composite.json");
 }
-#endif

@@ -599,8 +599,12 @@ class function_request_impl : public Intf
     calc_unique_hash() const
     {
         unique_hasher hasher;
-        assert(uuid_.disk_cacheable());
-        update_unique_hash(hasher, uuid_);
+        // If this is a non-cached subrequest of a fully-cached request,
+        // then uuid_ need not be "real"
+        if (uuid_.disk_cacheable())
+        {
+            update_unique_hash(hasher, uuid_);
+        }
         std::apply(
             [&hasher](auto&&... args) {
                 (update_unique_hash(hasher, args), ...);
@@ -692,6 +696,7 @@ class function_request_erased
     using ctx_type =
         typename function_request_ctx_type<introspective, caching_level>::type;
     using intf_type = function_request_intf<ctx_type, Value>;
+    using props_type = Props;
 
     template<typename Function, typename... Args>
     function_request_erased(Props props, Function function, Args... args)

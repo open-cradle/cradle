@@ -173,9 +173,11 @@ class context_intf
 };
 
 // Context interface needed for resolving a cached request
-class cached_context_intf : public context_intf
+class cached_context_intf : public virtual context_intf
 {
  public:
+    virtual ~cached_context_intf() = default;
+
     virtual inner_service_core&
     get_service()
         = 0;
@@ -186,9 +188,11 @@ class cached_context_intf : public context_intf
 };
 
 // Context interface needed for resolving an introspected request
-class introspected_context_intf : public context_intf
+class introspected_context_intf : public virtual context_intf
 {
  public:
+    virtual ~introspected_context_intf() = default;
+
     virtual tasklet_tracker*
     get_tasklet()
         = 0;
@@ -207,6 +211,8 @@ class introspected_context_intf : public context_intf
 class cached_introspected_context_intf : public cached_context_intf,
                                          public introspected_context_intf
 {
+ public:
+    virtual ~cached_introspected_context_intf() = default;
 };
 
 class context_tasklet

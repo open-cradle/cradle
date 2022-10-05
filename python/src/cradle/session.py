@@ -12,7 +12,18 @@ class Session:
     def __init__(self):
         self.impl = conn.Connection()
         self.context_id = self.impl.context_id
+        self._git_version = None
         self.registration()
+
+    @property
+    def api_url(self) -> str:
+        return self.impl.api_url
+
+    @property
+    def git_version(self) -> str:
+        if self._git_version is None:
+            self._git_version = self.query_requests_meta_info()['git_version']
+        return self._git_version
 
     def registration(self) -> None:
         command = cmd.RegistrationCommand(self.context_id,
