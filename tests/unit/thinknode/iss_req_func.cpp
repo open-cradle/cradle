@@ -77,24 +77,26 @@ TEST_CASE("ISS POST serialization - function, blob", "[iss_req_func]")
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT - plain, fully cached", "[iss_req_func]")
 {
     test_retrieve_immutable_object(
-        rq_retrieve_immutable_object_plain<caching_level_type::full>, "abc");
+        rq_retrieve_immutable_object_func<
+            caching_level_type::full,
+            std::string>,
+        "abc");
 }
 
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT - subreq, fully cached", "[iss_req_func]")
 {
-    using immutable_id_props
-        = request_props<caching_level_type::none, false, false>;
+    auto arg_request{rq_function_thinknode_value("abc")};
     test_retrieve_immutable_object(
-        rq_retrieve_immutable_object_subreq<
+        rq_retrieve_immutable_object_func<
             caching_level_type::full,
-            immutable_id_props>,
+            decltype(arg_request)>,
         rq_function_thinknode_value("abc"));
 }
 
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", "[iss_req_func]")
 {
     constexpr caching_level_type level = caching_level_type::full;
-    auto req{rq_retrieve_immutable_object_plain<level>(
+    auto req{rq_retrieve_immutable_object_func<level>(
         "https://mgh.thinknode.io/api/v1.0", "123", "abc")};
     test_serialize_thinknode_request(
         req,
@@ -106,9 +108,8 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", "[iss_req_func]"
 TEST_CASE(
     "RESOLVE ISS OBJECT TO IMMUTABLE serialization - function", "[iss_req_func]")
 {
-    auto req{
-        rq_resolve_iss_object_to_immutable_plain<caching_level_type::full>(
-            "https://mgh.thinknode.io/api/v1.0", "123", "abc", true)};
+    auto req{rq_resolve_iss_object_to_immutable_func<caching_level_type::full>(
+        "https://mgh.thinknode.io/api/v1.0", "123", "abc", true)};
     auto test_request = [](auto const& req1) {};
     test_serialize_thinknode_request(
         req,
@@ -127,10 +128,10 @@ TEST_CASE("Composite request serialization", "[iss_req_func]")
         context_id,
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
         make_blob("payload"))};
-    auto req1{rq_resolve_iss_object_to_immutable_subreq<level>(
+    auto req1{rq_resolve_iss_object_to_immutable_func<level>(
         api_url, context_id, req0, true)};
     auto req2{
-        rq_retrieve_immutable_object_subreq<level>(api_url, context_id, req1)};
+        rq_retrieve_immutable_object_func<level>(api_url, context_id, req1)};
     auto test_request
         = [](auto const& req1) { };
     test_serialize_thinknode_request(

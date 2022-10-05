@@ -45,36 +45,60 @@ rq_function_thinknode_subreq()
 
 namespace detail {
 
-// uuid string extension representing the type of one argument (a subrequest,
-// not a plain value), and the caching level.
-template<caching_level_type Level>
-struct subreq_string
+// Upgrades a raw C string to std::string, returns everything else as-is
+template<typename Input>
+auto
+upgrade_raw_string(Input&& input)
 {
-};
+    if constexpr (std::same_as<std::decay_t<Input>, const char*>)
+    {
+        return std::string(input);
+    }
+    else
+    {
+        return input;
+    }
+}
 
-template<>
-struct subreq_string<caching_level_type::none>
-{
-    static inline std::string str{"-subreq-none"};
-};
-
-template<>
-struct subreq_string<caching_level_type::memory>
-{
-    static inline std::string str{"-subreq-mem"};
-};
-
-template<>
-struct subreq_string<caching_level_type::full>
-{
-    static inline std::string str{"-subreq-full"};
-};
-
-template<caching_level_type Level>
+// Creates a uuid extension reflecting an argument of type Arg.
+// Default case if Arg is not a request
+template<typename Arg>
 std::string
 make_subreq_string()
 {
-    return subreq_string<Level>::str;
+    return "-plain";
+}
+
+// The other overloads are for Arg being a sub-request; the result depends
+// on the caching level for this sub-request.
+template<typename Arg>
+requires(Arg::caching_level == caching_level_type::none) std::string
+    make_subreq_string()
+{
+    return "-subreq-none";
+}
+
+template<typename Arg>
+requires(Arg::caching_level == caching_level_type::memory) std::string
+    make_subreq_string()
+{
+    return "-subreq-mem";
+}
+
+template<typename Arg>
+requires(Arg::caching_level == caching_level_type::full) std::string
+    make_subreq_string()
+{
+    return "-subreq-full";
+}
+
+// Creates a request_uuid from uuid_base, extended with something reflecting
+// Arg (a plain value or a sub-request)
+template<typename Arg>
+auto
+make_ext_uuid(std::string const& uuid_base, Arg const&)
+{
+    return request_uuid(uuid_base + make_subreq_string<Arg>());
 }
 
 } // namespace detail
@@ -101,8 +125,6 @@ rq_post_iss_object_func(
         std::move(object_data));
 }
 
-namespace detail {
-
 // Creates a function_request_erased object representing a
 // "retrieve immutable object" request,
 // where immutable_id is either a plain string, or a subrequest yielding a
@@ -115,121 +137,45 @@ namespace detail {
 // (b) Caching level
 // (c) immutable_id being a plain string or subrequest
 // uuid_ext is an extension capturing (b) and (c).
-template<caching_level_type Level>
+template<caching_level_type Level, typename ImmutableId>
 auto
 rq_retrieve_immutable_object_func(
-    std::string uuid_ext,
-    std::string api_url,
-    std::string context_id,
-    auto immutable_id)
+    std::string api_url, std::string context_id, ImmutableId immutable_id)
 {
-    std::string uuid_str{
-        std::string{"rq_retrieve_immutable_object"} + uuid_ext};
-    request_uuid uuid{uuid_str};
+    using value_type = blob;
+    auto upgraded_immutable_id{
+        detail::upgrade_raw_string(std::move(immutable_id))};
+    auto uuid{detail::make_ext_uuid(
+        "rq_retrieve_immutable_object", upgraded_immutable_id)};
     std::string title{"retrieve_immutable_object"};
-    return rq_function_erased_coro<blob>(
+    return rq_function_erased_coro<value_type>(
         thinknode_request_props<Level>(std::move(uuid), std::move(title)),
         retrieve_immutable_blob_uncached_wrapper,
         std::move(api_url),
         std::move(context_id),
-        std::move(immutable_id));
+        std::move(upgraded_immutable_id));
 }
-
-} // namespace detail
-
-// Creates a function_request_erased object representing a
-// "retrieve immutable object" request,
-// where immutable_id is a plain string.
-template<caching_level_type Level>
-auto
-rq_retrieve_immutable_object_plain(
-    std::string api_url, std::string context_id, std::string immutable_id)
-{
-    return detail::rq_retrieve_immutable_object_func<Level>(
-        "-plain",
-        std::move(api_url),
-        std::move(context_id),
-        std::move(immutable_id));
-}
-
-// Creates a function_request_erased object representing a
-// "retrieve immutable object" request,
-// where immutable_id is a subrequest yielding a string.
-template<caching_level_type Level, typename ImmutableIdProps>
-auto
-rq_retrieve_immutable_object_subreq(
-    std::string api_url,
-    std::string context_id,
-    function_request_erased<std::string, ImmutableIdProps> immutable_id)
-{
-    return detail::rq_retrieve_immutable_object_func<Level>(
-        detail::make_subreq_string<ImmutableIdProps::level>(),
-        std::move(api_url),
-        std::move(context_id),
-        std::move(immutable_id));
-}
-
-namespace detail {
 
 // Creates a function_request_erased object representing a
 // "get ISS object metadata" request,
 // where object_id is either a plain string, or a subrequest yielding a string.
-template<caching_level_type Level>
+template<caching_level_type Level, typename ObjectId>
 auto
 rq_get_iss_object_metadata_func(
-    std::string uuid_ext,
-    std::string api_url,
-    std::string context_id,
-    auto object_id)
+    std::string api_url, std::string context_id, ObjectId object_id)
 {
     using value_type = std::map<std::string, std::string>;
-    std::string uuid_str{std::string{"rq_get_iss_object_metadata"} + uuid_ext};
-    request_uuid uuid{uuid_str};
+    auto upgraded_object_id{detail::upgrade_raw_string(std::move(object_id))};
+    auto uuid{detail::make_ext_uuid(
+        "rq_get_iss_object_metadata", upgraded_object_id)};
     std::string title{"get_iss_object_metadata"};
     return rq_function_erased_coro<value_type>(
         thinknode_request_props<Level>(std::move(uuid), std::move(title)),
         get_iss_object_metadata_uncached_wrapper,
         std::move(api_url),
         std::move(context_id),
-        std::move(object_id));
+        std::move(upgraded_object_id));
 }
-
-} // namespace detail
-
-// Creates a function_request_erased object representing a
-// "get ISS object metadata" request,
-// where object_id is a plain std::string.
-template<caching_level_type Level>
-auto
-rq_get_iss_object_metadata_plain(
-    std::string api_url, std::string context_id, std::string object_id)
-{
-    return detail::rq_get_iss_object_metadata_func<Level>(
-        "-plain",
-        std::move(api_url),
-        std::move(context_id),
-        std::move(object_id));
-}
-
-// Creates a function_request_erased object representing a
-// "get ISS object metadata" request,
-// where object_id is another function_request_erased object,
-// with props independent from the main request.
-template<caching_level_type Level, typename ObjectIdProps>
-auto
-rq_get_iss_object_metadata_subreq(
-    std::string api_url,
-    std::string context_id,
-    function_request_erased<std::string, ObjectIdProps> object_id)
-{
-    return detail::rq_get_iss_object_metadata_func<Level>(
-        detail::make_subreq_string<ObjectIdProps::level>(),
-        std::move(api_url),
-        std::move(context_id),
-        std::move(object_id));
-}
-
-namespace detail {
 
 // Creates a function_request_erased object representing a
 // "resolve ISS object to immutable" request,
@@ -237,66 +183,25 @@ namespace detail {
 // string.
 // The two cases are associated with different uuid's, and the
 // function_request_erased instantiations are different classes.
-template<caching_level_type Level>
+template<caching_level_type Level, typename ObjectId>
 auto
 rq_resolve_iss_object_to_immutable_func(
-    std::string uuid_ext,
     std::string api_url,
     std::string context_id,
-    auto object_id,
+    ObjectId object_id,
     bool ignore_upgrades)
 {
     using value_type = std::string;
-    std::string uuid_str{
-        std::string{"rq_resolve_iss_object_to_immutable"} + uuid_ext};
-    request_uuid uuid{uuid_str};
+    auto upgraded_object_id{detail::upgrade_raw_string(std::move(object_id))};
+    auto uuid{detail::make_ext_uuid(
+        "rq_resolve_iss_object_to_immutable", upgraded_object_id)};
     std::string title{"resolve_iss_object_to_immutable"};
     return rq_function_erased_coro<value_type>(
         thinknode_request_props<Level>(std::move(uuid), std::move(title)),
         resolve_iss_object_to_immutable_uncached_wrapper,
         std::move(api_url),
         std::move(context_id),
-        std::move(object_id),
-        ignore_upgrades);
-}
-
-} // namespace detail
-
-// Creates a function_request_erased object representing a
-// "resolve ISS object to immutable" request,
-// where object_id is a plain string.
-template<caching_level_type Level>
-auto
-rq_resolve_iss_object_to_immutable_plain(
-    std::string api_url,
-    std::string context_id,
-    std::string object_id,
-    bool ignore_upgrades)
-{
-    return detail::rq_resolve_iss_object_to_immutable_func<Level>(
-        "-plain",
-        std::move(api_url),
-        std::move(context_id),
-        std::move(object_id),
-        ignore_upgrades);
-}
-
-// Creates a function_request_erased object representing a
-// "resolve ISS object to immutable" request,
-// where object_id is a subrequest yielding a string.
-template<caching_level_type Level, typename ObjectIdProps>
-auto
-rq_resolve_iss_object_to_immutable_subreq(
-    std::string api_url,
-    std::string context_id,
-    function_request_erased<std::string, ObjectIdProps> object_id,
-    bool ignore_upgrades)
-{
-    return detail::rq_resolve_iss_object_to_immutable_func<Level>(
-        detail::make_subreq_string<ObjectIdProps::level>(),
-        std::move(api_url),
-        std::move(context_id),
-        std::move(object_id),
+        std::move(upgraded_object_id),
         ignore_upgrades);
 }
 

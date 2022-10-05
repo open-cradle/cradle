@@ -80,9 +80,9 @@ create_requests_catalog()
         make_thinknode_type_info_with_nil_type(thinknode_nil_type())};
 
     // Two versions: immutable_id is either a plain string, or a subrequest
-    register_dynamic_resolver(rq_retrieve_immutable_object_plain<level>(
+    register_dynamic_resolver(rq_retrieve_immutable_object_func<level>(
         "sample URL", "sample context id", "sample immutable id"));
-    register_dynamic_resolver(rq_retrieve_immutable_object_subreq<level>(
+    register_dynamic_resolver(rq_retrieve_immutable_object_func<level>(
         "sample URL",
         "sample context id",
         rq_function_thinknode_subreq<level, std::string>()));
@@ -91,17 +91,17 @@ create_requests_catalog()
         "sample URL", "sample context id", sample_thinknode_info, blob()));
 
     // Two versions: object_id is either a plain string, or a subrequest
-    register_dynamic_resolver(rq_get_iss_object_metadata_plain<level>(
+    register_dynamic_resolver(rq_get_iss_object_metadata_func<level>(
         "sample URL", "sample context id", "sample object id"));
-    register_dynamic_resolver(rq_get_iss_object_metadata_subreq<level>(
+    register_dynamic_resolver(rq_get_iss_object_metadata_func<level>(
         "sample URL",
         "sample context id",
         rq_function_thinknode_subreq<level, std::string>()));
 
     // Two versions: object_id is either a plain string, or a subrequest
-    register_dynamic_resolver(rq_resolve_iss_object_to_immutable_plain<level>(
+    register_dynamic_resolver(rq_resolve_iss_object_to_immutable_func<level>(
         "sample URL", "sample context id", "sample object id", false));
-    register_dynamic_resolver(rq_resolve_iss_object_to_immutable_subreq<level>(
+    register_dynamic_resolver(rq_resolve_iss_object_to_immutable_func<level>(
         "sample URL",
         "sample context id",
         rq_function_thinknode_subreq<level, std::string>(),
