@@ -1,7 +1,7 @@
 #include <cassert>
 
 #include <cradle/thinknode/iss.h>
-#include <cradle/thinknode/iss_req.h>
+#include <cradle/thinknode/iss_req_common.h>
 #include <cradle/thinknode/utilities.h>
 
 namespace cradle {

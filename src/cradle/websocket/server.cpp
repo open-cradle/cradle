@@ -54,7 +54,7 @@
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/iam.h>
 #include <cradle/thinknode/iss.h>
-#include <cradle/thinknode/iss_req.h>
+#include <cradle/thinknode/iss_req_func.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/unique_hash.h>
 #include <cradle/typing/encodings/json.h>

@@ -6,7 +6,7 @@
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/service/core.h>
 #include <cradle/inner/service/request.h>
-#include <cradle/thinknode/iss_req.h>
+#include <cradle/thinknode/iss_req_class.h>
 #include <cradle/typing/encodings/msgpack.h>
 #include <cradle/typing/io/mock_http.h>
 #include <cradle/typing/service/core.h>
