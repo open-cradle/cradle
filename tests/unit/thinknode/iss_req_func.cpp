@@ -93,7 +93,8 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT - subreq, fully cached", "[iss_req_func]")
         rq_function_thinknode_value("abc"));
 }
 
-TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", "[iss_req_func]")
+TEST_CASE(
+    "RETRIEVE IMMUTABLE OBJECT serialization - function", "[iss_req_func]")
 {
     constexpr caching_level_type level = caching_level_type::full;
     auto req{rq_retrieve_immutable_object_func<level>(
@@ -106,7 +107,8 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", "[iss_req_func]"
 }
 
 TEST_CASE(
-    "RESOLVE ISS OBJECT TO IMMUTABLE serialization - function", "[iss_req_func]")
+    "RESOLVE ISS OBJECT TO IMMUTABLE serialization - function",
+    "[iss_req_func]")
 {
     auto req{rq_resolve_iss_object_to_immutable_func<caching_level_type::full>(
         "https://mgh.thinknode.io/api/v1.0", "123", "abc", true)};
@@ -132,8 +134,7 @@ TEST_CASE("Composite request serialization", "[iss_req_func]")
         api_url, context_id, req0, true)};
     auto req2{
         rq_retrieve_immutable_object_func<level>(api_url, context_id, req1)};
-    auto test_request
-        = [](auto const& req1) { };
+    auto test_request = [](auto const& req1) {};
     test_serialize_thinknode_request(
         req2,
         deserialize_function<decltype(req2)>,

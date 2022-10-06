@@ -109,7 +109,7 @@ class unique_hasher
 };
 
 template<typename T>
-requires std::integral<T> || std::floating_point<T>
+    requires std::integral<T> || std::floating_point<T>
 void
 update_unique_hash(unique_hasher& hasher, T val)
 {

@@ -74,8 +74,7 @@ class function_request_uncached
         // The "func=function_" is a workaround to prevent a gcc-10 internal
         // compiler error in release builds.
         co_return co_await std::apply(
-            [&, func = function_](auto&&... args)
-                -> cppcoro::task<Value> {
+            [&, func = function_](auto&&... args) -> cppcoro::task<Value> {
                 co_return func((co_await resolve_request(ctx, args))...);
             },
             args_);
@@ -115,7 +114,8 @@ template<
     typename Value,
     typename Function,
     typename... Args>
-requires(Level != caching_level_type::full) class function_request_cached
+    requires(Level != caching_level_type::full)
+class function_request_cached
 {
  public:
     using element_type = function_request_cached;
@@ -279,8 +279,8 @@ update_unique_hash(
 }
 
 template<caching_level_type Level, typename Function, typename... Args>
-requires(Level == caching_level_type::none) auto rq_function(
-    Function function, Args... args)
+    requires(Level == caching_level_type::none)
+auto rq_function(Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return function_request_uncached<Value, Function, Args...>{
@@ -288,8 +288,8 @@ requires(Level == caching_level_type::none) auto rq_function(
 }
 
 template<caching_level_type Level, typename Function, typename... Args>
-requires(Level != caching_level_type::none) auto rq_function(
-    Function function, Args... args)
+    requires(Level != caching_level_type::none)
+auto rq_function(Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return function_request_cached<Level, Value, Function, Args...>{
@@ -301,16 +301,16 @@ template<
     caching_level_type Level,
     typename Function,
     typename... Args>
-requires(Level != caching_level_type::none) auto rq_function(
-    Function function, Args... args)
+    requires(Level != caching_level_type::none)
+auto rq_function(Function function, Args... args)
 {
     return function_request_cached<Level, Value, Function, Args...>{
         std::move(function), std::move(args)...};
 }
 
 template<caching_level_type Level, typename Function, typename... Args>
-requires(Level == caching_level_type::none) auto rq_function_up(
-    Function function, Args... args)
+    requires(Level == caching_level_type::none)
+auto rq_function_up(Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return std::make_unique<
@@ -319,8 +319,8 @@ requires(Level == caching_level_type::none) auto rq_function_up(
 }
 
 template<caching_level_type Level, typename Function, typename... Args>
-requires(Level != caching_level_type::none) auto rq_function_up(
-    Function function, Args... args)
+    requires(Level != caching_level_type::none)
+auto rq_function_up(Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return std::make_unique<
@@ -329,8 +329,8 @@ requires(Level != caching_level_type::none) auto rq_function_up(
 }
 
 template<caching_level_type Level, typename Function, typename... Args>
-requires(Level == caching_level_type::none) auto rq_function_sp(
-    Function function, Args... args)
+    requires(Level == caching_level_type::none)
+auto rq_function_sp(Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return std::make_shared<
@@ -339,8 +339,8 @@ requires(Level == caching_level_type::none) auto rq_function_sp(
 }
 
 template<caching_level_type Level, typename Function, typename... Args>
-requires(Level != caching_level_type::none) auto rq_function_sp(
-    Function function, Args... args)
+    requires(Level != caching_level_type::none)
+auto rq_function_sp(Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return std::make_shared<
@@ -374,7 +374,8 @@ class function_request_intf : public id_interface
     virtual ~function_request_intf() = default;
 
     virtual request_uuid
-    get_uuid() const = 0;
+    get_uuid() const
+        = 0;
 
     virtual cppcoro::task<Value>
     resolve(Ctx& ctx) const = 0;
@@ -747,7 +748,8 @@ class function_request_erased
     }
 
     captured_id const&
-    get_captured_id() const requires(caching_level != caching_level_type::none)
+    get_captured_id() const
+        requires(caching_level != caching_level_type::none)
     {
         return captured_id_;
     }
@@ -766,7 +768,8 @@ class function_request_erased
     }
 
     std::string
-    get_introspection_title() const requires(introspective)
+    get_introspection_title() const
+        requires(introspective)
     {
         return title_;
     }
@@ -861,8 +864,8 @@ update_unique_hash(
 
 // Creates a type-erased request for a non-coroutine function
 template<typename Props, typename Function, typename... Args>
-requires(!Props::func_is_coro) auto rq_function_erased(
-    Props props, Function function, Args... args)
+    requires(!Props::func_is_coro)
+auto rq_function_erased(Props props, Function function, Args... args)
 {
     using Value = std::invoke_result_t<Function, arg_type<Args>...>;
     return function_request_erased<Value, Props>{
@@ -872,8 +875,8 @@ requires(!Props::func_is_coro) auto rq_function_erased(
 // Creates a type-erased request for a function that is a coroutine.
 // Value cannot be derived in this case so must be explicitly specified.
 template<typename Value, typename Props, typename Function, typename... Args>
-requires(Props::func_is_coro) auto rq_function_erased_coro(
-    Props props, Function function, Args... args)
+    requires(Props::func_is_coro)
+auto rq_function_erased_coro(Props props, Function function, Args... args)
 {
     return function_request_erased<Value, Props>{
         std::move(props), std::move(function), std::move(args)...};

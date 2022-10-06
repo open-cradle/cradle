@@ -15,7 +15,8 @@ class base
     virtual ~base() = default;
 
     virtual int
-    get_answer() const = 0;
+    get_answer() const
+        = 0;
 };
 
 // Cereal puts its data in global objects that are visible to all test cases.

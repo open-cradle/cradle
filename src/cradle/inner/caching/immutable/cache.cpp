@@ -81,7 +81,8 @@ struct sorted_snapshot
     explicit sorted_snapshot(immutable_cache_snapshot const& unsorted);
 
     auto
-    operator<=>(sorted_snapshot const& other) const = default;
+    operator<=>(sorted_snapshot const& other) const
+        = default;
 
  private:
     std::vector<immutable_cache_entry_snapshot> in_use;

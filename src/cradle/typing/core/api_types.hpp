@@ -227,17 +227,20 @@ struct api_function_interface
     execute(
         check_in_interface& check_in,
         progress_reporter_interface& reporter,
-        dynamic_array const& args) const = 0;
+        dynamic_array const& args) const
+        = 0;
     virtual dynamic
     execute(
         check_in_interface& check_in,
         progress_reporter_interface& reporter,
-        dynamic_map const& args) const = 0;
+        dynamic_map const& args) const
+        = 0;
     virtual untyped_immutable
     execute(
         check_in_interface& check_in,
         progress_reporter_interface& reporter,
-        std::vector<untyped_immutable> const& args) const = 0;
+        std::vector<untyped_immutable> const& args) const
+        = 0;
 };
 
 // If this flag is set, the function will actually use the check in and

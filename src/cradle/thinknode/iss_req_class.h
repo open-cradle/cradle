@@ -19,11 +19,11 @@
 namespace cradle {
 
 template<Request ObjectDataRequest>
-requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
-    // The identity of a request object is formed by:
-    // - The get_uuid() value, identifying the class
-    // - The runtime arguments: hash(), save(), load(), compare()
-    class my_post_iss_object_request_base
+    requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
+// The identity of a request object is formed by:
+// - The get_uuid() value, identifying the class
+// - The runtime arguments: hash(), save(), load(), compare()
+class my_post_iss_object_request_base
 {
  public:
     using value_type = std::string;
@@ -141,7 +141,8 @@ using my_post_iss_object_request = thinknode_request_container<
 // Create a request to post an ISS object, where the data are retrieved
 // by resolving another request, and return the request's ID.
 template<caching_level_type level, Request ObjectDataRequest>
-requires(std::same_as<typename ObjectDataRequest::value_type, blob>) auto rq_post_iss_object(
+    requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
+auto rq_post_iss_object(
     std::string api_url,
     std::string context_id,
     thinknode_type_info schema,
@@ -189,7 +190,8 @@ rq_post_iss_object(
 }
 
 template<caching_level_type level, Request ObjectDataRequest>
-requires(std::same_as<typename ObjectDataRequest::value_type, blob>) auto rq_post_iss_object_erased(
+    requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
+auto rq_post_iss_object_erased(
     std::string api_url,
     std::string context_id,
     thinknode_type_info schema,
@@ -221,9 +223,9 @@ rq_post_iss_object_erased(
 }
 
 template<Request ImmutableIdRequest>
-requires(std::same_as<
-         typename ImmutableIdRequest::value_type,
-         std::string>) class my_retrieve_immutable_object_request_base
+    requires(
+        std::same_as<typename ImmutableIdRequest::value_type, std::string>)
+class my_retrieve_immutable_object_request_base
 {
  public:
     using value_type = blob;
@@ -313,7 +315,9 @@ requires(std::same_as<
 };
 
 template<caching_level_type level, Request ImmutableIdRequest>
-requires(std::same_as<typename ImmutableIdRequest::value_type, std::string>) auto rq_retrieve_immutable_object(
+    requires(
+        std::same_as<typename ImmutableIdRequest::value_type, std::string>)
+auto rq_retrieve_immutable_object(
     std::string api_url,
     std::string context_id,
     ImmutableIdRequest immutable_id_request)

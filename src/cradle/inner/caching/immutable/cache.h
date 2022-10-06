@@ -91,7 +91,8 @@ struct immutable_cache_entry_snapshot
     size_t size;
 
     auto
-    operator<=>(immutable_cache_entry_snapshot const& other) const = default;
+    operator<=>(immutable_cache_entry_snapshot const& other) const
+        = default;
 };
 
 struct immutable_cache_snapshot

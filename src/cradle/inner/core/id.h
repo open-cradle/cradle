@@ -24,21 +24,25 @@ struct id_interface
     // Given another ID of the same type, return true iff it's equal to this
     // one.
     virtual bool
-    equals(id_interface const& other) const = 0;
+    equals(id_interface const& other) const
+        = 0;
 
     // Given another ID of the same type, return true iff it's less than this
     // one.
     virtual bool
-    less_than(id_interface const& other) const = 0;
+    less_than(id_interface const& other) const
+        = 0;
 
     // Generate a hash of the ID. This need not be unique over co-existing
     // objects.
     virtual size_t
-    hash() const = 0;
+    hash() const
+        = 0;
 
     // Update hasher's hash according to this ID.
     virtual void
-    update_hash(unique_hasher& hasher) const = 0;
+    update_hash(unique_hasher& hasher) const
+        = 0;
 };
 
 template<>
@@ -125,7 +129,8 @@ struct captured_id
     operator=(captured_id const& other)
         = default;
     captured_id&
-    operator=(captured_id&& other) noexcept = default;
+    operator=(captured_id&& other) noexcept
+        = default;
     void
     clear()
     {

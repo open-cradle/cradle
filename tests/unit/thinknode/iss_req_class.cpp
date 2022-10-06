@@ -207,7 +207,8 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT - class, fully cached", "[iss_req_class]")
         rq_retrieve_immutable_object<caching_level_type::full>, "abc");
 }
 
-TEST_CASE("RETRIEVE IMMUTABLE OBJECT - fully cached, parallel", "[iss_req_class]")
+TEST_CASE(
+    "RETRIEVE IMMUTABLE OBJECT - fully cached, parallel", "[iss_req_class]")
 {
     constexpr caching_level_type level = caching_level_type::full;
     using Req = thinknode_request_erased<level, blob>;

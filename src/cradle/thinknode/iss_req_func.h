@@ -72,22 +72,22 @@ make_subreq_string()
 // The other overloads are for Arg being a sub-request; the result depends
 // on the caching level for this sub-request.
 template<typename Arg>
-requires(Arg::caching_level == caching_level_type::none) std::string
-    make_subreq_string()
+    requires(Arg::caching_level == caching_level_type::none)
+std::string make_subreq_string()
 {
     return "-subreq-none";
 }
 
 template<typename Arg>
-requires(Arg::caching_level == caching_level_type::memory) std::string
-    make_subreq_string()
+    requires(Arg::caching_level == caching_level_type::memory)
+std::string make_subreq_string()
 {
     return "-subreq-mem";
 }
 
 template<typename Arg>
-requires(Arg::caching_level == caching_level_type::full) std::string
-    make_subreq_string()
+    requires(Arg::caching_level == caching_level_type::full)
+std::string make_subreq_string()
 {
     return "-subreq-full";
 }

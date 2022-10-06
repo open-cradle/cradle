@@ -43,7 +43,8 @@ class tasklet_tracker
 
  public:
     virtual int
-    own_id() const = 0;
+    own_id() const
+        = 0;
 
     virtual void
     on_running()

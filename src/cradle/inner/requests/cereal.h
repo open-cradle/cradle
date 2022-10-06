@@ -99,7 +99,8 @@ namespace detail {
 // made to look up something in the uuid_registry that wasn't put there,
 // assuming the type was registered using either mechanism.
 template<typename T>
-requires(std::is_class_v<T>) struct binding_name<T>
+    requires(std::is_class_v<T>)
+struct binding_name<T>
 {
     static char const*
     name()

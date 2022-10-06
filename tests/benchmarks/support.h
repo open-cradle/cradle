@@ -48,7 +48,8 @@ call_resolve_by_ptr_loop(Req const& req)
 // not measured
 // - Each equals() will immediately return true, so is also not really measured
 template<typename Ctx, RequestOrPtr Req>
-requires(MatchingContextRequest<Ctx, typename Req::element_type>) void resolve_request_loop(
+    requires(MatchingContextRequest<Ctx, typename Req::element_type>)
+void resolve_request_loop(
     benchmark::State& state, Ctx& ctx, Req const& req, int num_loops = 1000)
 {
     constexpr auto caching_level = Req::element_type::caching_level;
@@ -77,8 +78,8 @@ requires(MatchingContextRequest<Ctx, typename Req::element_type>) void resolve_r
 }
 
 template<typename Ctx, RequestOrPtr Req>
-requires(MatchingContextRequest<Ctx, typename Req::element_type>) void BM_resolve_request(
-    benchmark::State& state, Ctx& ctx, Req const& req)
+    requires(MatchingContextRequest<Ctx, typename Req::element_type>)
+void BM_resolve_request(benchmark::State& state, Ctx& ctx, Req const& req)
 {
     for (auto _ : state)
     {

@@ -8,10 +8,10 @@
 #include <cereal/archives/json.hpp>
 #include <cereal/types/string.hpp>
 
+#include <cradle/typing/encodings/msgpack.h>
 #include <cradle/typing/io/mock_http.h>
 #include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/testing.h>
-#include <cradle/typing/encodings/msgpack.h>
 
 namespace cradle {
 

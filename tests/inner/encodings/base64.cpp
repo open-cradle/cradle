@@ -3,8 +3,8 @@
 #include <boost/scoped_array.hpp>
 #include <catch2/catch.hpp>
 
-#include <cradle/inner/utilities/text.h>
 #include <cradle/inner/core/type_interfaces.h>
+#include <cradle/inner/utilities/text.h>
 
 using std::string;
 using namespace cradle;
@@ -103,7 +103,8 @@ TEST_CASE("missing base64 padding", "[encodings][base64]")
             "m"
             "cgZWxpdC4",
             get_mime_base64_character_set())
-        == make_blob(string("Lorem ipsum dolor sit amet, consectetur adipiscing elit.")));
+        == make_blob(string(
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit.")));
 }
 
 // Test that attempting to base64 decode the given string produces a parsing

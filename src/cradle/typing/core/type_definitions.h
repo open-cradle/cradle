@@ -326,7 +326,8 @@ struct omissible
         wrapped_ = std::move(value);
         return *this;
     }
-    omissible& operator=(none_t)
+    omissible&
+    operator=(none_t)
     {
         wrapped_ = none;
         return *this;
@@ -382,15 +383,20 @@ struct untyped_immutable_value : noncopyable
     {
     }
     virtual api_type_info
-    type_info() const = 0;
+    type_info() const
+        = 0;
     virtual size_t
-    deep_size() const = 0;
+    deep_size() const
+        = 0;
     virtual size_t
-    hash() const = 0;
+    hash() const
+        = 0;
     virtual dynamic
-    as_dynamic() const = 0;
+    as_dynamic() const
+        = 0;
     virtual bool
-    equals(untyped_immutable_value const* other) const = 0;
+    equals(untyped_immutable_value const* other) const
+        = 0;
 };
 
 struct untyped_immutable

@@ -14,7 +14,7 @@
 namespace cradle {
 
 template<typename T>
-requires std::integral<T> || std::floating_point<T>
+    requires std::integral<T> || std::floating_point<T>
 inline size_t
 deep_sizeof(T x)
 {

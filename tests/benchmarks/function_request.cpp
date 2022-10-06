@@ -315,8 +315,8 @@ create_thin_tree_erased()
 }
 
 template<caching_level_type level, int H>
-requires(
-    level != caching_level_type::full) auto create_triangular_tree_erased()
+    requires(level != caching_level_type::full)
+auto create_triangular_tree_erased()
 {
     request_props<level> props;
     if constexpr (H == 1)
@@ -334,8 +334,8 @@ requires(
 }
 
 template<caching_level_type level, int H>
-requires(
-    level == caching_level_type::full) auto create_triangular_tree_erased()
+    requires(level == caching_level_type::full)
+auto create_triangular_tree_erased()
 {
     if constexpr (H == 1)
     {

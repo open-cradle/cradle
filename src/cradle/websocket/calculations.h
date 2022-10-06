@@ -8,7 +8,8 @@
 namespace cradle {
 
 template<class Return, class... Args>
-auto make_function_id(Return (*ptr)(Args... args))
+auto
+make_function_id(Return (*ptr)(Args... args))
 {
     return make_captured_id(ptr);
 }

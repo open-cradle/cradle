@@ -48,7 +48,8 @@ struct args_comparator
     }
 
     template<typename Arg0, typename... Args>
-    requires(std::three_way_comparable<Arg0>) int
+        requires(std::three_way_comparable<Arg0>)
+    int
     operator()(Arg0&& lhs_arg0, Arg0&& rhs_arg0, Args&&... args)
     {
         int result;
@@ -65,7 +66,8 @@ struct args_comparator
     }
 
     template<typename Arg0, typename... Args>
-    requires(!std::three_way_comparable<Arg0>) int
+        requires(!std::three_way_comparable<Arg0>)
+    int
     operator()(Arg0&& lhs_arg0, Arg0&& rhs_arg0, Args&&... args)
     {
         int result;
@@ -263,7 +265,8 @@ class thinknode_request_container
     }
 
     std::string
-    get_introspection_title() const requires(introspective)
+    get_introspection_title() const
+        requires(introspective)
     {
         return impl_->get_introspection_title();
     }
@@ -277,8 +280,7 @@ class thinknode_request_container
     void
     save(Archive& archive) const
     {
-        archive(
-            cereal::make_nvp("impl", impl_));
+        archive(cereal::make_nvp("impl", impl_));
     }
 
     template<typename Archive>
@@ -493,7 +495,8 @@ class thinknode_request_erased
     }
 
     std::string
-    get_introspection_title() const requires(introspective)
+    get_introspection_title() const
+        requires(introspective)
     {
         return impl_->get_introspection_title();
     }

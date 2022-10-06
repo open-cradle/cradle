@@ -23,17 +23,20 @@ namespace cradle {
 
 // NIL
 
-inline bool operator==(nil_t, nil_t)
+inline bool
+operator==(nil_t, nil_t)
 {
     return true;
 }
 
-inline bool operator!=(nil_t, nil_t)
+inline bool
+operator!=(nil_t, nil_t)
 {
     return false;
 }
 
-inline bool operator<(nil_t, nil_t)
+inline bool
+operator<(nil_t, nil_t)
 {
     return false;
 }
@@ -48,7 +51,8 @@ struct type_info_query<nil_t>
     }
 };
 
-inline size_t deep_sizeof(nil_t)
+inline size_t
+deep_sizeof(nil_t)
 {
     return 0;
 }
@@ -67,7 +71,8 @@ from_dynamic(nil_t*, dynamic const&)
 {
 }
 
-inline size_t hash_value(nil_t)
+inline size_t
+hash_value(nil_t)
 {
     return 0;
 }
@@ -182,7 +187,8 @@ struct type_info_query<date>
     }
 };
 
-inline size_t deep_sizeof(date)
+inline size_t
+deep_sizeof(date)
 {
     return sizeof(date);
 }
@@ -236,7 +242,8 @@ struct type_info_query<ptime>
     }
 };
 
-inline size_t deep_sizeof(ptime)
+inline size_t
+deep_sizeof(ptime)
 {
     return sizeof(ptime);
 }
