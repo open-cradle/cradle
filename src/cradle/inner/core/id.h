@@ -177,29 +177,26 @@ operator!=(captured_id const& a, captured_id const& b);
 bool
 operator<(captured_id const& a, captured_id const& b);
 
-// ref(id) wraps a reference to an id_interface so that it can be combined.
+// id_ref puts an id_interface interface over a captured_id object.
 struct id_ref : id_interface
 {
-    id_ref() : id_(0), ownership_()
+    id_ref(captured_id const& id) : id_{id}
     {
-    }
-
-    id_ref(id_interface const& id) : id_(&id), ownership_()
-    {
+        assert(id.is_initialized());
     }
 
     bool
     equals(id_interface const& other) const override
     {
-        id_ref const& other_id = static_cast<id_ref const&>(other);
-        return *id_ == *other_id.id_;
+        id_ref const& other_ref = static_cast<id_ref const&>(other);
+        return id_ == other_ref.id_;
     }
 
     bool
     less_than(id_interface const& other) const override
     {
-        id_ref const& other_id = static_cast<id_ref const&>(other);
-        return *id_ < *other_id.id_;
+        id_ref const& other_ref = static_cast<id_ref const&>(other);
+        return id_ < other_ref.id_;
     }
 
     size_t
@@ -215,11 +212,13 @@ struct id_ref : id_interface
     }
 
  private:
-    id_interface const* id_;
-    std::shared_ptr<id_interface> ownership_;
+    captured_id id_;
 };
+
+// ref(id) disguises a captured_id as an id_interface (so that it can be
+// combined).
 inline id_ref
-ref(id_interface const& id)
+ref(captured_id const& id)
 {
     return id_ref(id);
 }
@@ -398,29 +397,22 @@ struct id_pair : id_interface
     Id1 id1_;
 };
 
-// combine_ids(id0, id1) combines id0 and id1 into a single ID pair.
+// combine_ids(id0, id1) combines id0 and id1 into a single, captured, ID pair.
 template<class Id0, class Id1>
 auto
 combine_ids(Id0 id0, Id1 id1)
 {
-    return id_pair<Id0, Id1>(std::move(id0), std::move(id1));
+    return captured_id{new id_pair{std::move(id0), std::move(id1)}};
 }
 
-// Combine more than two IDs into nested pairs.
+// Combine more than two IDs into nested pairs. Again, the result is a
+// captured_id object.
 template<class Id0, class Id1, class... Rest>
 auto
 combine_ids(Id0 id0, Id1 id1, Rest... rest)
 {
     return combine_ids(
-        combine_ids(std::move(id0), std::move(id1)), std::move(rest)...);
-}
-
-// Allow combine_ids() to take a single argument for variadic purposes.
-template<class Id0>
-auto
-combine_ids(Id0 id0)
-{
-    return id0;
+        id_pair{std::move(id0), std::move(id1)}, std::move(rest)...);
 }
 
 // null_id can be used when you have nothing to identify.

@@ -22,7 +22,7 @@ TEST_CASE("simple_id_by_reference", "[inner][id]")
 
 TEST_CASE("id_ref", "[inner][id]")
 {
-    test_different_ids(ref(make_id(0)), ref(make_id(1)));
+    test_different_ids(ref(make_captured_id(0)), ref(make_captured_id(1)));
 }
 
 TEST_CASE("captured_id basics", "[inner][id]")
@@ -126,32 +126,25 @@ TEST_CASE("captured_id move assignment", "[inner][id]")
     REQUIRE(!f.is_initialized());
 }
 
-TEST_CASE("combine_ids x1", "[inner][id]")
-{
-    auto a = combine_ids(make_id(0));
-    auto b = combine_ids(make_id(1));
-    test_different_ids(a, b);
-}
-
 TEST_CASE("combine_ids x2", "[inner][id]")
 {
     auto a = combine_ids(make_id(0), make_id(1));
     auto b = combine_ids(make_id(1), make_id(2));
-    test_different_ids(a, b);
+    test_different_ids(*a, *b);
 }
 
 TEST_CASE("combine_ids x3", "[inner][id]")
 {
     auto a = combine_ids(make_id(0), make_id(1), make_id(2));
     auto b = combine_ids(make_id(1), make_id(2), make_id(3));
-    test_different_ids(a, b);
+    test_different_ids(*a, *b);
 }
 
 TEST_CASE("combine_ids x4", "[inner][id]")
 {
     auto a = combine_ids(make_id(0), make_id(1), make_id(2), make_id(3));
     auto b = combine_ids(make_id(1), make_id(2), make_id(3), make_id(4));
-    test_different_ids(a, b);
+    test_different_ids(*a, *b);
 }
 
 TEST_CASE("map of IDs", "[inner][id]")
