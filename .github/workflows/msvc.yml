@@ -13,12 +13,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
     - name: Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
           ~/.conan/data
@@ -40,7 +40,7 @@ jobs:
         cmake --build build --target preprocessing -j4
 
     - name: Upload preprocessed headers
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: preprocessed
         path: build/generated
@@ -54,12 +54,12 @@ jobs:
         config: [Debug, Release]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
     - name: Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
           C:/.conan/data
@@ -70,7 +70,7 @@ jobs:
         pip install conan
 
     - name: Download preprocessed headers
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: preprocessed
         path: preprocessed
