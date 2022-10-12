@@ -112,8 +112,12 @@ cppcoro::task<std::string>
 get_context_id(api_session& session, std::string realm)
 {
     auto ctx{make_thinknode_request_context(session, "get_context_id")};
+    // The lifetime of the tasklet_run object must end after the
+    // cradle::get_context_id() coroutine has finished; meaning the current
+    // function has to be a coroutine, too.
     auto run_guard{tasklet_run(ctx.get_tasklet())};
-    return cradle::get_context_id(std::move(ctx), std::move(realm));
+    co_return co_await cradle::get_context_id(
+        std::move(ctx), std::move(realm));
 }
 
 cppcoro::shared_task<blob>
@@ -125,7 +129,7 @@ get_iss_object(
 {
     auto ctx{make_thinknode_request_context(session, "get_iss_object")};
     auto run_guard{tasklet_run(ctx.get_tasklet())};
-    return cradle::get_iss_blob(
+    co_return co_await cradle::get_iss_blob(
         std::move(ctx),
         std::move(context_id),
         std::move(object_id),
@@ -142,7 +146,7 @@ resolve_iss_object_to_immutable(
     auto ctx{make_thinknode_request_context(
         session, "resolve_iss_object_to_immutable")};
     auto run_guard{tasklet_run(ctx.get_tasklet())};
-    return cradle::resolve_iss_object_to_immutable(
+    co_return co_await cradle::resolve_iss_object_to_immutable(
         std::move(ctx),
         std::move(context_id),
         std::move(object_id),
@@ -156,7 +160,7 @@ get_iss_object_metadata(
     auto ctx{
         make_thinknode_request_context(session, "get_iss_object_metadata")};
     auto run_guard{tasklet_run(ctx.get_tasklet())};
-    return cradle::get_iss_object_metadata(
+    co_return co_await cradle::get_iss_object_metadata(
         std::move(ctx), std::move(context_id), std::move(object_id));
 }
 
@@ -169,7 +173,7 @@ post_iss_object(
 {
     auto ctx{make_thinknode_request_context(session, "post_iss_object")};
     auto run_guard{tasklet_run(ctx.get_tasklet())};
-    return cradle::post_iss_object(
+    co_return co_await cradle::post_iss_object(
         std::move(ctx),
         std::move(context_id),
         cradle::parse_url_type_string(schema),
@@ -220,7 +224,7 @@ resolve_calc_to_value(
 {
     auto ctx{make_thinknode_request_context(session, "resolve_calc_to_value")};
     auto run_guard{tasklet_run(ctx.get_tasklet())};
-    return cradle::resolve_calc_to_value(
+    co_return co_await cradle::resolve_calc_to_value(
         std::move(ctx), std::move(context_id), std::move(request));
 }
 
@@ -231,7 +235,7 @@ resolve_calc_to_iss_object(
     auto ctx{
         make_thinknode_request_context(session, "resolve_calc_to_iss_object")};
     auto run_guard{tasklet_run(ctx.get_tasklet())};
-    return cradle::resolve_calc_to_iss_object(
+    co_return co_await cradle::resolve_calc_to_iss_object(
         std::move(ctx), std::move(context_id), std::move(request));
 }
 
