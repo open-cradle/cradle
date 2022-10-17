@@ -7,7 +7,61 @@
 [![Python](https://github.com/mghro/cradle/actions/workflows/python.yml/badge.svg)](https://github.com/mghro/cradle/actions/workflows/python.yml)
 [![Code Coverage](https://codecov.io/gh/mghro/cradle/branch/main/graph/badge.svg)](https://codecov.io/gh/mghro/cradle)
 
-CRADLE acts as a local proxy for Thinknode
+## Abstract
+
+CRADLE is a framework that intends to speed up lengthy calculations.
+A calculation is modeled as a tree of subcalculations. Results of these subcalculations
+are cached, so a following calculation that is similar to the previous one can use
+these cached subresults, instead of calculating them again.
+
+CRADLE is being used in the context of cancer treatment plans, where it achieves to bring
+down the duration of re-calculations from several hours to several minutes.
+In this context, a subcalculation is represented by a Thinknode request, so CRADLE
+acts as a caching proxy for Thinknode.
+
+More recent developments try to generalize CRADLE, so that it hopefully also becomes useful in other domains.
+A calculation is now modeled as a [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree)
+of _requests_, where resolving a request means calling a C++ _function_, which yields a _value_.
+
+- A leaf in the Merkle tree is a constant value. This could be as simple as an integer constant.
+  Another possibility is an image that is stored in unmodifiable form somewhere on the internet,
+  and identified by its URL.
+- A branch in the Merkle tree corresponds to a C++ function that takes one or more subrequests
+  as its arguments, and returns a value.
+
+CRADLE offers two caches: a memory cache and a disk cache.
+
+The memory cache stores results in their C++ native format (embedded in an `std::any`),
+contained in an `std::unordered_map`. Advantages are:
+
+- No need to serialize the values.
+- The hash need not be unique, a "cheaper" implementation suffices.
+
+A nice property of the memory cache is that when the same subrequest appears
+multiple times in the calculation tree, and it is not yet cached, then it will be evaluated
+only once; all other threads will block until the result is available.
+
+The disk cache is a key-value cache, implemented using SQLite. A key is represented by a hash
+that must remain valid between application runs. Values have to be serialized (e.g. using
+[cereal](https://uscilab.github.io/cereal/)).
+
+A request has an associated caching level, which is one of the following:
+
+- Uncached. Appropriate for leaves in the calculation tree; could also be used for fast calculations.
+- Memory cache only.
+- Fully cached (memory cache and disk cache).
+
+Caching on disk, but not in memory, is not possible with the CRADLE design.
+
+There is a similarity between CRADLE and build systems like [Bazel](https://bazel.build/)
+or [clearmake](https://help.hcltechsw.com/versionvault/2.0.1/oxy_ex-1/com.ibm.rational.clearcase.tutorial.doc/topics/a_clearmake.html).
+These build systems also model their work as a Merkle tree, and cache intermediate results.
+Nodes in the tree correspond to a file:
+
+- A leaf in the tree corresponds to a source file.
+- Evaluating a branch in the tree means invoking a compiler or other tool that takes one
+  or more files as input, and produces another file.
+
 
 ## Build Requirements
 
