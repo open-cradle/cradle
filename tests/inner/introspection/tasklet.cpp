@@ -4,12 +4,13 @@
 #include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 
-#include "../introspection/tasklet_testing.h"
-#include "../support/core.h"
+#include "../../support/inner_service.h"
+#include "../../support/tasklet_testing.h"
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/introspection/tasklet_impl.h>
 #include <cradle/inner/introspection/tasklet_info.h>
-#include <cradle/inner/service/core.h>
+#include <cradle/inner/service/resources.h>
+//#include <cradle/plugins/disk_cache/serialization/native/native.h>
 
 using namespace cradle;
 
@@ -133,8 +134,8 @@ TEST_CASE("tasklet_await", "[introspection]")
 TEST_CASE("shared_task_for_cacheable", "[introspection]")
 {
     clean_tasklet_admin_fixture fixture;
-    inner_service_core core;
-    init_test_inner_service(core);
+    inner_resources resources;
+    init_test_inner_service(resources);
 
     captured_id cache_key{make_captured_id(87)};
     auto task_creator = []() -> cppcoro::task<blob> {
@@ -142,7 +143,7 @@ TEST_CASE("shared_task_for_cacheable", "[introspection]")
     };
     auto client = create_tasklet_tracker("client_pool", "client_title");
     auto me = make_shared_task_for_cacheable<blob>(
-        core, std::move(cache_key), task_creator, client, "my summary");
+        resources, std::move(cache_key), task_creator, client, "my summary");
     auto res = cppcoro::sync_wait(
         [&]() -> cppcoro::task<blob> { co_return co_await me; }());
 

@@ -18,12 +18,18 @@ file(GLOB_RECURSE test_srcs_unit CONFIGURE_DEPENDS
     "unit/*.cpp")
 add_library(test_lib_unit OBJECT ${test_srcs_unit})
 target_link_libraries(test_lib_unit PUBLIC
-    cradle_outer cradle_inner)
+    cradle_outer
+    cradle_inner
+    cradle_plugins
+    fakeit::fakeit)
 
 # Add the unit test runner.
 add_executable(unit_test_runner)
+target_sources(unit_test_runner PRIVATE
+    support/outer_service.cpp)
 target_link_libraries(unit_test_runner PRIVATE
-    test_lib_runner test_lib_unit)
+    test_lib_runner
+    test_lib_unit)
 
 # Add the unit testing target.
 add_custom_target(
@@ -46,12 +52,18 @@ file(GLOB_RECURSE test_srcs_inner CONFIGURE_DEPENDS
     "inner/*.cpp")
 add_library(test_lib_inner OBJECT ${test_srcs_inner})
 target_link_libraries(test_lib_inner PUBLIC
-    cradle_inner)
+    cradle_plugins
+    cradle_inner
+    Catch2::Catch2)
 
 # Add the inner test runner.
 add_executable(inner_test_runner)
+target_sources(inner_test_runner PRIVATE
+    support/inner_service.cpp
+    support/inner_disk_cached.cpp)
 target_link_libraries(inner_test_runner PRIVATE
-    test_lib_runner test_lib_inner)
+    test_lib_runner
+    test_lib_inner)
 
 # Add the inner testing target.
 add_custom_target(
@@ -69,12 +81,17 @@ file(GLOB_RECURSE test_srcs_external CONFIGURE_DEPENDS
     "external/*.cpp")
 add_library(test_lib_external OBJECT ${test_srcs_external})
 target_link_libraries(test_lib_external PUBLIC
-    cradle_outer cradle_inner)
+    cradle_outer
+    cradle_inner
+    cradle_plugins)
 
 # Add the external test runner.
 add_executable(external_test_runner)
+target_sources(external_test_runner PRIVATE
+    support/outer_service.cpp)
 target_link_libraries(external_test_runner PRIVATE
-    test_lib_runner test_lib_external)
+    test_lib_runner
+    test_lib_external)
 
 # Add the external testing target.
 add_custom_target(
@@ -87,10 +104,43 @@ add_test(
         --build ${CMAKE_BINARY_DIR}
         --target external_tests)
 
+# Define an object library covering the source files in plugins/.
+file(GLOB_RECURSE test_srcs_plugins CONFIGURE_DEPENDS
+    "plugins/*.cpp")
+add_library(test_lib_plugins OBJECT ${test_srcs_plugins})
+target_link_libraries(test_lib_plugins PUBLIC
+    cradle_plugins
+    cradle_outer
+    cradle_inner)
+
+# Add the plugins test runner.
+add_executable(plugins_test_runner)
+target_link_libraries(plugins_test_runner PRIVATE
+    test_lib_runner
+    test_lib_plugins)
+
+# Add the plugins testing target.
+add_custom_target(
+    plugins_tests
+    COMMAND $<TARGET_FILE:plugins_test_runner>
+    DEPENDS plugins_test_runner)
+add_test(
+    NAME plugins_tests
+    COMMAND ${CMAKE_COMMAND}
+        --build ${CMAKE_BINARY_DIR}
+        --target plugins_tests)
+
 # Add a runner covering all unit tests (including external and inner).
 add_executable(all_unit_tests_runner)
+target_sources(all_unit_tests_runner PRIVATE
+    support/inner_service.cpp 
+    support/outer_service.cpp)
 target_link_libraries(all_unit_tests_runner
-    test_lib_runner test_lib_unit test_lib_external test_lib_inner)
+    test_lib_runner
+    test_lib_unit
+    test_lib_external
+    test_lib_inner
+    test_lib_plugins)
 
 # Add a target running all unit tests (including external and inner).
 add_custom_target(
@@ -133,11 +183,17 @@ file(GLOB_RECURSE test_srcs_benchmark CONFIGURE_DEPENDS
     "benchmarks/*.cpp")
 add_library(test_lib_benchmark OBJECT ${test_srcs_benchmark})
 target_link_libraries(test_lib_benchmark PUBLIC
-    cradle_outer cradle_inner benchmark::benchmark)
+    cradle_outer
+    cradle_inner
+    benchmark::benchmark)
 
-add_executable(benchmark_test_runner inner/support/core.cpp)
+add_executable(benchmark_test_runner)
+target_sources(benchmark_test_runner PRIVATE
+    support/inner_service.cpp 
+    support/outer_service.cpp)
 target_link_libraries(benchmark_test_runner PRIVATE
-    test_lib_benchmark)
+    test_lib_benchmark
+    cradle_plugins)
 
 add_custom_target(
     benchmark_tests

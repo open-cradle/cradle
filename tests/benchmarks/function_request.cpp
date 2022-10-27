@@ -5,10 +5,11 @@
 
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/value.h>
-#include <cradle/inner/service/core.h>
+#include <cradle/inner/service/resources.h>
+#include <cradle/plugins/disk_cache/serialization/cereal/cereal.h>
 
-#include "../inner/support/core.h"
-#include "support.h"
+#include "../support/inner_service.h"
+#include "benchmark_support.h"
 
 using namespace cradle;
 

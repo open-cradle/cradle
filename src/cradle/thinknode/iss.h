@@ -1,6 +1,9 @@
 #ifndef CRADLE_THINKNODE_ISS_H
 #define CRADLE_THINKNODE_ISS_H
 
+#include <cppcoro/shared_task.hpp>
+#include <cppcoro/task.hpp>
+
 #include <cradle/thinknode/types.hpp>
 #include <cradle/typing/service/core.h>
 

@@ -21,7 +21,6 @@
 #include <cradle/inner/requests/cereal.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/uuid.h>
-#include <cradle/inner/service/core.h>
 #include <cradle/inner/service/request.h>
 
 namespace cradle {

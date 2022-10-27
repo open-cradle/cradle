@@ -4,16 +4,17 @@
 #include <spdlog/spdlog.h>
 
 #include <cradle/inner/requests/value.h>
-#include <cradle/inner/service/core.h>
 #include <cradle/inner/service/request.h>
+#include <cradle/inner/service/resources.h>
+#include <cradle/plugins/disk_cache/serialization/cereal/cereal.h>
 #include <cradle/thinknode/iss_req_class.h>
 #include <cradle/typing/encodings/msgpack.h>
 #include <cradle/typing/io/mock_http.h>
 #include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
-#include "../inner/support/core.h"
-#include "support.h"
+#include "../support/inner_service.h"
+#include "benchmark_support.h"
 
 using namespace cradle;
 using namespace std;
@@ -155,7 +156,7 @@ BM_resolve_thinknode_request(
                     }
                     if constexpr (need_empty_disk_cache)
                     {
-                        service.inner_reset_disk_cache();
+                        inner_reset_disk_cache(service);
                     }
                     if constexpr (pause_timing)
                     {

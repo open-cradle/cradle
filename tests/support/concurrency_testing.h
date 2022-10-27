@@ -1,5 +1,5 @@
-#ifndef CRADLE_TESTS_INNER_SUPPORT_CONCURRENCY_TESTING_H
-#define CRADLE_TESTS_INNER_SUPPORT_CONCURRENCY_TESTING_H
+#ifndef CRADLE_TESTS_SUPPORT_CONCURRENCY_TESTING_H
+#define CRADLE_TESTS_SUPPORT_CONCURRENCY_TESTING_H
 
 #include <chrono>
 #include <stdexcept>
@@ -7,8 +7,8 @@
 #include <thread>
 #include <utility>
 
-#include <cradle/inner/service/internals.h>
-#include <cradle/inner/service/types.h>
+#include <cradle/inner/service/resources.h>
+#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
 
 namespace cradle {
 
@@ -26,8 +26,6 @@ struct assertion_error : public std::logic_error
     {
     }
 };
-
-struct inner_service_core;
 
 // Wait up to a second to see if a condition occurs (i.e., returns true).
 // Check once per millisecond to see if it occurs.
@@ -51,12 +49,12 @@ occurs_soon(Condition&& condition, int wait_time_in_ms = 1000)
 // Data is written to the disk cache in a background thread;
 // wait until all these write operations have completed.
 inline void
-sync_wait_write_disk_cache(inner_service_core& service)
+sync_wait_write_disk_cache(inner_resources& service)
 {
-    if (!occurs_soon([&] {
-            return service.inner_internals().disk_write_pool.get_tasks_total()
-                   == 0;
-        }))
+    auto& write_pool
+        = static_cast<local_disk_cache&>(service.disk_cache()).write_pool();
+
+    if (!occurs_soon([&] { return write_pool.get_tasks_total() == 0; }))
     {
         throw assertion_error("Disk cache writes not finished in time");
     }

@@ -6,6 +6,7 @@
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/utilities/text.h>
 #include <cradle/thinknode/calc.h>
+#include <cradle/thinknode/disk_cache_serialization.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/monitoring.h>
 #include <cradle/typing/encodings/msgpack.h>

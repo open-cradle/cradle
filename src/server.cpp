@@ -4,7 +4,10 @@
 
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/file_io.h>
-#include <cradle/typing/encodings/json.h>
+#include <cradle/inner/service/config_map_json.h>
+#include <cradle/inner/service/resources.h>
+#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
+#include <cradle/plugins/disk_cache/storage/local/local_disk_cache_plugin.h>
 #include <cradle/version_info.hpp>
 
 using namespace cradle;
@@ -69,11 +72,17 @@ try
             get_config_search_path(none, "cradle"), "config.json");
     }
 
-    server_config config;
+    service_config_map config_map;
     if (config_path)
-        from_dynamic(
-            &config, parse_json_value(read_file_contents(*config_path)));
+        config_map
+            = read_config_map_from_json(read_file_contents(*config_path));
 
+    // Activate the only disk storage plugin we currently have.
+    activate_local_disk_cache_plugin();
+    config_map[inner_config_keys::DISK_CACHE_FACTORY]
+        = local_disk_cache_config_values::PLUGIN_NAME;
+
+    service_config config{config_map};
     websocket_server server(config);
     server.listen();
     server.run();

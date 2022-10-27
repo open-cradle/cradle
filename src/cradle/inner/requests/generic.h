@@ -11,7 +11,7 @@
 namespace cradle {
 
 struct immutable_cache;
-struct inner_service_core;
+class inner_resources;
 class request_uuid;
 class tasklet_tracker;
 
@@ -89,8 +89,9 @@ concept UncachedContext = true;
 template<typename Ctx>
 concept CachedContext = requires(Ctx& ctx) {
                             {
-                                ctx.get_service()
-                                } -> std::convertible_to<inner_service_core&>;
+                                ctx.get_resources()
+                            }
+                            ->std::convertible_to<inner_resources&>;
                             {
                                 ctx.get_cache()
                                 } -> std::convertible_to<immutable_cache&>;
@@ -168,8 +169,8 @@ class cached_context_intf : public virtual context_intf
  public:
     virtual ~cached_context_intf() = default;
 
-    virtual inner_service_core&
-    get_service()
+    virtual inner_resources&
+    get_resources()
         = 0;
 
     virtual immutable_cache&

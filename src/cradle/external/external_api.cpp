@@ -1,5 +1,7 @@
 #include <cradle/external/external_api_impl.h>
 #include <cradle/external_api.h>
+#include <cradle/inner/service/config.h>
+#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/iam.h>
 #include <cradle/thinknode/iss.h>
@@ -41,32 +43,74 @@ start_service(api_service_config const& config)
     return api_service(config);
 }
 
+static void
+set_optional_map_entry(
+    cradle::service_config_map& config_map,
+    std::string const& key,
+    std::optional<std::size_t> optional_value)
+{
+    if (optional_value)
+    {
+        config_map[key] = *optional_value;
+    }
+}
+
+static void
+set_optional_map_entry(
+    cradle::service_config_map& config_map,
+    std::string const& key,
+    std::optional<int> optional_value)
+{
+    if (optional_value)
+    {
+        config_map[key] = static_cast<std::size_t>(*optional_value);
+    }
+}
+
+static void
+set_optional_map_entry(
+    cradle::service_config_map& config_map,
+    std::string const& key,
+    std::optional<std::string> optional_value)
+{
+    if (optional_value)
+    {
+        config_map[key] = *optional_value;
+    }
+}
+
 cradle::service_config
 make_service_config(api_service_config const& config)
 {
-    cradle::service_config result;
-    if (config.memory_cache_unused_size_limit)
-    {
-        result.immutable_cache = cradle::service_immutable_cache_config{};
-        result.immutable_cache->unused_size_limit
-            = config.memory_cache_unused_size_limit.value();
-    }
-    if (config.disk_cache_directory || config.disk_cache_size_limit)
-    {
-        if (!config.disk_cache_size_limit)
-        {
-            CRADLE_THROW(
-                external_api_violation()
-                << reason_info("config.disk_cache_directory given but not "
-                               "config.disk_cache_size_limit"));
-        }
-        result.disk_cache = cradle::service_disk_cache_config(
-            config.disk_cache_directory, config.disk_cache_size_limit.value());
-    }
-    result.request_concurrency = config.request_concurrency;
-    result.compute_concurrency = config.compute_concurrency;
-    result.http_concurrency = config.http_concurrency;
-    return result;
+    cradle::service_config_map config_map;
+    set_optional_map_entry(
+        config_map,
+        inner_config_keys::MEMORY_CACHE_UNUSED_SIZE_LIMIT,
+        config.memory_cache_unused_size_limit);
+    config_map[inner_config_keys::DISK_CACHE_FACTORY]
+        = local_disk_cache_config_values::PLUGIN_NAME;
+    set_optional_map_entry(
+        config_map,
+        local_disk_cache_config_keys::DIRECTORY,
+        config.disk_cache_directory);
+    set_optional_map_entry(
+        config_map,
+        local_disk_cache_config_keys::SIZE_LIMIT,
+        config.disk_cache_size_limit);
+    set_optional_map_entry(
+        config_map,
+        typing_config_keys::REQUEST_CONCURRENCY,
+        config.request_concurrency);
+    set_optional_map_entry(
+        config_map,
+        typing_config_keys::COMPUTE_CONCURRENCY,
+        config.compute_concurrency);
+    set_optional_map_entry(
+        config_map,
+        typing_config_keys::HTTP_CONCURRENCY,
+        config.http_concurrency);
+
+    return cradle::service_config(config_map);
 }
 
 api_service_impl::api_service_impl(api_service_config const& config)

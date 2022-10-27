@@ -6,11 +6,12 @@
 #include <cppcoro/shared_task.hpp>
 
 #include <cradle/inner/core/id.h>
+#include <cradle/inner/service/core.h>
 
 namespace cradle {
 
 struct id_interface;
-struct inner_service_core;
+class inner_resources;
 
 /**
  * Tracks a "tasklet": a conceptual task, implemented as a coroutine
@@ -179,14 +180,14 @@ shared_task_wrapper(
 template<typename Value, typename TaskCreator>
 cppcoro::shared_task<Value>
 make_shared_task_for_cacheable(
-    inner_service_core& service,
+    inner_resources& resources,
     captured_id const& cache_key,
     TaskCreator task_creator,
     tasklet_tracker* client,
     std::string summary)
 {
     auto shared_task
-        = fully_cached<Value>(service, cache_key, std::move(task_creator));
+        = fully_cached<Value>(resources, cache_key, std::move(task_creator));
     if (client)
     {
         return detail::shared_task_wrapper<Value>(

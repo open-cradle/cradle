@@ -1,24 +1,26 @@
 #ifndef CRADLE_INNER_SERVICE_REQUEST_H
 #define CRADLE_INNER_SERVICE_REQUEST_H
 
-#include <sstream>
 #include <type_traits>
 
-#include <cereal/archives/binary.hpp>
 #include <cppcoro/fmap.hpp>
 #include <cppcoro/shared_task.hpp>
 #include <cppcoro/task.hpp>
 
-#include <cradle/inner/caching/disk_cache.h>
 #include <cradle/inner/caching/immutable.h>
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/internals.h>
-#include <cradle/inner/service/types.h>
+#include <cradle/inner/service/disk_cache_intf.h>
+#include <cradle/inner/service/disk_cache_serialization.h>
+#include <cradle/inner/service/disk_cached_blob.h>
+#include <cradle/inner/service/resources.h>
 
 namespace cradle {
 
+// Resolves a memory-cached request using some sort of disk cache.
+// A memory-cached request needs no disk cache, so it can be resolved
+// right away (by calling the request's function).
 template<typename Ctx, typename Req>
     requires(Req::caching_level == caching_level_type::memory)
 cppcoro::task<typename Req::value_type> resolve_disk_cached(
@@ -27,59 +29,39 @@ cppcoro::task<typename Req::value_type> resolve_disk_cached(
     return req.resolve(ctx);
 }
 
-// Values are stored in the disk cache after serializing using cereal.
-// Supporting different serialization algorithms won't be easy.
-template<typename Value>
-blob
-serialize_value(Value const& value)
-{
-    std::stringstream ss;
-    cereal::BinaryOutputArchive oarchive(ss);
-    oarchive(value);
-    return make_blob(ss.str());
-}
-
-template<typename Value>
-Value
-deserialize_value(blob const& x)
-{
-    auto data = reinterpret_cast<char const*>(x.data());
-    std::stringstream is;
-    is.str(std::string(data, x.size()));
-    cereal::BinaryInputArchive iarchive(is);
-    Value res;
-    iarchive(res);
-    return res;
-}
-
+// Resolves a fully-cached request using some sort of disk cache, and some
+// sort of serialization.
 template<typename Ctx, typename Req>
-    requires(FullyCachedContextRequest<Ctx, Req>)
-cppcoro::task<typename Req::value_type> resolve_disk_cached(
-    Ctx& ctx, Req const& req)
+requires(FullyCachedContextRequest<Ctx, Req>)
+    cppcoro::task<typename Req::value_type> resolve_disk_cached(
+        Ctx& ctx, Req const& req)
 {
     using Value = typename Req::value_type;
-    inner_service_core& core{ctx.get_service()};
+    inner_resources& resources{ctx.get_resources()};
     captured_id const& key{req.get_captured_id()};
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
-        co_return serialize_value(co_await req.resolve(ctx));
+        co_return serialize_disk_cache_value(co_await req.resolve(ctx));
     };
-    co_return deserialize_value<Value>(
-        co_await disk_cached<blob>(core, key, create_blob_task));
+    co_return deserialize_disk_cache_value<Value>(
+        co_await disk_cached_blob(resources, key, create_blob_task));
 }
 
-// Subsuming the concepts from the previous template
+// Subsuming the concepts from the previous template.
+// A blob stored in the disk cache need not be serialized, saving some
+// overhead.
+// Maybe this decision should be in the plugin but that would require the
+// plugin always to be #include'd before the present request.h.
 template<typename Ctx, typename Req>
-    requires(
-        FullyCachedContextRequest<Ctx, Req>
-        && std::same_as<typename Req::value_type, blob>)
-cppcoro::task<blob> resolve_disk_cached(Ctx& ctx, Req const& req)
+requires(FullyCachedContextRequest<Ctx, Req>&&
+             std::same_as<typename Req::value_type, blob>)
+    cppcoro::task<blob> resolve_disk_cached(Ctx& ctx, Req const& req)
 {
-    inner_service_core& core{ctx.get_service()};
+    inner_resources& resources{ctx.get_resources()};
     captured_id const& key{req.get_captured_id()};
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
         co_return co_await req.resolve(ctx);
     };
-    return disk_cached<blob>(core, key, create_blob_task);
+    return disk_cached_blob(resources, key, create_blob_task);
 }
 
 // This function, being a coroutine, takes key by value.

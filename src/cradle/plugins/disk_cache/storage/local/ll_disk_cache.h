@@ -1,13 +1,16 @@
-#ifndef CRADLE_INNER_CACHING_DISK_CACHE_H
-#define CRADLE_INNER_CACHING_DISK_CACHE_H
+#ifndef CRADLE_PLUGINS_DISK_CACHE_STORAGE_LOCAL_LL_DISK_CACHE_H
+#define CRADLE_PLUGINS_DISK_CACHE_STORAGE_LOCAL_LL_DISK_CACHE_H
 
+#include <cstddef>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/fs/types.h>
+#include <cradle/inner/service/config.h>
 
 namespace cradle {
 
@@ -25,16 +28,22 @@ namespace cradle {
 // A cache is internally protected by a mutex, so it can be used concurrently
 // from multiple threads.
 
-struct disk_cache_config
+// ll_disk_cache stands for "low level disk cache": it is a helper in the
+// implementation of the local disk cache.
+
+struct ll_disk_cache_config
 {
     std::optional<std::string> directory;
-    size_t size_limit;
+    std::optional<size_t> size_limit;
 };
 
-struct disk_cache_info
+struct ll_disk_cache_info
 {
     // the directory where the cache is stored
     std::string directory;
+
+    // maximum size of the disk cache
+    int64_t size_limit;
 
     // the number of entries currently stored in the cache
     int64_t entry_count;
@@ -43,7 +52,7 @@ struct disk_cache_info
     int64_t total_size;
 };
 
-struct disk_cache_entry
+struct ll_disk_cache_entry
 {
     // the key for the entry
     std::string key;
@@ -70,28 +79,28 @@ struct disk_cache_entry
 };
 
 // This exception indicates a failure in the operation of the disk cache.
-CRADLE_DEFINE_EXCEPTION(disk_cache_failure)
+CRADLE_DEFINE_EXCEPTION(ll_disk_cache_failure)
 // This provides the path to the disk cache directory.
-CRADLE_DEFINE_ERROR_INFO(file_path, disk_cache_path)
+CRADLE_DEFINE_ERROR_INFO(file_path, ll_disk_cache_path)
 // This exception also provides internal_error_message_info.
 
-struct disk_cache_impl;
+struct ll_disk_cache_impl;
 
-struct disk_cache
+struct ll_disk_cache
 {
     // The default constructor creates an invalid disk cache that must be
     // initialized via reset().
-    disk_cache();
+    ll_disk_cache();
 
     // Create a disk cache that's initialized with the given config.
-    disk_cache(disk_cache_config const& config);
+    ll_disk_cache(ll_disk_cache_config const& config);
 
-    ~disk_cache();
+    ~ll_disk_cache();
 
     // Reset the cache with a new config.
     // After a successful call to this, the cache is considered initialized.
     void
-    reset(disk_cache_config const& config);
+    reset(ll_disk_cache_config const& config);
 
     // Reset the cache to an uninitialized state.
     void
@@ -108,12 +117,12 @@ struct disk_cache
     // returns true.
 
     // Get summary information about the cache.
-    disk_cache_info
+    ll_disk_cache_info
     get_summary_info();
 
     // Get a list of all entries in the cache.
     // Note that none of the returned entries will include values.
-    std::vector<disk_cache_entry>
+    std::vector<ll_disk_cache_entry>
     get_entry_list();
 
     // Remove an individual entry from the cache.
@@ -132,7 +141,7 @@ struct disk_cache
     // Note that for entries stored directly in the database, this also
     // retrieves the value associated with the entry.
     //
-    std::optional<disk_cache_entry>
+    std::optional<ll_disk_cache_entry>
     find(std::string const& key);
 
     // Add a small entry to the cache.
@@ -195,7 +204,7 @@ struct disk_cache
     do_idle_processing();
 
  private:
-    std::unique_ptr<disk_cache_impl> impl_;
+    std::unique_ptr<ll_disk_cache_impl> impl_;
 };
 
 } // namespace cradle

@@ -4,10 +4,11 @@
 
 #include <filesystem>
 
+#include <cradle/inner/service/core.h>
 #include <cradle/typing/service/internals.h>
 #include <cradle/typing/utilities/testing.h>
 
-#include "../../inner/support/concurrency_testing.h"
+#include "../../support/concurrency_testing.h"
 
 using namespace cradle;
 

@@ -5,6 +5,7 @@
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
+#include <cradle/thinknode/disk_cache_serialization.h>
 #include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/monitoring.h>

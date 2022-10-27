@@ -1,4 +1,4 @@
-#include <cradle/inner/caching/disk_cache.h>
+#include <cradle/plugins/disk_cache/storage/local/ll_disk_cache.h>
 
 #include <chrono>
 #include <filesystem>
@@ -19,11 +19,11 @@ using namespace cradle;
 namespace {
 
 void
-init_disk_cache(disk_cache& cache, string const& cache_dir = "disk_cache")
+init_disk_cache(ll_disk_cache& cache, string const& cache_dir = "disk_cache")
 {
     reset_directory(cache_dir);
 
-    disk_cache_config config;
+    ll_disk_cache_config config;
     config.directory = some(cache_dir);
     // Given the way that the value strings are generated below, this is
     // enough to hold a little under 20 items (which matters for testing
@@ -65,7 +65,7 @@ generate_value_string(int item_id)
 // The return value indicates whether or not the item was already cached.
 //
 bool
-test_item_access(disk_cache& cache, int item_id)
+test_item_access(ll_disk_cache& cache, int item_id)
 {
     auto key = generate_key_string(item_id);
     auto value = generate_value_string(item_id);
@@ -129,17 +129,17 @@ test_item_access(disk_cache& cache, int item_id)
 
 } // namespace
 
-TEST_CASE("resetting", "[disk_cache]")
+TEST_CASE("resetting", "[ll_disk_cache]")
 {
-    disk_cache cache;
+    ll_disk_cache cache;
     init_disk_cache(cache);
     cache.reset();
     REQUIRE(!cache.is_initialized());
 }
 
-TEST_CASE("simple item access", "[disk_cache]")
+TEST_CASE("simple item access", "[ll_disk_cache]")
 {
-    disk_cache cache;
+    ll_disk_cache cache;
     init_disk_cache(cache);
     // The first time, it shouldn't be in the cache, but the second time, it
     // should be.
@@ -149,9 +149,9 @@ TEST_CASE("simple item access", "[disk_cache]")
     REQUIRE(test_item_access(cache, 1));
 }
 
-TEST_CASE("multiple initializations", "[disk_cache]")
+TEST_CASE("multiple initializations", "[ll_disk_cache]")
 {
-    disk_cache cache;
+    ll_disk_cache cache;
     init_disk_cache(cache);
     init_disk_cache(cache, "alt_disk_cache");
     // Test that it can still handle basic operations.
@@ -161,9 +161,9 @@ TEST_CASE("multiple initializations", "[disk_cache]")
     REQUIRE(test_item_access(cache, 1));
 }
 
-TEST_CASE("clearing", "[disk_cache]")
+TEST_CASE("clearing", "[ll_disk_cache]")
 {
-    disk_cache cache;
+    ll_disk_cache cache;
     init_disk_cache(cache);
     REQUIRE(!test_item_access(cache, 0));
     REQUIRE(!test_item_access(cache, 1));
@@ -174,9 +174,9 @@ TEST_CASE("clearing", "[disk_cache]")
     REQUIRE(!test_item_access(cache, 1));
 }
 
-TEST_CASE("LRU removal", "[disk_cache]")
+TEST_CASE("LRU removal", "[ll_disk_cache]")
 {
-    disk_cache cache;
+    ll_disk_cache cache;
     init_disk_cache(cache);
     test_item_access(cache, 0);
     test_item_access(cache, 1);
@@ -201,9 +201,9 @@ TEST_CASE("LRU removal", "[disk_cache]")
     }
 }
 
-TEST_CASE("entry removal error", "[disk_cache]")
+TEST_CASE("entry removal error", "[ll_disk_cache]")
 {
-    disk_cache cache;
+    ll_disk_cache cache;
     init_disk_cache(cache);
 
     // Access item 1 and then open the file that holds it to create a lock on
@@ -232,9 +232,9 @@ TEST_CASE("entry removal error", "[disk_cache]")
     test_item_access(cache, 1);
 }
 
-TEST_CASE("manual entry removal", "[disk_cache]")
+TEST_CASE("manual entry removal", "[ll_disk_cache]")
 {
-    disk_cache cache;
+    ll_disk_cache cache;
     init_disk_cache(cache);
     for (int i = 0; i != 2; ++i)
     {
@@ -252,9 +252,9 @@ TEST_CASE("manual entry removal", "[disk_cache]")
     }
 }
 
-TEST_CASE("cache summary info", "[disk_cache]")
+TEST_CASE("cache summary info", "[ll_disk_cache]")
 {
-    disk_cache cache;
+    ll_disk_cache cache;
 
     int64_t expected_size = 0;
     int64_t expected_count = 0;
@@ -297,9 +297,9 @@ TEST_CASE("cache summary info", "[disk_cache]")
     check_summary_info();
 }
 
-TEST_CASE("cache entry list", "[disk_cache]")
+TEST_CASE("cache entry list", "[ll_disk_cache]")
 {
-    disk_cache cache;
+    ll_disk_cache cache;
     init_disk_cache(cache);
     test_item_access(cache, 0);
     test_item_access(cache, 1);
@@ -327,7 +327,7 @@ TEST_CASE("cache entry list", "[disk_cache]")
     }
 }
 
-TEST_CASE("corrupt cache", "[disk_cache]")
+TEST_CASE("corrupt cache", "[ll_disk_cache]")
 {
     // Set up an invalid cache directory.
     reset_directory("disk_cache");
@@ -337,12 +337,12 @@ TEST_CASE("corrupt cache", "[disk_cache]")
 
     // Check that the cache still initializes and that the extraneous file
     // is removed.
-    disk_cache cache;
+    ll_disk_cache cache;
     init_disk_cache(cache);
     REQUIRE(!exists(extraneous_file));
 }
 
-TEST_CASE("incompatible cache", "[disk_cache]")
+TEST_CASE("incompatible cache", "[ll_disk_cache]")
 {
     // Set up a cache directory with an incompatible database version number.
     reset_directory("disk_cache");
@@ -359,7 +359,7 @@ TEST_CASE("incompatible cache", "[disk_cache]")
 
     // Check that the cache still initializes and that the extraneous file
     // is removed.
-    disk_cache cache;
+    ll_disk_cache cache;
     init_disk_cache(cache);
     REQUIRE(!exists(extraneous_file));
 }

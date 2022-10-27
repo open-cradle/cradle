@@ -4,11 +4,12 @@
 #include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 
-#include "../support/concurrency_testing.h"
-#include "../support/core.h"
-#include "../support/request.h"
-#include <cradle/inner/service/core.h>
+#include "../../support/concurrency_testing.h"
+#include "../../support/inner_service.h"
+#include "../../support/request.h"
 #include <cradle/inner/service/request.h>
+#include <cradle/inner/service/resources.h>
+#include <cradle/plugins/disk_cache/serialization/cereal/cereal.h>
 
 using namespace cradle;
 
@@ -269,7 +270,7 @@ TEST_CASE("evaluate erased function request V+V - fully cached", "[requests]")
     // Resolving a fully-cached request stores the result in both
     // memory cache and disk cache.
     auto res00 = cppcoro::sync_wait(resolve_request(ctx, req_full));
-    sync_wait_write_disk_cache(ctx.get_service());
+    sync_wait_write_disk_cache(ctx.get_resources());
     REQUIRE(res00 == 7);
     REQUIRE(num_add_calls == 1);
 
@@ -405,6 +406,9 @@ TEST_CASE("evaluate function requests in parallel - disk cached", "[requests]")
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     cached_request_resolution_context ctx{};
+    auto& ll_cache
+        = static_cast<local_disk_cache&>(ctx.get_resources().disk_cache())
+              .get_ll_disk_cache();
     std::vector<Req> requests;
     for (int i = 0; i < num_requests; ++i)
     {
@@ -415,7 +419,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", "[requests]")
     }
 
     auto res0 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
-    sync_wait_write_disk_cache(ctx.get_service());
+    sync_wait_write_disk_cache(ctx.get_resources());
 
     REQUIRE(res0.size() == num_requests);
     for (int i = 0; i < num_requests; ++i)
@@ -425,8 +429,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", "[requests]")
     REQUIRE(num_add_calls == num_requests);
     auto ic0 = get_summary_info(ctx.get_cache());
     REQUIRE(ic0.entry_count == num_requests);
-    auto dc0
-        = ctx.get_service().inner_internals().disk_cache.get_summary_info();
+    auto dc0 = ll_cache.get_summary_info();
     REQUIRE(dc0.entry_count == num_requests);
 
     ctx.reset_memory_cache();
@@ -441,7 +444,6 @@ TEST_CASE("evaluate function requests in parallel - disk cached", "[requests]")
     REQUIRE(num_add_calls == num_requests);
     auto ic1 = get_summary_info(ctx.get_cache());
     REQUIRE(ic1.entry_count == num_requests);
-    auto dc1
-        = ctx.get_service().inner_internals().disk_cache.get_summary_info();
+    auto dc1 = ll_cache.get_summary_info();
     REQUIRE(dc1.entry_count == num_requests);
 }

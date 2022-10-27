@@ -1,16 +1,34 @@
 #ifndef CRADLE_TYPING_SERVICE_CORE_H
 #define CRADLE_TYPING_SERVICE_CORE_H
 
+// Services exposed by the typing subsystem.
+
 #include <memory>
 
-#include <cppcoro/fmap.hpp>
-
-#include <cradle/inner/service/core.h>
+#include <cradle/inner/service/config.h>
+#include <cradle/inner/service/resources.h>
 #include <cradle/typing/io/http_requests.hpp>
 #include <cradle/typing/service/internals.h>
-#include <cradle/typing/service/types.hpp>
 
 namespace cradle {
+
+// Configuration keys for the typing subsystem
+struct typing_config_keys
+{
+    // (Optional integer)
+    // How many concurrent threads to use for request handling.
+    // The default is one thread for each processor core.
+    inline static std::string const REQUEST_CONCURRENCY{"request_concurrency"};
+
+    // (Optional integer)
+    // How many concurrent threads to use for computing.
+    // The default is one thread for each processor core.
+    inline static std::string const COMPUTE_CONCURRENCY{"compute_concurrency"};
+
+    // (Optional integer)
+    // How many concurrent threads to use for HTTP requests
+    inline static std::string const HTTP_CONCURRENCY{"http_concurrency"};
+};
 
 namespace detail {
 
@@ -18,21 +36,19 @@ struct service_core_internals;
 
 }
 
-struct service_core : public inner_service_core
+struct service_core : public inner_resources
 {
-    service_core() : inner_service_core()
+    service_core() : inner_resources()
     {
     }
-    service_core(service_config const& config) : inner_service_core()
+
+    service_core(service_config const& config) : inner_resources()
     {
-        reset(config);
+        initialize(config);
     }
-    ~service_core();
 
     void
-    reset();
-    void
-    reset(service_config const& config);
+    initialize(service_config const& config);
 
     detail::service_core_internals&
     internals()
@@ -52,29 +68,6 @@ async_http_request(
     service_core& core,
     http_request request,
     tasklet_tracker* client = nullptr);
-
-template<>
-cppcoro::task<dynamic>
-disk_cached(
-    inner_service_core& core,
-    captured_id key,
-    std::function<cppcoro::task<dynamic>()> create_task);
-
-template<class Value>
-cppcoro::task<Value>
-disk_cached(
-    inner_service_core& core,
-    captured_id key,
-    std::function<cppcoro::task<Value>()> create_task)
-{
-    return cppcoro::make_task(cppcoro::fmap(
-        CRADLE_LAMBDIFY(from_dynamic<Value>),
-        disk_cached<dynamic>(
-            core, key, [create_task = std::move(create_task)]() {
-                return cppcoro::make_task(cppcoro::fmap(
-                    CRADLE_LAMBDIFY(to_dynamic<Value>), create_task()));
-            })));
-}
 
 // Initialize a service for unit testing purposes.
 void

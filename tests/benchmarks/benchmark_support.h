@@ -1,9 +1,9 @@
-#ifndef CRADLE_TESTS_BENCHMARKS_SUPPORT_H
-#define CRADLE_TESTS_BENCHMARKS_SUPPORT_H
+#ifndef CRADLE_TESTS_BENCHMARKS_BENCHMARK_SUPPORT_H
+#define CRADLE_TESTS_BENCHMARKS_BENCHMARK_SUPPORT_H
 
 #include <benchmark/benchmark.h>
 
-#include "../inner/support/concurrency_testing.h"
+#include "../support/concurrency_testing.h"
 #include <cradle/inner/service/request.h>
 
 namespace cradle {
@@ -48,8 +48,7 @@ call_resolve_by_ptr_loop(Req const& req)
 // not measured
 // - Each equals() will immediately return true, so is also not really measured
 template<typename Ctx, RequestOrPtr Req>
-    requires(MatchingContextRequest<Ctx, typename Req::element_type>)
-void resolve_request_loop(
+requires(MatchingContextRequest<Ctx, typename Req::element_type>) void resolve_request_loop(
     benchmark::State& state, Ctx& ctx, Req const& req, int num_loops = 1000)
 {
     constexpr auto caching_level = Req::element_type::caching_level;
@@ -59,7 +58,7 @@ void resolve_request_loop(
             state.PauseTiming();
             ctx.reset_memory_cache();
             benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
-            sync_wait_write_disk_cache(ctx.get_service());
+            sync_wait_write_disk_cache(ctx.get_resources());
             state.ResumeTiming();
         }
         for (int i = 0; i < num_loops; ++i)
@@ -78,8 +77,8 @@ void resolve_request_loop(
 }
 
 template<typename Ctx, RequestOrPtr Req>
-    requires(MatchingContextRequest<Ctx, typename Req::element_type>)
-void BM_resolve_request(benchmark::State& state, Ctx& ctx, Req const& req)
+requires(MatchingContextRequest<Ctx, typename Req::element_type>) void BM_resolve_request(
+    benchmark::State& state, Ctx& ctx, Req const& req)
 {
     for (auto _ : state)
     {

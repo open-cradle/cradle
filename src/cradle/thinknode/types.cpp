@@ -1,5 +1,4 @@
-#include <cradle/inner/service/internals.h>
-#include <cradle/inner/service/types.h>
+#include <cradle/inner/service/resources.h>
 #include <cradle/thinknode/types.hpp>
 #include <cradle/typing/service/core.h>
 
@@ -15,8 +14,8 @@ thinknode_request_context::thinknode_request_context(
     }
 }
 
-inner_service_core&
-thinknode_request_context::get_service()
+inner_resources&
+thinknode_request_context::get_resources()
 {
     return service;
 }
@@ -24,7 +23,7 @@ thinknode_request_context::get_service()
 immutable_cache&
 thinknode_request_context::get_cache()
 {
-    return service.inner_internals().cache;
+    return service.memory_cache();
 }
 
 tasklet_tracker*
