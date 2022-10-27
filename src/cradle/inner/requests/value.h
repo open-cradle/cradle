@@ -6,12 +6,16 @@
 
 #include <cppcoro/task.hpp>
 
+#include <cradle/inner/core/hash.h>
+#include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/uuid.h>
 
 namespace cradle {
 
 /**
  * Request for an immediate value. No caching, no introspection.
+ * Satisfies concept UncachedRequest.
  */
 template<typename Value>
 class value_request
@@ -31,21 +35,65 @@ class value_request
     {
     }
 
+    request_uuid
+    get_uuid() const
+    {
+        // Zero uuid information
+        return request_uuid();
+    }
+
     Value
     get_value() const
     {
         return value_;
     }
 
-    template<typename Context>
+    void
+    update_hash(unique_hasher& hasher) const
+    {
+        update_unique_hash(hasher, value_);
+    }
+
+    // VS2019 build fails with
+    // resolve(UncachedContext auto& ctx) const
+    template<UncachedContext Ctx>
     cppcoro::task<Value>
-    resolve(Context const& ctx) const
+    resolve(Ctx& ctx) const
     {
         co_return value_;
     }
 
+ public:
+    // cereal interface
+    value_request() = default;
+
+    template<typename Archive>
+    void
+    serialize(Archive& archive)
+    {
+        archive(value_);
+    }
+
  private:
     Value value_;
+};
+
+template<typename Value>
+struct arg_type_struct<value_request<Value>>
+{
+    using value_type = Value;
+};
+
+template<typename Value>
+struct arg_type_struct<std::unique_ptr<value_request<Value>>>
+{
+    using value_type = Value;
+};
+
+template<typename Value>
+struct arg_type_struct<std::shared_ptr<value_request<Value>>>
+{
+    using value_type = Value;
 };
 
 template<typename Value>
@@ -67,6 +115,74 @@ auto
 rq_value_sp(Value&& value)
 {
     return std::make_shared<value_request<Value>>(std::forward<Value>(value));
+}
+
+// operator==() and operator<() are used:
+// - For memory cache, ordered map (currently not selected)
+// - When a value request is an argument to another request
+//
+// Value should support operator==() and operator<(), but not necessarily all
+// comparison operators demanded by the std::equality_comparable and
+// std::totally_ordered concepts.
+// The comparison operators that it does implement should comprise a
+// consistent ordering relation.
+template<typename Value>
+bool
+operator==(value_request<Value> const& lhs, value_request<Value> const& rhs)
+{
+    return lhs.get_value() == rhs.get_value();
+}
+
+template<typename Value>
+bool
+operator<(value_request<Value> const& lhs, value_request<Value> const& rhs)
+{
+    return lhs.get_value() < rhs.get_value();
+}
+
+// For memory cache, unordered map
+template<typename Value>
+size_t
+hash_value(value_request<Value> const& req)
+{
+    return invoke_hash(req.get_value());
+}
+
+template<typename Value>
+size_t
+hash_value(std::unique_ptr<value_request<Value>> const& req)
+{
+    return invoke_hash(req->get_value());
+}
+
+template<typename Value>
+size_t
+hash_value(std::shared_ptr<value_request<Value>> const& req)
+{
+    return invoke_hash(req->get_value());
+}
+
+template<typename Value>
+void
+update_unique_hash(unique_hasher& hasher, value_request<Value> const& req)
+{
+    req.update_hash(hasher);
+}
+
+template<typename Value>
+void
+update_unique_hash(
+    unique_hasher& hasher, std::unique_ptr<value_request<Value>> const& req)
+{
+    req->update_hash(hasher);
+}
+
+template<typename Value>
+void
+update_unique_hash(
+    unique_hasher& hasher, std::shared_ptr<value_request<Value>> const& req)
+{
+    req->update_hash(hasher);
 }
 
 } // namespace cradle

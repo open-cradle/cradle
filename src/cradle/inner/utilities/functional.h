@@ -39,8 +39,8 @@ template<class Container, class Fn>
 auto
 map_to_vector(Fn const& fn, Container&& container)
 {
-    typedef decltype(
-        fn(std::declval<typename std::decay<Container>::type::value_type>()))
+    typedef decltype(fn(
+        std::declval<typename std::decay<Container>::type::value_type>()))
         mapped_item_type;
     std::vector<mapped_item_type> result;
     result.reserve(container.size());

@@ -14,7 +14,7 @@ namespace cradle {
 
 namespace detail {
 
-struct immutable_cache;
+struct immutable_cache_impl;
 
 } // namespace detail
 
@@ -23,6 +23,12 @@ struct immutable_cache_config
     // The maximum amount of memory to use for caching results that are no
     // longer in use, in bytes.
     size_t unused_size_limit;
+};
+
+struct immutable_cache_info
+{
+    // The number of entries currently stored in the cache.
+    size_t entry_count;
 };
 
 struct immutable_cache
@@ -52,7 +58,7 @@ struct immutable_cache
         return impl ? true : false;
     }
 
-    std::unique_ptr<detail::immutable_cache> impl;
+    std::unique_ptr<detail::immutable_cache_impl> impl;
 };
 
 enum class immutable_cache_entry_state
@@ -85,7 +91,8 @@ struct immutable_cache_entry_snapshot
     size_t size;
 
     auto
-    operator<=>(immutable_cache_entry_snapshot const& other) const = default;
+    operator<=>(immutable_cache_entry_snapshot const& other) const
+        = default;
 };
 
 struct immutable_cache_snapshot
@@ -97,13 +104,24 @@ struct immutable_cache_snapshot
     // necessary
     std::vector<immutable_cache_entry_snapshot> pending_eviction;
 
+    // Total size of the cache entries on the eviction list.
+    // The size of a cache entry in LOADING state counts as zero.
+    size_t total_size_eviction_list{0};
+
+    bool
+    operator==(immutable_cache_snapshot const& other) const;
+
     auto
-    operator<=>(immutable_cache_snapshot const& other) const = default;
+    operator<=>(immutable_cache_snapshot const& other) const;
 };
 
 // Get a snapshot of the contents of an immutable memory cache.
 immutable_cache_snapshot
 get_cache_snapshot(immutable_cache& cache);
+
+// Get summary information about the cache.
+immutable_cache_info
+get_summary_info(immutable_cache& cache);
 
 // Clear unused entries from the cache.
 void

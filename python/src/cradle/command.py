@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, Optional
 
 import msgpack  # type: ignore
@@ -284,3 +285,38 @@ class IntrospectionClearAdminCommand(Command):
 
     def decode_content(self, _content: Content) -> None:
         return None
+
+
+class QueryRequestsMetaInfoCommand(Command):
+    def name(self) -> str:
+        return 'query requests meta info'
+
+    def create_content(self) -> Content:
+        return \
+            {
+                'requests_meta_info_query': {
+                }
+            }
+
+    def decode_content(self, content: Content) -> Object:
+        return content['requests_meta_info_response']
+
+
+class ResolveRequestCommand(Command):
+    def __init__(self, context_id: str, req_data: Object):
+        super().__init__(context_id)
+        self.json_text = json.dumps(req_data)
+
+    def name(self) -> str:
+        return 'resolve request'
+
+    def create_content(self) -> Content:
+        return \
+            {
+                'resolve_request': {
+                    'json_text': self.json_text
+                }
+            }
+
+    def decode_content(self, content: Content) -> Object:
+        return content['resolve_request_response']

@@ -1,6 +1,7 @@
 #ifndef CRADLE_INNER_CORE_EXCEPTION_H
 #define CRADLE_INNER_CORE_EXCEPTION_H
 
+#include <stdexcept>
 #include <string>
 
 #include <boost/exception/all.hpp>
@@ -54,6 +55,21 @@ get_required_error_info(Exception const& e)
     }
     return *info;
 }
+
+struct not_implemented_error : public std::logic_error
+{
+    not_implemented_error() : std::logic_error("Not implemented")
+    {
+    }
+
+    not_implemented_error(std::string const& what) : std::logic_error(what)
+    {
+    }
+
+    not_implemented_error(char const* what) : std::logic_error(what)
+    {
+    }
+};
 
 } // namespace cradle
 

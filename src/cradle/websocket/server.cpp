@@ -17,6 +17,8 @@
 #include <boost/crc.hpp>
 #endif
 
+#include <cereal/archives/json.hpp>
+
 #include <picosha2.h>
 
 #include <websocketpp/config/asio_no_tls.hpp>
@@ -38,10 +40,13 @@
 #include <cppcoro/when_all.hpp>
 
 #include <cradle/inner/caching/disk_cache.h>
+#include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/introspection/tasklet.h>
+#include <cradle/inner/requests/function.h>
+#include <cradle/inner/service/request.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
 #include <cradle/inner/utilities/text.h>
@@ -49,15 +54,17 @@
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/iam.h>
 #include <cradle/thinknode/iss.h>
+#include <cradle/thinknode/iss_req_func.h>
 #include <cradle/thinknode/utilities.h>
+#include <cradle/typing/core/unique_hash.h>
 #include <cradle/typing/encodings/json.h>
 #include <cradle/typing/encodings/msgpack.h>
-#include <cradle/typing/encodings/sha256_hash_id.h>
 #include <cradle/typing/encodings/yaml.h>
 #include <cradle/typing/io/http_requests.hpp>
 #include <cradle/typing/utilities/diff.hpp>
 #include <cradle/typing/utilities/logging.h>
 #include <cradle/websocket/calculations.h>
+#include <cradle/websocket/catalog.h>
 #include <cradle/websocket/introspection.h>
 #include <cradle/websocket/messages.hpp>
 
@@ -332,7 +339,7 @@ resolve_named_type_reference(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 
@@ -418,7 +425,7 @@ coerce_encoded_object(
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 
@@ -1736,6 +1743,28 @@ process_message(websocket_server_impl& server, client_request request)
                     response));
             break;
         }
+        case client_message_content_tag::REQUESTS_META_INFO_QUERY: {
+            std::string git_version = request_uuid::get_git_version();
+            auto response = make_requests_meta_info_response(git_version);
+            send_response(
+                server,
+                request,
+                make_server_message_content_with_requests_meta_info_response(
+                    response));
+            break;
+        }
+        case client_message_content_tag::RESOLVE_REQUEST: {
+            auto const& rr = as_resolve_request(content);
+            auto ctx{make_thinknode_request_context(server, request)};
+            dynamic response
+                = co_await resolve_serialized_request(ctx, rr.json_text);
+            send_response(
+                server,
+                request,
+                make_server_message_content_with_resolve_request_response(
+                    response));
+            break;
+        }
         default:
         case client_message_content_tag::KILL: {
             break;
@@ -1878,6 +1907,8 @@ initialize(websocket_server_impl& server, server_config const& config)
         spdlog::register_logger(combined_logger);
         spdlog::set_pattern("[%H:%M:%S:%e] [thread %t] %v");
     }
+
+    create_requests_catalog();
 }
 
 websocket_server::websocket_server(server_config const& config)

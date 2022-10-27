@@ -5,11 +5,10 @@
 #include <map>
 #include <unordered_map>
 
-#include <boost/lexical_cast.hpp>
 #include <catch2/catch.hpp>
 
-#include "../../inner/support/ids.h"
-#include <cradle/typing/encodings/sha256_hash_id.h>
+#include "../support/ids.h"
+#include <cradle/inner/core/sha256_hash_id.h>
 
 using namespace cradle;
 
@@ -17,8 +16,10 @@ TEST_CASE("sha256_hashed_id", "[id]")
 {
     test_different_ids(
         make_sha256_hashed_id("token", 0), make_sha256_hashed_id("token", 1));
-    auto as_string
-        = boost::lexical_cast<std::string>(make_sha256_hashed_id("token", 0));
+    unique_hasher hasher;
+    auto id{make_sha256_hashed_id("token", 0)};
+    id.update_hash(hasher);
+    auto as_string{hasher.get_string()};
     REQUIRE(as_string.length() == 64);
     REQUIRE(std::all_of(as_string.begin(), as_string.end(), [](char c) {
         return std::isxdigit(c);

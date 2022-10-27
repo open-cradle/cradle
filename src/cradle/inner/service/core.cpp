@@ -50,6 +50,33 @@ inner_service_core::inner_reset(inner_service_config const& config)
         .disk_write_pool = thread_pool(2)});
 }
 
+void
+inner_service_core::inner_reset_memory_cache()
+{
+    inner_reset_memory_cache(immutable_cache_config{0x40'00'00'00});
+}
+
+void
+inner_service_core::inner_reset_memory_cache(
+    immutable_cache_config const& config)
+{
+    impl_->reset_memory_cache(config);
+}
+
+void
+inner_service_core::inner_reset_disk_cache()
+{
+    disk_cache_config dc_config;
+    dc_config.size_limit = 0x1'00'00'00'00;
+    inner_reset_disk_cache(dc_config);
+}
+
+void
+inner_service_core::inner_reset_disk_cache(disk_cache_config const& config)
+{
+    impl_->reset_disk_cache(config);
+}
+
 cppcoro::task<std::string>
 read_file_contents(inner_service_core& core, file_path const& path)
 {
@@ -67,13 +94,14 @@ blob_to_string(blob const& x)
     return os.str();
 }
 
+// This is a coroutine so takes id_key by value.
 cppcoro::task<blob>
 generic_disk_cached(
     inner_service_core& core,
-    id_interface const& id_key,
+    captured_id id_key,
     std::function<cppcoro::task<blob>()> create_task)
 {
-    std::string key{boost::lexical_cast<std::string>(id_key)};
+    std::string key{get_unique_string(*id_key)};
     // Check the cache for an existing value.
     auto& cache = core.inner_internals().disk_cache;
     try
@@ -200,7 +228,7 @@ template<>
 cppcoro::task<blob>
 disk_cached(
     inner_service_core& core,
-    id_interface const& key,
+    captured_id key,
     std::function<cppcoro::task<blob>()> create_task)
 {
     return detail::generic_disk_cached(core, key, std::move(create_task));

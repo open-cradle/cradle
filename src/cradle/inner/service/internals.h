@@ -18,6 +18,12 @@ struct inner_service_core_internals
     cradle::disk_cache disk_cache;
     cppcoro::static_thread_pool disk_read_pool;
     thread_pool disk_write_pool;
+
+    void
+    reset_memory_cache(immutable_cache_config const& config);
+
+    void
+    reset_disk_cache(disk_cache_config const& config);
 };
 
 } // namespace detail

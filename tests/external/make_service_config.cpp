@@ -69,6 +69,6 @@ TEST_CASE("make_service_config - disk cache directory only", "[external]")
 
     REQUIRE_THROWS_WITH(
         cradle::external::make_service_config(api_config),
-        Catch::Matchers::Contains(
-            "config.disk_cache_directory given but not config.disk_cache_size_limit"));
+        Catch::Matchers::Contains("config.disk_cache_directory given but not "
+                                  "config.disk_cache_size_limit"));
 }

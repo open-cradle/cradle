@@ -15,6 +15,7 @@
 
 #include <cppcoro/when_all.hpp>
 
+#include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
@@ -24,7 +25,7 @@
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/dynamic.h>
 #include <cradle/typing/encodings/msgpack.h>
-#include <cradle/typing/encodings/sha256_hash_id.h>
+#include <cradle/typing/encodings/native.h>
 #include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/logging.h>
 #include <cradle/websocket/local_calcs.h>
@@ -43,12 +44,12 @@ perform_lambda_calc(
     auto app = string{"any"};
     auto image = make_thinknode_provider_image_info_with_tag("unused");
     auto pool_name = std::string{"lambda@"} + app;
-    auto tasklet
-        = create_tasklet_tracker(pool_name, "lambda func", ctx.tasklet);
+    context_tasklet tasklet_guard{ctx, pool_name, "lambda func"};
     co_await get_local_compute_pool_for_image(
         ctx.service, std::make_pair(app, image))
         .schedule();
 
+    auto tasklet{ctx.get_tasklet()};
     auto run_guard = tasklet_run(tasklet);
     co_return function.object(std::move(args), tasklet);
 }
@@ -62,15 +63,15 @@ perform_lambda_calc(
     std::vector<dynamic> args)
 {
     string function_name{"lambda_calc"};
-    auto combined_id{combine_ids(
+    auto cache_key{combine_ids(
         make_id(function_name),
-        ref(*function.id),
+        ref(function.id),
         make_id(natively_encoded_sha256(args)))};
-    auto cache_key{captured_id{combined_id.clone()}};
 
-    auto await_guard = tasklet_await(ctx.tasklet, function_name, *cache_key);
+    auto await_guard
+        = tasklet_await(ctx.get_tasklet(), function_name, *cache_key);
     co_return co_await cached<dynamic>(
-        ctx.service, cache_key, [&](id_interface const&) {
+        ctx.service, cache_key, [&](captured_id const&) {
             return uncached::perform_lambda_calc(
                 ctx, function, std::move(args));
         });

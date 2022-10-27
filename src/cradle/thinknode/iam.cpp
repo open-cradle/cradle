@@ -1,8 +1,8 @@
 #include <cradle/thinknode/iam.h>
 
+#include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/monitoring.h>
-#include <cradle/typing/encodings/sha256_hash_id.h>
 #include <cradle/typing/io/http_requests.hpp>
 
 namespace cradle {
@@ -50,7 +50,7 @@ get_context_contents(thinknode_request_context ctx, string context_id)
         ctx.service,
         cache_key,
         create_task,
-        ctx.tasklet,
+        ctx.get_tasklet(),
         std::move(function_name));
 }
 

@@ -17,12 +17,12 @@ jobs:
         config: [Debug, Release]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
     - name: Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
           ~/.conan/data
@@ -62,6 +62,7 @@ jobs:
       if: ${{ matrix.config == 'Release' }}
       run: |
         cmake --build build --config Release --target benchmark_tests
+      timeout-minutes: 20
 
     - name: Unit test with coverage
       if: ${{ matrix.config == 'Debug' }}

@@ -1,5 +1,4 @@
 #include <cradle/inner/core/id.h>
-#include <typeinfo>
 
 namespace cradle {
 
