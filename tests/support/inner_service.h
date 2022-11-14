@@ -1,14 +1,17 @@
-#ifndef CRADLE_TESTS_INNER_SUPPORT_CORE_H
-#define CRADLE_TESTS_INNER_SUPPORT_CORE_H
+#ifndef CRADLE_TESTS_SUPPORT_INNER_SERVICE_H
+#define CRADLE_TESTS_SUPPORT_INNER_SERVICE_H
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/core.h>
+#include <cradle/inner/service/resources.h>
 
 namespace cradle {
 
 void
-init_test_inner_service(inner_service_core& core);
+init_test_inner_service(inner_resources& resources);
+
+void
+inner_reset_disk_cache(inner_resources& resources);
 
 struct uncached_request_resolution_context : public context_intf
 {
@@ -16,20 +19,20 @@ struct uncached_request_resolution_context : public context_intf
 
 struct cached_request_resolution_context : public cached_context_intf
 {
-    inner_service_core service;
+    inner_resources resources;
 
     cached_request_resolution_context();
 
-    inner_service_core&
-    get_service() override
+    inner_resources&
+    get_resources() override
     {
-        return service;
+        return resources;
     }
 
     immutable_cache&
     get_cache() override
     {
-        return service.inner_internals().cache;
+        return resources.memory_cache();
     }
 
     void

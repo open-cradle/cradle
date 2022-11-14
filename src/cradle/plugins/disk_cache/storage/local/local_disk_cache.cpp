@@ -1,4 +1,7 @@
+// A reference key-value store based on a local disk cache.
+
 #include <cppcoro/fmap.hpp>
+#include <cppcoro/static_thread_pool.hpp>
 #include <spdlog/spdlog.h>
 
 // Boost.Crc triggers some warnings on MSVC.
@@ -17,76 +20,21 @@
 #include <cradle/inner/encodings/lz4.h>
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/fs/types.h>
-#include <cradle/inner/service/core.h>
-
-using std::string;
+#include <cradle/inner/service/disk_cache_intf.h>
+#include <cradle/inner/service/resources.h>
+#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
 
 namespace cradle {
 
-void
-inner_service_core::inner_reset()
+static cppcoro::task<std::string>
+read_file_contents(
+    cppcoro::static_thread_pool& read_pool, file_path const& path)
 {
-    impl_.reset();
-}
-
-void
-inner_service_core::inner_reset(inner_service_config const& config)
-{
-    size_t ic_size{
-        config.immutable_cache ? config.immutable_cache->unused_size_limit
-                               : 0x40'00'00'00};
-    std::optional<string> dc_directory;
-    if (config.disk_cache && config.disk_cache->directory)
-    {
-        dc_directory = *config.disk_cache->directory;
-    }
-    size_t dc_size{
-        config.disk_cache ? config.disk_cache->size_limit : 0x1'00'00'00'00};
-    disk_cache_config dc_config{dc_directory, dc_size};
-    impl_.reset(new detail::inner_service_core_internals{
-        .cache = immutable_cache_config{ic_size},
-        .disk_cache = dc_config,
-        .disk_read_pool = cppcoro::static_thread_pool(2),
-        .disk_write_pool = thread_pool(2)});
-}
-
-void
-inner_service_core::inner_reset_memory_cache()
-{
-    inner_reset_memory_cache(immutable_cache_config{0x40'00'00'00});
-}
-
-void
-inner_service_core::inner_reset_memory_cache(
-    immutable_cache_config const& config)
-{
-    impl_->reset_memory_cache(config);
-}
-
-void
-inner_service_core::inner_reset_disk_cache()
-{
-    disk_cache_config dc_config;
-    dc_config.size_limit = 0x1'00'00'00'00;
-    inner_reset_disk_cache(dc_config);
-}
-
-void
-inner_service_core::inner_reset_disk_cache(disk_cache_config const& config)
-{
-    impl_->reset_disk_cache(config);
-}
-
-cppcoro::task<std::string>
-read_file_contents(inner_service_core& core, file_path const& path)
-{
-    co_await core.inner_internals().disk_read_pool.schedule();
+    co_await read_pool.schedule();
     co_return read_file_contents(path);
 }
 
-namespace detail {
-
-string
+static std::string
 blob_to_string(blob const& x)
 {
     std::ostringstream os;
@@ -94,19 +42,51 @@ blob_to_string(blob const& x)
     return os.str();
 }
 
+static struct ll_disk_cache_config
+make_ll_disk_cache_config(service_config const& config)
+{
+    return ll_disk_cache_config{
+        config.get_optional_string(local_disk_cache_config_keys::DIRECTORY),
+        config.get_optional_number(local_disk_cache_config_keys::SIZE_LIMIT)};
+}
+
+static uint32_t
+get_num_threads_read_pool(service_config const& config)
+{
+    return static_cast<uint32_t>(config.get_number_or_default(
+        local_disk_cache_config_keys::NUM_THREADS_READ_POOL, 2));
+}
+
+static unsigned
+get_num_threads_write_pool(service_config const& config)
+{
+    return static_cast<unsigned>(config.get_number_or_default(
+        local_disk_cache_config_keys::NUM_THREADS_WRITE_POOL, 2));
+}
+
+local_disk_cache::local_disk_cache(service_config const& config)
+    : ll_cache_{make_ll_disk_cache_config(config)},
+      read_pool_{get_num_threads_read_pool(config)},
+      write_pool_{get_num_threads_write_pool(config)}
+{
+}
+
+void
+local_disk_cache::reset(service_config const& config)
+{
+    ll_cache_.reset(make_ll_disk_cache_config(config));
+}
+
 // This is a coroutine so takes id_key by value.
 cppcoro::task<blob>
-generic_disk_cached(
-    inner_service_core& core,
-    captured_id id_key,
-    std::function<cppcoro::task<blob>()> create_task)
+local_disk_cache::disk_cached_blob(
+    captured_id id_key, std::function<cppcoro::task<blob>()> create_task)
 {
     std::string key{get_unique_string(*id_key)};
     // Check the cache for an existing value.
-    auto& cache = core.inner_internals().disk_cache;
     try
     {
-        auto entry = cache.find(key);
+        auto entry = ll_cache_.find(key);
         if (entry)
         {
             spdlog::get("cradle")->info("disk cache hit on {}", key);
@@ -123,7 +103,7 @@ generic_disk_cached(
             {
                 spdlog::get("cradle")->debug("reading file", key);
                 auto data = co_await read_file_contents(
-                    core, cache.get_path_for_id(entry->id));
+                    read_pool_, ll_cache_.get_path_for_id(entry->id));
 
                 spdlog::get("cradle")->debug("decompressing", key);
                 auto original_size
@@ -166,8 +146,7 @@ generic_disk_cached(
     auto result = co_await create_task();
 
     // Cache the result.
-    core.inner_internals().disk_write_pool.push_task([&core, key, result] {
-        auto& cache = core.inner_internals().disk_cache;
+    write_pool_.push_task([&ll_cache = ll_cache_, key, result] {
         try
         {
             if (result.size() > 1024)
@@ -183,9 +162,9 @@ generic_disk_cached(
                     result.data(),
                     result.size());
 
-                auto cache_id = cache.initiate_insert(key);
+                auto cache_id = ll_cache.initiate_insert(key);
                 {
-                    auto entry_path = cache.get_path_for_id(cache_id);
+                    auto entry_path = ll_cache.get_path_for_id(cache_id);
                     std::ofstream output;
                     open_file(
                         output,
@@ -197,11 +176,12 @@ generic_disk_cached(
                 }
                 boost::crc_32_type crc;
                 crc.process_bytes(result.data(), result.size());
-                cache.finish_insert(cache_id, crc.checksum(), result.size());
+                ll_cache.finish_insert(
+                    cache_id, crc.checksum(), result.size());
             }
             else
             {
-                cache.insert(
+                ll_cache.insert(
                     key,
                     base64_encode(
                         reinterpret_cast<uint8_t const*>(result.data()),
@@ -209,29 +189,17 @@ generic_disk_cached(
                         get_mime_base64_character_set()));
             }
         }
-        catch (...)
+        catch (std::exception& e)
         {
             // Something went wrong trying to write the cached value, so issue
             // a warning and move on.
             spdlog::get("cradle")->warn(
                 "error writing disk cache entry {}", key);
+            spdlog::get("cradle")->warn(e.what());
         }
     });
 
     co_return result;
-}
-
-} // namespace detail
-
-// The inner core has just this one specialization.
-template<>
-cppcoro::task<blob>
-disk_cached(
-    inner_service_core& core,
-    captured_id key,
-    std::function<cppcoro::task<blob>()> create_task)
-{
-    return detail::generic_disk_cached(core, key, std::move(create_task));
 }
 
 } // namespace cradle

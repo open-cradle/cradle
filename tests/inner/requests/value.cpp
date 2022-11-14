@@ -6,12 +6,12 @@
 #include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 
-#include "../introspection/tasklet_testing.h"
-#include "../support/core.h"
-#include "../support/request.h"
+#include "../../support/inner_service.h"
+#include "../../support/request.h"
+#include "../../support/tasklet_testing.h"
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/core.h>
 #include <cradle/inner/service/request.h>
+#include <cradle/inner/service/resources.h>
 
 using namespace cradle;
 

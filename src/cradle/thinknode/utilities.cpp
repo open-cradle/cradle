@@ -1,5 +1,6 @@
 #include <cradle/thinknode/utilities.h>
 
+#include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
 

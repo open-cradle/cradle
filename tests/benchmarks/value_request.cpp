@@ -3,10 +3,10 @@
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/requests/value.h>
-#include <cradle/inner/service/core.h>
+#include <cradle/inner/service/resources.h>
 
-#include "../inner/support/core.h"
-#include "support.h"
+#include "../support/inner_service.h"
+#include "benchmark_support.h"
 
 using namespace cradle;
 

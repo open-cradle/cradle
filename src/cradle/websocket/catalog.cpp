@@ -4,6 +4,7 @@
 
 #include <cereal/types/map.hpp>
 
+#include <cradle/plugins/disk_cache/serialization/cereal/cereal.h>
 #include <cradle/thinknode/iss_req_func.h>
 #include <cradle/websocket/catalog.h>
 #include <cradle/websocket/catalog_impl.h>

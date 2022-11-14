@@ -1,6 +1,8 @@
 #ifndef CRADLE_THINKNODE_APM_H
 #define CRADLE_THINKNODE_APM_H
 
+#include <cppcoro/shared_task.hpp>
+
 #include <cradle/thinknode/types.hpp>
 #include <cradle/typing/service/core.h>
 

@@ -39,7 +39,6 @@
 #include <cppcoro/task.hpp>
 #include <cppcoro/when_all.hpp>
 
-#include <cradle/inner/caching/disk_cache.h>
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/fs/app_dirs.h>
@@ -50,8 +49,11 @@
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
 #include <cradle/inner/utilities/text.h>
+#include <cradle/plugins/disk_cache/storage/local/ll_disk_cache.h>
+#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
 #include <cradle/thinknode/apm.h>
 #include <cradle/thinknode/calc.h>
+#include <cradle/thinknode/disk_cache_serialization.h>
 #include <cradle/thinknode/iam.h>
 #include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/iss_req_func.h>
@@ -186,7 +188,7 @@ struct client_request
 
 struct websocket_server_impl
 {
-    server_config config;
+    service_config config;
     http_request_system http_system;
     ws_server_type ws;
     client_connection_list clients;
@@ -1481,8 +1483,10 @@ process_message(websocket_server_impl& server, client_request request)
         }
         case client_message_content_tag::CACHE_INSERT: {
             auto const& insertion = as_cache_insert(content);
-            server.core.inner_internals().disk_cache.insert(
-                insertion.key, insertion.value);
+            auto& ll_disk_cache{
+                static_cast<local_disk_cache&>(server.core.disk_cache())
+                    .get_ll_disk_cache()};
+            ll_disk_cache.insert(insertion.key, insertion.value);
             send_response(
                 server,
                 request,
@@ -1492,7 +1496,10 @@ process_message(websocket_server_impl& server, client_request request)
         }
         case client_message_content_tag::CACHE_QUERY: {
             auto const& key = as_cache_query(content);
-            auto entry = server.core.inner_internals().disk_cache.find(key);
+            auto& ll_disk_cache{
+                static_cast<local_disk_cache&>(server.core.disk_cache())
+                    .get_ll_disk_cache()};
+            auto entry = ll_disk_cache.find(key);
             send_response(
                 server,
                 request,
@@ -1871,11 +1878,11 @@ on_message(
 }
 
 static void
-initialize(websocket_server_impl& server, server_config const& config)
+initialize(websocket_server_impl& server, service_config const& config)
 {
     server.config = config;
 
-    server.core.reset(config);
+    server.core.initialize(config);
 
     server.ws.clear_access_channels(websocketpp::log::alevel::all);
     server.ws.init_asio();
@@ -1911,7 +1918,7 @@ initialize(websocket_server_impl& server, server_config const& config)
     create_requests_catalog();
 }
 
-websocket_server::websocket_server(server_config const& config)
+websocket_server::websocket_server(service_config const& config)
 {
     impl_ = new websocket_server_impl;
     initialize(*impl_, config);
@@ -1930,8 +1937,10 @@ void
 websocket_server::listen()
 {
     auto& server = *impl_;
-    bool open = server.config.open ? *server.config.open : false;
-    auto port = server.config.port ? *server.config.port : 41071;
+    bool open
+        = server.config.get_bool_or_default(server_config_keys::OPEN, false);
+    auto port
+        = server.config.get_number_or_default(server_config_keys::PORT, 41071);
     if (open)
     {
         server.ws.listen(port);

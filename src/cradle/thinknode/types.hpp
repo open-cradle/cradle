@@ -41,8 +41,8 @@ struct thinknode_request_context : public cached_introspected_context_intf
         thinknode_session session,
         tasklet_tracker* tasklet);
 
-    inner_service_core&
-    get_service() override;
+    inner_resources&
+    get_resources() override;
 
     immutable_cache&
     get_cache() override;

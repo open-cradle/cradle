@@ -129,8 +129,7 @@ test_post_iss_requests_parallel(
     if constexpr (level >= caching_level_type::full)
     {
         sync_wait_write_disk_cache(service);
-        service.inner_reset_memory_cache(
-            immutable_cache_config{0x40'00'00'00});
+        service.inner_reset_memory_cache();
 
         // Resolve using disk cache
         auto res2 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
@@ -206,8 +205,7 @@ test_retrieve_immutable_object_parallel(
     if constexpr (level >= caching_level_type::full)
     {
         sync_wait_write_disk_cache(service);
-        service.inner_reset_memory_cache(
-            immutable_cache_config{0x40'00'00'00});
+        service.inner_reset_memory_cache();
 
         // Resolve using disk cache
         auto res2 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));

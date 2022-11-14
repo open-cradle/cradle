@@ -25,13 +25,12 @@ struct api_service_config
     std::optional<std::size_t> memory_cache_unused_size_limit;
 
     // Config for the disk cache
-    // If disk_cache_directory is given, then so must disk_cache_size_limit.
     std::optional<std::string> disk_cache_directory;
     std::optional<std::size_t> disk_cache_size_limit;
 
     // How many concurrent threads to use for request handling.
     // The default is one thread for each processor core.
-    // TODO unused it seems?
+    // TODO remove request_concurrency if really unused
     std::optional<int> request_concurrency;
 
     // How many concurrent threads to use for computing.

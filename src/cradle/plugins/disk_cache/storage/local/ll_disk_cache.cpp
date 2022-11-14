@@ -1,4 +1,4 @@
-#include <cradle/inner/caching/disk_cache.h>
+#include <cradle/plugins/disk_cache/storage/local/ll_disk_cache.h>
 
 #include <chrono>
 #include <filesystem>
@@ -19,7 +19,7 @@ using std::string;
 
 namespace cradle {
 
-struct disk_cache_impl
+struct ll_disk_cache_impl
 {
     file_path dir;
 
@@ -61,8 +61,8 @@ open_db(sqlite3** db, file_path const& file)
     if (sqlite3_open(file.string().c_str(), db) != SQLITE_OK)
     {
         CRADLE_THROW(
-            disk_cache_failure()
-            << disk_cache_path_info(file.parent_path())
+            ll_disk_cache_failure()
+            << ll_disk_cache_path_info(file.parent_path())
             << internal_error_message_info(
                    "failed to create disk cache index file (index.db)"));
     }
@@ -70,14 +70,15 @@ open_db(sqlite3** db, file_path const& file)
 
 static void
 throw_query_error(
-    disk_cache_impl const& cache, string const& sql, string const& error)
+    ll_disk_cache_impl const& cache, string const& sql, string const& error)
 {
     CRADLE_THROW(
-        disk_cache_failure() << disk_cache_path_info(cache.dir)
-                             << internal_error_message_info(
-                                    "error executing SQL query in index.db\n"
-                                    "SQL query: "
-                                    + sql + "\n" + "error: " + error));
+        ll_disk_cache_failure()
+        << ll_disk_cache_path_info(cache.dir)
+        << internal_error_message_info(
+               "error executing SQL query in index.db\n"
+               "SQL query: "
+               + sql + "\n" + "error: " + error));
 }
 
 static string
@@ -94,7 +95,7 @@ copy_and_free_message(char* msg)
 }
 
 static void
-execute_sql(disk_cache_impl const& cache, string const& sql)
+execute_sql(ll_disk_cache_impl const& cache, string const& sql)
 {
     char* msg;
     int code = sqlite3_exec(cache.db, sql.c_str(), 0, 0, &msg);
@@ -105,13 +106,13 @@ execute_sql(disk_cache_impl const& cache, string const& sql)
 
 // Check a return code from SQLite.
 static void
-check_sqlite_code(disk_cache_impl const& cache, int code)
+check_sqlite_code(ll_disk_cache_impl const& cache, int code)
 {
     if (code != SQLITE_OK)
     {
         CRADLE_THROW(
-            disk_cache_failure()
-            << disk_cache_path_info(cache.dir)
+            ll_disk_cache_failure()
+            << ll_disk_cache_path_info(cache.dir)
             << internal_error_message_info(
                    string("SQLite error: ") + sqlite3_errstr(code)));
     }
@@ -121,7 +122,7 @@ check_sqlite_code(disk_cache_impl const& cache, int code)
 // This checks to make sure that the creation was successful, so the returned
 // pointer is always valid.
 static sqlite3_stmt*
-prepare_statement(disk_cache_impl const& cache, string const& sql)
+prepare_statement(ll_disk_cache_impl const& cache, string const& sql)
 {
     sqlite3_stmt* statement;
     auto code = sqlite3_prepare_v2(
@@ -133,14 +134,14 @@ prepare_statement(disk_cache_impl const& cache, string const& sql)
     if (code != SQLITE_OK)
     {
         CRADLE_THROW(
-            disk_cache_failure() << disk_cache_path_info(cache.dir)
-                                 << internal_error_message_info(
-                                        "error preparing SQL query\n"
-                                        "SQL query: "
-                                        + sql
-                                        + "\n"
-                                          "error: "
-                                        + sqlite3_errstr(code)));
+            ll_disk_cache_failure() << ll_disk_cache_path_info(cache.dir)
+                                    << internal_error_message_info(
+                                           "error preparing SQL query\n"
+                                           "SQL query: "
+                                           + sql
+                                           + "\n"
+                                             "error: "
+                                           + sqlite3_errstr(code)));
     }
     return statement;
 }
@@ -148,7 +149,7 @@ prepare_statement(disk_cache_impl const& cache, string const& sql)
 // Bind a 32-bit integer to a parameter of a prepared statement.
 static void
 bind_int32(
-    disk_cache_impl const& cache,
+    ll_disk_cache_impl const& cache,
     sqlite3_stmt* statement,
     int parameter_index,
     int value)
@@ -160,7 +161,7 @@ bind_int32(
 // Bind a 64-bit integer to a parameter of a prepared statement.
 static void
 bind_int64(
-    disk_cache_impl const& cache,
+    ll_disk_cache_impl const& cache,
     sqlite3_stmt* statement,
     int parameter_index,
     int64_t value)
@@ -172,7 +173,7 @@ bind_int64(
 // Bind a string to a parameter of a prepared statement.
 static void
 bind_string(
-    disk_cache_impl const& cache,
+    ll_disk_cache_impl const& cache,
     sqlite3_stmt* statement,
     int parameter_index,
     string const& value)
@@ -191,7 +192,7 @@ bind_string(
 // Bind a blob to a parameter of a prepared statement.
 static void
 bind_blob(
-    disk_cache_impl const& cache,
+    ll_disk_cache_impl const& cache,
     sqlite3_stmt* statement,
     int parameter_index,
     string const& value)
@@ -211,16 +212,17 @@ bind_blob(
 // This should only be used for statements that don't return results.
 static void
 execute_prepared_statement(
-    disk_cache_impl const& cache, sqlite3_stmt* statement)
+    ll_disk_cache_impl const& cache, sqlite3_stmt* statement)
 {
     auto code = sqlite3_step(statement);
     if (code != SQLITE_DONE)
     {
         CRADLE_THROW(
-            disk_cache_failure() << disk_cache_path_info(cache.dir)
-                                 << internal_error_message_info(
-                                        string("SQL query failed\n")
-                                        + "error: " + sqlite3_errstr(code)));
+            ll_disk_cache_failure()
+            << ll_disk_cache_path_info(cache.dir)
+            << internal_error_message_info(
+                   string("SQL query failed\n")
+                   + "error: " + sqlite3_errstr(code)));
     }
     check_sqlite_code(cache, sqlite3_reset(statement));
 }
@@ -282,7 +284,7 @@ struct single_row_result
 template<class RowHandler>
 static void
 execute_prepared_statement(
-    disk_cache_impl const& cache,
+    ll_disk_cache_impl const& cache,
     sqlite3_stmt* statement,
     expected_column_count expected_columns,
     single_row_result single_row,
@@ -298,8 +300,8 @@ execute_prepared_statement(
             if (sqlite3_column_count(statement) != expected_columns.value)
             {
                 CRADLE_THROW(
-                    disk_cache_failure()
-                    << disk_cache_path_info(cache.dir)
+                    ll_disk_cache_failure()
+                    << ll_disk_cache_path_info(cache.dir)
                     << internal_error_message_info(string(
                            "SQL query result column count incorrect\n")));
             }
@@ -316,17 +318,19 @@ execute_prepared_statement(
     if (code != SQLITE_DONE)
     {
         CRADLE_THROW(
-            disk_cache_failure() << disk_cache_path_info(cache.dir)
-                                 << internal_error_message_info(
-                                        string("SQL query failed\n")
-                                        + "error: " + sqlite3_errstr(code)));
+            ll_disk_cache_failure()
+            << ll_disk_cache_path_info(cache.dir)
+            << internal_error_message_info(
+                   string("SQL query failed\n")
+                   + "error: " + sqlite3_errstr(code)));
     }
     if (single_row.value && row_count != 1)
     {
         CRADLE_THROW(
-            disk_cache_failure() << disk_cache_path_info(cache.dir)
-                                 << internal_error_message_info(string(
-                                        "SQL query row count incorrect\n")));
+            ll_disk_cache_failure()
+            << ll_disk_cache_path_info(cache.dir)
+            << internal_error_message_info(
+                   string("SQL query row count incorrect\n")));
     }
     check_sqlite_code(cache, sqlite3_reset(statement));
 }
@@ -335,7 +339,7 @@ execute_prepared_statement(
 
 // Get the total size of all entries in the cache.
 static int64_t
-get_cache_size(disk_cache_impl& cache)
+get_cache_size(ll_disk_cache_impl& cache)
 {
     int64_t size;
     execute_prepared_statement(
@@ -349,7 +353,7 @@ get_cache_size(disk_cache_impl& cache)
 
 // Get the total number of valid entries in the cache.
 static int64_t
-get_cache_entry_count(disk_cache_impl& cache)
+get_cache_entry_count(ll_disk_cache_impl& cache)
 {
     int64_t count;
     execute_prepared_statement(
@@ -362,16 +366,17 @@ get_cache_entry_count(disk_cache_impl& cache)
 }
 
 // Get a list of entries in the cache.
-std::vector<disk_cache_entry> static get_entry_list(disk_cache_impl& cache)
+std::vector<ll_disk_cache_entry> static get_entry_list(
+    ll_disk_cache_impl& cache)
 {
-    std::vector<disk_cache_entry> entries;
+    std::vector<ll_disk_cache_entry> entries;
     execute_prepared_statement(
         cache,
         cache.entry_list_query,
         expected_column_count{6},
         single_row_result{false},
         [&](sqlite_row& row) {
-            disk_cache_entry e;
+            ll_disk_cache_entry e;
             e.key = read_string(row, 0);
             e.id = read_int64(row, 1);
             e.in_db = read_int64(row, 2) && read_bool(row, 2);
@@ -391,7 +396,7 @@ struct lru_entry
 };
 typedef std::vector<lru_entry> lru_entry_list;
 static lru_entry_list
-get_lru_entries(disk_cache_impl& cache)
+get_lru_entries(ll_disk_cache_impl& cache)
 {
     lru_entry_list entries;
     execute_prepared_statement(
@@ -410,8 +415,8 @@ get_lru_entries(disk_cache_impl& cache)
 }
 
 // Get the entry associated with a particular key (if any).
-static optional<disk_cache_entry>
-look_up(disk_cache_impl const& cache, string const& key, bool only_if_valid)
+static optional<ll_disk_cache_entry>
+look_up(ll_disk_cache_impl const& cache, string const& key, bool only_if_valid)
 {
     bool exists = false;
     int64_t id = 0;
@@ -439,7 +444,7 @@ look_up(disk_cache_impl const& cache, string const& key, bool only_if_valid)
             exists = true;
         });
 
-    return (exists && (!only_if_valid || valid)) ? some(disk_cache_entry{
+    return (exists && (!only_if_valid || valid)) ? some(ll_disk_cache_entry{
                key, id, in_db, value, size, original_size, crc32})
                                                  : none;
 }
@@ -447,14 +452,14 @@ look_up(disk_cache_impl const& cache, string const& key, bool only_if_valid)
 // OTHER UTILITIES
 
 static file_path
-get_path_for_id(disk_cache_impl& cache, int64_t id)
+get_path_for_id(ll_disk_cache_impl& cache, int64_t id)
 {
     hashidsxx::Hashids hash("cradle", 6);
     return cache.dir / hash.encode(&id, &id + 1);
 }
 
 static void
-remove_entry(disk_cache_impl& cache, int64_t id, bool remove_file = true)
+remove_entry(ll_disk_cache_impl& cache, int64_t id, bool remove_file = true)
 {
     file_path path = get_path_for_id(cache, id);
     if (remove_file && exists(path))
@@ -465,7 +470,7 @@ remove_entry(disk_cache_impl& cache, int64_t id, bool remove_file = true)
 }
 
 static void
-enforce_cache_size_limit(disk_cache_impl& cache)
+enforce_cache_size_limit(ll_disk_cache_impl& cache)
 {
     try
     {
@@ -496,20 +501,20 @@ enforce_cache_size_limit(disk_cache_impl& cache)
 }
 
 static void
-record_activity(disk_cache_impl& cache)
+record_activity(ll_disk_cache_impl& cache)
 {
     cache.latest_activity = std::chrono::system_clock::now();
 }
 
 static void
-record_usage_to_db(disk_cache_impl const& cache, int64_t id)
+record_usage_to_db(ll_disk_cache_impl const& cache, int64_t id)
 {
     bind_int64(cache, cache.record_usage_statement, 1, id);
     execute_prepared_statement(cache, cache.record_usage_statement);
 }
 
 static void
-write_usage_records(disk_cache_impl& cache)
+write_usage_records(ll_disk_cache_impl& cache)
 {
     for (auto const& record : cache.usage_record_buffer)
         record_usage_to_db(cache, record);
@@ -517,7 +522,7 @@ write_usage_records(disk_cache_impl& cache)
 }
 
 void
-record_cache_growth(disk_cache_impl& cache, uint64_t size)
+record_cache_growth(ll_disk_cache_impl& cache, uint64_t size)
 {
     cache.bytes_inserted_since_last_sweep += size;
     // Allow the cache to write out roughly 1% of its capacity between size
@@ -528,7 +533,7 @@ record_cache_growth(disk_cache_impl& cache, uint64_t size)
 }
 
 static void
-shut_down(disk_cache_impl& cache)
+shut_down(ll_disk_cache_impl& cache)
 {
     if (cache.db)
     {
@@ -552,7 +557,7 @@ shut_down(disk_cache_impl& cache)
 // Open (or create) the database file and verify that the version number is
 // what we expect.
 static void
-open_and_check_db(disk_cache_impl& cache)
+open_and_check_db(ll_disk_cache_impl& cache)
 {
     int const expected_database_version = 3;
 
@@ -593,14 +598,14 @@ open_and_check_db(disk_cache_impl& cache)
     else if (database_version != expected_database_version)
     {
         CRADLE_THROW(
-            disk_cache_failure()
-            << disk_cache_path_info(cache.dir)
+            ll_disk_cache_failure()
+            << ll_disk_cache_path_info(cache.dir)
             << internal_error_message_info("incompatible database"));
     }
 }
 
 static void
-initialize(disk_cache_impl& cache, disk_cache_config const& config)
+initialize(ll_disk_cache_impl& cache, ll_disk_cache_config const& config)
 {
     cache.dir = config.directory ? file_path(*config.directory)
                                  : get_shared_cache_dir(none, "cradle");
@@ -608,7 +613,7 @@ initialize(disk_cache_impl& cache, disk_cache_config const& config)
     if (!exists(cache.dir))
         create_directory(cache.dir);
 
-    cache.size_limit = config.size_limit;
+    cache.size_limit = config.size_limit.value_or(0x40'00'00'00);
 
     // Open the database file.
     try
@@ -681,27 +686,27 @@ initialize(disk_cache_impl& cache, disk_cache_config const& config)
 
 // API
 
-disk_cache::disk_cache()
+ll_disk_cache::ll_disk_cache()
 {
 }
 
-disk_cache::disk_cache(disk_cache_config const& config)
-    : impl_(new disk_cache_impl)
+ll_disk_cache::ll_disk_cache(ll_disk_cache_config const& config)
+    : impl_(new ll_disk_cache_impl)
 {
     this->reset(config);
 }
 
-disk_cache::~disk_cache()
+ll_disk_cache::~ll_disk_cache()
 {
     if (this->impl_)
         shut_down(*this->impl_);
 }
 
 void
-disk_cache::reset(disk_cache_config const& config)
+ll_disk_cache::reset(ll_disk_cache_config const& config)
 {
     if (!this->impl_)
-        this->impl_.reset(new disk_cache_impl);
+        this->impl_.reset(new ll_disk_cache_impl);
     auto& cache = *this->impl_;
     std::scoped_lock<std::mutex> lock(cache.mutex);
     shut_down(cache);
@@ -709,15 +714,15 @@ disk_cache::reset(disk_cache_config const& config)
 }
 
 void
-disk_cache::reset()
+ll_disk_cache::reset()
 {
     if (this->impl_)
         shut_down(*impl_);
     impl_.reset();
 }
 
-disk_cache_info
-disk_cache::get_summary_info()
+ll_disk_cache_info
+ll_disk_cache::get_summary_info()
 {
     auto& cache = *this->impl_;
     std::scoped_lock<std::mutex> lock(cache.mutex);
@@ -725,15 +730,16 @@ disk_cache::get_summary_info()
     // Note that these are actually inconsistent since the size includes
     // invalid entries, while the entry count does not, but I think that's
     // reasonable behavior and in any case not a big deal.
-    disk_cache_info info;
+    ll_disk_cache_info info;
     info.directory = cache.dir.string();
+    info.size_limit = cache.size_limit;
     info.entry_count = get_cache_entry_count(cache);
     info.total_size = get_cache_size(cache);
     return info;
 }
 
-std::vector<disk_cache_entry>
-disk_cache::get_entry_list()
+std::vector<ll_disk_cache_entry>
+ll_disk_cache::get_entry_list()
 {
     auto& cache = *this->impl_;
     std::scoped_lock<std::mutex> lock(cache.mutex);
@@ -742,7 +748,7 @@ disk_cache::get_entry_list()
 }
 
 void
-disk_cache::remove_entry(int64_t id)
+ll_disk_cache::remove_entry(int64_t id)
 {
     auto& cache = *this->impl_;
     std::scoped_lock<std::mutex> lock(cache.mutex);
@@ -751,7 +757,7 @@ disk_cache::remove_entry(int64_t id)
 }
 
 void
-disk_cache::clear()
+ll_disk_cache::clear()
 {
     auto& cache = *this->impl_;
     std::scoped_lock<std::mutex> lock(cache.mutex);
@@ -768,8 +774,8 @@ disk_cache::clear()
     }
 }
 
-optional<disk_cache_entry>
-disk_cache::find(string const& key)
+optional<ll_disk_cache_entry>
+ll_disk_cache::find(string const& key)
 {
     auto& cache = *this->impl_;
     std::scoped_lock<std::mutex> lock(cache.mutex);
@@ -780,7 +786,7 @@ disk_cache::find(string const& key)
 }
 
 void
-disk_cache::insert(
+ll_disk_cache::insert(
     string const& key, string const& value, optional<size_t> original_size)
 {
     auto& cache = *this->impl_;
@@ -818,7 +824,7 @@ disk_cache::insert(
 }
 
 int64_t
-disk_cache::initiate_insert(string const& key)
+ll_disk_cache::initiate_insert(string const& key)
 {
     auto& cache = *this->impl_;
     std::scoped_lock<std::mutex> lock(cache.mutex);
@@ -839,16 +845,17 @@ disk_cache::initiate_insert(string const& key)
         // Since we checked that the insert succeeded, we really shouldn't
         // get here.
         CRADLE_THROW(
-            disk_cache_failure() << disk_cache_path_info(cache.dir)
-                                 << internal_error_message_info(
-                                        "failed to create entry in index.db"));
+            ll_disk_cache_failure()
+            << ll_disk_cache_path_info(cache.dir)
+            << internal_error_message_info(
+                   "failed to create entry in index.db"));
     }
 
     return entry->id;
 }
 
 void
-disk_cache::finish_insert(
+ll_disk_cache::finish_insert(
     int64_t id, uint32_t crc32, optional<size_t> original_size)
 {
     auto& cache = *this->impl_;
@@ -872,7 +879,7 @@ disk_cache::finish_insert(
 }
 
 file_path
-disk_cache::get_path_for_id(int64_t id)
+ll_disk_cache::get_path_for_id(int64_t id)
 {
     auto& cache = *this->impl_;
     std::scoped_lock<std::mutex> lock(cache.mutex);
@@ -881,7 +888,7 @@ disk_cache::get_path_for_id(int64_t id)
 }
 
 void
-disk_cache::record_usage(int64_t id)
+ll_disk_cache::record_usage(int64_t id)
 {
     auto& cache = *this->impl_;
     std::scoped_lock<std::mutex> lock(cache.mutex);
@@ -890,7 +897,7 @@ disk_cache::record_usage(int64_t id)
 }
 
 void
-disk_cache::write_usage_records()
+ll_disk_cache::write_usage_records()
 {
     auto& cache = *this->impl_;
     std::scoped_lock<std::mutex> lock(cache.mutex);
@@ -899,7 +906,7 @@ disk_cache::write_usage_records()
 }
 
 void
-disk_cache::do_idle_processing()
+ll_disk_cache::do_idle_processing()
 {
     auto& cache = *this->impl_;
     std::scoped_lock<std::mutex> lock(cache.mutex);

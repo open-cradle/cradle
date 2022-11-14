@@ -2,9 +2,10 @@
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
 
-#include "../support/core.h"
+#include "../../support/inner_service.h"
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/service/core.h>
+#include <cradle/inner/service/resources.h>
 
 using namespace cradle;
 
@@ -19,7 +20,7 @@ eval_ptr2(immutable_cache_ptr<blob>& ptr2)
 cppcoro::task<void>
 eval_tasks(
     bool test_snapshots,
-    inner_service_core& core,
+    inner_resources& resources,
     cppcoro::shared_task<blob> task0,
     cppcoro::shared_task<blob> task1)
 {
@@ -35,7 +36,7 @@ eval_tasks(
     // record2 == {state: READY, size: B}
 
     size_t const B = deep_sizeof(make_blob("42"));
-    auto& cache = core.inner_internals().cache;
+    auto& cache = resources.memory_cache();
     if (test_snapshots)
     {
         auto snapshot0 = get_cache_snapshot(cache);
@@ -81,15 +82,15 @@ eval_tasks(
 void
 do_the_test(bool clear_key0, bool test_snapshots)
 {
-    inner_service_core core;
-    init_test_inner_service(core);
+    inner_resources resources;
+    init_test_inner_service(resources);
 
     auto create_task01
         = []() -> cppcoro::task<blob> { co_return make_blob("42"); };
 
     // Create a first cache record, zero size for now.
     captured_id key0{make_captured_id(0)};
-    auto task0{fully_cached<blob>(core, key0, create_task01)};
+    auto task0{fully_cached<blob>(resources, key0, create_task01)};
     if (clear_key0)
     {
         // Ensure the only remaining reference to key0's id_interface object
@@ -99,7 +100,7 @@ do_the_test(bool clear_key0, bool test_snapshots)
 
     // Create a second cache record, zero size for now.
     captured_id key1{make_captured_id(1)};
-    auto task1{fully_cached<blob>(core, key1, create_task01)};
+    auto task1{fully_cached<blob>(resources, key1, create_task01)};
 
     auto create_task2 = [](captured_id const&) -> cppcoro::task<blob> {
         co_return make_blob("43");
@@ -108,7 +109,7 @@ do_the_test(bool clear_key0, bool test_snapshots)
         // Create a third cache record, with non-zero size.
         captured_id key2{make_captured_id(2)};
         immutable_cache_ptr<blob> ptr2(
-            core.inner_internals().cache,
+            resources.memory_cache(),
             key2,
             wrap_task_creator<blob>(create_task2));
 
@@ -117,7 +118,7 @@ do_the_test(bool clear_key0, bool test_snapshots)
         // ptr2's destructor moves the cache record to the eviction list.
     }
 
-    cppcoro::sync_wait(eval_tasks(test_snapshots, core, task0, task1));
+    cppcoro::sync_wait(eval_tasks(test_snapshots, resources, task0, task1));
 }
 
 } // namespace
