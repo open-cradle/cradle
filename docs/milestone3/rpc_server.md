@@ -123,8 +123,11 @@ In addition, the WebSocket server is still available as a separate process;
 we shouldn't have to change anything there. However, if there is a significant overlap
 of requests between C++ and Python applications (tbc), we could go for the solution depicted
 in the preceding figure. The WebSocket server would become another C++ application and
-access the main server across C++; it would (normally) no longer use its own caches.
-Of course, this implies adapting the WebSocket-related code.
+access the main server across C++.
+Of course, this means we will have to change the WebSocket-related code;
+it should be possible to make the WebSocket server into a relatively simple translation
+between the WebSocket and RPC protocols.
+An alternative would be that the Python applications talk RPC.
 
 
 ## The RPC protocol
@@ -213,23 +216,9 @@ As long as we stay on the same machine, error sources and impact will be limited
 # Future directions
 1. Put some of the services that we need (execution, storage, caching) into the cloud.
    Access will probably be via the CRADLE server.
-2. Refactor the current Thinknode functionality:
-   - Rewrite to use the CRADLE requests framework
-   - Add a catalog of the newly created requests, where each result is a dynamic
-   - Put everything in a separate plugin (library)
 
 
 # Details
-## Work breakdown
-What do we need to implement?
-
-- Shared blob
-- Changes to the current CRADLE framework, e.g. request classes, memory cache, serialization
-- RPC client implementation
-- RPC server implementation
-- Probably more...
-
-
 ## Shared blobs
 On Linux, shared memory is accessed via the
 [POSIX shared memory API](https://man7.org/linux/man-pages/man7/shm_overview.7.html).

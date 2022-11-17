@@ -31,6 +31,20 @@ The C++ API has two flavors: typed and untyped. Both have their disadvantages:
 
 Iceoryx offers a request-response exchange but does not map well to the longer-term chunk storage that we need.
 
+Summarizing why iceoryx is unsuitable:
+
+* We would need to use the same compiler, and the same compiler flags, for all applications and RouDi.
+  Maybe this would apply only when using the typed interfaces and not for the administration
+  performed by RouDi, but such optimism is asking for trouble.
+* The typed interfaces are not suitable for us, and the untyped ones look rather clumsy;
+  e.g., their is no "get size" operation for a shared memory chunk.
+* We need some form of RPC, and iceoryx does not really provide that.
+* Iceoryx provides no support for the shared blobs that we need, so we have to implement
+  our own solution for them anyway.
+* A bit more abstract: iceoryx was created for automotive/IoT domains, real-time processing
+  of typed and smallish messages (e.g. a 4K image is "large"). There is hardly any overlap
+  with our requirements.
+
 There are other implementations of IPC over shared memory (like Apache Thrift, cpp-ipc, eCAL,
 Cyclone DDS, hostppc) but none seem to map well to our needs; in addition, they tend to be
 either immature or huge.
