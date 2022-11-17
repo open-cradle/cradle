@@ -37,28 +37,23 @@ CRADLE can be used by multiple applications simultaneously, where each applicati
 to the CRADLE library, and has its
 own memory and disk cache. There is no re-use of cached results between the applications.
 
-CRADLE already offers a Websocket interface, but C++ applications access this going
-through PUMA/Python so it's quite inefficient:
+CRADLE already offers a Websocket interface that is used by Python applications:
 
 ```plantuml
 @startuml
-component appX as "C++ application X"
-component appY as "C++ application Y"
+component appP as "Python application P"
+component appQ as "Python application Q"
 
-component puma as "PUMA"
-
-component server as "CRADLE WebSocket server"
+component ws_server as "CRADLE WebSocket server"
 
 database mem_cache as "memory cache"
 database disk_cache as "disk cache"
 
-appX <--> puma : Python
-appY <--> puma : Python
+appP <--> ws_server : WebSocket
+appQ <--> ws_server : WebSocket
 
-puma <--> server : WebSocket
-
-server -- mem_cache
-server -- disk_cache
+ws_server -- mem_cache
+ws_server -- disk_cache
 @enduml
 ```
 
@@ -84,27 +79,28 @@ database appY_disk_cache as "disk cache"
 appY -- appY_mem_cache
 appY -- appY_disk_cache
 
+component appP as "Python application P"
+component ws_server as "CRADLE WebSocket server"
+
 database shared_mem_cache as "shared memory cache"
 appX -- shared_mem_cache
 appY -- shared_mem_cache
 server -- shared_mem_cache
-database server_mem_cache as "local memory cache"
-server -- server_mem_cache
-
-component appZ as "C++ application Z"
-component puma as "PUMA"
+ws_server -- shared_mem_cache
 
 appX <--> server : RPC
 appY <--> server : RPC
-appZ <--> puma : Python
-puma <--> server: WebSocket
+appP <--> ws_server: WebSocket
+ws_server <--> server: RPC
 @enduml
 ```
 
-Each application still has its own memory cache and disk cache that are used in resolving requests locally;
-if no requests are resolved on the server, this amounts to the current situation.
+Applications still have the option to resolve requests locally; this could either be
+an application-wide operation mode, or request-specific. It would avoid the overhead
+(need to define a request UUID, serialization, RPC call) associated with going to the server.
+The results from these requests would be stored in application-local memory and disk caches.
 
-However, an application now has the option of having the server resolve a request.
+However, normally an application will have the server resolve a request.
 If several applications want to have the same request be resolved at the same time,
 the server ensures that it will do the calculation only once.
 
@@ -123,11 +119,12 @@ The memory cache is also used for storing large blobs that are part of a request
 The server also uses a disk cache that is functionally shared with the applications; however,
 applications have no direct access to the cache.
 
-In addition, the server still exposes the current WebSocket interface. Caching is done
-in its local memory cache, and the shared disk cache; we shouldn't have to change much here.
-(Maybe two threads for the two servers, and synchronization between them.)
-An alternative setup would be to have the WebSocket server run in a separate process that
-communicates with the main server across the RPC interface.
+In addition, the WebSocket server is still available as a separate process;
+we shouldn't have to change anything there. However, if there is a significant overlap
+of requests between C++ and Python applications (tbc), we could go for the solution depicted
+in the preceding figure. The WebSocket server would become another C++ application and
+access the main server across C++; it would (normally) no longer use its own caches.
+Of course, this implies adapting the WebSocket-related code.
 
 
 ## The RPC protocol
