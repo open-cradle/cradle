@@ -1,39 +1,44 @@
-# Work for milestone 3
+# Milestone 3: RPC server, part 1
 
-## Introduction
-This document describes the (initial?) work we have to do in milestone 3.
+## Abstract
+What we want to achieve is to share calculation (sub-)results between C++ applications
+running at the same time, on the same machine.
 
-The (first) major functionality we want to introduce is an RPC server, that
+This will be realized by introducing a central RPC server, that
 resolves requests on behalf of a number of clients (C++ applications, WebSocket server).
 The server's caches are logically shared between clients: if client X needs a (sub-)result
 that was already calculated and cached for client Y, then it will immediately get
-the cached result; it need not be recalculated. This already should bring a significant
-speedup; by also physically sharing the memory cache between clients, the speedup
-will even be more significant.
+the cached result; it need not be recalculated.
 
-Before we accomplish this, there is technical debt to be resolved.
+Requests and responses between clients and server will be serialized across
+(typically) Unix sockets. The serialization of requests builds on the requests framework
+that we implemented in the previous milestone. Serializing large blobs will give a
+significant overhead compared to the current in-machine solution. We will overcome this
+by introducing shared blobs, that are physically shared between clients and server.
+However, this will be too much to finish in milestone 3 (ending 2022).
+
+In addition, there is technical debt that is more or less blocking (details below).
+What we intend to achieve in milestone 3 is to resolve the blocking technical debt,
+and implement the RPC server basic functionality. This should be enough to be
+functionally usable, but in practice may not give any performance improvement.
 
 
 ## Technical debt
-### Thinknode requests should use the request-based framework
+### Refactor a subset of Thinknode requests to use the request-based framework
 The major functionality
 implemented in the previous milestone was the transition to a request-based framework.
-However, this was not completed, the old framework is still there, and used for resolving
-the majority of Thinknode requests. The RPC server functionality will work only in
-combination with the new framework, as it really needs the new-style requests. We will
-have to refactor more code to use the new framework.
+However, Thinknode requests, especially those in the external C++ API, are still
+using the old, legacy, framework. The RPC server functionality can work only in
+combination with the new framework.
+We will have to refactor at least the most important Thinknode requests.
 
-- Decide whether we will refactor all Thinknode functionality, or keep the old framework
-  as a legacy solution
-- Refactor all or the most important Thinknode requests; on behalf of C++ and/or PUMA
-  clients (`external` versus `websocket` directories)
-- Add more requests to the external C++ API?
+- Refactor or implement the most important Thinknode requests, on behalf of C++ clients ("external" API)
+- Same for PUMA clients ("websocket" API)
 - Move refactored code out of `websocket/` to `thinknode/`
 - Update tests, possibly create new ones to improve test coverage
-- Remove legacy framework if it becomes unused, otherwise clearly mark it as legacy
+- Clearly mark the old framework as "legacy"
 - Add converted request types to the catalog
 - Put all Thinknode requests functionality in a separate plugin (library)
-
 
 ### Remove obsolete / experimental requests code
 In the implementation of the request-based framework, various solutions were evaluated.
@@ -55,6 +60,12 @@ JSON shows (too) many implementation details, and looks impractically complex.
 We might need to improve (maybe even move to MessagePack? One reason being that
 cereal seems to have a bug converting maps to JSON).
 
+Is it possible to have more than one serialization mechanism, and choose one during build-/runtime?
+Disadvantage: more testing effort (for us and/or the computer).
+
+### Resolving serialized requests
+Resolving a serialized request currently requires a `thinknode_request_context`; this should be generalized.
+
 
 ## RPC server
 See [other document](rpc_server.md) for details.
@@ -67,11 +78,10 @@ See [other document](rpc_server.md) for details.
 - Decide what (meta-)information should be put where: in a request, in the resolution context,
   in request properties; as template argument or inside a struct/class.
   Try to cut down the number of template instantiations.
-- As a starter, only synchronous (=blocking) requests
 
 ### Shared memory optimization
-Sending large blobs across normal RPC channels will be slow, which might in practice
-even mean that reusing a cached result from the RPC server would be slower than
+Sending large blobs across normal RPC channels will be slow, which could very well
+mean that reusing a cached result from the RPC server would be slower than
 recalculating it in-process. A major performance improvement will be to store
 these blobs in shared memory, that can be directly accessed by various clients.
 
@@ -82,15 +92,20 @@ See [other document](shared_memory.md) for technical details.
 - Adapt memory cache so that it can store shared blobs
 - More...
 
+### Asynchronous requests
+Initially, requests to the server will be synchronous (=blocking).
+We also want to have asynchronous requests, where a client can query the server for progress information.
+
 
 ## Miscellaneous
 More technical debt, and improvement opportunities.
 
-### Flexible design
-- Continue driving from the monolithic design
+### General improvements
+- Strive after a composable architecture, moving away from the monolithic design
 - E.g. option to assemble a "CRADLE light" solution not linking to any RPC code
   (or maybe dummy code that won't get called)
 - Continue splitting the `cradle_outer` cmake target
+- More (code) documentation
 
 ### Possible disk cache optimizations
 - No base64 encoding for blobs;
@@ -99,9 +114,10 @@ More technical debt, and improvement opportunities.
   cf. [SQLite document](https://sqlite.org/intern-v-extern-blob.html)
 
 ### Upgrade used libraries
-- E.g. we are using [msgpack](https://github.com/msgpack/msgpack-c) 3.3.0, but Conan has 4.1.2
-  (from the active `cpp_master` branch). cmake is complaining about our version being an one one.
-  However, when upgrading, one unit test fails.
+- E.g. we are using [msgpack](https://github.com/msgpack/msgpack-c) 3.3.0.
+  cmake is complaining about our version being an old one.
+  We cannot use the latest one available in Conan due to an "optimization" breaking
+  backward compatiblity (see [analysis](msgpack.md)), but the one-but-latest version should do.
 - rpclib is using a msgpack version based on 2.1.5; can we merge the two?
 - Get rid of remaining `picosha2` usages, preferring the faster openssl
 
