@@ -78,12 +78,16 @@ let union_declaration u =
   ^ "& operator=(" ^ u.union_id ^ "&& other) " ^ "{ " ^ "type = other.type; "
   ^ "contents_ = std::move(other.contents_); " ^ "return *this; " ^ "} " ^ "}; "
 
-let union_type_info_declaration u =
+let union_type_info_declaration namespace u =
+  let qualified_union_name = namespace ^ "::" ^ u.union_id in
   cpp_code_blocks
     [
       [
+        "}";
+      ];
+      [
         "template<>";
-        "struct definitive_type_info_query<" ^ u.union_id ^ ">";
+        "struct cradle::definitive_type_info_query<" ^ qualified_union_name ^ ">";
         "{";
         "    static void";
         "    get(cradle::api_type_info*);";
@@ -91,11 +95,14 @@ let union_type_info_declaration u =
       ];
       [
         "template<>";
-        "struct type_info_query<" ^ u.union_id ^ ">";
+        "struct cradle::type_info_query<" ^ qualified_union_name ^ ">";
         "{";
         "    static void";
         "    get(cradle::api_type_info*);";
         "};";
+      ];
+      [
+        "namespace " ^ namespace ^ " {";
       ];
     ]
 
@@ -117,12 +124,16 @@ let union_auto_upgrade_value_declaration u =
 let union_upgrade_value_declaration_api_instance app_id u =
   u.union_id ^ " upgrade_value_" ^ u.union_id ^ "(cradle::dynamic const& v);"
 
-let union_type_info_definition app_id u =
+let union_type_info_definition app_id namespace u =
+  let qualified_union_name = namespace ^ "::" ^ u.union_id in
   cpp_code_blocks
     [
       [
+        "}";
+      ];
+      [
         "void";
-        "definitive_type_info_query<" ^ u.union_id ^ ">::get(";
+        "cradle::definitive_type_info_query<" ^ qualified_union_name ^ ">::get(";
         "    cradle::api_type_info* info)";
         "{";
         "    std::map<std::string, cradle::api_union_member_info> members;";
@@ -147,7 +158,7 @@ let union_type_info_definition app_id u =
       ];
       [
         "void";
-        "type_info_query<" ^ u.union_id ^ ">::get(";
+        "cradle::type_info_query<" ^ qualified_union_name ^ ">::get(";
         "    cradle::api_type_info* info)";
         "{";
         "    *info =";
@@ -155,6 +166,9 @@ let union_type_info_definition app_id u =
         "            cradle::api_named_type_reference(";
         "                \"" ^ app_id ^ "\", \"" ^ u.union_id ^ "\"));";
         "}";
+      ];
+      [
+        "namespace " ^ namespace ^ " {";
       ];
     ]
 
@@ -477,7 +491,7 @@ let cpp_code_to_register_upgrade_function_instance u =
 let hpp_string_of_union account_id app_id namespace u =
   hpp_string_of_enum account_id app_id namespace (type_enum_of_union u)
   ^ union_declaration u
-  ^ union_type_info_declaration u
+  ^ union_type_info_declaration namespace u
   ^ union_constructor_declarations u
   ^ union_accessor_declarations u
   ^ union_comparison_declarations u
@@ -492,7 +506,7 @@ let hpp_string_of_union account_id app_id namespace u =
 
 let cpp_string_of_union account_id app_id namespace u =
   cpp_string_of_enum account_id app_id namespace (type_enum_of_union u)
-  ^ union_type_info_definition app_id u
+  ^ union_type_info_definition app_id namespace u
   ^ union_constructor_definitions u
   ^ union_accessor_definitions u
   ^ union_comparison_definitions u
