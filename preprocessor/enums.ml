@@ -96,7 +96,8 @@ let enum_type_info_definition app_id namespace e =
         "{";
         "    *info =";
         "        cradle::make_api_type_info_with_enum_type(";
-        "            cradle::get_enum_type_info<" ^ e.enum_id ^ ">());";
+        "            cradle::get_enum_type_info<" ^
+                        qualified_enum_name ^ ">());";
         "}";
       ];
       [
