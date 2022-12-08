@@ -218,6 +218,7 @@ let structure_type_info_definition_instance app_id namespace label assignments
         "cradle::structure_field_type_info_adder<" ^ full_structure_name ^ ">::add(";
         "    std::map<std::string, cradle::api_structure_field_info>* fields)";
         "{";
+        "    using namespace " ^ namespace ^ ";";
         ( match s.structure_super with
         | Some super ->
             "    structure_field_type_info_adder<" ^ super ^ ">::add(fields); "

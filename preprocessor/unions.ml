@@ -136,7 +136,7 @@ let union_type_info_definition app_id namespace u =
         "cradle::definitive_type_info_query<" ^ qualified_union_name ^ ">::get(";
         "    cradle::api_type_info* info)";
         "{";
-        "    using namespace " ^ namespace ^ ";" ^
+        "    using namespace " ^ namespace ^ ";";
         "    std::map<std::string, cradle::api_union_member_info> members;";
         String.concat ""
           (List.map
