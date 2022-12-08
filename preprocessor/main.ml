@@ -85,6 +85,7 @@ let declaration_registration_code account_id type_app_id fun_app_id decl =
 
 let cpp_registration_code account_id type_app_id fun_app_id file_id decls =
   "void add_" ^ file_id ^ "_api(cradle::api_implementation& api)\n" ^ "{\n"
+  ^ "using namespace cradle;\n"
   ^ String.concat ""
       (List.map
          (declaration_registration_code account_id type_app_id fun_app_id)
