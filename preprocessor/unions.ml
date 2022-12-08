@@ -206,7 +206,7 @@ let union_auto_upgrade_value_definition app_id u =
     ^ String.concat ""
         (List.map
            (fun m ->
-             "{ auto i = fields.find(dynamic(\"" ^ m.um_id ^ "\")); "
+             "{ auto i = fields.find(cradle::dynamic(\"" ^ m.um_id ^ "\")); "
              ^ "if (i != fields.end()) " ^ "{ "
              ^ cpp_code_for_type m.um_type
              ^ " ut;" ^ "upgrade_value(&ut, i->second);" ^ u.union_id
@@ -400,8 +400,8 @@ let union_conversion_definitions u =
          (fun m ->
            "case "
            ^ cpp_enum_value_of_union_member u m
-           ^ ": " ^ "cradle::to_dynamic(&s[dynamic(\"" ^ m.um_id ^ "\")], as_"
-           ^ m.um_id ^ "(x)); " ^ "break; ")
+           ^ ": " ^ "cradle::to_dynamic(&s[cradle::dynamic(\"" ^ m.um_id ^
+           "\")], as_" ^ m.um_id ^ "(x)); " ^ "break; ")
          u.union_members)
   ^ "} " ^ "*v = std::move(s); " ^ "} " ^ "void from_dynamic(" ^ u.union_id
   ^ "* x, cradle::dynamic const& v) " ^ "{ " ^ "cradle::dynamic_map const& s = "
