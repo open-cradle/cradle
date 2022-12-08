@@ -290,7 +290,7 @@ let enum_conversion_definitions e =
         "    " ^ e.enum_id ^ "* x,";
         "    cradle::dynamic const& v)";
         "{";
-        "    string s = cast<string>(v);";
+        "    std::string s = cast<std::string>(v);";
         String.concat ""
           (List.map
              (fun v ->
