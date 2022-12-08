@@ -400,8 +400,8 @@ let union_conversion_definitions u =
          (fun m ->
            "case "
            ^ cpp_enum_value_of_union_member u m
-           ^ ": " ^ "to_dynamic(&s[dynamic(\"" ^ m.um_id ^ "\")], as_" ^ m.um_id
-           ^ "(x)); " ^ "break; ")
+           ^ ": " ^ "cradle::to_dynamic(&s[dynamic(\"" ^ m.um_id ^ "\")], as_"
+           ^ m.um_id ^ "(x)); " ^ "break; ")
          u.union_members)
   ^ "} " ^ "*v = std::move(s); " ^ "} " ^ "void from_dynamic(" ^ u.union_id
   ^ "* x, cradle::dynamic const& v) " ^ "{ " ^ "cradle::dynamic_map const& s = "
@@ -418,7 +418,7 @@ let union_conversion_definitions u =
            ^ "\")); " ^ "x->contents_ = tmp; " ^ "break; " ^ " } ")
          u.union_members)
   ^ "} " ^ "} " ^ "std::ostream& operator<<(std::ostream& s, " ^ u.union_id
-  ^ " const& x) " ^ "{ return s << to_dynamic(x); } "
+  ^ " const& x) " ^ "{ return s << cradle::to_dynamic(x); } "
 
 let union_swap_declaration u =
   "void swap(" ^ u.union_id ^ "& a, " ^ u.union_id ^ "& b); "
