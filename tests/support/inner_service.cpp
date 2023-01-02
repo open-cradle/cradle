@@ -1,6 +1,7 @@
 #include "inner_service.h"
 #include <cradle/inner/fs/types.h>
 #include <cradle/inner/fs/utilities.h>
+#include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
 #include <cradle/plugins/disk_cache/storage/local/local_disk_cache_plugin.h>
@@ -51,6 +52,17 @@ cached_request_resolution_context::reset_memory_cache()
         {inner_config_keys::MEMORY_CACHE_UNUSED_SIZE_LIMIT, 0x40'00'00'00U},
     };
     resources.inner_reset_memory_cache(service_config(config_map));
+}
+
+void
+ensure_loopback_service()
+{
+    static bool registered{false};
+    if (!registered)
+    {
+        register_loopback_service();
+        registered = true;
+    }
 }
 
 } // namespace cradle

@@ -7,6 +7,7 @@
 #include <cppcoro/static_thread_pool.hpp>
 
 #include <cradle/inner/introspection/tasklet.h>
+#include <cradle/thinknode/context.h>
 #include <cradle/thinknode/types.hpp>
 #include <cradle/typing/service/core.h>
 

@@ -4,8 +4,8 @@
 #include <filesystem>
 
 #include <boost/algorithm/string.hpp>
-
 #include <curl/curl.h>
+#include <spdlog/fmt/ostr.h>
 
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/utilities/errors.h>
@@ -252,7 +252,11 @@ http_connection::perform_request(
     progress_reporter_interface& reporter,
     http_request const& request)
 {
-    spdlog::get("cradle")->info("HTTP perform_request");
+    auto logger = spdlog::get("cradle");
+    logger->info("HTTP perform_request");
+    logger->debug("<<< query");
+    logger->debug("{}", redact_request(request));
+    logger->debug(">>> query");
 
     CURL* curl = impl_->curl;
     assert(curl);
@@ -388,6 +392,10 @@ http_connection::perform_request(
             << attempted_http_request_info(redact_request(request))
             << http_response_info(response));
     }
+
+    logger->debug("<<< response");
+    logger->debug("{}", response);
+    logger->debug(">>> response");
 
     return response;
 }

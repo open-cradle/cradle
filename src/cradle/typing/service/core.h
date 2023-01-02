@@ -5,6 +5,7 @@
 
 #include <memory>
 
+#include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/service/config.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/typing/io/http_requests.hpp>

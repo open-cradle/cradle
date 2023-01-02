@@ -5,10 +5,9 @@
 #include <mutex>
 
 #include <boost/algorithm/string/replace.hpp>
-
-#include <sqlite3.h>
-
 #include <hashids.h>
+#include <spdlog/spdlog.h>
+#include <sqlite3.h>
 
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/utilities/errors.h>
@@ -58,6 +57,7 @@ struct ll_disk_cache_impl
 static void
 open_db(sqlite3** db, file_path const& file)
 {
+    spdlog::get("cradle")->info("Using disk cache {}", file.string());
     if (sqlite3_open(file.string().c_str(), db) != SQLITE_OK)
     {
         CRADLE_THROW(

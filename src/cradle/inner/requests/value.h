@@ -26,6 +26,7 @@ class value_request
 
     static constexpr caching_level_type caching_level{
         caching_level_type::none};
+    static constexpr bool introspective{false};
 
     value_request(Value const& value) : value_{value}
     {
@@ -54,9 +55,7 @@ class value_request
         update_unique_hash(hasher, value_);
     }
 
-    // VS2019 build fails with
-    // resolve(UncachedContext auto& ctx) const
-    template<UncachedContext Ctx>
+    template<Context Ctx>
     cppcoro::task<Value>
     resolve(Ctx& ctx) const
     {

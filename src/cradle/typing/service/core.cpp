@@ -60,7 +60,10 @@ async_http_request(
 mock_http_session&
 enable_http_mocking(service_core& core)
 {
-    core.internals().mock_http = std::make_unique<mock_http_session>();
+    if (!core.internals().mock_http)
+    {
+        core.internals().mock_http = std::make_unique<mock_http_session>();
+    }
     return *core.internals().mock_http;
 }
 

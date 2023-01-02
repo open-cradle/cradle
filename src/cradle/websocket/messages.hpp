@@ -270,6 +270,7 @@ api(struct)
 struct resolve_request_request
 {
     std::string json_text;
+    bool remote;
 };
 
 api(union)

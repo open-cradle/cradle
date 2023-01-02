@@ -55,7 +55,7 @@ perform_local_function_calc(
     auto const image = as_private(*version_info.manifest->provider).image;
 
     auto pool_name = std::string{"local@"} + app;
-    context_tasklet tasklet_guard{ctx, pool_name, "local calc"};
+    tasklet_context tasklet_guard{ctx, pool_name, "local calc"};
     co_await get_local_compute_pool_for_image(
         ctx.service, std::make_pair(app, image))
         .schedule();

@@ -3,6 +3,6 @@
 
 // Disk cache serialization in a Thinknode context
 
-#include <cradle/plugins/disk_cache/serialization/native/native.h>
+#include <cradle/plugins/serialization/disk_cache/legacy/native/native.h>
 
 #endif

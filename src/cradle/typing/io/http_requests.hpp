@@ -1,9 +1,10 @@
 #ifndef CRADLE_TYPING_IO_HTTP_REQUESTS_HPP
 #define CRADLE_TYPING_IO_HTTP_REQUESTS_HPP
 
-#include <cradle/inner/fs/types.h>
-
 #include <memory>
+#include <string>
+
+#include <cradle/inner/fs/types.h>
 
 // This file defines a low-level facility for doing authenticated HTTP
 // requests.
@@ -14,7 +15,7 @@ struct progress_reporter_interface;
 struct check_in_interface;
 
 // HTTP headers are specified as a mapping from field names to values.
-typedef std::map<string, string> http_header_list;
+typedef std::map<std::string, std::string> http_header_list;
 
 // The body of an HTTP request is a blob.
 typedef blob http_body;
@@ -35,15 +36,15 @@ api(struct internal)
 struct http_request
 {
     http_request_method method;
-    string url;
+    std::string url;
     http_header_list headers;
     blob body;
-    optional<string> socket;
+    optional<std::string> socket;
 };
 
 // Construct a GET request (in a convenient way).
 inline http_request
-make_get_request(string url, http_header_list headers)
+make_get_request(std::string url, http_header_list headers)
 {
     return http_request{
         http_request_method::GET,
@@ -57,7 +58,7 @@ make_get_request(string url, http_header_list headers)
 inline http_request
 make_http_request(
     http_request_method method,
-    string url,
+    std::string url,
     http_header_list headers,
     http_body body)
 {
@@ -87,7 +88,7 @@ parse_msgpack_response(http_response const& response);
 
 // Make a successful (200) HTTP response with the given body.
 http_response
-make_http_200_response(string body);
+make_http_200_response(std::string body);
 
 // This exception indicates a general failure in the HTTP request
 // system (e.g., a failure to initialize).

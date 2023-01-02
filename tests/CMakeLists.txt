@@ -3,6 +3,7 @@
 add_library(test_lib_runner OBJECT
     runner.cpp)
 target_link_libraries(test_lib_runner PUBLIC
+    cradle_inner
     Catch2::Catch2
     spdlog::spdlog)
 
@@ -21,12 +22,18 @@ target_link_libraries(test_lib_unit PUBLIC
     cradle_outer
     cradle_inner
     cradle_plugins
+    cradle_rpclib_client
     fakeit::fakeit)
 
 # Add the unit test runner.
 add_executable(unit_test_runner)
 target_sources(unit_test_runner PRIVATE
-    support/outer_service.cpp)
+    support/inner_service.cpp
+    support/outer_service.cpp
+    support/thinknode.cpp)
+target_include_directories(unit_test_runner PUBLIC
+    ${generated_src_dirs}
+    src)
 target_link_libraries(unit_test_runner PRIVATE
     test_lib_runner
     test_lib_unit)
@@ -83,15 +90,19 @@ add_library(test_lib_external OBJECT ${test_srcs_external})
 target_link_libraries(test_lib_external PUBLIC
     cradle_outer
     cradle_inner
-    cradle_plugins)
+    cradle_plugins
+    cradle_rpclib_client)
 
 # Add the external test runner.
 add_executable(external_test_runner)
 target_sources(external_test_runner PRIVATE
     support/outer_service.cpp)
+target_include_directories(external_test_runner PUBLIC
+    ${generated_src_dirs}
+    src)
 target_link_libraries(external_test_runner PRIVATE
-    test_lib_runner
-    test_lib_external)
+    test_lib_external
+    test_lib_runner)
 
 # Add the external testing target.
 add_custom_target(
@@ -131,16 +142,23 @@ add_test(
         --target plugins_tests)
 
 # Add a runner covering all unit tests (including external and inner).
+# TODO linking rpclib_client doesn't work
 add_executable(all_unit_tests_runner)
 target_sources(all_unit_tests_runner PRIVATE
-    support/inner_service.cpp 
-    support/outer_service.cpp)
+    support/inner_service.cpp
+    support/outer_service.cpp
+    support/thinknode.cpp
+    ../src/cradle/rpclib/client/proxy.cpp)
+target_include_directories(all_unit_tests_runner PUBLIC
+    ${generated_src_dirs}
+    src)
 target_link_libraries(all_unit_tests_runner
     test_lib_runner
     test_lib_unit
     test_lib_external
     test_lib_inner
-    test_lib_plugins)
+    test_lib_plugins
+    rpclib::rpclib)
 
 # Add a target running all unit tests (including external and inner).
 add_custom_target(
@@ -188,6 +206,7 @@ target_link_libraries(test_lib_benchmark PUBLIC
     benchmark::benchmark)
 
 add_executable(benchmark_test_runner)
+add_dependencies(benchmark_test_runner rpclib_server)
 target_sources(benchmark_test_runner PRIVATE
     support/inner_service.cpp 
     support/outer_service.cpp)

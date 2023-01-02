@@ -1,4 +1,4 @@
-#define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_RUNNER
 
 // Ask Catch to dump memory leaks under Windows.
 #ifdef _WIN32
@@ -20,7 +20,14 @@
 
 #include <catch2/catch.hpp>
 
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/spdlog.h>
+#include <cradle/inner/utilities/logging.h>
 
-auto the_logger = spdlog::stdout_color_mt("cradle");
+int
+main(int argc, char* argv[])
+{
+    // Can be overruled by setting SPDLOG_LEVEL, e.g.
+    //   export SPDLOG_LEVEL=debug
+    cradle::initialize_logging("warn");
+
+    return Catch::Session().run(argc, argv);
+}

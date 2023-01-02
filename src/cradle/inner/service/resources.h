@@ -51,6 +51,8 @@ class inner_resources
     // Creates an object that needs an inner_initialize() call
     inner_resources() = default;
 
+    virtual ~inner_resources() = default;
+
     void
     inner_initialize(service_config const& config);
 

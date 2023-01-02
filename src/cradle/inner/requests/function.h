@@ -50,8 +50,9 @@ class function_request_uncached
     using element_type = function_request_uncached;
     using value_type = Value;
 
-    static constexpr caching_level_type caching_level
-        = caching_level_type::none;
+    static constexpr caching_level_type caching_level{
+        caching_level_type::none};
+    static constexpr bool introspective{false};
 
     function_request_uncached(Function function, Args... args)
         : function_{std::move(function)}, args_{std::move(args)...}
@@ -66,9 +67,10 @@ class function_request_uncached
         throw not_implemented_error();
     }
 
-    template<UncachedContext Ctx>
-    cppcoro::task<Value>
-    resolve(Ctx& ctx) const
+    template<typename Ctx>
+    requires ContextMatchingProps<Ctx, introspective, caching_level>
+        cppcoro::task<Value>
+        resolve(Ctx& ctx) const
     {
         // The "func=function_" is a workaround to prevent a gcc-10 internal
         // compiler error in release builds.
@@ -173,9 +175,10 @@ class function_request_cached
         return id_;
     }
 
-    template<CachedContext Ctx>
-    cppcoro::task<Value>
-    resolve(Ctx& ctx) const
+    template<typename Ctx>
+    requires ContextMatchingProps<Ctx, introspective, caching_level>
+        cppcoro::task<Value>
+        resolve(Ctx& ctx) const
     {
         // The "func=function_" is a workaround to prevent a gcc-10 internal
         // compiler error in release builds.
@@ -364,7 +367,7 @@ auto rq_function_sp(Function function, Args... args)
  * Ctx is the "minimum" context needed to resolve this request.
  * E.g. a "cached" context can be used to resolve a non-cached request.
  */
-template<RequestContext Ctx, typename Value>
+template<Context Ctx, typename Value>
 class function_request_intf : public id_interface
 {
  public:
@@ -392,7 +395,7 @@ class function_request_intf : public id_interface
  *
  * Only a small part of this class depends on the context type, so there will
  * be object code duplication if multiple instantiations exist differing in
- * the context (i.e., introspected + caching level) only. Maybe this could be
+ * the context (i.e., introspective + caching level) only. Maybe this could be
  * optimized if it becomes an issue.
  */
 template<
@@ -452,24 +455,30 @@ class function_request_impl : public Intf
         return args_ < other.args_;
     }
 
-    // Caller promises that *this and other are the same type.
+    // other will be a function_request_impl, but possibly instantiated from
+    // different template arguments.
     bool
     equals(id_interface const& other) const override
     {
-        assert(dynamic_cast<function_request_impl const*>(&other));
-        auto const& other_id
-            = static_cast<function_request_impl const&>(other);
-        return equals(other_id);
+        if (auto other_impl
+            = dynamic_cast<function_request_impl const*>(&other))
+        {
+            return equals(*other_impl);
+        }
+        return false;
     }
 
-    // Caller promises that *this and other are the same type.
+    // other will be a function_request_impl, but possibly instantiated from
+    // different template arguments.
     bool
     less_than(id_interface const& other) const override
     {
-        assert(dynamic_cast<function_request_impl const*>(&other));
-        auto const& other_id
-            = static_cast<function_request_impl const&>(other);
-        return less_than(other_id);
+        if (auto other_impl
+            = dynamic_cast<function_request_impl const*>(&other))
+        {
+            return less_than(*other_impl);
+        }
+        return typeid(*this).before(typeid(other));
     }
 
     // Maybe caching the hashes could be optional (policy?).
@@ -615,61 +624,27 @@ class function_request_impl : public Intf
     }
 };
 
-// Defines the context_intf derived class needed for resolving a request
-// characterized by Intrsp and Level.
-// Primary template first, followed by the four partial specializations for
-// all (is request introspected?, is request cached?) combinations.
-template<bool Intrsp, caching_level_type Level>
-struct function_request_ctx_type;
-
-template<caching_level_type Level>
-struct function_request_ctx_type<false, Level>
-{
-    // Resolving a cached function request requires a cached context.
-    using type = cached_context_intf;
-};
-
-template<caching_level_type Level>
-struct function_request_ctx_type<true, Level>
-{
-    // Resolving a cached+introspected function request requires a
-    // cached+introspected context.
-    using type = cached_introspected_context_intf;
-};
-
-template<>
-struct function_request_ctx_type<false, caching_level_type::none>
-{
-    // An uncached function request can be resolved using any kind of context.
-    using type = context_intf;
-};
-
-template<>
-struct function_request_ctx_type<true, caching_level_type::none>
-{
-    // Resolving an introspected function request requires an introspected
-    // context.
-    using type = introspected_context_intf;
-};
-
 // Request properties that would be identical between similar requests
 template<
     caching_level_type Level,
     bool AsCoro = false,
-    bool Introspected = false>
+    bool Introspective = false,
+    typename Ctx = ctx_type_for_props<Introspective, Level>>
 struct request_props
 {
     static constexpr caching_level_type level = Level;
     static constexpr bool func_is_coro = AsCoro;
-    static constexpr bool introspected = Introspected;
+    static constexpr bool introspective = Introspective;
+    using ctx_type = Ctx;
+
     request_uuid uuid_;
-    std::string title_; // Used only if introspected
+    std::string title_; // Used only if introspective
 
     request_props(
         request_uuid uuid = request_uuid(), std::string title = std::string())
         : uuid_(std::move(uuid)), title_(std::move(title))
     {
-        assert(!(introspected && title_.empty()));
+        assert(!(introspective && title_.empty()));
     }
 };
 
@@ -680,21 +655,20 @@ struct request_props
  * (0) Plain function: res = function(args...)
  * (1) Coroutine needing context: res = co_await function(ctx, args...)
  *
- * Props::introspected is a template argument instead of being passed by value
+ * Props::introspective is a template argument instead of being passed by value
  * because of the overhead, in object size and execution time, when resolving
- * an introspected request; see resolve_request_cached().
+ * an introspective request; see resolve_request_cached().
  */
 template<typename Value, typename Props>
 class function_request_erased
 {
  public:
     static constexpr caching_level_type caching_level = Props::level;
-    static constexpr bool introspective = Props::introspected;
+    static constexpr bool introspective = Props::introspective;
 
     using element_type = function_request_erased;
     using value_type = Value;
-    using ctx_type =
-        typename function_request_ctx_type<introspective, caching_level>::type;
+    using ctx_type = typename Props::ctx_type;
     using intf_type = function_request_intf<ctx_type, Value>;
     using props_type = Props;
 
@@ -721,7 +695,8 @@ class function_request_erased
         init_captured_id();
     }
 
-    // *this and other are the same type
+    // *this and other are the same type; however, their impl_'s types could
+    // differ (especially if these are subrequests).
     bool
     equals(function_request_erased const& other) const
     {
@@ -759,9 +734,10 @@ class function_request_erased
         return impl_->get_uuid();
     }
 
-    template<RequestContext Ctx>
-    cppcoro::task<Value>
-    resolve(Ctx& ctx) const
+    template<typename Ctx>
+    requires ContextMatchingProps<Ctx, introspective, caching_level>
+        cppcoro::task<Value>
+        resolve(Ctx& ctx) const
     {
         return impl_->resolve(ctx);
     }

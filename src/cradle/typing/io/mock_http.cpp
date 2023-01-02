@@ -13,6 +13,13 @@ mock_http_session::set_script(mock_http_script script)
     in_order_ = true;
 }
 
+void
+mock_http_session::set_canned_response(http_response const& response)
+{
+    canned_response_ = std::make_unique<http_response>(response);
+    in_order_ = true;
+}
+
 bool
 mock_http_session::is_complete() const
 {
@@ -33,6 +40,10 @@ mock_http_connection::perform_request(
 {
     // These calls may arrive from different threads.
     std::scoped_lock<std::mutex> lock(session_.mutex_);
+    if (session_.canned_response_)
+    {
+        return *session_.canned_response_;
+    }
     auto exchange
         = std::ranges::find_if(session_.script_, [&](auto const& exchange) {
               return exchange.request == request;

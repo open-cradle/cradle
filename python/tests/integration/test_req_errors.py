@@ -1,9 +1,11 @@
 import pytest
 
 import cradle
+import params
 
 
-def test_req_no_uuid_in_json(session):
+@pytest.mark.parametrize('remote', params.remote_params, ids=params.remote_ids)
+def test_req_no_uuid_in_json(session, remote):
     req_data = \
         {'impl': {'polymorphic_id': 2147483649,
                   'missing_polymorphic_name': 'sample uuid',
@@ -11,12 +13,13 @@ def test_req_no_uuid_in_json(session):
          'title': 'sample title'}
 
     with pytest.raises(cradle.exceptions.ErrorResponseError) as excinfo:
-        session.resolve_request(req_data)
+        session.resolve_request(req_data, remote)
     msg = excinfo.value.response['content']['error']['unknown']
     assert msg == 'no polymorphic_name found in JSON'
 
 
-def test_req_unknown_uuid_in_json(session):
+@pytest.mark.parametrize('remote', params.remote_params, ids=params.remote_ids)
+def test_req_unknown_uuid_in_json(session, remote):
     req_data = \
         {'impl': {'polymorphic_id': 2147483649,
                   'polymorphic_name': 'unknown_uuid',
@@ -24,6 +27,6 @@ def test_req_unknown_uuid_in_json(session):
          'title': 'sample title'}
 
     with pytest.raises(cradle.exceptions.ErrorResponseError) as excinfo:
-        session.resolve_request(req_data)
+        session.resolve_request(req_data, remote)
     msg = excinfo.value.response['content']['error']['unknown']
-    assert msg == 'no request registered with uuid unknown_uuid'
+    assert msg.startswith('no request registered with uuid unknown_uuid')

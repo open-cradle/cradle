@@ -24,13 +24,7 @@
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 
-#include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
-#ifdef _WIN32
-#include <spdlog/sinks/wincolor_sink.h>
-#else
-#include <spdlog/sinks/ansicolor_sink.h>
-#endif
 
 #include <cppcoro/async_scope.hpp>
 #include <cppcoro/schedule_on.hpp>
@@ -44,20 +38,27 @@
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/introspection/tasklet.h>
+#include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/service/request.h>
+#include <cradle/inner/service/seri_req.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
+#include <cradle/inner/utilities/logging.h>
 #include <cradle/inner/utilities/text.h>
 #include <cradle/plugins/disk_cache/storage/local/ll_disk_cache.h>
 #include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
+#include <cradle/rpclib/client/proxy.h>
+#include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/apm.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/disk_cache_serialization.h>
+#include <cradle/thinknode/domain.h>
 #include <cradle/thinknode/iam.h>
 #include <cradle/thinknode/iss.h>
-#include <cradle/thinknode/iss_req_func.h>
+#include <cradle/thinknode/iss_req.h>
 #include <cradle/thinknode/utilities.h>
+#include <cradle/typing/core/fmt_format.h>
 #include <cradle/typing/core/unique_hash.h>
 #include <cradle/typing/encodings/json.h>
 #include <cradle/typing/encodings/msgpack.h>
@@ -66,7 +67,6 @@
 #include <cradle/typing/utilities/diff.hpp>
 #include <cradle/typing/utilities/logging.h>
 #include <cradle/websocket/calculations.h>
-#include <cradle/websocket/catalog.h>
 #include <cradle/websocket/introspection.h>
 #include <cradle/websocket/messages.hpp>
 
@@ -189,6 +189,8 @@ struct client_request
 struct websocket_server_impl
 {
     service_config config;
+    std::shared_ptr<spdlog::logger> logger;
+    // TODO another http_request_system singleton in typing/service/core.cpp
     http_request_system http_system;
     ws_server_type ws;
     client_connection_list clients;
@@ -1433,12 +1435,17 @@ send_response(
 
 static thinknode_request_context
 make_thinknode_request_context(
-    websocket_server_impl& server, client_request& request)
+    websocket_server_impl& server,
+    client_request& request,
+    bool remotely = false)
 {
-    return thinknode_request_context{
+    thinknode_request_context ctx{
         server.core,
         get_client(server.clients, request.client).session,
-        request.tasklet};
+        request.tasklet,
+        remotely};
+    ctx.proxy_name("rpclib");
+    return ctx;
 }
 
 static cppcoro::task<>
@@ -1464,6 +1471,10 @@ process_message(websocket_server_impl& server, client_request request)
                 client.name = registration.name;
                 client.session = registration.session;
             });
+            // TODO keep reference to thinknode_domain object?
+            thinknode_domain dom;
+            dom.initialize();
+            dom.set_session(registration.session);
             send_response(
                 server,
                 request,
@@ -1762,9 +1773,19 @@ process_message(websocket_server_impl& server, client_request request)
         }
         case client_message_content_tag::RESOLVE_REQUEST: {
             auto const& rr = as_resolve_request(content);
-            auto ctx{make_thinknode_request_context(server, request)};
-            dynamic response
+            server.logger->info("resolve {}", rr.remote ? "remote" : "local");
+            // serialized will be response, serialized as msgpack
+            auto ctx{
+                make_thinknode_request_context(server, request, rr.remote)};
+            blob serialized
                 = co_await resolve_serialized_request(ctx, rr.json_text);
+            // TODO msgpack -> dynamic -> msgpack
+            // - First conversion here
+            // - Second in value_to_msgpack_string(), above
+            dynamic response = parse_msgpack_value(
+                reinterpret_cast<uint8_t const*>(serialized.data()),
+                serialized.size());
+            server.logger->info("dynamic response {}", response);
             send_response(
                 server,
                 request,
@@ -1800,6 +1821,16 @@ process_message_with_error_handling(
                         get_required_error_info<attempted_http_request_info>(
                             e),
                         get_required_error_info<http_response_info>(e)))));
+    }
+    catch (rpclib_error& e)
+    {
+        spdlog::get("cradle")->error(e.what());
+        spdlog::get("cradle")->error(e.msg());
+        send_response(
+            server,
+            request,
+            make_server_message_content_with_error(
+                make_error_response_with_unknown(e.msg())));
     }
     catch (std::exception& e)
     {
@@ -1881,6 +1912,7 @@ static void
 initialize(websocket_server_impl& server, service_config const& config)
 {
     server.config = config;
+    server.logger = create_logger("ws_server");
 
     server.core.initialize(config);
 
@@ -1897,27 +1929,7 @@ initialize(websocket_server_impl& server, service_config const& config)
             on_message(server, hdl, message);
         });
 
-    // Create and register the logger.
-    if (!spdlog::get("cradle"))
-    {
-        std::vector<spdlog::sink_ptr> sinks;
-#ifdef _WIN32
-        sinks.push_back(
-            std::make_shared<spdlog::sinks::wincolor_stdout_sink_mt>());
-#else
-        sinks.push_back(
-            std::make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>());
-#endif
-        auto log_path = get_user_logs_dir(none, "cradle") / "log";
-        sinks.push_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-            log_path.string(), 262144, 2));
-        auto combined_logger = std::make_shared<spdlog::logger>(
-            "cradle", begin(sinks), end(sinks));
-        spdlog::register_logger(combined_logger);
-        spdlog::set_pattern("[%H:%M:%S:%e] [thread %t] %v");
-    }
-
-    create_requests_catalog();
+    register_rpclib_client(config);
 }
 
 websocket_server::websocket_server(service_config const& config)

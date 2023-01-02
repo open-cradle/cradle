@@ -42,7 +42,11 @@ jobs:
         source .venv/bin/activate
         cmake -Bbuild -DCMAKE_BUILD_TYPE=${{matrix.config}} .
 
-    - name: Build & Test
+    - name: Build
+      run: |
+        cmake --build build --config ${{matrix.config}} -j4
+
+    - name: Test
       run: |
         python python/generate_config.py $CRADLE_THINKNODE_API_TOKEN
         cmake --build build --config ${{matrix.config}} --target all_unit_tests -j4

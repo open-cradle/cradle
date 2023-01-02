@@ -3,6 +3,7 @@
 
 #include <array>
 #include <concepts>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <optional>
@@ -122,6 +123,9 @@ make_blob(std::string s);
 // Make a blob that holds the contents of a byte vector.
 blob
 make_blob(byte_vector v);
+
+std::ostream&
+operator<<(std::ostream& s, blob const& b);
 
 } // namespace cradle
 

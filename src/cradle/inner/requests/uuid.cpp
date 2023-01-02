@@ -2,7 +2,7 @@
 #include <sstream>
 
 #include <cradle/inner/requests/uuid.h>
-#include <cradle/version_info.hpp>
+#include <cradle/version_info.h>
 
 namespace cradle {
 

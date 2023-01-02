@@ -14,7 +14,7 @@ def make_function_request_impl(session: Session, uuid_base_ext: str, title: str,
     my_id = 2147483649 + id_offset
 
     # Args
-    all_args = [session.api_url, session.context_id] + args
+    all_args = [session.context_id] + args
     args_data = {f'tuple_element{i}': arg for i, arg in enumerate(all_args)}
 
     return \
@@ -27,7 +27,8 @@ def make_function_request_impl(session: Session, uuid_base_ext: str, title: str,
 
 
 def make_post_iss_object_request(session: Session, value: str, id_offset: int = 0) -> Any:
-    uuid_base = 'rq_post_iss_object_func'
+    uuid_base = 'rq_post_iss_object'
+    uuid_ext = 'blob'
     title = 'post_iss_object'
     msgpack_encoded = msgpack.packb(value, use_bin_type=True)
     base64_encoded = base64.standard_b64encode(msgpack_encoded)
@@ -37,7 +38,7 @@ def make_post_iss_object_request(session: Session, value: str, id_offset: int = 
         {'size': len(msgpack_encoded), 'blob': ascii_encoded}
     ]
 
-    return make_function_request_impl(session, uuid_base, title, id_offset, args)
+    return make_function_request_impl(session, f'{uuid_base}-{uuid_ext}', title, id_offset, args)
 
 
 def make_get_iss_object_metadata_request(session: Session, object_id: Any, id_offset: int = 0) -> Any:

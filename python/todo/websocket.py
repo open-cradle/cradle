@@ -11,8 +11,8 @@ import pytest
 
 def create_connection_robustly(url):
     """
-    Attempt to connect to a server, retrying for a brief period if it doesn't
-    initially work.
+    Attempt to connect to a WebSocket server, retrying for a brief period if it
+    doesn't initially work.
     """
     attempts_left = 100
     while True:
@@ -34,7 +34,7 @@ def test_websocket_server():
 
     server_process = \
         subprocess.Popen(
-            [deploy_dir + "/server"], cwd=deploy_dir,
+            [deploy_dir + "/websocket_server"], cwd=deploy_dir,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     try:

@@ -6,9 +6,10 @@
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/service/config_map_json.h>
 #include <cradle/inner/service/resources.h>
+#include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
 #include <cradle/plugins/disk_cache/storage/local/local_disk_cache_plugin.h>
-#include <cradle/version_info.hpp>
+#include <cradle/version_info.h>
 
 using namespace cradle;
 
@@ -76,6 +77,8 @@ try
     if (config_path)
         config_map
             = read_config_map_from_json(read_file_contents(*config_path));
+
+    initialize_logging();
 
     // Activate the only disk storage plugin we currently have.
     activate_local_disk_cache_plugin();

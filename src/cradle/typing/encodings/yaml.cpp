@@ -13,6 +13,7 @@
 #include <yaml-cpp/yaml.h>
 #endif
 
+#include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/utilities/text.h>
 #include <cradle/typing/utilities/arrays.h>
@@ -297,23 +298,6 @@ value_to_yaml(dynamic const& v)
     return out.c_str();
 }
 
-// Decide if we should print the contents of a blob as part of a diagnostic
-// output.
-static bool
-is_printable(blob const& x)
-{
-    if (x.size() > 1024)
-        return false;
-
-    for (size_t i = 0; i != x.size(); ++i)
-    {
-        if (reinterpret_cast<unsigned char const*>(x.data())[i] > 127)
-            return false;
-    }
-
-    return true;
-}
-
 static void
 emit_diagnostic_yaml_value(YAML::Emitter& out, dynamic const& v)
 {
@@ -347,20 +331,9 @@ emit_diagnostic_yaml_value(YAML::Emitter& out, dynamic const& v)
             break;
         }
         case value_type::BLOB: {
-            blob const& x = cast<blob>(v);
-            if (x.size() != 0 && is_printable(x))
-            {
-                out << YAML::Literal
-                    << "<blob>\n"
-                           + string(
-                               reinterpret_cast<char const*>(x.data()),
-                               x.size());
-            }
-            else
-            {
-                out << "<blob - size: " + lexical_cast<string>(x.size())
-                           + " bytes>";
-            }
+            std::ostringstream os;
+            os << cast<blob>(v);
+            out << os.str();
             break;
         }
         case value_type::DATETIME:

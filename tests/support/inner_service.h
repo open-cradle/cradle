@@ -15,6 +15,11 @@ inner_reset_disk_cache(inner_resources& resources);
 
 struct uncached_request_resolution_context : public context_intf
 {
+    bool
+    remotely() const override
+    {
+        return false;
+    }
 };
 
 struct cached_request_resolution_context : public cached_context_intf
@@ -33,6 +38,12 @@ struct cached_request_resolution_context : public cached_context_intf
     get_cache() override
     {
         return resources.memory_cache();
+    }
+
+    bool
+    remotely() const override
+    {
+        return false;
     }
 
     void
@@ -54,6 +65,10 @@ struct request_resolution_context_struct<caching_level_type::none>
 template<caching_level_type level>
 using request_resolution_context =
     typename request_resolution_context_struct<level>::type;
+
+// Ensure that the "remote" loopback service is available
+void
+ensure_loopback_service();
 
 } // namespace cradle
 

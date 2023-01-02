@@ -1,13 +1,21 @@
+#include <stdexcept>
+#include <thread>
+
 #include <benchmark/benchmark.h>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
+#include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/service/request.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/disk_cache/serialization/cereal/cereal.h>
-#include <cradle/thinknode/iss_req_class.h>
+#include <cradle/plugins/serialization/disk_cache/preferred/cereal/cereal.h>
+#include <cradle/rpclib/client/proxy.h>
+#include <cradle/rpclib/client/registry.h>
+#include <cradle/thinknode/iss_req.h>
+#include <cradle/thinknode/seri_catalog.h>
 #include <cradle/typing/encodings/msgpack.h>
 #include <cradle/typing/io/mock_http.h>
 #include <cradle/typing/service/core.h>
@@ -23,7 +31,6 @@ template<caching_level_type caching_level>
 static void
 BM_create_post_iss_request(benchmark::State& state)
 {
-    string api_url{"https://mgh.thinknode.io/api/v1.0"};
     string context_id{"123"};
     auto schema{
         make_thinknode_type_info_with_string_type(thinknode_string_type())};
@@ -32,7 +39,7 @@ BM_create_post_iss_request(benchmark::State& state)
     for (auto _ : state)
     {
         benchmark::DoNotOptimize(rq_post_iss_object<caching_level>(
-            api_url, context_id, schema, object_data));
+            context_id, schema, object_data));
     }
 }
 
@@ -42,30 +49,6 @@ BENCHMARK(BM_create_post_iss_request<caching_level_type::memory>)
     ->Name("BM_create_post_iss_request_memory_cached");
 BENCHMARK(BM_create_post_iss_request<caching_level_type::full>)
     ->Name("BM_create_post_iss_request_fully_cached");
-
-template<caching_level_type caching_level>
-static void
-BM_create_post_iss_request_erased(benchmark::State& state)
-{
-    string api_url{"https://mgh.thinknode.io/api/v1.0"};
-    string context_id{"123"};
-    auto schema{
-        make_thinknode_type_info_with_string_type(thinknode_string_type())};
-    auto object_data{make_blob("payload")};
-
-    for (auto _ : state)
-    {
-        benchmark::DoNotOptimize(rq_post_iss_object_erased<caching_level>(
-            api_url, context_id, schema, object_data));
-    }
-}
-
-BENCHMARK(BM_create_post_iss_request_erased<caching_level_type::none>)
-    ->Name("BM_create_post_iss_request_erased_uncached");
-BENCHMARK(BM_create_post_iss_request_erased<caching_level_type::memory>)
-    ->Name("BM_create_post_iss_request_erased_memory_cached");
-BENCHMARK(BM_create_post_iss_request_erased<caching_level_type::full>)
-    ->Name("BM_create_post_iss_request_erased_fully_cached");
 
 static void
 set_mock_script(
@@ -81,13 +64,57 @@ set_mock_script(
     mock_http.set_script(script);
 }
 
+static void
+register_remote_services(
+    std::string const& proxy_name, mock_http_exchange const& exchange)
+{
+    static bool registered_resolvers = false;
+    if (!registered_resolvers)
+    {
+        register_thinknode_seri_resolvers();
+        registered_resolvers = true;
+    }
+    if (proxy_name == "loopback")
+    {
+        static bool registered_loopback;
+        if (!registered_loopback)
+        {
+            register_loopback_service();
+            registered_loopback = true;
+        }
+    }
+    else if (proxy_name == "rpclib")
+    {
+        // TODO no static here, add func to get previously registered client
+        static std::shared_ptr<rpclib_client> rpclib_client;
+        if (!rpclib_client)
+        {
+            // TODO pass non-default config?
+            rpclib_client = register_rpclib_client(service_config());
+        }
+        // TODO should body be blob or string?
+        auto const& body{exchange.response.body};
+        std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
+        rpclib_client->mock_http(s);
+    }
+    else
+    {
+        throw std::invalid_argument(
+            fmt::format("Unknown proxy name {}", proxy_name));
+    }
+}
+
+static char const s_loopback[] = "loopback";
+static char const s_rpclib[] = "rpclib";
+
 template<caching_level_type caching_level, bool storing, typename Req>
 void
-BM_resolve_thinknode_request(
+BM_try_resolve_thinknode_request(
     benchmark::State& state,
     Req const& req,
     string const& api_url,
-    mock_http_exchange const& exchange)
+    mock_http_exchange const& exchange,
+    char const* proxy_name = nullptr)
 {
     service_core service;
     init_test_service(service);
@@ -95,12 +122,12 @@ BM_resolve_thinknode_request(
     thinknode_session session;
     session.api_url = api_url;
     session.access_token = "xyz";
-    thinknode_request_context ctx{service, session, nullptr};
-
-    // Suppress output about disk cache hits
-    if constexpr (caching_level == caching_level_type::full)
+    bool remotely = proxy_name != nullptr;
+    thinknode_request_context ctx{service, session, nullptr, remotely};
+    if (remotely)
     {
-        spdlog::set_level(spdlog::level::warn);
+        register_remote_services(proxy_name, exchange);
+        ctx.proxy_name(proxy_name);
     }
 
     // Fill the appropriate cache if any
@@ -171,16 +198,44 @@ BM_resolve_thinknode_request(
     }
 }
 
-template<caching_level_type caching_level, bool storing>
+template<caching_level_type caching_level, bool storing, typename Req>
 void
-BM_resolve_post_iss_request_impl(auto& create_request, benchmark::State& state)
+BM_resolve_thinknode_request(
+    benchmark::State& state,
+    Req const& req,
+    string const& api_url,
+    mock_http_exchange const& exchange,
+    char const* proxy_name = nullptr)
+{
+    try
+    {
+        BM_try_resolve_thinknode_request<caching_level, storing, Req>(
+            state, req, api_url, exchange, proxy_name);
+    }
+    catch (std::exception& e)
+    {
+        state.SkipWithError(e.what());
+    }
+    catch (...)
+    {
+        state.SkipWithError("Caught unknown exception");
+    }
+}
+
+template<
+    caching_level_type caching_level,
+    bool storing = false,
+    char const* proxy_name = nullptr>
+void
+BM_resolve_post_iss_request(benchmark::State& state)
 {
     string api_url{"https://mgh.thinknode.io/api/v1.0"};
     string context_id{"123"};
     auto schema{
         make_thinknode_type_info_with_string_type(thinknode_string_type())};
     auto object_data{make_blob("payload")};
-    auto req{create_request(api_url, context_id, schema, object_data)};
+    auto req{
+        rq_post_iss_object<caching_level>(context_id, schema, object_data)};
     mock_http_exchange exchange{
         make_http_request(
             http_request_method::POST,
@@ -190,24 +245,8 @@ BM_resolve_post_iss_request_impl(auto& create_request, benchmark::State& state)
              {"Content-Type", "application/octet-stream"}},
             make_blob("payload")),
         make_http_200_response("{ \"id\": \"def\" }")};
-
     BM_resolve_thinknode_request<caching_level, storing>(
-        state, req, api_url, exchange);
-}
-
-template<caching_level_type caching_level, bool storing = false>
-void
-BM_resolve_post_iss_request(benchmark::State& state)
-{
-    auto create_request = [](string api_url,
-                             string context_id,
-                             thinknode_type_info schema,
-                             blob object_data) {
-        return rq_post_iss_object<caching_level>(
-            api_url, context_id, schema, object_data);
-    };
-    BM_resolve_post_iss_request_impl<caching_level, storing>(
-        create_request, state);
+        state, req, api_url, exchange, proxy_name);
 }
 
 BENCHMARK(BM_resolve_post_iss_request<caching_level_type::none>)
@@ -225,48 +264,27 @@ BENCHMARK(BM_resolve_post_iss_request<caching_level_type::full, true>)
 BENCHMARK(BM_resolve_post_iss_request<caching_level_type::full, false>)
     ->Name("BM_resolve_post_iss_request_load_from_disk_cache")
     ->Apply(thousand_loops);
-
-template<caching_level_type caching_level, bool storing = false>
-void
-BM_resolve_post_iss_request_erased(benchmark::State& state)
-{
-    auto create_request = [](string api_url,
-                             string context_id,
-                             thinknode_type_info schema,
-                             blob object_data) {
-        return rq_post_iss_object_erased<caching_level>(
-            api_url, context_id, schema, object_data);
-    };
-    BM_resolve_post_iss_request_impl<caching_level, storing>(
-        create_request, state);
-}
-
-BENCHMARK(BM_resolve_post_iss_request_erased<caching_level_type::none>)
-    ->Name("BM_resolve_post_iss_request_erased_uncached")
-    ->Apply(thousand_loops);
-BENCHMARK(BM_resolve_post_iss_request_erased<caching_level_type::memory, true>)
-    ->Name("BM_resolve_post_iss_request_erased_store_to_mem_cache")
+BENCHMARK(
+    BM_resolve_post_iss_request<caching_level_type::full, false, s_loopback>)
+    ->Name("BM_resolve_post_iss_request_loopback")
     ->Apply(thousand_loops);
 BENCHMARK(
-    BM_resolve_post_iss_request_erased<caching_level_type::memory, false>)
-    ->Name("BM_resolve_post_iss_request_erased_load_from_mem_cache")
-    ->Apply(thousand_loops);
-BENCHMARK(BM_resolve_post_iss_request_erased<caching_level_type::full, true>)
-    ->Name("BM_resolve_post_iss_request_erased_store_to_disk_cache")
-    ->Apply(thousand_loops);
-BENCHMARK(BM_resolve_post_iss_request_erased<caching_level_type::full, false>)
-    ->Name("BM_resolve_post_iss_request_erased_load_from_disk_cache")
+    BM_resolve_post_iss_request<caching_level_type::full, false, s_rpclib>)
+    ->Name("BM_resolve_post_iss_request_rpclib")
     ->Apply(thousand_loops);
 
-template<caching_level_type caching_level, bool storing>
+template<
+    caching_level_type caching_level,
+    bool storing = false,
+    char const* proxy_name = nullptr>
 void
 BM_resolve_retrieve_immutable_request(benchmark::State& state)
 {
     string api_url{"https://mgh.thinknode.io/api/v1.0"};
     string context_id{"123"};
     string immutable_id{"abc"};
-    auto req{rq_retrieve_immutable_object<caching_level>(
-        api_url, context_id, immutable_id)};
+    auto req{
+        rq_retrieve_immutable_object<caching_level>(context_id, immutable_id)};
     mock_http_exchange exchange{
         make_get_request(
             "https://mgh.thinknode.io/api/v1.0/iss/immutable/"
@@ -275,7 +293,7 @@ BM_resolve_retrieve_immutable_request(benchmark::State& state)
              {"Accept", "application/octet-stream"}}),
         make_http_200_response("payload")};
     BM_resolve_thinknode_request<caching_level, storing>(
-        state, req, api_url, exchange);
+        state, req, api_url, exchange, proxy_name);
 }
 
 BENCHMARK(
@@ -297,4 +315,16 @@ BENCHMARK(
 BENCHMARK(
     BM_resolve_retrieve_immutable_request<caching_level_type::full, false>)
     ->Name("BM_resolve_retrieve_immutable_request_load_from_disk_cache")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_retrieve_immutable_request<
+              caching_level_type::full,
+              false,
+              s_loopback>)
+    ->Name("BM_resolve_retrieve_immutable_request_loopback")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_retrieve_immutable_request<
+              caching_level_type::full,
+              false,
+              s_rpclib>)
+    ->Name("BM_resolve_retrieve_immutable_request_rpclib")
     ->Apply(thousand_loops);

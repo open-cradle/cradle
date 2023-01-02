@@ -1,8 +1,10 @@
 #ifndef CRADLE_TYPING_IO_MOCK_HTTP_H
 #define CRADLE_TYPING_IO_MOCK_HTTP_H
 
-#include <cradle/typing/io/http_requests.hpp>
+#include <memory>
 #include <mutex>
+
+#include <cradle/typing/io/http_requests.hpp>
 
 namespace cradle {
 
@@ -29,6 +31,10 @@ struct mock_http_session
     void
     set_script(mock_http_script script);
 
+    // Set a response that will be returned on each request
+    void
+    set_canned_response(http_response const& response);
+
     // Have all exchanges in the script been executed?
     bool
     is_complete() const;
@@ -42,6 +48,7 @@ struct mock_http_session
 
     std::mutex mutex_;
     mock_http_script script_;
+    std::unique_ptr<http_response> canned_response_;
 
     // Has the script been executed in order so far?
     bool in_order_ = true;

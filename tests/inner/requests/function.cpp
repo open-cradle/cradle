@@ -9,7 +9,7 @@
 #include "../../support/request.h"
 #include <cradle/inner/service/request.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/disk_cache/serialization/cereal/cereal.h>
+#include <cradle/plugins/serialization/disk_cache/preferred/cereal/cereal.h>
 
 using namespace cradle;
 
@@ -446,4 +446,42 @@ TEST_CASE("evaluate function requests in parallel - disk cached", "[requests]")
     REQUIRE(ic1.entry_count == num_requests);
     auto dc1 = ll_cache.get_summary_info();
     REQUIRE(dc1.entry_count == num_requests);
+}
+
+static auto add2 = [](int a, int b) { return a + b; };
+
+TEST_CASE("function_request_erased with subrequest - compare", "[X]")
+{
+    request_props<caching_level_type::memory> props;
+    auto req0a{rq_function_erased(props, add2, 1, 2)};
+    auto req0b{rq_function_erased(props, add2, 1, 2)};
+
+    REQUIRE(req0a == req0b);
+    REQUIRE(!(req0a < req0b));
+    REQUIRE(!(req0b < req0a));
+
+    auto req1a{rq_function_erased(props, add2, req0a, 3)};
+    auto req1b{rq_function_erased(props, add2, req0b, 3)};
+    REQUIRE(req1a == req1b);
+    REQUIRE(!(req1a < req1b));
+    REQUIRE(!(req1b < req1a));
+
+    // Shouldn't assert in function_request_impl::equals()
+    REQUIRE(req0a != req1a);
+    REQUIRE((req0a < req1a || req1a < req0a));
+}
+
+TEST_CASE("function_request_erased with subrequest - resolve", "[Y]")
+{
+    request_props<caching_level_type::memory> props;
+    auto req0{rq_function_erased(props, add2, 1, 2)};
+    auto req1{rq_function_erased(props, add2, req0, 3)};
+    auto req2{rq_function_erased(props, add2, req1, 4)};
+    cached_request_resolution_context ctx;
+
+    REQUIRE(cppcoro::sync_wait(resolve_request(ctx, req0)) == 3);
+    REQUIRE(cppcoro::sync_wait(resolve_request(ctx, req1)) == 6);
+    // The following shouldn't assert even if function_request_impl::hash()
+    // is modified to always return the same value.
+    REQUIRE(cppcoro::sync_wait(resolve_request(ctx, req2)) == 10);
 }

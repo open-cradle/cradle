@@ -1,0 +1,16 @@
+#ifndef CRADLE_DEPLOY_DIR_H
+#define CRADLE_DEPLOY_DIR_H
+
+#include <string>
+
+namespace cradle {
+
+inline std::string
+get_rpclib_server_path()
+{
+    return "@deploy_dir@/rpclib_server@exe_ext@";
+}
+
+} // namespace cradle
+
+#endif

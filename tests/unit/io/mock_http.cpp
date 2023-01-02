@@ -126,3 +126,22 @@ TEST_CASE("mock GET request", "[io][mock_http]")
     REQUIRE(session.is_complete());
     REQUIRE(!session.is_in_order());
 }
+
+TEST_CASE("mock HTTP with canned response", "[io][mock_http]")
+{
+    auto response = make_http_200_response("canned A");
+    mock_http_session session;
+    session.set_canned_response(response);
+
+    mock_http_connection conn(session);
+    null_check_in check_in;
+    null_progress_reporter reporter;
+
+    REQUIRE(
+        conn.perform_request(
+            check_in,
+            reporter,
+            make_get_request(
+                "https://postman-echo.com/get?color=navy", http_header_list()))
+        == response);
+}

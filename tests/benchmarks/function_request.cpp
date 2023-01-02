@@ -6,7 +6,7 @@
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/disk_cache/serialization/cereal/cereal.h>
+#include <cradle/plugins/serialization/disk_cache/preferred/cereal/cereal.h>
 
 #include "../support/inner_service.h"
 #include "benchmark_support.h"
@@ -358,7 +358,7 @@ auto create_triangular_tree_erased()
 
 template<caching_level_type level, int H>
 auto
-create_triangular_tree_erased_introspected()
+create_triangular_tree_erased_introspective()
 {
     if constexpr (H == 1)
     {
@@ -374,8 +374,8 @@ create_triangular_tree_erased_introspected()
         return rq_function_erased(
             props,
             add,
-            create_triangular_tree_erased_introspected<level, H - 1>(),
-            create_triangular_tree_erased_introspected<level, H - 1>());
+            create_triangular_tree_erased_introspective<level, H - 1>(),
+            create_triangular_tree_erased_introspective<level, H - 1>());
     }
 }
 
@@ -438,7 +438,7 @@ BM_create_tri_tree_erased_intrsp(benchmark::State& state)
     for (auto _ : state)
     {
         benchmark::DoNotOptimize(
-            create_triangular_tree_erased_introspected<level, H>());
+            create_triangular_tree_erased_introspective<level, H>());
     }
 }
 
