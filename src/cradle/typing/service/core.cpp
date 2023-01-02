@@ -30,9 +30,16 @@ http_connection_for_thread(service_core& core)
 {
     if (core.internals().mock_http)
     {
-        thread_local mock_http_connection the_connection(
-            *core.internals().mock_http);
-        return the_connection;
+        if (core.internals().http_is_synchronous)
+        {
+            return core.internals().mock_http->synchronous_connection();
+        }
+        else
+        {
+            thread_local mock_http_connection the_connection(
+                *core.internals().mock_http);
+            return the_connection;
+        }
     }
     else
     {
@@ -49,7 +56,10 @@ async_http_request(
     std::ostringstream s;
     s << "HTTP: " << request.method << " " << request.url;
     auto tasklet = create_tasklet_tracker("HTTP", s.str(), client);
-    co_await core.internals().http_pool.schedule();
+    if (!core.internals().http_is_synchronous)
+    {
+        co_await core.internals().http_pool.schedule();
+    }
     tasklet_run tasklet_run(tasklet);
     null_check_in check_in;
     null_progress_reporter reporter;
@@ -58,11 +68,12 @@ async_http_request(
 }
 
 mock_http_session&
-enable_http_mocking(service_core& core)
+enable_http_mocking(service_core& core, bool http_is_synchronous)
 {
     if (!core.internals().mock_http)
     {
         core.internals().mock_http = std::make_unique<mock_http_session>();
+        core.internals().http_is_synchronous = http_is_synchronous;
     }
     return *core.internals().mock_http;
 }

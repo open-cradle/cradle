@@ -6,6 +6,17 @@
 
 namespace cradle {
 
+mock_http_session::mock_http_session()
+    : synchronous_connection_(mock_http_connection(*this))
+{
+}
+
+mock_http_session::mock_http_session(mock_http_script script)
+    : synchronous_connection_(mock_http_connection(*this))
+{
+    set_script(std::move(script));
+}
+
 void
 mock_http_session::set_script(mock_http_script script)
 {
@@ -38,7 +49,7 @@ mock_http_connection::perform_request(
     progress_reporter_interface&,
     http_request const& request)
 {
-    // These calls may arrive from different threads.
+    // These calls may arrive from different threads in the HTTP thread pool.
     std::scoped_lock<std::mutex> lock(session_.mutex_);
     if (session_.canned_response_)
     {

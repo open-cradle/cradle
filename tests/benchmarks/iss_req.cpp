@@ -51,22 +51,8 @@ BENCHMARK(BM_create_post_iss_request<caching_level_type::full>)
     ->Name("BM_create_post_iss_request_fully_cached");
 
 static void
-set_mock_script(
-    mock_http_session& mock_http,
-    mock_http_exchange const& exchange,
-    int num_loops)
-{
-    mock_http_script script;
-    for (int i = 0; i < num_loops; ++i)
-    {
-        script.push_back(exchange);
-    }
-    mock_http.set_script(script);
-}
-
-static void
 register_remote_services(
-    std::string const& proxy_name, mock_http_exchange const& exchange)
+    std::string const& proxy_name, http_response const& response)
 {
     static bool registered_resolvers = false;
     if (!registered_resolvers)
@@ -93,7 +79,7 @@ register_remote_services(
             rpclib_client = register_rpclib_client(service_config());
         }
         // TODO should body be blob or string?
-        auto const& body{exchange.response.body};
+        auto const& body{response.body};
         std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
         rpclib_client->mock_http(s);
     }
@@ -113,12 +99,13 @@ BM_try_resolve_thinknode_request(
     benchmark::State& state,
     Req const& req,
     string const& api_url,
-    mock_http_exchange const& exchange,
+    http_response const& response,
     char const* proxy_name = nullptr)
 {
     service_core service;
     init_test_service(service);
-    auto& mock_http = enable_http_mocking(service);
+    auto& mock_http = enable_http_mocking(service, true);
+    mock_http.set_canned_response(response);
     thinknode_session session;
     session.api_url = api_url;
     session.access_token = "xyz";
@@ -126,7 +113,7 @@ BM_try_resolve_thinknode_request(
     thinknode_request_context ctx{service, session, nullptr, remotely};
     if (remotely)
     {
-        register_remote_services(proxy_name, exchange);
+        register_remote_services(proxy_name, response);
         ctx.proxy_name(proxy_name);
     }
 
@@ -134,7 +121,6 @@ BM_try_resolve_thinknode_request(
     auto init = [&]() -> cppcoro::task<void> {
         if constexpr (caching_level != caching_level_type::none)
         {
-            set_mock_script(mock_http, exchange, 1);
             benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
             if constexpr (caching_level == caching_level_type::full)
             {
@@ -151,15 +137,11 @@ BM_try_resolve_thinknode_request(
         auto loop = [&]() -> cppcoro::task<void> {
             for (int i = 0; i < num_loops; ++i)
             {
-                constexpr bool need_mock_script
-                    = caching_level == caching_level_type::none || storing;
                 constexpr bool need_empty_memory_cache
                     = caching_level == caching_level_type::full || storing;
                 constexpr bool need_empty_disk_cache
                     = caching_level == caching_level_type::full && storing;
-                if constexpr (
-                    need_mock_script || need_empty_memory_cache
-                    || need_empty_disk_cache)
+                if constexpr (need_empty_memory_cache || need_empty_disk_cache)
                 {
                     // Some scenarios are problematic for some reason
                     // (huge CPU times, only one iteration).
@@ -172,10 +154,6 @@ BM_try_resolve_thinknode_request(
                     if constexpr (pause_timing)
                     {
                         state.PauseTiming();
-                    }
-                    if constexpr (need_mock_script)
-                    {
-                        set_mock_script(mock_http, exchange, 1);
                     }
                     if constexpr (need_empty_memory_cache)
                     {
@@ -204,13 +182,13 @@ BM_resolve_thinknode_request(
     benchmark::State& state,
     Req const& req,
     string const& api_url,
-    mock_http_exchange const& exchange,
+    http_response const& response,
     char const* proxy_name = nullptr)
 {
     try
     {
         BM_try_resolve_thinknode_request<caching_level, storing, Req>(
-            state, req, api_url, exchange, proxy_name);
+            state, req, api_url, response, proxy_name);
     }
     catch (std::exception& e)
     {
@@ -236,17 +214,9 @@ BM_resolve_post_iss_request(benchmark::State& state)
     auto object_data{make_blob("payload")};
     auto req{
         rq_post_iss_object<caching_level>(context_id, schema, object_data)};
-    mock_http_exchange exchange{
-        make_http_request(
-            http_request_method::POST,
-            "https://mgh.thinknode.io/api/v1.0/iss/string?context=123",
-            {{"Authorization", "Bearer xyz"},
-             {"Accept", "application/json"},
-             {"Content-Type", "application/octet-stream"}},
-            make_blob("payload")),
-        make_http_200_response("{ \"id\": \"def\" }")};
+    auto response{make_http_200_response("{ \"id\": \"def\" }")};
     BM_resolve_thinknode_request<caching_level, storing>(
-        state, req, api_url, exchange, proxy_name);
+        state, req, api_url, response, proxy_name);
 }
 
 BENCHMARK(BM_resolve_post_iss_request<caching_level_type::none>)
@@ -285,15 +255,9 @@ BM_resolve_retrieve_immutable_request(benchmark::State& state)
     string immutable_id{"abc"};
     auto req{
         rq_retrieve_immutable_object<caching_level>(context_id, immutable_id)};
-    mock_http_exchange exchange{
-        make_get_request(
-            "https://mgh.thinknode.io/api/v1.0/iss/immutable/"
-            "abc?context=123",
-            {{"Authorization", "Bearer xyz"},
-             {"Accept", "application/octet-stream"}}),
-        make_http_200_response("payload")};
+    auto response{make_http_200_response("payload")};
     BM_resolve_thinknode_request<caching_level, storing>(
-        state, req, api_url, exchange, proxy_name);
+        state, req, api_url, response, proxy_name);
 }
 
 BENCHMARK(

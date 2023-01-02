@@ -20,6 +20,12 @@ struct service_core_internals
         local_compute_pool;
 
     std::unique_ptr<mock_http_session> mock_http;
+
+    // Normally, HTTP requests are dispatched to a thread in the HTTP thread
+    // pool. Setting this to true causes them to be evaluated on the calling
+    // thread. This should happen only for mock HTTP in benchmark tests, where
+    // it tends to give more reliable and consistent timings.
+    bool http_is_synchronous{false};
 };
 
 } // namespace detail

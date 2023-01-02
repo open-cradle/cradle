@@ -16,16 +16,29 @@ struct mock_http_exchange
 
 typedef std::vector<mock_http_exchange> mock_http_script;
 
-struct mock_http_session
+struct mock_http_session;
+
+struct mock_http_connection : http_connection_interface
 {
-    mock_http_session()
+    mock_http_connection(mock_http_session& session) : session_(session)
     {
     }
 
-    mock_http_session(mock_http_script script)
-    {
-        set_script(std::move(script));
-    }
+    http_response
+    perform_request(
+        check_in_interface& check_in,
+        progress_reporter_interface& reporter,
+        http_request const& request) override;
+
+ private:
+    mock_http_session& session_;
+};
+
+struct mock_http_session
+{
+    mock_http_session();
+
+    mock_http_session(mock_http_script script);
 
     // Set the script of expected exchanges for this mock HTTP session.
     void
@@ -43,31 +56,24 @@ struct mock_http_session
     bool
     is_in_order() const;
 
+    // Returns a connection that can be used for synchronous HTTP requests.
+    // Should be used for benchmark tests (only).
+    mock_http_connection&
+    synchronous_connection()
+    {
+        return synchronous_connection_;
+    }
+
  private:
     friend struct mock_http_connection;
 
     std::mutex mutex_;
     mock_http_script script_;
     std::unique_ptr<http_response> canned_response_;
+    mock_http_connection synchronous_connection_;
 
     // Has the script been executed in order so far?
     bool in_order_ = true;
-};
-
-struct mock_http_connection : http_connection_interface
-{
-    mock_http_connection(mock_http_session& session) : session_(session)
-    {
-    }
-
-    http_response
-    perform_request(
-        check_in_interface& check_in,
-        progress_reporter_interface& reporter,
-        http_request const& request) override;
-
- private:
-    mock_http_session& session_;
 };
 
 } // namespace cradle

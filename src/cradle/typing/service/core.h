@@ -78,7 +78,7 @@ init_test_service(service_core& core);
 // This returns the mock_http_session that's been associated with the service.
 struct mock_http_session;
 mock_http_session&
-enable_http_mocking(service_core& core);
+enable_http_mocking(service_core& core, bool http_is_synchronous = false);
 
 template<class Sequence, class Function>
 cppcoro::task<>
