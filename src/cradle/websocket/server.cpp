@@ -1886,6 +1886,8 @@ initialize(websocket_server_impl& server, service_config const& config)
 
     server.ws.clear_access_channels(websocketpp::log::alevel::all);
     server.ws.init_asio();
+    // TODO following line under evaluation, for development only
+    server.ws.set_reuse_addr(true);
     server.ws.set_open_handler(
         [&](connection_hdl hdl) { on_open(server, hdl); });
     server.ws.set_close_handler(
