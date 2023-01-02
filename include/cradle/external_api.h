@@ -18,28 +18,44 @@ namespace external {
 
 // Failures lead to thrown exceptions
 
-struct api_service_config
-{
-    // The maximum amount of memory to use for caching results that are no
-    // longer in use, in bytes.
-    std::optional<std::size_t> memory_cache_unused_size_limit;
-
-    // Config for the disk cache
-    std::optional<std::string> disk_cache_directory;
-    std::optional<std::size_t> disk_cache_size_limit;
-
-    // How many concurrent threads to use for request handling.
-    // The default is one thread for each processor core.
-    // TODO remove request_concurrency if really unused
-    std::optional<int> request_concurrency;
-
-    // How many concurrent threads to use for computing.
-    // The default is one thread for each processor core.
-    std::optional<int> compute_concurrency;
-
-    // How many concurrent threads to use for HTTP requests
-    std::optional<int> http_concurrency;
-};
+/*
+ * Documentation for the JSON configuration passed to start_service();
+ * possibly outdated and/or incomplete. All values are optional.
+ *
+ * (int) memory_cache/unused_size_limit
+ * The maximum amount of memory to use for caching results that are no
+ * longer in use, in bytes.
+ *
+ * (string) disk_cache/directory
+ * (int) disk_cache/size_limit
+ * Config for the disk cache plugin
+ *
+ * (int) request_concurrency
+ * How many concurrent threads to use for request handling.
+ * The default is one thread for each processor core.
+ * TODO remove request_concurrency if really unused
+ *
+ * (int) compute_concurrency
+ * How many concurrent threads to use for computing.
+ * The default is one thread for each processor core.
+ *
+ * (int) http_concurrency
+ * How many concurrent threads to use for HTTP requests
+ *
+ * Example:
+ * {
+ *     "memory_cache": {
+ *         "unused_size_limit": 1073741824
+ *     },
+ *     "disk_cache": {
+ *         "directory": "some_dir",
+ *         "size_limit": 1073741824
+ *     },
+ *     "request_concurrency": 2,
+ *     "compute_concurrency": 2,
+ *     "http_concurrency": 2
+ * }
+ */
 
 class api_service_impl;
 class api_service
@@ -47,7 +63,7 @@ class api_service
     std::unique_ptr<api_service_impl> pimpl_;
 
  public:
-    api_service(api_service_config const& config);
+    api_service(std::string json_text);
     api_service(api_service&& that);
     ~api_service();
     api_service_impl&
@@ -59,7 +75,7 @@ class api_service
 
 // The service will be stopped when the returned object goes out of scope.
 api_service
-start_service(api_service_config const& config);
+start_service(std::string json_text);
 
 struct api_thinknode_session_config
 {
@@ -84,6 +100,7 @@ class api_session
     }
 };
 
+// TODO replace this config too with JSON?
 api_session
 start_session(
     api_service& service, api_thinknode_session_config const& config);

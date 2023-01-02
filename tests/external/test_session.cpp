@@ -11,9 +11,9 @@ external_test_session
 make_external_test_session()
 {
     activate_local_disk_cache_plugin();
-    cradle::external::api_service_config service_config{};
+    std::string json_config{"{}"};
     cradle::external::api_service service{
-        cradle::external::start_service(service_config)};
+        cradle::external::start_service(std::move(json_config))};
     cradle::external::api_thinknode_session_config session_config{
         .api_url = "https://mgh.thinknode.io/api/v1.0",
         .access_token = "xyz",

@@ -1,6 +1,8 @@
+#include <utility>
+
 #include <cradle/external/external_api_impl.h>
 #include <cradle/external_api.h>
-#include <cradle/inner/service/config.h>
+#include <cradle/inner/service/config_map_json.h>
 #include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/iam.h>
@@ -24,8 +26,8 @@ make_thinknode_request_context(api_session& session, char const* title)
         tasklet};
 }
 
-api_service::api_service(api_service_config const& config)
-    : pimpl_{std::make_unique<api_service_impl>(config)}
+api_service::api_service(std::string json_text)
+    : pimpl_{std::make_unique<api_service_impl>(std::move(json_text))}
 {
 }
 
@@ -38,84 +40,19 @@ api_service::~api_service()
 }
 
 api_service
-start_service(api_service_config const& config)
+start_service(std::string json_text)
 {
-    return api_service(config);
+    return api_service(std::move(json_text));
 }
 
-static void
-set_optional_map_entry(
-    cradle::service_config_map& config_map,
-    std::string const& key,
-    std::optional<std::size_t> optional_value)
+api_service_impl::api_service_impl(std::string json_text)
 {
-    if (optional_value)
-    {
-        config_map[key] = *optional_value;
-    }
-}
-
-static void
-set_optional_map_entry(
-    cradle::service_config_map& config_map,
-    std::string const& key,
-    std::optional<int> optional_value)
-{
-    if (optional_value)
-    {
-        config_map[key] = static_cast<std::size_t>(*optional_value);
-    }
-}
-
-static void
-set_optional_map_entry(
-    cradle::service_config_map& config_map,
-    std::string const& key,
-    std::optional<std::string> optional_value)
-{
-    if (optional_value)
-    {
-        config_map[key] = *optional_value;
-    }
-}
-
-cradle::service_config
-make_service_config(api_service_config const& config)
-{
-    cradle::service_config_map config_map;
-    set_optional_map_entry(
-        config_map,
-        inner_config_keys::MEMORY_CACHE_UNUSED_SIZE_LIMIT,
-        config.memory_cache_unused_size_limit);
+    service_config_map config_map{
+        read_config_map_from_json(std::move(json_text))};
     config_map[inner_config_keys::DISK_CACHE_FACTORY]
         = local_disk_cache_config_values::PLUGIN_NAME;
-    set_optional_map_entry(
-        config_map,
-        local_disk_cache_config_keys::DIRECTORY,
-        config.disk_cache_directory);
-    set_optional_map_entry(
-        config_map,
-        local_disk_cache_config_keys::SIZE_LIMIT,
-        config.disk_cache_size_limit);
-    set_optional_map_entry(
-        config_map,
-        typing_config_keys::REQUEST_CONCURRENCY,
-        config.request_concurrency);
-    set_optional_map_entry(
-        config_map,
-        typing_config_keys::COMPUTE_CONCURRENCY,
-        config.compute_concurrency);
-    set_optional_map_entry(
-        config_map,
-        typing_config_keys::HTTP_CONCURRENCY,
-        config.http_concurrency);
-
-    return cradle::service_config(config_map);
-}
-
-api_service_impl::api_service_impl(api_service_config const& config)
-    : service_core_{make_service_config(config)}
-{
+    service_config config{config_map};
+    service_core_.initialize(config);
 }
 
 api_session::api_session(

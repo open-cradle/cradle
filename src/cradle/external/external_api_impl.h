@@ -12,15 +12,12 @@ namespace external {
 CRADLE_DEFINE_EXCEPTION(external_api_violation)
 CRADLE_DEFINE_ERROR_INFO(string, reason)
 
-cradle::service_config
-make_service_config(api_service_config const& config);
-
 class api_service_impl
 {
     cradle::service_core service_core_;
 
  public:
-    api_service_impl(api_service_config const& config);
+    api_service_impl(std::string json_text);
 
     cradle::service_core&
     get_service_core()
