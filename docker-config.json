@@ -1,8 +1,6 @@
 {
     "disk_cache": {
-        "directory": {
-            "some": "/var/cache/cradle"
-        },
+        "directory": "/var/cache/cradle",
         "size_limit": 6000000000
     },
     "open": true

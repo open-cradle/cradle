@@ -33,35 +33,46 @@ parse_json_value(simdjson::dom::element const& json)
     throw json_config_error("JSON value has unsupported type");
 }
 
+void
+parse_json_object(
+    simdjson::dom::object const& obj,
+    std::string const& key_prefix,
+    service_config_map& result)
+{
+    for (auto const& kv : obj)
+    {
+        std::string key{key_prefix + std::string(kv.key)};
+        auto const& value{kv.value};
+        if (value.type() == simdjson::dom::element_type::OBJECT)
+        {
+            parse_json_object(value, key + '/', result);
+        }
+        else
+        {
+            result[key] = parse_json_value(value);
+        }
+    }
+}
+
 service_config_map
 parse_json_doc(simdjson::dom::element const& json)
 {
     service_config_map result;
-    simdjson::dom::array arr = json;
-    for (auto const& elt : arr)
-    {
-        simdjson::dom::object obj = elt;
-        if (obj.size() != 2)
-        {
-            throw json_config_error(
-                "Object should have two entries (key and value)");
-        }
-        std::string key{std::string_view(obj["key"])};
-        auto val = parse_json_value(obj["value"]);
-        result[key] = val;
-    }
+    parse_json_object(json, "", result);
     return result;
 }
 
 } // namespace
 
-// The JSON should be an array of key-value pairs like
+// The JSON should be an object like
 //
-// [
-//     { "key": "port", "value": 41071 },
-//     { "key": "open", "value": false },
-//     { "key": "disk_cache/factory", "value": "local_disk_cache" }
-// ]
+// {
+//     "disk_cache": {
+//         "directory": "/var/cache/cradle",
+//         "size_limit": 6000000000
+//     },
+//     "open": true
+// }
 //
 // Values can be unsigned integers, booleans or strings.
 // Errors lead to an exception being thrown.
