@@ -306,10 +306,18 @@ add_custom_command(
         -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.cmake
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.h.in)
 
-# Add the library for the inner core.
-file(GLOB_RECURSE srcs_inner CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/inner/*.cpp"
+# The library for the in-tree third-party software
+file(GLOB_RECURSE srcs_third_party CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/*.cpp")
+add_library(lib_third_party STATIC ${srcs_third_party})
+target_compile_definitions(
+    lib_third_party PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
+target_include_directories(lib_third_party PUBLIC
+    src/third-party)
+
+# The library for the inner core
+file(GLOB_RECURSE srcs_inner CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/inner/*.cpp")
 add_library(cradle_inner STATIC ${srcs_inner})
 add_dependencies(cradle_inner version_info)
 target_compile_definitions(
@@ -328,16 +336,37 @@ target_include_directories(cradle_inner PUBLIC
     src/third-party)
 target_link_libraries(cradle_inner PUBLIC
     Boost::headers
-    spdlog::spdlog
+    cereal::cereal
+    cppcoro
     fmt::fmt
     lz4::lz4
-    cppcoro
-    cereal::cereal
+    msgpack::msgpack
     OpenSSL::OpenSSL
     simdjson::simdjson
-    msgpack::msgpack)
+    spdlog::spdlog)
 
-# Add a library for the rpclib client
+# A library for the plugins depending on the inner library
+file(GLOB_RECURSE srcs_plugins_inner CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/disk_cache/storage/local/*.cpp")
+add_library(cradle_plugins_inner STATIC ${srcs_plugins_inner})
+add_dependencies(cradle_plugins_inner preprocessing)
+target_compile_definitions(
+    cradle_plugins_inner PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
+target_include_directories(cradle_plugins_inner PUBLIC
+    include
+    ${generated_src_dirs}
+    src
+    src/third-party)
+target_link_libraries(cradle_plugins_inner PUBLIC
+    cradle_inner
+    lib_third_party
+    Boost::headers
+    cereal::cereal
+    cppcoro
+    spdlog::spdlog
+    SQLite::SQLite3)
+
+# The library for the rpclib client
 file(GLOB_RECURSE srcs_rpclib_client CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/client/*.cpp")
 add_library(cradle_rpclib_client STATIC)
@@ -351,21 +380,73 @@ target_include_directories(cradle_rpclib_client PRIVATE
     ${intgen_src_dir}
     src)
 target_link_libraries(cradle_rpclib_client PUBLIC
-    rpclib::rpclib
-    cereal::cereal
-    Boost::headers
+    cradle_inner
     Boost::filesystem
-    spdlog::spdlog
+    Boost::headers
     cppcoro
-    OpenSSL::OpenSSL)
+    rpclib::rpclib
+    spdlog::spdlog)
 
-# Add the main library: everything outside the inner core.
-file(GLOB_RECURSE srcs_outer CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/typing/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/thinknode/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/websocket/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/external/*.cpp")
-add_library(cradle_outer STATIC ${srcs_outer} ${headers})
+# The typing library (a.o.) adds a type system (e.g. dynamics)
+file(GLOB_RECURSE srcs_typing CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/typing/*.cpp")
+add_library(cradle_typing STATIC ${srcs_typing} ${headers})
+target_sources(cradle_typing PRIVATE ${generated_headers} ${generated_srcs})
+target_compile_definitions(
+    cradle_typing PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
+target_include_directories(cradle_typing PUBLIC
+    include
+    ${generated_src_dirs}
+    src)
+target_link_libraries(cradle_typing PUBLIC
+    cradle_inner
+    Boost::headers
+    Catch2::Catch2
+    cppcoro
+    CURL::libcurl
+    nlohmann_json::nlohmann_json
+    spdlog::spdlog
+    yaml-cpp::yaml-cpp)
+
+# The library for the plugins depending on the typing library
+file(GLOB_RECURSE srcs_plugins_typing CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/serialization/disk_cache/legacy/native/*.cpp")
+add_library(cradle_plugins_typing STATIC ${srcs_plugins_typing})
+add_dependencies(cradle_plugins_typing preprocessing)
+target_compile_definitions(
+    cradle_plugins_typing PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
+target_include_directories(cradle_plugins_typing PUBLIC
+    include
+    ${generated_src_dirs}
+    src)
+target_link_libraries(cradle_plugins_typing PUBLIC
+    cradle_typing
+    cppcoro)
+
+# The thinknode library adds some Thinknode requests
+file(GLOB_RECURSE srcs_thinknode CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/thinknode/*.cpp")
+add_library(cradle_thinknode STATIC ${srcs_thinknode} ${headers})
+target_sources(cradle_thinknode PRIVATE ${generated_headers} ${generated_srcs})
+target_compile_definitions(
+    cradle_thinknode PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
+target_include_directories(cradle_thinknode PUBLIC
+    include
+    ${generated_src_dirs}
+    src
+    src/third-party)
+target_link_libraries(cradle_thinknode PUBLIC
+    cradle_plugins_typing
+    cradle_typing
+    Boost::headers
+    cereal::cereal
+    cppcoro
+    spdlog::spdlog)
+
+# The websocket library adds more Thinknode requests, and a WebSocket interface
+file(GLOB_RECURSE srcs_websocket CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/websocket/*.cpp")
+add_library(cradle_websocket STATIC ${srcs_websocket} ${headers})
 # There doesn't seem to be a better way to disable the warnings that are
 # generated by WebSocket++.
 if(IS_MSVC)
@@ -376,77 +457,50 @@ if(IS_MSVC)
         SOURCE src/cradle/websocket/client.cpp
         APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4996 /wd4127 /wd4267 /wd4244")
 endif()
-target_sources(cradle_outer PRIVATE ${generated_headers} ${generated_srcs})
+target_sources(cradle_websocket PRIVATE ${generated_headers} ${generated_srcs})
 target_compile_definitions(
-    cradle_outer PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
-target_include_directories(cradle_outer PUBLIC
+    cradle_websocket PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
+target_include_directories(cradle_websocket PUBLIC
     include
     ${generated_src_dirs}
     src
     src/third-party)
-target_link_libraries(cradle_outer PUBLIC
-    cradle_inner
-    cradle_plugins
+target_link_libraries(cradle_websocket PUBLIC
+    cradle_thinknode
     cradle_rpclib_client
     Boost::headers
-    Catch2::Catch2
-    nlohmann_json::nlohmann_json
-    CURL::libcurl
-    OpenSSL::OpenSSL
-    websocketpp::websocketpp
-    yaml-cpp::yaml-cpp
-    spdlog::spdlog
+    cereal::cereal
     cppcoro
-    cereal::cereal)
+    spdlog::spdlog
+    websocketpp::websocketpp)
 
-# Add a library for the plugins
-file(GLOB_RECURSE srcs_plugins CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/*.cpp")
-add_library(cradle_plugins STATIC ${srcs_plugins})
-add_dependencies(cradle_plugins preprocessing)
+# The external library adds a C++ API
+file(GLOB_RECURSE srcs_external CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/external/*.cpp")
+add_library(cradle_external STATIC ${srcs_external} ${headers})
+target_sources(cradle_external PRIVATE ${generated_headers} ${generated_srcs})
 target_compile_definitions(
-    cradle_plugins PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
-target_include_directories(cradle_plugins PUBLIC
+    cradle_external PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
+target_include_directories(cradle_external PUBLIC
     include
     ${generated_src_dirs}
-    src
-    src/third-party)
-target_link_libraries(cradle_plugins PUBLIC
-    cradle_inner
-    SQLite::SQLite3
-    Boost::headers
-    spdlog::spdlog
-    lz4::lz4
-    cppcoro
-    cereal::cereal
-    OpenSSL::OpenSSL)
+    src)
+target_link_libraries(cradle_external PUBLIC
+    cradle_websocket)
 
-# Add a library for the in-tree third-party software
-file(GLOB_RECURSE srcs_third_party CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/*.cpp")
-add_library(lib_third_party STATIC ${srcs_third_party})
-target_compile_definitions(
-    lib_third_party PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
-target_include_directories(lib_third_party PUBLIC
-    src/third-party)
-
-# Add the WebSocket server.
+# The WebSocket server
 add_executable(websocket_server src/server.cpp)
 target_include_directories(websocket_server PRIVATE
     ${generated_src_dirs}
     src)
 target_link_libraries(websocket_server
-    cradle_outer
-    cradle_inner
-    cradle_plugins
-    cradle_inner
-    cradle_rpclib_client
-    lib_third_party
+    cradle_websocket
+    cradle_plugins_inner
     Boost::program_options)
 add_custom_command(TARGET websocket_server POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:websocket_server> ${deploy_dir})
 
-# Add the rpclib server.
+# The rpclib server
 file(GLOB_RECURSE srcs_rpclib_server CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/server/*.cpp")
 add_executable(rpclib_server ${srcs_rpclib_server})
@@ -454,16 +508,18 @@ target_include_directories(rpclib_server PRIVATE
     ${generated_src_dirs}
     src)
 target_link_libraries(rpclib_server
-    cradle_outer
-    cradle_inner
-    cradle_plugins
-    cradle_inner
-    cradle_rpclib_client
-    lib_third_party
-    Boost::program_options)
+    cradle_thinknode
+    cradle_plugins_inner
+    Boost::headers
+    Boost::program_options
+    cppcoro
+    fmt::fmt
+    rpclib::rpclib
+    spdlog::spdlog)
 add_custom_command(TARGET rpclib_server POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:rpclib_server> ${deploy_dir})
 
+# Convenience target denoting all servers
 add_custom_target(servers)
 add_dependencies(servers websocket_server rpclib_server)
 
