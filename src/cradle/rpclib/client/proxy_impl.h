@@ -29,7 +29,7 @@ class rpclib_client_impl
     void
     mock_http(std::string const& response_body);
 
-    int
+    std::string
     ping();
 
  private:

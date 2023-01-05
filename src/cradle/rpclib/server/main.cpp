@@ -16,6 +16,7 @@
 
 // Ensure to #include only from the msgpack inside rpclib
 #include <cradle/inner/encodings/msgpack_adaptors_rpclib.h>
+#include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
 #include <cradle/plugins/disk_cache/storage/local/local_disk_cache_plugin.h>
@@ -112,7 +113,7 @@ run_server(cli_options const& options)
     srv.bind("mock_http", [&](std::string const& body) {
         return cppcoro::sync_wait(handle_mock_http(hctx, body));
     });
-    srv.bind("ping", []() { return 42; });
+    srv.bind("ping", []() { return request_uuid::get_git_version(); });
 
     auto num_threads = config.get_number_or_default(
         rpclib_config_keys::SERVER_CONCURRENCY, 22);

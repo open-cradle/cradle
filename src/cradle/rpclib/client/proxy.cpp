@@ -31,7 +31,7 @@ rpclib_client::mock_http(std::string const& response_body)
 }
 
 // Note is blocking
-int
+std::string
 rpclib_client::ping()
 {
     return pimpl_->ping();

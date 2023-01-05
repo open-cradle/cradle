@@ -52,8 +52,9 @@ class rpclib_client : public remote_proxy
     mock_http(std::string const& response_body);
 
     // Tests if the rpclib server is running, throws rpc::system_error if not.
+    // Returns the Git version identifying the code base.
     // Blocking RPC call.
-    int
+    std::string
     ping();
 
  private:

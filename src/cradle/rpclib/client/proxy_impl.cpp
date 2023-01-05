@@ -8,6 +8,7 @@
 #include <cradle/deploy_dir.h>
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/encodings/msgpack_adaptors_rpclib.h>
+#include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/utilities/logging.h>
 
 #include <cradle/rpclib/client/proxy.h>
@@ -112,11 +113,11 @@ rpclib_client_impl::mock_http(std::string const& response_body)
 }
 
 // Note is blocking
-int
+std::string
 rpclib_client_impl::ping()
 {
     logger_->debug("ping");
-    int result = do_rpc_call(*rpc_client_, "ping").as<int>();
+    std::string result = do_rpc_call(*rpc_client_, "ping").as<std::string>();
     logger_->debug("pong {}", result);
     return result;
 }
@@ -125,10 +126,11 @@ bool
 rpclib_client_impl::server_is_running()
 {
     logger_->info("test whether rpclib server is running");
+    std::string server_git_version;
     try
     {
         rpc_client_ = std::make_unique<rpc::client>(localhost_, port_);
-        ping();
+        server_git_version = ping();
     }
     catch (rpc::system_error& e)
     {
@@ -137,7 +139,19 @@ rpclib_client_impl::server_is_running()
             "rpclib server is not running (code {})", e.code().value());
         return false;
     }
-    logger_->info("received pong: rpclib server is running");
+    logger_->info(
+        "received pong {}: rpclib server is running", server_git_version);
+    // Detect a rogue rpclib server instance (TODO finetune)
+    std::string client_git_version{request_uuid::get_git_version()};
+    if (server_git_version != client_git_version)
+    {
+        auto msg{fmt::format(
+            "rpclib server has {}, client has {}",
+            server_git_version,
+            client_git_version)};
+        logger_->error(msg);
+        throw rpclib_error("code version mismatch", msg);
+    }
     return true;
 }
 
