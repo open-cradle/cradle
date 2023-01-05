@@ -19,9 +19,9 @@
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
 #include <cradle/plugins/disk_cache/storage/local/local_disk_cache_plugin.h>
+#include <cradle/plugins/domain/all/all_domains.h>
 #include <cradle/rpclib/common/common.h>
 #include <cradle/rpclib/server/handlers.h>
-#include <cradle/thinknode/domain.h>
 #include <cradle/typing/service/core.h>
 
 using namespace cradle;
@@ -95,13 +95,7 @@ run_server(cli_options const& options)
     service.initialize(config);
     rpclib_handler_context hctx{service, *my_logger};
 
-    std::vector<std::shared_ptr<domain>> domains{
-        std::make_shared<thinknode_domain>()};
-    for (auto& domain : domains)
-    {
-        register_domain(domain);
-        domain->initialize();
-    }
+    register_and_initialize_all_domains();
 
     rpc::server srv(RPCLIB_PORT);
     my_logger->info("listening on port {}", srv.port());

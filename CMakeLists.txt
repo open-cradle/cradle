@@ -347,7 +347,8 @@ target_link_libraries(cradle_inner PUBLIC
 
 # A library for the plugins depending on the inner library
 file(GLOB_RECURSE srcs_plugins_inner CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/disk_cache/storage/local/*.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/disk_cache/storage/local/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/testing/*.cpp")
 add_library(cradle_plugins_inner STATIC ${srcs_plugins_inner})
 add_dependencies(cradle_plugins_inner preprocessing)
 target_compile_definitions(
@@ -443,6 +444,18 @@ target_link_libraries(cradle_thinknode PUBLIC
     cppcoro
     spdlog::spdlog)
 
+# A library of plugins depending on the thinknode library
+file(GLOB_RECURSE srcs_plugins_thinknode CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/all/*.cpp")
+add_library(cradle_plugins_thinknode STATIC ${srcs_plugins_thinknode})
+target_compile_definitions(
+    cradle_plugins_thinknode PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
+target_include_directories(cradle_plugins_thinknode PUBLIC
+    ${generated_src_dirs}
+    src)
+target_link_libraries(cradle_plugins_thinknode PUBLIC
+    cradle_thinknode)
+
 # The websocket library adds more Thinknode requests, and a WebSocket interface
 file(GLOB_RECURSE srcs_websocket CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/websocket/*.cpp")
@@ -508,6 +521,7 @@ target_include_directories(rpclib_server PRIVATE
     ${generated_src_dirs}
     src)
 target_link_libraries(rpclib_server
+    cradle_plugins_thinknode
     cradle_thinknode
     cradle_plugins_inner
     Boost::headers
