@@ -72,12 +72,15 @@ call_resolve_sync(
 } // namespace
 
 rpclib_client_impl::rpclib_client_impl(service_config const& config)
-    : logger_{create_logger("rpclib_client")},
-      port_(RPCLIB_PORT),
+    : port_(RPCLIB_PORT),
       thread_pool_{cppcoro::static_thread_pool(
           static_cast<uint32_t>(config.get_number_or_default(
               rpclib_config_keys::CLIENT_CONCURRENCY, 22)))}
 {
+    if (!logger_)
+    {
+        logger_ = create_logger("rpclib_client");
+    }
     start_server();
 }
 

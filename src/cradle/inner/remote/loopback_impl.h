@@ -21,7 +21,7 @@ class loopback_service : public remote_proxy
     resolve_request(remote_context_intf& ctx, std::string seri_req) override;
 
  private:
-    std::shared_ptr<spdlog::logger> logger_;
+    inline static std::shared_ptr<spdlog::logger> logger_;
 };
 
 } // namespace cradle

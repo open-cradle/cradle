@@ -33,7 +33,7 @@ class rpclib_client_impl
     ping();
 
  private:
-    std::shared_ptr<spdlog::logger> logger_;
+    inline static std::shared_ptr<spdlog::logger> logger_;
     uint16_t port_;
     cppcoro::static_thread_pool thread_pool_;
     // On Windows, localhost and 127.0.0.1 are not the same:

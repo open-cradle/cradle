@@ -6,8 +6,12 @@
 
 namespace cradle {
 
-loopback_service::loopback_service() : logger_{create_logger("loopback")}
+loopback_service::loopback_service()
 {
+    if (!logger_)
+    {
+        logger_ = create_logger("loopback");
+    }
 }
 
 std::string
