@@ -53,17 +53,14 @@ register_remote_services(std::string const& proxy_name)
     }
 }
 
-static char const s_loopback[] = "loopback";
-static char const s_rpclib[] = "rpclib";
-
 template<caching_level_type caching_level, bool storing, typename Req>
 void
 BM_try_resolve_testing_request(
-    benchmark::State& state, Req const& req, char const* proxy_name = nullptr)
+    benchmark::State& state, Req const& req, std::string const& proxy_name)
 {
     inner_resources service;
     init_test_inner_service(service);
-    bool remotely = proxy_name != nullptr;
+    bool remotely = proxy_name.size() > 0;
     testing_request_context ctx{service, nullptr, remotely};
     if (remotely)
     {
@@ -133,7 +130,7 @@ BM_try_resolve_testing_request(
 template<caching_level_type caching_level, bool storing, typename Req>
 void
 BM_resolve_testing_request(
-    benchmark::State& state, Req const& req, char const* proxy_name = nullptr)
+    benchmark::State& state, Req const& req, std::string const& proxy_name)
 {
     try
     {
@@ -150,14 +147,43 @@ BM_resolve_testing_request(
     }
 }
 
+enum class remoting
+{
+    none,
+    loopback,
+    copy,
+    shared
+};
+
 template<
     caching_level_type caching_level,
-    bool storing = false,
-    char const* proxy_name = nullptr>
+    bool storing,
+    size_t size = 10240,
+    remoting remote = remoting::none>
 void
 BM_resolve_make_some_blob(benchmark::State& state)
 {
-    auto req{rq_make_some_blob<caching_level>(10000)};
+    std::string proxy_name;
+    bool shared = false;
+    switch (remote)
+    {
+        case remoting::none:
+            shared = false;
+            break;
+        case remoting::loopback:
+            proxy_name = "loopback";
+            shared = false;
+            break;
+        case remoting::copy:
+            proxy_name = "rpclib";
+            shared = false;
+            break;
+        case remoting::shared:
+            proxy_name = "rpclib";
+            shared = true;
+            break;
+    }
+    auto req{rq_make_some_blob<caching_level>(size, shared)};
     BM_resolve_testing_request<caching_level, storing>(state, req, proxy_name);
 }
 
@@ -183,10 +209,22 @@ BENCHMARK(BM_resolve_make_some_blob<caching_level_type::full, false>)
     ->Name("BM_resolve_make_some_blob_load_from_disk_cache")
     ->Apply(thousand_loops);
 #endif
-BENCHMARK(
-    BM_resolve_make_some_blob<caching_level_type::full, false, s_loopback>)
-    ->Name("BM_resolve_make_some_blob_loopback")
+
+constexpr auto full = caching_level_type::full;
+constexpr size_t tenK = 10'240;
+constexpr size_t oneM = 1'048'576;
+BENCHMARK(BM_resolve_make_some_blob<full, false, tenK, remoting::loopback>)
+    ->Name("BM_resolve_make_some_blob_loopback_10K")
     ->Apply(thousand_loops);
-BENCHMARK(BM_resolve_make_some_blob<caching_level_type::full, false, s_rpclib>)
-    ->Name("BM_resolve_make_some_blob_rpclib")
+BENCHMARK(BM_resolve_make_some_blob<full, false, tenK, remoting::copy>)
+    ->Name("BM_resolve_make_some_blob_rpclib_copy_10K")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_make_some_blob<full, false, tenK, remoting::shared>)
+    ->Name("BM_resolve_make_some_blob_rpclib_shared_10K")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_make_some_blob<full, false, oneM, remoting::copy>)
+    ->Name("BM_resolve_make_some_blob_rpclib_copy_1M")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_make_some_blob<full, false, oneM, remoting::shared>)
+    ->Name("BM_resolve_make_some_blob_rpclib_shared_1M")
     ->Apply(thousand_loops);

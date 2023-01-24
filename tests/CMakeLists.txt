@@ -55,15 +55,18 @@ add_test(
 
 # Define an object library covering the source files in inner/.
 file(GLOB_RECURSE test_srcs_inner CONFIGURE_DEPENDS
-    "inner/*.cpp")
+    "inner/*.cpp"
+    "rpclib/*.cpp")
 add_library(test_lib_inner OBJECT ${test_srcs_inner})
 target_link_libraries(test_lib_inner PUBLIC
     cradle_plugins_inner
+    cradle_rpclib_client
     cradle_inner
     Catch2::Catch2)
 
 # Add the inner test runner.
 add_executable(inner_test_runner)
+add_dependencies(inner_test_runner rpclib_server)
 target_sources(inner_test_runner PRIVATE
     support/inner_service.cpp
     support/inner_disk_cached.cpp)
@@ -123,6 +126,8 @@ target_link_libraries(test_lib_plugins PUBLIC
 
 # Add the plugins test runner.
 add_executable(plugins_test_runner)
+target_sources(plugins_test_runner PRIVATE
+    support/inner_service.cpp)
 target_link_libraries(plugins_test_runner PRIVATE
     test_lib_runner
     test_lib_plugins)
@@ -140,6 +145,7 @@ add_test(
 
 # Add a runner covering all unit tests (including external and inner).
 add_executable(all_unit_tests_runner)
+add_dependencies(all_unit_tests_runner rpclib_server)
 target_sources(all_unit_tests_runner PRIVATE
     support/inner_service.cpp
     support/outer_service.cpp

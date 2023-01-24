@@ -8,8 +8,8 @@
 
 #include <cppcoro/task.hpp>
 
-#include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/service/seri_result.h>
 
 namespace cradle {
 
@@ -26,7 +26,7 @@ namespace cradle {
  * serialized. So, this function's return type is the serialized value;
  * currently(?), this will be a MessagePack string.
  */
-cppcoro::task<blob>
+cppcoro::task<serialized_result>
 resolve_serialized_request(context_intf& ctx, std::string const& seri_req);
 
 } // namespace cradle

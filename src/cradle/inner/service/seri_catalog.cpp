@@ -14,7 +14,7 @@ seri_catalog::instance()
     return the_catalog;
 }
 
-cppcoro::task<blob>
+cppcoro::task<serialized_result>
 seri_catalog::resolve(context_intf& ctx, std::string const& seri_req)
 {
     auto uuid_str{find_uuid_str(seri_req)};

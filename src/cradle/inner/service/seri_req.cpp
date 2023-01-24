@@ -3,7 +3,7 @@
 
 namespace cradle {
 
-cppcoro::task<blob>
+cppcoro::task<serialized_result>
 resolve_serialized_request(context_intf& ctx, std::string const& seri_req)
 {
     if (remote_context_intf* rem_ctx = to_remote_context_intf(ctx))

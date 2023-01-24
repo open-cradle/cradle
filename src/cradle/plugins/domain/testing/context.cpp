@@ -13,10 +13,6 @@ testing_request_context::testing_request_context(
     }
 }
 
-testing_request_context::~testing_request_context()
-{
-}
-
 inner_resources&
 testing_request_context::get_resources()
 {
@@ -72,6 +68,12 @@ std::unique_ptr<remote_context_intf>
 testing_request_context::local_clone() const
 {
     return std::make_unique<testing_request_context>(service, nullptr);
+}
+
+std::shared_ptr<blob_file_writer>
+testing_request_context::make_blob_file_writer(size_t size)
+{
+    return service.make_blob_file_writer(size);
 }
 
 } // namespace cradle

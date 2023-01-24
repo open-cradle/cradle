@@ -96,6 +96,39 @@ as_bytes(T const* ptr)
 size_t
 hash_value(blob const& x);
 
+// Blob data owner where the data is stored in a byte_vector
+class byte_vector_owner : public data_owner
+{
+ public:
+    byte_vector_owner(byte_vector value) : value_{std::move(value)}
+    {
+    }
+
+    ~byte_vector_owner() = default;
+
+    std::uint8_t*
+    data()
+    {
+        return value_.data();
+    }
+
+    std::byte*
+    bytes()
+    {
+        return reinterpret_cast<std::byte*>(value_.data());
+    }
+
+    size_t
+    size() const
+    {
+        return value_.size();
+    }
+
+ private:
+    byte_vector value_;
+};
+
+// Blob data owner where the data is stored in a string
 class string_owner : public data_owner
 {
  public:
@@ -143,6 +176,7 @@ make_blob(byte_vector v);
 blob
 make_blob(byte_vector v, std::size_t size);
 
+// Create a data buffer that can be filled and attached to a blob
 std::shared_ptr<byte_vector_owner>
 make_shared_buffer(std::size_t size);
 

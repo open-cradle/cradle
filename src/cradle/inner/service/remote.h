@@ -8,15 +8,15 @@
 #include <cppcoro/shared_task.hpp>
 #include <cppcoro/task.hpp>
 
-#include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/service/seri_result.h>
 #include <cradle/plugins/serialization/request/cereal_json.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 
 namespace cradle {
 
 // Remotely resolves a serialized request to a serialized response
-cppcoro::task<blob>
+cppcoro::task<serialized_result>
 resolve_remote(remote_context_intf& ctx, std::string const& seri_req);
 
 /* Remotely resolves a plain request to a plain value
@@ -31,7 +31,9 @@ resolve_remote_to_value(remote_context_intf& ctx, Req const& req)
     using Value = typename Req::value_type;
     std::string seri_req{serialize_request(req)};
     auto seri_resp = co_await resolve_remote(ctx, seri_req);
-    co_return deserialize_response<Value>(seri_resp);
+    Value result = deserialize_response<Value>(seri_resp.value());
+    seri_resp.on_deserialized();
+    co_return result;
 }
 
 } // namespace cradle

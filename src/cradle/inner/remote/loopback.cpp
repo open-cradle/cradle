@@ -20,15 +20,15 @@ loopback_service::name() const
     return "loopback";
 }
 
-cppcoro::task<blob>
+cppcoro::task<serialized_result>
 loopback_service::resolve_request(
     remote_context_intf& ctx, std::string seri_req)
 {
     logger_->debug("request: {}", seri_req);
     auto local_ctx{ctx.local_clone()};
-    blob result
+    auto result
         = co_await resolve_serialized_request(*local_ctx, std::move(seri_req));
-    logger_->debug("response {}", result);
+    logger_->debug("response {}", result.value());
     co_return result;
 }
 

@@ -4,8 +4,11 @@
 #include <memory>
 #include <stdexcept>
 
+#include <fmt/format.h>
+
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/service/config.h>
+#include <cradle/inner/service/seri_result.h>
 
 namespace cradle {
 
@@ -14,19 +17,14 @@ namespace cradle {
 class rpclib_error : public std::logic_error
 {
  public:
+    rpclib_error(std::string const& what) : std::logic_error(what)
+    {
+    }
+
     rpclib_error(std::string const& what, std::string const& msg)
-        : std::logic_error(what), msg_{msg}
+        : std::logic_error(fmt::format("{}: {}", what, msg))
     {
     }
-
-    std::string const&
-    msg() const
-    {
-        return msg_;
-    }
-
- private:
-    std::string msg_;
 };
 
 class rpclib_client_impl;
@@ -42,7 +40,7 @@ class rpclib_client : public remote_proxy
     name() const override;
 
     // Throws rpclib_error
-    cppcoro::task<blob>
+    cppcoro::task<serialized_result>
     resolve_request(remote_context_intf& ctx, std::string seri_req) override;
 
     // Instructs the RPC server to mock all HTTP requests, returning a 200
@@ -56,6 +54,13 @@ class rpclib_client : public remote_proxy
     // Blocking RPC call.
     std::string
     ping();
+
+    // Intended for test purposes only
+    rpclib_client_impl&
+    pimpl()
+    {
+        return *pimpl_;
+    }
 
  private:
     std::unique_ptr<rpclib_client_impl> pimpl_;

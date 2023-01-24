@@ -15,7 +15,7 @@ def test_req_no_uuid_in_json(session, remote):
     with pytest.raises(cradle.exceptions.ErrorResponseError) as excinfo:
         session.resolve_request(req_data, remote)
     msg = excinfo.value.response['content']['error']['unknown']
-    assert msg == 'no polymorphic_name found in JSON'
+    assert 'no polymorphic_name found in JSON' in msg
 
 
 @pytest.mark.parametrize('remote', params.remote_params, ids=params.remote_ids)
@@ -29,4 +29,4 @@ def test_req_unknown_uuid_in_json(session, remote):
     with pytest.raises(cradle.exceptions.ErrorResponseError) as excinfo:
         session.resolve_request(req_data, remote)
     msg = excinfo.value.response['content']['error']['unknown']
-    assert msg.startswith('no request registered with uuid unknown_uuid')
+    assert 'no request registered with uuid unknown_uuid' in msg

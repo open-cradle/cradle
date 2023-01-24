@@ -6,8 +6,8 @@
 
 #include <cppcoro/task.hpp>
 
-#include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/service/seri_result.h>
 
 namespace cradle {
 
@@ -21,8 +21,7 @@ class remote_proxy
 
     // Returns serialized response
     // Throws on error
-    // TODO replace blob with some kind of shared string?
-    virtual cppcoro::task<blob>
+    virtual cppcoro::task<serialized_result>
     resolve_request(remote_context_intf& ctx, std::string seri_req) = 0;
 };
 

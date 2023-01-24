@@ -18,6 +18,12 @@ TEST_CASE("format empty blob", "[inner][fmt]")
     test_formatter(empty_blob, "0-bytes blob");
 }
 
+TEST_CASE("format one-byte blob", "[inner][fmt]")
+{
+    auto one_byte_blob = make_string_literal_blob("Q");
+    test_formatter(one_byte_blob, "1-byte blob: Q");
+}
+
 TEST_CASE("format small printable blob", "[inner][fmt]")
 {
     auto small_blob = make_string_literal_blob("small blob");

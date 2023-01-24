@@ -10,10 +10,10 @@
 
 #include <cppcoro/task.hpp>
 
-#include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/request.h>
+#include <cradle/inner/service/seri_result.h>
 #include <cradle/plugins/serialization/request/cereal_json.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 
@@ -29,7 +29,7 @@ class seri_resolver_intf
  public:
     virtual ~seri_resolver_intf() = default;
 
-    virtual cppcoro::task<blob>
+    virtual cppcoro::task<serialized_result>
     resolve(context_intf& ctx, std::string const& seri_req) = 0;
 };
 
@@ -47,7 +47,7 @@ template<Context Ctx, Request Req>
 class seri_resolver_impl : public seri_resolver_intf
 {
  public:
-    cppcoro::task<blob>
+    cppcoro::task<serialized_result>
     resolve(context_intf& ctx, std::string const& seri_req) override
     {
         assert(!ctx.remotely());
@@ -56,7 +56,7 @@ class seri_resolver_impl : public seri_resolver_intf
 
         auto req{deserialize_request<Req>(seri_req)};
         auto value = co_await resolve_request(*actual_ctx, req);
-        co_return serialize_response(value);
+        co_return serialized_result{serialize_response(value)};
     }
 };
 

@@ -20,6 +20,8 @@ struct fmt::formatter<cradle::blob>
         auto it = ctx.begin();
         if (it != ctx.end() && *it != '}')
         {
+            // This (intentionally) raises a compile-time error so cannot be
+            // covered in a unit test.
             throw fmt::format_error("invalid format");
         }
         return it;

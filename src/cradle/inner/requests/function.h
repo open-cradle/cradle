@@ -18,6 +18,7 @@
 #include <cradle/inner/core/id.h>
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/core/unique_hash.h>
+#include <cradle/inner/encodings/cereal.h>
 #include <cradle/inner/requests/cereal.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/uuid.h>

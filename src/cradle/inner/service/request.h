@@ -48,25 +48,6 @@ requires ContextMatchingRequest<Ctx, Req>
         co_await disk_cached_blob(resources, key, create_blob_task));
 }
 
-// Subsuming the concepts from the previous template.
-// A blob stored in the disk cache need not be serialized, saving some
-// overhead.
-// Maybe this decision should be in the plugin but that would require the
-// plugin always to be #include'd before the present request.h.
-template<typename Ctx, FullyCachedRequest Req>
-requires ContextMatchingRequest<Ctx, Req>&&
-    std::same_as<typename Req::value_type, blob>
-        cppcoro::task<blob>
-        resolve_disk_cached(Ctx& ctx, Req const& req)
-{
-    inner_resources& resources{ctx.get_resources()};
-    captured_id const& key{req.get_captured_id()};
-    auto create_blob_task = [&]() -> cppcoro::task<blob> {
-        co_return co_await req.resolve(ctx);
-    };
-    return disk_cached_blob(resources, key, create_blob_task);
-}
-
 // This function, being a coroutine, takes key by value.
 // The caller should ensure that cache, ctx and req outlive the coroutine.
 template<typename Ctx, CachedRequest Req>
@@ -117,6 +98,8 @@ requires ContextMatchingRequest<Ctx, Req>
 {
     if (ctx.remotely())
     {
+        // This optimization rules out the combination of a run-time remote
+        // context and a build-time non-introspective request.
         throw std::logic_error("TODO cannot remote here");
     }
     immutable_cache_ptr<typename Req::value_type> ptr{

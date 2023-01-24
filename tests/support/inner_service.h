@@ -4,6 +4,7 @@
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/resources.h>
+#include <cradle/rpclib/client/proxy.h>
 
 namespace cradle {
 
@@ -69,6 +70,10 @@ using request_resolution_context =
 // Ensure that the "remote" loopback service is available
 void
 ensure_loopback_service();
+
+// Ensure that an rpclib client and server are available; returns the client
+std::shared_ptr<rpclib_client>
+ensure_rpclib_service();
 
 } // namespace cradle
 

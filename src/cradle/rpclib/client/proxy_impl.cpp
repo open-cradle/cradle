@@ -41,7 +41,7 @@ get_message(rpc::rpc_error& exc)
     return msg;
 }
 
-// Performs an RPC call.
+// Performs a synchronous RPC call.
 // rpc::client::call is blocking. Internally it calls async_call() which
 // returns a future.
 template<typename... Args>
@@ -58,23 +58,42 @@ do_rpc_call(rpc::client& rpc_client, Args... args)
     }
 }
 
-cppcoro::task<blob>
-call_resolve_sync(
-    rpc::client& rpc_client, std::string domain_name, std::string seri_req)
+// Performs an asynchronous RPC call.
+template<typename... Args>
+void
+do_rpc_async_call(rpc::client& rpc_client, Args... args)
 {
+    try
+    {
+        rpc_client.async_call(std::move(args)...);
+    }
+    catch (rpc::rpc_error& e)
+    {
+        throw rpclib_error(e.what(), get_message(e));
+    }
+}
+
+cppcoro::task<rpclib_response>
+call_resolve_sync(
+    rpc::client& rpc_client,
+    spdlog::logger& logger,
+    std::string domain_name,
+    std::string seri_req)
+{
+    logger.debug("call_resolve_sync");
     co_return do_rpc_call(
         rpc_client,
         "resolve_sync",
         std::move(domain_name),
         std::move(seri_req))
-        .as<blob>();
+        .as<rpclib_response>();
 }
 
 } // namespace
 
 rpclib_client_impl::rpclib_client_impl(service_config const& config)
     : port_(RPCLIB_PORT),
-      thread_pool_{cppcoro::static_thread_pool(
+      coro_thread_pool_{cppcoro::static_thread_pool(
           static_cast<uint32_t>(config.get_number_or_default(
               rpclib_config_keys::CLIENT_CONCURRENCY, 22)))}
 {
@@ -90,18 +109,29 @@ rpclib_client_impl::~rpclib_client_impl()
     stop_server();
 }
 
-cppcoro::task<blob>
+cppcoro::task<serialized_result>
 rpclib_client_impl::resolve_request(
     remote_context_intf& ctx, std::string seri_req)
 {
     std::string domain_name{ctx.domain_name()};
     logger_->debug("request on {}: {}", domain_name, seri_req);
-    blob result = co_await cppcoro::schedule_on(
-        thread_pool_,
+    auto response = co_await cppcoro::schedule_on(
+        coro_thread_pool_,
         call_resolve_sync(
-            *rpc_client_, std::move(domain_name), std::move(seri_req)));
-    logger_->debug("response {}", result);
-    co_return result;
+            *rpc_client_,
+            *logger_,
+            std::move(domain_name),
+            std::move(seri_req)));
+    auto response_id = std::get<0>(response);
+    blob value = std::get<1>(response);
+    std::unique_ptr<deserialization_observer> observer;
+    logger_->debug("response_id {}, value {}", response_id, value);
+    if (response_id != 0)
+    {
+        observer = std::make_unique<rpclib_deserialization_observer>(
+            *this, response_id);
+    }
+    co_return serialized_result(value, std::move(observer));
 }
 
 void
@@ -120,6 +150,17 @@ rpclib_client_impl::ping()
     std::string result = do_rpc_call(*rpc_client_, "ping").as<std::string>();
     logger_->debug("pong {}", result);
     return result;
+}
+
+// Note is asynchronous
+void
+rpclib_client_impl::ack_response(uint32_t pool_id)
+{
+    logger_->debug("ack_response {}", pool_id);
+    // It looks more efficient to dispatch the call to another thread, but
+    // attempts to do so resulted in resolve_sync hangups of typically 48ms,
+    // about every 10 requests, making everything much slower.
+    do_rpc_async_call(*rpc_client_, "ack_response", pool_id);
 }
 
 bool
@@ -142,6 +183,14 @@ rpclib_client_impl::server_is_running()
     logger_->info(
         "received pong {}: rpclib server is running", server_git_version);
     // Detect a rogue rpclib server instance (TODO finetune)
+    verify_git_version(server_git_version);
+    // rpc_client_->set_timeout(30);
+    return true;
+}
+
+void
+rpclib_client_impl::verify_git_version(std::string const& server_git_version)
+{
     std::string client_git_version{request_uuid::get_git_version()};
     if (server_git_version != client_git_version)
     {
@@ -152,7 +201,6 @@ rpclib_client_impl::server_is_running()
         logger_->error(msg);
         throw rpclib_error("code version mismatch", msg);
     }
-    return true;
 }
 
 void
@@ -204,6 +252,18 @@ rpclib_client_impl::stop_server()
 
     logger_->info("rpclib server process killed");
     child_ = boost::process::child();
+}
+
+rpclib_deserialization_observer::rpclib_deserialization_observer(
+    rpclib_client_impl& client, uint32_t pool_id)
+    : client_{client}, pool_id_{pool_id}
+{
+}
+
+void
+rpclib_deserialization_observer::on_deserialized()
+{
+    client_.ack_response(pool_id_);
 }
 
 } // namespace cradle

@@ -17,7 +17,7 @@ class loopback_service : public remote_proxy
     std::string
     name() const override;
 
-    cppcoro::task<blob>
+    cppcoro::task<serialized_result>
     resolve_request(remote_context_intf& ctx, std::string seri_req) override;
 
  private:

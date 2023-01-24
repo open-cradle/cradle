@@ -7,9 +7,9 @@
 
 #include <cppcoro/task.hpp>
 
-#include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/seri_resolver.h>
+#include <cradle/inner/service/seri_result.h>
 
 namespace cradle {
 
@@ -48,7 +48,7 @@ class seri_catalog
      * The request is characterized by a uuid encoded in seri_req.
      * Throws uuid_error if the uuid does not appear in the catalog.
      */
-    cppcoro::task<blob>
+    cppcoro::task<serialized_result>
     resolve(context_intf& ctx, std::string const& seri_req);
 
  private:
@@ -60,6 +60,22 @@ class seri_catalog
     std::shared_ptr<seri_resolver_intf>
     find_resolver(std::string const& uuid_str);
 };
+
+/**
+ * Registers a resolver from a template/sample request object.
+ *
+ * The resolver will be able to resolve serialized requests that are similar
+ * to the template one; different arguments are allowed, but otherwise the
+ * request should be identical to the template.
+ *
+ * Context at resolution time should equal Ctx.
+ */
+template<Context Ctx, Request Req>
+void
+register_seri_resolver(Req const& req)
+{
+    seri_catalog::instance().register_resolver<Ctx, Req>(req.get_uuid().str());
+}
 
 } // namespace cradle
 

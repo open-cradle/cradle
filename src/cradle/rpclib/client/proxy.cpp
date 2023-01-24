@@ -18,7 +18,7 @@ rpclib_client::name() const
     return "rpclib";
 }
 
-cppcoro::task<blob>
+cppcoro::task<serialized_result>
 rpclib_client::resolve_request(remote_context_intf& ctx, std::string seri_req)
 {
     return pimpl_->resolve_request(ctx, std::move(seri_req));

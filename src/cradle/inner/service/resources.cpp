@@ -3,6 +3,8 @@
 #include <stdexcept>
 #include <string>
 
+#include <spdlog/spdlog.h>
+
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/fs/file_io.h>
@@ -35,6 +37,7 @@ inner_resources::inner_initialize(service_config const& config)
 {
     create_memory_cache(config);
     create_disk_cache(config);
+    blob_dir_ = std::make_unique<blob_file_directory>(config);
 }
 
 void
@@ -76,6 +79,13 @@ void
 inner_resources::inner_reset_disk_cache(service_config const& config)
 {
     disk_cache_->reset(config);
+}
+
+std::shared_ptr<blob_file_writer>
+inner_resources::make_blob_file_writer(std::size_t size)
+{
+    auto path{blob_dir_->allocate_file()};
+    return std::make_shared<blob_file_writer>(path, size);
 }
 
 } // namespace cradle

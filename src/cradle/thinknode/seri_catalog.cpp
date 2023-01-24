@@ -1,6 +1,6 @@
 #include <cereal/types/map.hpp>
 
-#include <cradle/inner/service/seri_registry.h>
+#include <cradle/inner/service/seri_catalog.h>
 #include <cradle/plugins/serialization/disk_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
 
@@ -16,7 +16,7 @@ namespace cradle {
  *   - Function is coroutine
  *   - Introspective
  *
- * The first thing is that when deserializing a JSON-serialized erquest,
+ * The first thing is that when deserializing a JSON-serialized request,
  * a corresponding function_request_impl object must be created.
  * In C++, this means that corresponding constructors must exist and able to
  * be found; otherwise, cereal will complain with "Trying to load an

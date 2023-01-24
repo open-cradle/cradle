@@ -19,17 +19,18 @@ using testing_request_props
     = request_props<Level, true, true, testing_request_context>;
 
 cppcoro::task<blob>
-make_some_blob(testing_request_context ctx, std::size_t size);
+make_some_blob(testing_request_context ctx, std::size_t size, bool shared);
 
 template<caching_level_type Level>
 auto
-rq_make_some_blob(std::size_t size)
+rq_make_some_blob(std::size_t size, bool shared)
 {
     return rq_function_erased_coro<blob>(
         testing_request_props<Level>(
             request_uuid{"make_some_blob"}, std::string{"make_some_blob"}),
         make_some_blob,
-        size);
+        size,
+        shared);
 }
 
 } // namespace cradle

@@ -19,6 +19,13 @@ struct rpclib_config_keys
         "rpclib/server_concurrency"};
 };
 
+// Response to "resolve" request
+// Using a tuple because a struct requires several non-intrusive msgpack
+// adapters.
+// The first element is the response id; 0 if unused.
+// The second element is the response data itself.
+using rpclib_response = std::tuple<int, blob>;
+
 } // namespace cradle
 
 #endif

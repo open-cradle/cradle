@@ -35,7 +35,9 @@ def make_post_iss_object_request(session: Session, value: str, id_offset: int = 
     ascii_encoded = str(base64_encoded, encoding='ascii')
     args = [
         'array/string',
-        {'size': len(msgpack_encoded), 'blob': ascii_encoded}
+        {'as_file': False,
+         'size': len(msgpack_encoded),
+         'blob': ascii_encoded}
     ]
 
     return make_function_request_impl(session, f'{uuid_base}-{uuid_ext}', title, id_offset, args)

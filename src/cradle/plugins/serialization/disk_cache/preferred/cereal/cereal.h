@@ -29,6 +29,8 @@ deserialize_disk_cache_value(blob const& x)
 {
     auto data = reinterpret_cast<char const*>(x.data());
     std::stringstream is;
+    // The string constructor will copy the blob data but this looks
+    // unavoidable.
     is.str(std::string(data, x.size()));
     cereal::BinaryInputArchive iarchive(is);
     Value res;

@@ -7,6 +7,8 @@
 #include <memory>
 #include <optional>
 
+#include <cradle/inner/blob_file/blob_file.h>
+#include <cradle/inner/blob_file/blob_file_dir.h>
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/service/config.h>
 #include <cradle/inner/service/disk_cache_intf.h>
@@ -77,9 +79,13 @@ class inner_resources
         return *disk_cache_;
     }
 
+    std::shared_ptr<blob_file_writer>
+    make_blob_file_writer(std::size_t size);
+
  private:
     std::unique_ptr<cradle::immutable_cache> memory_cache_;
     std::unique_ptr<disk_cache_intf> disk_cache_;
+    std::unique_ptr<blob_file_directory> blob_dir_;
 
     void
     create_memory_cache(service_config const& config);

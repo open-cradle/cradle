@@ -1,13 +1,14 @@
 #ifndef CRADLE_INNER_CORE_TYPE_DEFINITIONS_H
 #define CRADLE_INNER_CORE_TYPE_DEFINITIONS_H
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
 
-#include <cereal/types/memory.hpp>
+#include <cradle/inner/core/exception.h>
 
 namespace cradle {
 
@@ -22,7 +23,6 @@ some(T&& x)
     return std::optional<std::remove_reference_t<T>>(std::forward<T>(x));
 }
 
-// TODO consider making this a template where T can be any byte-like type
 typedef std::vector<std::uint8_t> byte_vector;
 
 // Owns the data to which a blob refers.
@@ -30,45 +30,39 @@ class data_owner
 {
  public:
     virtual ~data_owner() = default;
-};
 
-// Blob data owner where the data is stored in a byte_vector
-class byte_vector_owner : public data_owner
-{
- public:
-    byte_vector_owner(byte_vector value) : value_{std::move(value)}
+    // true if the data is formed by a memory-mapped file
+    virtual bool
+    maps_file() const
     {
+        return false;
     }
 
-    ~byte_vector_owner() = default;
-
-    std::uint8_t*
-    data()
+    // If maps_file: absolute path to the memory-mapped file
+    virtual std::string
+    mapped_file() const
     {
-        return value_.data();
+        throw not_implemented_error();
     }
 
-    std::byte*
-    bytes()
+    // If the owned data was modified after this object was created,
+    // this function should be called after the modification has completed.
+    // If the data is formed by a memory-mapped file, this function will
+    // flush memory contents to that file (possibly asynchronously);
+    // otherwise, it will be a no-op. A flush will also happen when
+    // this object's destructor is called.
+    virtual void
+    on_write_completed()
     {
-        return reinterpret_cast<std::byte*>(value_.data());
     }
-
-    size_t
-    size() const
-    {
-        return value_.size();
-    }
-
- private:
-    byte_vector value_;
 };
 
 // A blob is a sequence of bytes.
-// A blob, once constructed or deserialized, is immutable.
+// A blob, once constructed or deserialized, should not be changed anymore.
 class blob
 {
  public:
+    // Should be followed up by a reset()
     blob() = default;
 
     // To be used for static data (no owner)
@@ -77,11 +71,24 @@ class blob
     }
 
     blob(
-        std::shared_ptr<data_owner> const& owner,
+        std::shared_ptr<data_owner> owner,
         std::byte const* data,
         std::size_t size)
-        : owner_{owner}, data_{data}, size_{size}
+        : owner_{std::move(owner)}, data_{data}, size_{size}
     {
+    }
+
+    // Intended for deserialization only, on an empty object
+    void
+    reset(
+        std::shared_ptr<data_owner> owner,
+        std::byte const* data,
+        std::size_t size)
+    {
+        assert(!data_);
+        owner_ = std::move(owner);
+        data_ = data;
+        size_ = size;
     }
 
     std::byte const*
@@ -96,37 +103,16 @@ class blob
         return size_;
     }
 
- public:
-    // cereal support
-    // TODO move out cereal support to plugin
-    //
-    // A blob will typically contain binary data. cereal offers
-    // saveBinaryValue() and loadBinaryValue() that cause binary data to be
-    // stored as base64 in JSON and XML. JSON stores non-printable bytes
-    // as e.g. "\u0001" (500% overhead), so base64 (33% overhead) might be
-    // more efficient.
-    template<typename Archive>
-    void
-    save(Archive& archive) const
+    data_owner const*
+    owner() const
     {
-        archive(cereal::make_nvp("size", size_));
-        archive.saveBinaryValue(data_, size_, "blob");
+        return owner_ ? &*owner_ : nullptr;
     }
 
-    template<typename Archive>
-    void
-    load(Archive& archive)
+    data_owner const*
+    mapped_file_data_owner() const
     {
-        // TODO serialize blob subtypes
-        // It's somewhat redundant to serialize the size as it's implied by
-        // the base64 string, but the array passed to loadBinaryValue()
-        // must have the appropriate size.
-        archive(cereal::make_nvp("size", size_));
-        // TODO use make_shared_buffer() once in scope
-        auto owner{std::make_shared<byte_vector_owner>(byte_vector(size_))};
-        archive.loadBinaryValue(owner->data(), size_, "blob");
-        owner_ = owner;
-        data_ = owner->bytes();
+        return owner_ && owner_->maps_file() ? &*owner_ : nullptr;
     }
 
  private:

@@ -1,8 +1,10 @@
 #ifndef CRADLE_PLUGINS_DOMAIN_TESTING_CONTEXT_H
 #define CRADLE_PLUGINS_DOMAIN_TESTING_CONTEXT_H
 
+#include <memory>
 #include <vector>
 
+#include <cradle/inner/blob_file/blob_file.h>
 #include <cradle/inner/requests/generic.h>
 
 namespace cradle {
@@ -16,8 +18,6 @@ struct testing_request_context : public cached_introspective_context_intf,
         inner_resources& service,
         tasklet_tracker* tasklet,
         bool remotely = false);
-
-    ~testing_request_context();
 
     inner_resources&
     get_resources() override;
@@ -54,6 +54,9 @@ struct testing_request_context : public cached_introspective_context_intf,
 
     std::unique_ptr<remote_context_intf>
     local_clone() const override;
+
+    std::shared_ptr<blob_file_writer>
+    make_blob_file_writer(size_t size);
 
  private:
     std::vector<tasklet_tracker*> tasklets_;

@@ -89,7 +89,8 @@ run_server(cli_options const& options)
     activate_local_disk_cache_plugin();
     config_map[inner_config_keys::DISK_CACHE_FACTORY]
         = local_disk_cache_config_values::PLUGIN_NAME;
-    config_map[local_disk_cache_config_keys::DIRECTORY] = "rpclib_cache";
+    config_map[local_disk_cache_config_keys::DIRECTORY] = "server_cache";
+    config_map[blob_cache_config_keys::DIRECTORY] = "server_cache";
 
     service_core service;
     service_config config{config_map};
@@ -112,6 +113,9 @@ run_server(cli_options const& options)
         });
     srv.bind("mock_http", [&](std::string const& body) {
         return cppcoro::sync_wait(handle_mock_http(hctx, body));
+    });
+    srv.bind("ack_response", [&](int response_id) {
+        return cppcoro::sync_wait(handle_ack_response(hctx, response_id));
     });
     srv.bind("ping", []() { return request_uuid::get_git_version(); });
 

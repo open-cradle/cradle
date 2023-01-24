@@ -1777,14 +1777,16 @@ process_message(websocket_server_impl& server, client_request request)
             // serialized will be response, serialized as msgpack
             auto ctx{
                 make_thinknode_request_context(server, request, rr.remote)};
-            blob serialized
+            auto seri_result
                 = co_await resolve_serialized_request(ctx, rr.json_text);
+            blob seri_value = seri_result.value();
             // TODO msgpack -> dynamic -> msgpack
             // - First conversion here
             // - Second in value_to_msgpack_string(), above
             dynamic response = parse_msgpack_value(
-                reinterpret_cast<uint8_t const*>(serialized.data()),
-                serialized.size());
+                reinterpret_cast<uint8_t const*>(seri_value.data()),
+                seri_value.size());
+            seri_result.on_deserialized();
             server.logger->info("dynamic response {}", response);
             send_response(
                 server,
@@ -1821,16 +1823,6 @@ process_message_with_error_handling(
                         get_required_error_info<attempted_http_request_info>(
                             e),
                         get_required_error_info<http_response_info>(e)))));
-    }
-    catch (rpclib_error& e)
-    {
-        spdlog::get("cradle")->error(e.what());
-        spdlog::get("cradle")->error(e.msg());
-        send_response(
-            server,
-            request,
-            make_server_message_content_with_error(
-                make_error_response_with_unknown(e.msg())));
     }
     catch (std::exception& e)
     {

@@ -450,7 +450,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", "[requests]")
 
 static auto add2 = [](int a, int b) { return a + b; };
 
-TEST_CASE("function_request_erased with subrequest - compare", "[X]")
+TEST_CASE("function_request_erased with subrequest - compare", "[requests]")
 {
     request_props<caching_level_type::memory> props;
     auto req0a{rq_function_erased(props, add2, 1, 2)};
@@ -471,7 +471,7 @@ TEST_CASE("function_request_erased with subrequest - compare", "[X]")
     REQUIRE((req0a < req1a || req1a < req0a));
 }
 
-TEST_CASE("function_request_erased with subrequest - resolve", "[Y]")
+TEST_CASE("function_request_erased with subrequest - resolve", "[requests]")
 {
     request_props<caching_level_type::memory> props;
     auto req0{rq_function_erased(props, add2, 1, 2)};
