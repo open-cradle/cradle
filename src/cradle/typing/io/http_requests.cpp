@@ -12,6 +12,7 @@
 #include <cradle/typing/core/monitoring.h>
 #include <cradle/typing/encodings/json.h>
 #include <cradle/typing/encodings/msgpack.h>
+#include <cradle/typing/io/http_requests_internal.h>
 #include <cradle/typing/utilities/logging.h>
 
 // Include this again for #define sanitization.
@@ -129,8 +130,6 @@ transmit_request_body(void* ptr, size_t size, size_t nmemb, void* userdata)
     return n_bytes;
 }
 
-typedef std::unique_ptr<char, decltype(&free)> malloc_buffer_ptr;
-
 struct receive_transmission_state
 {
     malloc_buffer_ptr buffer;
@@ -230,11 +229,13 @@ struct scoped_curl_slist
 static blob
 make_blob(receive_transmission_state&& transmission)
 {
-    return blob(
-        std::shared_ptr<std::byte const>(
-            as_bytes(transmission.buffer.release()),
-            [](std::byte const* ptr) { free(const_cast<std::byte*>(ptr)); }),
-        transmission.write_position);
+    auto data{as_bytes(transmission.buffer.get())};
+    size_t size{transmission.write_position};
+    return blob{
+        std::make_shared<malloc_buffer_ptr_wrapper>(
+            std::move(transmission.buffer)),
+        data,
+        size};
 }
 
 http_request

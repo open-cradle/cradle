@@ -1,5 +1,6 @@
 #include <cradle/inner/core/type_interfaces.h>
 
+#include <cassert>
 #include <cctype>
 #include <cstring>
 #include <iomanip>
@@ -34,8 +35,7 @@ hash_value(blob const& x)
 blob
 make_static_blob(std::byte const* data, size_t size)
 {
-    return blob(
-        std::shared_ptr<std::byte const>(data, [](std::byte const*) {}), size);
+    return blob{data, size};
 }
 
 blob
@@ -47,22 +47,29 @@ make_string_literal_blob(char const* data)
 blob
 make_blob(std::string s)
 {
-    // This is a little roundabout, but it seems like the most reasonable way
-    // to ensure that a) the string contents don't move if the blob is moved
-    // and b) the string contents aren't actually copied if they're large.
-    size_t size = s.size();
-    auto shared_string = std::make_shared<std::string>(std::move(s));
-    char const* data = shared_string->data();
-    return make_blob(std::move(shared_string), as_bytes(data), size);
+    auto owner{std::make_shared<string_owner>(std::move(s))};
+    return blob{owner, owner->data(), owner->size()};
 }
 
 blob
 make_blob(byte_vector v)
 {
-    size_t size = v.size();
-    auto shared_vector = std::make_shared<byte_vector>(std::move(v));
-    char const* data = reinterpret_cast<char const*>(shared_vector->data());
-    return make_blob(std::move(shared_vector), as_bytes(data), size);
+    auto owner{std::make_shared<byte_vector_owner>(std::move(v))};
+    return blob{owner, owner->bytes(), owner->size()};
+}
+
+blob
+make_blob(byte_vector v, std::size_t size)
+{
+    assert(size <= v.size());
+    auto owner{std::make_shared<byte_vector_owner>(std::move(v))};
+    return blob{owner, owner->bytes(), size};
+}
+
+std::shared_ptr<byte_vector_owner>
+make_shared_buffer(std::size_t size)
+{
+    return std::make_shared<byte_vector_owner>(byte_vector(size));
 }
 
 // Decides whether a blob can be interpreted as a printable string

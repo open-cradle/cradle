@@ -23,6 +23,38 @@
 
 namespace cradle {
 
+class sbuffer_wrapper : public data_owner
+{
+ public:
+    ~sbuffer_wrapper() = default;
+
+    auto&
+    sbuffer()
+    {
+        return wrapped_;
+    }
+
+ private:
+    msgpack::sbuffer wrapped_;
+};
+
+class object_handle_wrapper : public data_owner
+{
+ public:
+    object_handle_wrapper(uint8_t const* data, size_t size);
+
+    ~object_handle_wrapper() = default;
+
+    msgpack::object_handle&
+    handle()
+    {
+        return handle_;
+    }
+
+ private:
+    msgpack::object_handle handle_;
+};
+
 template<class Buffer>
 void
 write_msgpack_value(msgpack::packer<Buffer>& packer, dynamic const& v)

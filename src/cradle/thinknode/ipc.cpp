@@ -11,10 +11,11 @@ void
 read_message_body(
     thinknode_supervisor_message* message,
     uint8_t code,
-    std::shared_ptr<uint8_t[]> const& body,
+    std::shared_ptr<data_owner> const& body,
+    uint8_t const* data,
     size_t length)
 {
-    raw_input_buffer buffer(body.get(), length);
+    raw_input_buffer buffer(data, length);
     raw_memory_reader<raw_input_buffer> reader(buffer);
     switch (static_cast<calc_message_code>(code))
     {
@@ -29,10 +30,8 @@ read_message_body(
             {
                 auto arg_length
                     = boost::numeric_cast<size_t>(read_int<uint64_t>(reader));
-                request.args[i] = parse_msgpack_value(
-                    reinterpret_pointer_cast<char const>(body),
-                    buffer.data(),
-                    arg_length);
+                request.args[i]
+                    = parse_msgpack_value(body, buffer.data(), arg_length);
                 buffer.advance(arg_length);
             }
             *message = make_thinknode_supervisor_message_with_function(
@@ -54,10 +53,11 @@ void
 read_message_body(
     thinknode_provider_message* message,
     uint8_t code,
-    std::shared_ptr<uint8_t[]> const& body,
+    std::shared_ptr<data_owner> const& body,
+    uint8_t const* data,
     size_t length)
 {
-    raw_input_buffer buffer(body.get(), length);
+    raw_input_buffer buffer(data, length);
     raw_memory_reader<raw_input_buffer> reader(buffer);
     switch (static_cast<calc_message_code>(code))
     {
@@ -86,10 +86,7 @@ read_message_body(
             // Allow the dynamic value to claim ownership of the buffer in case
             // it wants to reference data directly from it.
             *message = make_thinknode_provider_message_with_result(
-                parse_msgpack_value(
-                    reinterpret_pointer_cast<char const>(body),
-                    buffer.data(),
-                    buffer.size()));
+                parse_msgpack_value(body, buffer.data(), buffer.size()));
             break;
         }
         case calc_message_code::FAILURE: {

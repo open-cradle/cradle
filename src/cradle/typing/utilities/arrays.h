@@ -4,7 +4,6 @@
 #include <string>
 
 #include <cradle/inner/core/exception.h>
-#include <cradle/inner/utilities/arrays.h>
 
 namespace cradle {
 

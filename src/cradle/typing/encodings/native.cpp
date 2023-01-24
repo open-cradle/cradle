@@ -50,11 +50,9 @@ read_natively_encoded_value(raw_memory_reader<raw_input_buffer>& r, dynamic& v)
             uint64_t length;
             raw_read(r, &length, 8);
             auto size = boost::numeric_cast<size_t>(length);
-            std::byte* data = new std::byte[size];
-            std::shared_ptr<std::byte const> ptr(
-                data, array_deleter<std::byte>());
-            raw_read(r, data, size);
-            v = blob(ptr, size);
+            byte_vector bv(size);
+            raw_read(r, bv.data(), size);
+            v = make_blob(std::move(bv));
             break;
         }
         case value_type::DATETIME: {

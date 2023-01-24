@@ -96,17 +96,30 @@ as_bytes(T const* ptr)
 size_t
 hash_value(blob const& x);
 
-// Make a blob using a shared_ptr to another type that owns the actual
-// content.
-template<class OwnedType>
-blob
-make_blob(std::shared_ptr<OwnedType> ptr, std::byte const* data, size_t size)
+class string_owner : public data_owner
 {
-    // Here we are leveraging shared_ptr's flexibility to provide ownership of
-    // another object (of an arbitrary type) while storing a pointer to data
-    // inside that object.
-    return blob(std::shared_ptr<std::byte const>(std::move(ptr), data), size);
-}
+ public:
+    string_owner(std::string value) : value_{std::move(value)}
+    {
+    }
+
+    ~string_owner() = default;
+
+    std::byte const*
+    data() const
+    {
+        return as_bytes(value_.c_str());
+    }
+
+    size_t
+    size() const
+    {
+        return value_.size();
+    }
+
+ private:
+    std::string value_;
+};
 
 // Make a blob that holds a pointer to some statically allocated data.
 blob
@@ -120,9 +133,18 @@ make_string_literal_blob(char const* data);
 blob
 make_blob(std::string s);
 
-// Make a blob that holds the contents of a byte vector.
+// Make a blob that holds the contents of a byte vector, where the blob size
+// equals the vector size.
 blob
 make_blob(byte_vector v);
+
+// Make a blob that holds the contents of a byte vector, where the blob size
+// may be smaller than the vector size.
+blob
+make_blob(byte_vector v, std::size_t size);
+
+std::shared_ptr<byte_vector_owner>
+make_shared_buffer(std::size_t size);
 
 std::ostream&
 operator<<(std::ostream& s, blob const& b);

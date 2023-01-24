@@ -4,7 +4,7 @@
 #include <iomanip>
 #include <sstream>
 
-#include <cradle/inner/utilities/arrays.h>
+#include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/utilities/text.h>
 
 using std::string;
@@ -167,16 +167,15 @@ blob
 base64_decode(string const& encoded, base64_character_set const& character_set)
 {
     auto max_decoded_size{get_base64_decoded_length(encoded.length())};
-    auto decoded{new std::byte[max_decoded_size]};
-    std::shared_ptr<std::byte const> ptr{decoded, array_deleter<std::byte>()};
+    auto decoded{byte_vector(max_decoded_size)};
     size_t decoded_size;
     base64_decode(
-        reinterpret_cast<uint8_t*>(decoded),
+        decoded.data(),
         &decoded_size,
         &encoded[0],
         encoded.length(),
         character_set);
-    return blob{ptr, decoded_size};
+    return make_blob(std::move(decoded), decoded_size);
 }
 
 } // namespace cradle

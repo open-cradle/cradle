@@ -16,6 +16,7 @@
 #endif
 
 #include <cradle/inner/core/type_definitions.h>
+#include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/encodings/lz4.h>
 #include <cradle/inner/fs/file_io.h>
@@ -108,27 +109,20 @@ local_disk_cache::disk_cached_blob(
                 spdlog::get("cradle")->debug("decompressing", key);
                 auto original_size
                     = boost::numeric_cast<size_t>(entry->original_size);
-                std::unique_ptr<uint8_t[]> decompressed_data(
-                    new uint8_t[original_size]);
+                byte_vector decompressed(original_size);
                 lz4::decompress(
-                    decompressed_data.get(),
+                    decompressed.data(),
                     original_size,
                     data.data(),
                     data.size());
 
                 spdlog::get("cradle")->debug("checking CRC", key);
                 boost::crc_32_type crc;
-                crc.process_bytes(decompressed_data.get(), original_size);
+                crc.process_bytes(decompressed.data(), original_size);
                 if (crc.checksum() == entry->crc32)
                 {
-                    spdlog::get("cradle")->debug("decoding", key);
-                    blob decoded{
-                        reinterpret_pointer_cast<std::byte const>(
-                            std::shared_ptr<uint8_t[]>{
-                                std::move(decompressed_data)}),
-                        original_size};
                     spdlog::get("cradle")->debug("returning", key);
-                    co_return decoded;
+                    co_return make_blob(std::move(decompressed));
                 }
             }
         }

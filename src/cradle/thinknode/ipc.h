@@ -4,6 +4,7 @@
 #include <boost/function.hpp>
 #include <boost/shared_array.hpp>
 
+#include <cradle/inner/core/type_definitions.h>
 #include <cradle/thinknode/messages.h>
 #include <cradle/thinknode/types.hpp>
 #include <cradle/typing/core.h>
@@ -33,7 +34,8 @@ void
 read_message_body(
     thinknode_supervisor_message* message,
     uint8_t code,
-    std::shared_ptr<uint8_t[]> const& body,
+    std::shared_ptr<data_owner> const& body,
+    uint8_t const* data,
     size_t length);
 
 // provider messsages
@@ -42,7 +44,8 @@ void
 read_message_body(
     thinknode_provider_message* message,
     uint8_t code,
-    std::shared_ptr<uint8_t[]> const& body,
+    std::shared_ptr<data_owner> const& body,
+    uint8_t const* data,
     size_t length);
 
 // The following interface is required of messages that are to be written out

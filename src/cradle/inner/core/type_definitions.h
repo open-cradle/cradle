@@ -2,13 +2,12 @@
 #define CRADLE_INNER_CORE_TYPE_DEFINITIONS_H
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
 
 #include <cereal/types/memory.hpp>
-
-#include <boost/cstdint.hpp>
 
 namespace cradle {
 
@@ -23,23 +22,72 @@ some(T&& x)
     return std::optional<std::remove_reference_t<T>>(std::forward<T>(x));
 }
 
-typedef std::vector<boost::uint8_t> byte_vector;
+// TODO consider making this a template where T can be any byte-like type
+typedef std::vector<std::uint8_t> byte_vector;
 
-struct blob
+// Owns the data to which a blob refers.
+class data_owner
 {
-    blob() : size_(0)
+ public:
+    virtual ~data_owner() = default;
+};
+
+// Blob data owner where the data is stored in a byte_vector
+class byte_vector_owner : public data_owner
+{
+ public:
+    byte_vector_owner(byte_vector value) : value_{std::move(value)}
     {
     }
 
-    blob(std::shared_ptr<std::byte const> data, std::size_t size)
-        : data_(std::move(data)), size_(size)
+    ~byte_vector_owner() = default;
+
+    std::uint8_t*
+    data()
+    {
+        return value_.data();
+    }
+
+    std::byte*
+    bytes()
+    {
+        return reinterpret_cast<std::byte*>(value_.data());
+    }
+
+    size_t
+    size() const
+    {
+        return value_.size();
+    }
+
+ private:
+    byte_vector value_;
+};
+
+// A blob is a sequence of bytes.
+// A blob, once constructed or deserialized, is immutable.
+class blob
+{
+ public:
+    blob() = default;
+
+    // To be used for static data (no owner)
+    blob(std::byte const* data, std::size_t size) : data_{data}, size_{size}
+    {
+    }
+
+    blob(
+        std::shared_ptr<data_owner> const& owner,
+        std::byte const* data,
+        std::size_t size)
+        : owner_{owner}, data_{data}, size_{size}
     {
     }
 
     std::byte const*
     data() const
     {
-        return data_.get();
+        return data_;
     }
 
     std::size_t
@@ -50,6 +98,7 @@ struct blob
 
  public:
     // cereal support
+    // TODO move out cereal support to plugin
     //
     // A blob will typically contain binary data. cereal offers
     // saveBinaryValue() and loadBinaryValue() that cause binary data to be
@@ -61,27 +110,29 @@ struct blob
     save(Archive& archive) const
     {
         archive(cereal::make_nvp("size", size_));
-        archive.saveBinaryValue(data(), size(), "blob");
+        archive.saveBinaryValue(data_, size_, "blob");
     }
 
     template<typename Archive>
     void
     load(Archive& archive)
     {
+        // TODO serialize blob subtypes
         // It's somewhat redundant to serialize the size as it's implied by
         // the base64 string, but the array passed to loadBinaryValue()
         // must have the appropriate size.
         archive(cereal::make_nvp("size", size_));
-        auto ptr = std::make_shared<std::vector<std::byte>>();
-        ptr->reserve(size_);
-        auto data = ptr->data();
-        archive.loadBinaryValue(data, size_, "blob");
-        data_ = std::shared_ptr<std::byte const>(std::move(ptr), data);
+        // TODO use make_shared_buffer() once in scope
+        auto owner{std::make_shared<byte_vector_owner>(byte_vector(size_))};
+        archive.loadBinaryValue(owner->data(), size_, "blob");
+        owner_ = owner;
+        data_ = owner->bytes();
     }
 
  private:
-    std::shared_ptr<std::byte const> data_;
-    std::size_t size_;
+    std::shared_ptr<data_owner> owner_;
+    std::byte const* data_{nullptr};
+    std::size_t size_{0};
 };
 
 } // namespace cradle
