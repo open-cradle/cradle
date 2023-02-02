@@ -123,32 +123,6 @@ update_unique_hash(unique_hasher& hasher, std::string const& val);
 void
 update_unique_hash(unique_hasher& hasher, blob const& val);
 
-// A wrapper around unique_hasher, transforming it into something that can be
-// passed to cereal's serialize().
-class unique_functor
-{
- public:
-    template<typename Arg0, typename... Args>
-    void
-    operator()(Arg0&& arg0, Args&&... args)
-    {
-        update_unique_hash(hasher_, std::forward<Arg0>(arg0));
-        if constexpr (sizeof...(args) > 0)
-        {
-            operator()(args...);
-        }
-    }
-
-    void
-    get_result(unique_hasher::result_t& result)
-    {
-        hasher_.get_result(result);
-    }
-
- private:
-    unique_hasher hasher_;
-};
-
 } // namespace cradle
 
 #endif

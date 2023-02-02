@@ -10,7 +10,6 @@
 
 #include <cradle/inner/requests/function.h>
 #include <cradle/thinknode/iss.h>
-#include <cradle/thinknode/request.h>
 
 namespace cradle {
 

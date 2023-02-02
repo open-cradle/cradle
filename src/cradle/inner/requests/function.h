@@ -3,15 +3,19 @@
 
 #include <cassert>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
+#include <type_traits>
 #include <typeindex>
 #include <typeinfo>
+#include <unordered_map>
 #include <utility>
 
 #include <cereal/types/memory.hpp>
 #include <cereal/types/tuple.hpp>
 #include <cppcoro/task.hpp>
+#include <fmt/format.h>
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/hash.h>
@@ -389,6 +393,8 @@ class function_request_intf : public id_interface
  * constructor (and erased elsewhere).
  *
  * Intf is a function_request_intf instantiation.
+ * Function must be MoveAssignable but may not be CopyAssignable (e.g. if it's
+ * a lambda).
  *
  * This class implements id_interface exactly like sha256_hashed_id. Pros:
  * - args_ need not be copied
@@ -398,6 +404,15 @@ class function_request_intf : public id_interface
  * be object code duplication if multiple instantiations exist differing in
  * the context (i.e., introspective + caching level) only. Maybe this could be
  * optimized if it becomes an issue.
+ *
+ * If Function is a class, then the type of a function_request_impl
+ * instantiation will uniquely identify it.
+ * If Function is a C++ function, then the type of a function_request_impl
+ * instantiation will correspond to all C++ functions having the same
+ * signature, so it must be combined with the function's address to achieve
+ * that uniqueness.
+ * Uniqueness is relevant when serializing or hashing function_request_impl
+ * objects.
  */
 template<
     typename Value,
@@ -409,18 +424,50 @@ class function_request_impl : public Intf
 {
  public:
     static constexpr bool func_is_coro = AsCoro;
+    static constexpr bool func_is_plain
+        = std::is_function_v<std::remove_pointer_t<Function>>;
     using this_type = function_request_impl;
     using base_type = Intf;
     using context_type = typename Intf::context_type;
 
     function_request_impl(request_uuid uuid, Function function, Args... args)
-        : uuid_{std::move(uuid)},
-          function_{std::move(function)},
-          args_{std::move(args)...}
+        : uuid_{std::move(uuid)}, args_{std::move(args)...}
     {
         if (uuid_.serializable())
         {
-            register_polymorphic_type<this_type, base_type>(uuid_);
+            // The uuid uniquely identifies the function.
+            // Have a single shared_ptr per function
+            // (though not really necessary).
+            auto uuid_str{uuid_.str()};
+            std::scoped_lock lock{static_mutex_};
+            auto it = matching_functions_.find(uuid_str);
+            if (it == matching_functions_.end())
+            {
+                register_polymorphic_type<this_type, base_type>(uuid_);
+                function_ = std::make_shared<Function>(std::move(function));
+                matching_functions_[uuid_str] = function_;
+            }
+            else
+            {
+                function_ = matching_functions_[uuid_str];
+                // Attempts to associate more than one Function (type) with
+                // a single uuid will be caught in uuid_registry.
+                // The following check catches attempts to associate more than
+                // one C++ function with a single uuid.
+                if constexpr (func_is_plain)
+                {
+                    if (**function_ != *function)
+                    {
+                        throw uuid_error(fmt::format(
+                            "Multiple C++ functions for uuid {}", uuid_str));
+                    }
+                }
+            }
+        }
+        else
+        {
+            // The shared_ptr won't be shared in this case.
+            function_ = std::make_shared<Function>(std::move(function));
         }
     }
 
@@ -488,13 +535,22 @@ class function_request_impl : public Intf
     {
         if (!hash_)
         {
-            auto function_hash = invoke_hash(get_function_type_index());
+            auto function_type_hash = invoke_hash(get_function_type_index());
             auto args_hash = std::apply(
                 [](auto&&... args) {
                     return combine_hashes(invoke_hash(args)...);
                 },
                 args_);
-            hash_ = combine_hashes(function_hash, args_hash);
+            if constexpr (func_is_plain)
+            {
+                auto function_hash = invoke_hash(*function_);
+                hash_ = combine_hashes(
+                    function_type_hash, function_hash, args_hash);
+            }
+            else
+            {
+                hash_ = combine_hashes(function_type_hash, args_hash);
+            }
         }
         return *hash_;
     }
@@ -520,11 +576,12 @@ class function_request_impl : public Intf
     {
         if constexpr (!func_is_coro)
         {
-            // The "func=function_" is a workaround to prevent a gcc-10
-            // internal compiler error in release builds.
+            // gcc tends to have trouble with this piece of code (leading to
+            // compiler crashes or runtime errors).
             co_return co_await std::apply(
-                [&, func = function_](auto&&... args) -> cppcoro::task<Value> {
-                    co_return func((co_await resolve_request(ctx, args))...);
+                [&](auto&&... args) -> cppcoro::task<Value> {
+                    co_return (*function_)(
+                        (co_await resolve_request(ctx, args))...);
                 },
                 args_);
         }
@@ -532,7 +589,7 @@ class function_request_impl : public Intf
         {
             co_return co_await std::apply(
                 [&](auto&&... args) -> cppcoro::task<Value> {
-                    co_return co_await function_(
+                    co_return co_await (*function_)(
                         ctx, (co_await resolve_request(ctx, args))...);
                 },
                 args_);
@@ -543,24 +600,11 @@ class function_request_impl : public Intf
     // cereal-related
 
     friend class cereal::access;
-    // Assumes instance_ was set
-    function_request_impl() : function_(instance_->function_)
+    function_request_impl()
     {
     }
 
  public:
-    // It is kind of cheating, but at least it's some solution:
-    // function_ cannot be serialized, and somehow needs to be set when
-    // deserializing, if possible in a type-safe way.
-    // For the time being, objects of this class can be deserialized only
-    // when an instance was created before.
-    void
-    register_instance(std::shared_ptr<function_request_impl> const& instance)
-    {
-        assert(instance);
-        instance_ = instance;
-    }
-
     template<typename Archive>
     void
     save(Archive& archive) const
@@ -576,6 +620,14 @@ class function_request_impl : public Intf
     {
         load_save(archive);
         assert(uuid_.serializable());
+        std::scoped_lock lock{static_mutex_};
+        auto it = matching_functions_.find(uuid_.str());
+        if (it == matching_functions_.end())
+        {
+            throw uuid_error(
+                fmt::format("No function found for uuid {}", uuid_.str()));
+        }
+        function_ = it->second;
     }
 
  private:
@@ -590,10 +642,31 @@ class function_request_impl : public Intf
     }
 
  private:
-    static inline std::shared_ptr<function_request_impl> instance_;
+    // Protector of matching_functions_
+    static inline std::mutex static_mutex_;
+
+    // The functions matching this request's type, indexed by uuid string.
+    // Used only when the uuid is serializable.
+    // If Function is a class, the map size will normally be one (unless
+    // multiple uuid's refer to the same function), and all map values will
+    // be equal.
+    // The function cannot be serialized, but somehow needs to be set when
+    // deserializing, if possible in a type-safe way. This is achieved by
+    // registering an object of this class: its function will be put in this
+    // map.
+    static inline std::unordered_map<std::string, std::shared_ptr<Function>>
+        matching_functions_;
+
+    // If serializable, uniquely identifies the function.
     request_uuid uuid_;
-    Function function_;
+
+    // The function to call when the request is resolved. If the uuid is
+    // serializable, function_ will be one of matching_functions_'s values.
+    std::shared_ptr<Function> function_;
+
+    // The arguments to pass to the function.
     std::tuple<Args...> args_;
+
     mutable std::optional<size_t> hash_;
     mutable unique_hasher::result_t unique_hash_;
     mutable bool have_unique_hash_{false};
@@ -684,15 +757,14 @@ class function_request_erased
                 throw uuid_error("Real uuid needed for fully-cached request");
             }
         }
-        auto impl{std::make_shared<function_request_impl<
+        using impl_type = function_request_impl<
             Value,
             intf_type,
             Props::func_is_coro,
             Function,
-            Args...>>(
-            std::move(props.uuid_), std::move(function), std::move(args)...)};
-        impl->register_instance(impl);
-        impl_ = impl;
+            Args...>;
+        impl_ = std::make_shared<impl_type>(
+            std::move(props.uuid_), std::move(function), std::move(args)...);
         init_captured_id();
     }
 
@@ -785,6 +857,7 @@ class function_request_erased
  private:
     std::string title_;
     std::shared_ptr<intf_type> impl_;
+    // captured_id_, if set, will hold a shared_ptr reference to impl_
     captured_id captured_id_;
 
     void
