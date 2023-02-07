@@ -1,5 +1,6 @@
 #include <iostream>
-#include <sstream>
+
+#include <fmt/format.h>
 
 #include <cradle/inner/requests/cereal.h>
 
@@ -29,10 +30,9 @@ uuid_registry::find(std::type_index key)
     auto it = map_.find(key);
     if (it == map_.end())
     {
-        std::ostringstream oss;
-        oss << "uuid_registry has no entry for "
-            << cereal::util::demangle(key.name());
-        throw uuid_error(oss.str());
+        throw uuid_error(fmt::format(
+            "uuid_registry has no entry for {}",
+            cereal::util::demangle(key.name())));
     }
     request_uuid const& res = it->second;
 #if LOGGING
@@ -82,12 +82,11 @@ uuid_registry::add_to_inverse_map(
         }
         else
         {
-            auto this_name = cereal::util::demangle(key.name());
-            auto earlier_name = cereal::util::demangle(it->second.name());
-            std::ostringstream oss;
-            oss << "ERROR: uuid \"" << uuid.str() << "\" refers to "
-                << earlier_name << " and " << this_name;
-            throw uuid_error(oss.str());
+            throw conflicting_types_uuid_error(fmt::format(
+                "uuid \"{}\" refers to {} and {}",
+                uuid.str(),
+                cereal::util::demangle(it->second.name()),
+                cereal::util::demangle(key.name())));
         }
     }
     else

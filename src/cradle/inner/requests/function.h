@@ -2,6 +2,7 @@
 #define CRADLE_INNER_REQUESTS_FUNCTION_H
 
 #include <cassert>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -29,6 +30,14 @@
 #include <cradle/inner/service/request.h>
 
 namespace cradle {
+
+/*
+ * Requests based on a function, which can be either a "normal" function
+ * (plain C++ function or object), or a coroutine.
+ * Currently, a coroutine takes a context as its first argument, whereas
+ * a normal function does not. This could be split into four cases
+ * (function/coroutine with/without context argument).
+ */
 
 /*
  * The first part of this file defines the "original" function requests,
@@ -365,6 +374,18 @@ auto rq_function_sp(Function function, Args... args)
  * These classes intend to overcome the drawbacks of the earlier ones.
  */
 
+class conflicting_functions_uuid_error : public uuid_error
+{
+ public:
+    using uuid_error::uuid_error;
+};
+
+class no_function_for_uuid_error : public uuid_error
+{
+ public:
+    using uuid_error::uuid_error;
+};
+
 /*
  * The interface type exposing the functionality that function_request_erased
  * requires outside its constructor.
@@ -458,7 +479,7 @@ class function_request_impl : public Intf
                 {
                     if (**function_ != *function)
                     {
-                        throw uuid_error(fmt::format(
+                        throw conflicting_functions_uuid_error(fmt::format(
                             "Multiple C++ functions for uuid {}", uuid_str));
                     }
                 }
@@ -471,38 +492,6 @@ class function_request_impl : public Intf
         }
     }
 
-    // *this and other are the same type, so their function types are
-    // identical, but the functions themselves might still be different.
-    // Likewise, argument types will be identical, but their values might
-    // differ.
-    bool
-    equals(function_request_impl const& other) const
-    {
-        if (this == &other)
-        {
-            return true;
-        }
-        return get_function_type_index() == other.get_function_type_index()
-               && args_ == other.args_;
-    }
-
-    // *this and other are the same type
-    bool
-    less_than(function_request_impl const& other) const
-    {
-        if (this == &other)
-        {
-            return false;
-        }
-        auto this_type_index = get_function_type_index();
-        auto other_type_index = other.get_function_type_index();
-        if (this_type_index != other_type_index)
-        {
-            return this_type_index < other_type_index;
-        }
-        return args_ < other.args_;
-    }
-
     // other will be a function_request_impl, but possibly instantiated from
     // different template arguments.
     bool
@@ -511,7 +500,7 @@ class function_request_impl : public Intf
         if (auto other_impl
             = dynamic_cast<function_request_impl const*>(&other))
         {
-            return equals(*other_impl);
+            return equals_same_type(*other_impl);
         }
         return false;
     }
@@ -524,7 +513,7 @@ class function_request_impl : public Intf
         if (auto other_impl
             = dynamic_cast<function_request_impl const*>(&other))
         {
-            return less_than(*other_impl);
+            return less_than_same_type(*other_impl);
         }
         return typeid(*this).before(typeid(other));
     }
@@ -574,6 +563,11 @@ class function_request_impl : public Intf
     cppcoro::task<Value>
     resolve(context_type& ctx) const override
     {
+        // TODO can/must std::forward args?
+        // If there is no coroutine function and no caching in the request
+        // tree, there is nothing to co_await on (but how useful would such
+        // a request be?).
+        // TODO optimize resolve() for "simple" request trees
         if constexpr (!func_is_coro)
         {
             // gcc tends to have trouble with this piece of code (leading to
@@ -624,7 +618,8 @@ class function_request_impl : public Intf
         auto it = matching_functions_.find(uuid_.str());
         if (it == matching_functions_.end())
         {
-            throw uuid_error(
+            // This cannot happen.
+            throw no_function_for_uuid_error(
                 fmt::format("No function found for uuid {}", uuid_.str()));
         }
         function_ = it->second;
@@ -678,12 +673,59 @@ class function_request_impl : public Intf
         return std::type_index(typeid(Function));
     }
 
+    // *this and other are the same type, so their function types (i.e.,
+    // typeid(Function)) are identical. The functions themselves might still
+    // differ if they are plain C++ functions.
+    // Likewise, argument types will be identical, but their values might
+    // differ.
+    bool
+    equals_same_type(function_request_impl const& other) const
+    {
+        if (this == &other)
+        {
+            return true;
+        }
+        if constexpr (func_is_plain)
+        {
+            if (**function_ != **other.function_)
+            {
+                return false;
+            }
+        }
+        return args_ == other.args_;
+    }
+
+    // *this and other are the same type.
+    bool
+    less_than_same_type(function_request_impl const& other) const
+    {
+        if (this == &other)
+        {
+            return false;
+        }
+        if constexpr (func_is_plain)
+        {
+            if (**function_ != **other.function_)
+            {
+                // Clang refuses to compare using <
+                return std::less<Function>{}(*function_, *other.function_);
+            }
+        }
+        return args_ < other.args_;
+    }
+
     void
     calc_unique_hash() const
     {
         unique_hasher hasher;
-        // If this is a non-cached subrequest of a fully-cached request,
-        // then uuid_ need not be "real"
+        // A unique hash will be requested for a fully-cached request, which
+        // must have a uuid uniquely identifying the request's type, and any
+        // C++ functions that might be involved.
+        // In case of a composite request, that request will be the root of
+        // a request tree. Its uuid will also uniquely identify the type of
+        // all subrequests. Subrequests therefore need not have a uuid
+        // themselves, and generally will not have one if their caching level
+        // is "none".
         if (uuid_.disk_cacheable())
         {
             update_unique_hash(hasher, uuid_);

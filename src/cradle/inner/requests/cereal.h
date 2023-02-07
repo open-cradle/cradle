@@ -33,6 +33,12 @@
 
 namespace cradle {
 
+class conflicting_types_uuid_error : public uuid_error
+{
+ public:
+    using uuid_error::uuid_error;
+};
+
 /*
  * Registry of a one-to-one relationship between uuid's and C++ classes.
  * A class is identified by one or more type_index values; there could be more

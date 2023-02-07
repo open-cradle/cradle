@@ -22,8 +22,6 @@ static char const tag[] = "[inner][service][seri_catalog]";
 template<caching_level_type Level>
 using local_props = request_props<Level, true, true, testing_request_context>;
 
-// TODO same-typed raw functions would be treated identically in the cereal
-// part of register_polymorphic_type()
 template<char const* arg>
 class make_string
 {
@@ -112,4 +110,52 @@ TEST_CASE("malformed serialized request", tag)
     REQUIRE_THROWS_WITH(
         cppcoro::sync_wait(seri_catalog::instance().resolve(ctx, seri_req)),
         Catch::StartsWith("rapidjson internal assertion failure"));
+}
+
+namespace {
+
+cppcoro::task<std::string>
+make_e_string(testing_request_context& ctx)
+{
+    co_return "e";
+}
+
+cppcoro::task<std::string>
+make_f_string(testing_request_context& ctx)
+{
+    co_return "f";
+}
+
+} // namespace
+
+TEST_CASE("resolve two C++ functions with the same signature", tag)
+{
+    auto req_e{rq_local(make_e_string, "test_seri_catalog_e")};
+    auto req_f{rq_local(make_f_string, "test_seri_catalog_f")};
+
+    REQUIRE_NOTHROW(register_seri_resolver<testing_request_context>(req_e));
+    REQUIRE_NOTHROW(register_seri_resolver<testing_request_context>(req_f));
+
+    std::string seri_req_e{serialize_request(req_e)};
+    std::string seri_req_f{serialize_request(req_f)};
+
+    REQUIRE(seri_req_e != seri_req_f);
+
+    inner_resources service;
+    init_test_inner_service(service);
+    testing_request_context ctx{service, nullptr};
+
+    auto seri_resp_e{
+        cppcoro::sync_wait(seri_catalog::instance().resolve(ctx, seri_req_e))};
+    auto seri_resp_f{
+        cppcoro::sync_wait(seri_catalog::instance().resolve(ctx, seri_req_f))};
+    REQUIRE(seri_resp_e.value() != seri_resp_f.value());
+
+    std::string resp_e{deserialize_response<std::string>(seri_resp_e.value())};
+    seri_resp_e.on_deserialized();
+    std::string resp_f{deserialize_response<std::string>(seri_resp_f.value())};
+    seri_resp_f.on_deserialized();
+
+    REQUIRE(resp_e == "e");
+    REQUIRE(resp_f == "f");
 }
