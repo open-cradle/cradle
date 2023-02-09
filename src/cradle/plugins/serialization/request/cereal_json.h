@@ -13,13 +13,14 @@ std::string
 serialize_request(Req const& req)
 {
     std::stringstream os;
-    cereal::JSONOutputArchive oarchive(os);
-    oarchive(req);
-    std::string seri_req = os.str();
-    // TODO the serialization _from_ the request has prepended
-    // { "value0" :
-    // but not appended the corresponding brace.
-    return seri_req.substr(16);
+    {
+        cereal::JSONOutputArchive oarchive(os);
+        // Assumes Req::save() to exist. The official way would be
+        //   oarchive(req);
+        // but this adds a redundant outer "value0".
+        req.save(oarchive);
+    }
+    return os.str();
 }
 
 template<typename Req>

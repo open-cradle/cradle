@@ -56,6 +56,44 @@ make_test_uuid(std::string const& ext)
 
 } // namespace
 
+TEST_CASE(
+    "create function_request_erased: identical C++ functions, one uuid", tag)
+{
+    request_props<caching_level_type::memory> props{make_test_uuid("0000")};
+    REQUIRE_NOTHROW(rq_function_erased(props, func_a));
+    REQUIRE_NOTHROW(rq_function_erased(props, func_a));
+}
+
+TEST_CASE(
+    "create function_request_erased: different C++ functions, one uuid", tag)
+{
+    request_props<caching_level_type::memory> props{make_test_uuid("0001")};
+    REQUIRE_NOTHROW(rq_function_erased(props, func_a));
+    REQUIRE_THROWS_AS(
+        rq_function_erased(props, func_b), conflicting_functions_uuid_error);
+}
+
+TEST_CASE("create function_request_erased: identical functors, one uuid", tag)
+{
+    request_props<caching_level_type::memory> props{make_test_uuid("0002")};
+    REQUIRE_NOTHROW(rq_function_erased(props, functor_a));
+    REQUIRE_NOTHROW(rq_function_erased(props, functor_a));
+}
+
+TEST_CASE("create function_request_erased: different functors, one uuid", tag)
+{
+    request_props<caching_level_type::memory> props{make_test_uuid("0003")};
+    REQUIRE_NOTHROW(rq_function_erased(props, functor_a));
+    REQUIRE_THROWS_AS(
+        rq_function_erased(props, functor_b), conflicting_types_uuid_error);
+}
+
+TEST_CASE("create function_request_erased: fully cached, no uuid", tag)
+{
+    request_props<caching_level_type::full> props;
+    REQUIRE_THROWS_AS(rq_function_erased(props, func_a), missing_uuid_error);
+}
+
 TEST_CASE("compare function_request_erased with subrequest", tag)
 {
     request_props<caching_level_type::memory> props;
@@ -77,7 +115,17 @@ TEST_CASE("compare function_request_erased with subrequest", tag)
     REQUIRE((req0a < req1a || req1a < req0a));
 }
 
-TEST_CASE("compare function_request_erased for identical C++ functions", tag)
+TEST_CASE("compare function_request_erased: one C++ function", tag)
+{
+    request_props<caching_level_type::memory> props;
+    auto req_a{rq_function_erased(props, func_a)};
+
+    REQUIRE(req_a.equals(req_a));
+
+    REQUIRE(!req_a.less_than(req_a));
+}
+
+TEST_CASE("compare function_request_erased: identical C++ functions", tag)
 {
     constexpr bool is_coro{true};
     request_props<caching_level_type::memory, is_coro> props;
@@ -97,7 +145,7 @@ TEST_CASE("compare function_request_erased for identical C++ functions", tag)
     REQUIRE(hasher_a0.get_string() == hasher_a1.get_string());
 }
 
-TEST_CASE("compare function_request_erased for different C++ functions", tag)
+TEST_CASE("compare function_request_erased: different C++ functions", tag)
 {
     constexpr bool is_coro{true};
     request_props<caching_level_type::memory, is_coro> props;
@@ -125,8 +173,7 @@ TEST_CASE("compare function_request_erased for different C++ functions", tag)
 }
 
 TEST_CASE(
-    "compare function_request_erased for C++ functions with different args",
-    tag)
+    "compare function_request_erased: C++ functions with different args", tag)
 {
     constexpr bool is_coro{true};
     request_props<caching_level_type::memory, is_coro> props;
@@ -151,40 +198,10 @@ TEST_CASE(
     REQUIRE(hasher_a.get_string() != hasher_b.get_string());
 }
 
-TEST_CASE("function_request_erased: identical C++ functions, one uuid", tag)
-{
-    request_props<caching_level_type::memory> props{make_test_uuid("0000")};
-    REQUIRE_NOTHROW(rq_function_erased(props, func_a));
-    REQUIRE_NOTHROW(rq_function_erased(props, func_a));
-}
-
-TEST_CASE("function_request_erased: different C++ functions, one uuid", tag)
-{
-    request_props<caching_level_type::memory> props{make_test_uuid("0001")};
-    REQUIRE_NOTHROW(rq_function_erased(props, func_a));
-    REQUIRE_THROWS_AS(
-        rq_function_erased(props, func_b), conflicting_functions_uuid_error);
-}
-
-TEST_CASE("function_request_erased: identical functors, one uuid", tag)
-{
-    request_props<caching_level_type::memory> props{make_test_uuid("0002")};
-    REQUIRE_NOTHROW(rq_function_erased(props, functor_a));
-    REQUIRE_NOTHROW(rq_function_erased(props, functor_a));
-}
-
-TEST_CASE("function_request_erased: different functors, one uuid", tag)
-{
-    request_props<caching_level_type::memory> props{make_test_uuid("0003")};
-    REQUIRE_NOTHROW(rq_function_erased(props, functor_a));
-    REQUIRE_THROWS_AS(
-        rq_function_erased(props, functor_b), conflicting_types_uuid_error);
-}
-
 TEST_CASE("function_request_impl: load unregistered function", tag)
 {
-    std::string good_uuid_str{"before_0004_after"};
-    std::string bad_uuid_str{"before_0005_after"};
+    std::string good_uuid_str{"before_0100_after"};
+    std::string bad_uuid_str{"before_0101_after"};
     auto good_uuid{make_test_uuid(good_uuid_str)};
     request_props<caching_level_type::memory> props{good_uuid};
     using value_type = std::string;
@@ -199,9 +216,11 @@ TEST_CASE("function_request_impl: load unregistered function", tag)
 
     auto good_impl{std::make_shared<impl_type>(good_uuid, func_a)};
     std::stringstream os;
-    cereal::JSONOutputArchive oarchive(os);
-    oarchive(good_impl);
-    std::string good_seri = os.str() + "}"; // TODO again cereal bug workaround
+    {
+        cereal::JSONOutputArchive oarchive(os);
+        oarchive(good_impl);
+    }
+    std::string good_seri = os.str();
 
     auto bad_seri{std::regex_replace(
         good_seri, std::regex{good_uuid_str}, bad_uuid_str)};

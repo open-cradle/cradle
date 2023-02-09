@@ -140,7 +140,8 @@ requires ContextMatchingRequest<Ctx, Req>
     return shared_task;
 }
 
-// If second arg is a request, one of the following templates will subsume
+// If second arg is a request, one of the following templates will subsume.
+// (Maybe that arg should be Val&& but then the mechanism doesn't work.)
 template<typename Ctx, typename Val>
 cppcoro::task<Val>
 resolve_request(Ctx& ctx, Val const& val)

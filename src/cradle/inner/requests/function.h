@@ -39,6 +39,24 @@ namespace cradle {
  * (function/coroutine with/without context argument).
  */
 
+class conflicting_functions_uuid_error : public uuid_error
+{
+ public:
+    using uuid_error::uuid_error;
+};
+
+class no_function_for_uuid_error : public uuid_error
+{
+ public:
+    using uuid_error::uuid_error;
+};
+
+class missing_uuid_error : public uuid_error
+{
+ public:
+    using uuid_error::uuid_error;
+};
+
 /*
  * The first part of this file defines the "original" function requests,
  * that have no type erasure.
@@ -53,8 +71,11 @@ namespace cradle {
  *   object through a shared_ptr), but a function_request_cached object also
  *   has a shared_ptr in its captured_id member.
  * - Request identity (uuid) is not really supported.
+ * - No disk caching.
+ * - Memory caching is theoretically flawed (details below).
+ * - No serialization.
  *
- * So normally the type-erased requests in function.h should be preferred.
+ * So normally the type-erased requests (below) should be preferred.
  */
 
 template<typename Value, typename Function, typename... Args>
@@ -90,7 +111,8 @@ class function_request_uncached
         // compiler error in release builds.
         co_return co_await std::apply(
             [&, func = function_](auto&&... args) -> cppcoro::task<Value> {
-                co_return func((co_await resolve_request(ctx, args))...);
+                co_return func((co_await resolve_request(
+                    ctx, std::forward<decltype(args)>(args)))...);
             },
             args_);
     }
@@ -374,18 +396,6 @@ auto rq_function_sp(Function function, Args... args)
  * These classes intend to overcome the drawbacks of the earlier ones.
  */
 
-class conflicting_functions_uuid_error : public uuid_error
-{
- public:
-    using uuid_error::uuid_error;
-};
-
-class no_function_for_uuid_error : public uuid_error
-{
- public:
-    using uuid_error::uuid_error;
-};
-
 /*
  * The interface type exposing the functionality that function_request_erased
  * requires outside its constructor.
@@ -563,19 +573,20 @@ class function_request_impl : public Intf
     cppcoro::task<Value>
     resolve(context_type& ctx) const override
     {
-        // TODO can/must std::forward args?
         // If there is no coroutine function and no caching in the request
         // tree, there is nothing to co_await on (but how useful would such
         // a request be?).
-        // TODO optimize resolve() for "simple" request trees
+        // TODO consider optimizing resolve() for "simple" request trees
+        // The std::forward probably doesn't help as all resolve_request()
+        // variants take the arg as const&.
         if constexpr (!func_is_coro)
         {
             // gcc tends to have trouble with this piece of code (leading to
             // compiler crashes or runtime errors).
             co_return co_await std::apply(
                 [&](auto&&... args) -> cppcoro::task<Value> {
-                    co_return (*function_)(
-                        (co_await resolve_request(ctx, args))...);
+                    co_return (*function_)((co_await resolve_request(
+                        ctx, std::forward<decltype(args)>(args)))...);
                 },
                 args_);
         }
@@ -584,7 +595,9 @@ class function_request_impl : public Intf
             co_return co_await std::apply(
                 [&](auto&&... args) -> cppcoro::task<Value> {
                     co_return co_await (*function_)(
-                        ctx, (co_await resolve_request(ctx, args))...);
+                        ctx,
+                        (co_await resolve_request(
+                            ctx, std::forward<decltype(args)>(args)))...);
                 },
                 args_);
         }
@@ -796,7 +809,8 @@ class function_request_erased
         {
             if (!props.uuid_.disk_cacheable())
             {
-                throw uuid_error("Real uuid needed for fully-cached request");
+                throw missing_uuid_error{
+                    "Real uuid needed for fully-cached request"};
             }
         }
         using impl_type = function_request_impl<

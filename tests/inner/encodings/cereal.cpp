@@ -44,10 +44,11 @@ static std::string
 serialize_to_json(blob const& x)
 {
     std::stringstream os;
-    cereal::JSONOutputArchive oarchive(os);
-    oarchive(x);
-    // TODO workaround for bug in cereal
-    return os.str() + "}";
+    {
+        cereal::JSONOutputArchive oarchive(os);
+        oarchive(x);
+    }
+    return os.str();
 }
 
 static blob
