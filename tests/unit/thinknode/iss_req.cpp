@@ -14,6 +14,7 @@
 #include "../../support/request.h"
 #include "../../support/tasklet_testing.h"
 #include "../../support/thinknode.h"
+#include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/requests/function.h>

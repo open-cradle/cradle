@@ -6,6 +6,7 @@
 
 #include <cradle/typing/utilities/testing.h>
 
+#include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/utilities/environment.h>

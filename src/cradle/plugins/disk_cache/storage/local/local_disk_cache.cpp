@@ -15,6 +15,7 @@
 #include <boost/crc.hpp>
 #endif
 
+#include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/encodings/base64.h>

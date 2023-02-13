@@ -5,6 +5,8 @@
 #include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 
+#include <cradle/inner/core/get_unique_string.h>
+
 using namespace cradle;
 
 namespace {
