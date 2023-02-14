@@ -28,7 +28,7 @@ def make_function_request_impl(session: Session, uuid_base_ext: str, title: str,
 
 def make_post_iss_object_request(session: Session, value: str, id_offset: int = 0) -> Any:
     uuid_base = 'rq_post_iss_object'
-    uuid_ext = 'blob'
+    uuid_ext = 'plain'
     title = 'post_iss_object'
     msgpack_encoded = msgpack.packb(value, use_bin_type=True)
     base64_encoded = base64.standard_b64encode(msgpack_encoded)

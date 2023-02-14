@@ -1,6 +1,7 @@
 #include <benchmark/benchmark.h>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include <cradle/inner/requests/function.h>
@@ -14,6 +15,15 @@
 using namespace cradle;
 
 static auto add = [](int a, int b) { return a + b; };
+
+namespace {
+
+request_uuid
+make_uuid()
+{
+    static int next_id{};
+    return request_uuid{fmt::format("benchmark-{}", next_id++)};
+}
 
 template<int H>
 auto
@@ -46,6 +56,8 @@ create_triangular_tree()
             create_triangular_tree<level, H - 1>());
     }
 }
+
+} // namespace
 
 template<int H>
 void
@@ -303,7 +315,7 @@ template<caching_level_type level, int H>
 auto
 create_thin_tree_erased()
 {
-    request_props<level> props;
+    request_props<level> props{make_uuid()};
     if constexpr (H == 1)
     {
         return rq_function_erased(props, add, 2, 1);
@@ -319,7 +331,7 @@ template<caching_level_type level, int H>
     requires(level != caching_level_type::full)
 auto create_triangular_tree_erased()
 {
-    request_props<level> props;
+    request_props<level> props{make_uuid()};
     if constexpr (H == 1)
     {
         return rq_function_erased(props, add, 2, 1);
@@ -338,16 +350,13 @@ template<caching_level_type level, int H>
     requires(level == caching_level_type::full)
 auto create_triangular_tree_erased()
 {
+    request_props<level, false, false> props{make_uuid()};
     if constexpr (H == 1)
     {
-        request_props<level, false, false> props{request_uuid("uuid_2_1")};
         return rq_function_erased(props, add, 2, 1);
     }
     else
     {
-        std::ostringstream oss;
-        oss << "uuid_add_H=" << H;
-        request_props<level, false, false> props{request_uuid(oss.str())};
         return rq_function_erased(
             props,
             add,
@@ -362,15 +371,13 @@ create_triangular_tree_erased_introspective()
 {
     if constexpr (H == 1)
     {
-        request_props<level, false, true> props{request_uuid(), "add 2+1"};
+        request_props<level, false, true> props{make_uuid(), "add 2+1"};
         return rq_function_erased(props, add, 2, 1);
     }
     else
     {
-        std::stringstream ss;
-        ss << "add H" << H;
-        std::string title{ss.str()};
-        request_props<level, false, true> props{request_uuid(), title};
+        std::string title{fmt::format("add H{}", H)};
+        request_props<level, false, true> props{make_uuid(), title};
         return rq_function_erased(
             props,
             add,

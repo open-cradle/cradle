@@ -86,7 +86,6 @@ TEST_CASE("unique_hash: empty input", tag)
     unique_hasher::result_t result{};
     hasher.get_result(result);
     REQUIRE(memcmp(&result, &null_result, sizeof(result)) == 0);
-
     REQUIRE(hasher.get_string() == null_string);
 }
 

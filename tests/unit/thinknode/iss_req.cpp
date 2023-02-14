@@ -28,6 +28,10 @@
 
 using namespace cradle;
 
+namespace {
+
+static char const tag[] = "[inner][service][seri_catalog]";
+
 template<typename Request>
 auto
 deserialize_function(cereal::JSONInputArchive& iarchive)
@@ -46,15 +50,15 @@ identity(Value&& value)
 
 // Creates a type-erased, uncached, request for an immediate value in Thinknode
 // context.
-// The request has no real uuid, meaning it cannot be serialized.
-// As it won't be cached, the absence of a uuid is no obstacle there.
 template<typename Value>
 auto
 rq_function_thinknode_value(Value&& value)
 {
+    static int next_id{};
+    request_uuid uuid{fmt::format("{}-value-{}", tag, next_id++)};
     using props_type = request_props<caching_level_type::none, false, false>;
     return function_request_erased<Value, props_type>(
-        props_type(), identity<Value>, std::forward<Value>(value));
+        props_type{uuid}, identity<Value>, std::forward<Value>(value));
 }
 
 static auto
@@ -236,7 +240,9 @@ test_post_iss_request(
         requests, payloads, results, introspective, remotely);
 }
 
-TEST_CASE("ISS POST serialization - value", "[iss_req]")
+} // namespace
+
+TEST_CASE("ISS POST serialization - value", tag)
 {
     auto req{make_post_iss_request_constant<caching_level_type::full>()};
     // With this test_request lambda, testing serialization includes testing
@@ -250,7 +256,7 @@ TEST_CASE("ISS POST serialization - value", "[iss_req]")
         "iss_post_value.json");
 }
 
-TEST_CASE("ISS POST serialization - subreq", "[iss_req]")
+TEST_CASE("ISS POST serialization - subreq", tag)
 {
     auto req{make_post_iss_request_subreq<caching_level_type::full>()};
     auto test_request
@@ -262,25 +268,25 @@ TEST_CASE("ISS POST serialization - subreq", "[iss_req]")
         "iss_post_subreq.json");
 }
 
-TEST_CASE("ISS POST resolution - value, uncached", "[iss_req]")
+TEST_CASE("ISS POST resolution - value, uncached", tag)
 {
     test_post_iss_request(
         make_post_iss_request_constant<caching_level_type::none>(), false);
 }
 
-TEST_CASE("ISS POST resolution - value, memory cached", "[iss_req]")
+TEST_CASE("ISS POST resolution - value, memory cached", tag)
 {
     test_post_iss_request(
         make_post_iss_request_subreq<caching_level_type::memory>(), false);
 }
 
-TEST_CASE("ISS POST resolution - value, fully cached", "[iss_req]")
+TEST_CASE("ISS POST resolution - value, fully cached", tag)
 {
     test_post_iss_request(
         make_post_iss_request_subreq<caching_level_type::full>(), false);
 }
 
-TEST_CASE("ISS POST resolution - subreq, fully cached, parallel", "[iss_req]")
+TEST_CASE("ISS POST resolution - subreq, fully cached, parallel", tag)
 {
     constexpr caching_level_type level = caching_level_type::full;
     using Req = decltype(make_post_iss_request_subreq<level>());
@@ -311,7 +317,7 @@ TEST_CASE("ISS POST resolution - subreq, fully cached, parallel", "[iss_req]")
     test_post_iss_requests_parallel(requests, payloads, results);
 }
 
-TEST_CASE("ISS POST resolution - remote", "[iss_req]")
+TEST_CASE("ISS POST resolution - remote", tag)
 {
     test_post_iss_request(
         make_post_iss_request_constant<caching_level_type::full>(),
@@ -319,7 +325,7 @@ TEST_CASE("ISS POST resolution - remote", "[iss_req]")
         true);
 }
 
-TEST_CASE("RESOLVE ISS OBJECT TO IMMUTABLE serialization", "[iss_req]")
+TEST_CASE("RESOLVE ISS OBJECT TO IMMUTABLE serialization", tag)
 {
     auto req{rq_resolve_iss_object_to_immutable<caching_level_type::full>(
         "123", "abc", true)};
@@ -411,16 +417,14 @@ test_retrieve_immutable_object(auto create_req, auto immutable_id)
     test_retrieve_immutable_object_req(req);
 }
 
-TEST_CASE(
-    "RETRIEVE IMMUTABLE OBJECT resolution - value, fully cached", "[iss_req]")
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - value, fully cached", tag)
 {
     test_retrieve_immutable_object(
         rq_retrieve_immutable_object<caching_level_type::full, std::string>,
         "abc");
 }
 
-TEST_CASE(
-    "RETRIEVE IMMUTABLE OBJECT resolution - subreq, fully cached", "[iss_req]")
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - subreq, fully cached", tag)
 {
     auto arg_request{rq_function_thinknode_value("abc")};
     test_retrieve_immutable_object(
@@ -432,7 +436,7 @@ TEST_CASE(
 
 TEST_CASE(
     "RETRIEVE IMMUTABLE OBJECT resolution - value, fully cached, parallel",
-    "[iss_req]")
+    tag)
 {
     constexpr caching_level_type level = caching_level_type::full;
     using Req = decltype(rq_retrieve_immutable_object<level>("", ""));
@@ -461,7 +465,7 @@ TEST_CASE(
     test_retrieve_immutable_object_parallel(requests, object_ids, responses);
 }
 
-TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", "[iss_req]")
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", tag)
 {
     constexpr caching_level_type level = caching_level_type::full;
     auto req{rq_retrieve_immutable_object<level>("123", "abc")};
@@ -472,7 +476,7 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", "[iss_req]")
         "retrieve_immutable.json");
 }
 
-TEST_CASE("Composite request serialization", "[iss_req]")
+TEST_CASE("Composite request serialization", tag)
 {
     constexpr auto level = caching_level_type::full;
     std::string const context_id{"123"};

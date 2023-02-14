@@ -84,16 +84,10 @@ class request_uuid
         return str_;
     }
 
-    // Indicates whether a request with this uuid can be disk-cached
+    // Indicates whether this is a "real" (non-empty, non-placeholder) uuid.
+    // A request with a real uuid can be disk-cached and serialized.
     bool
-    disk_cacheable() const
-    {
-        return !str_.empty();
-    }
-
-    // Indicates whether a request with this uuid can be serialized
-    bool
-    serializable() const
+    is_real() const
     {
         return !str_.empty();
     }

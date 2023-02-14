@@ -427,10 +427,6 @@ class function_request_intf : public id_interface
  * Function must be MoveAssignable but may not be CopyAssignable (e.g. if it's
  * a lambda).
  *
- * This class implements id_interface exactly like sha256_hashed_id. Pros:
- * - args_ need not be copied
- * - Not needing a (theoretically?) unreliable type_info::name() value
- *
  * Only a small part of this class depends on the context type, so there will
  * be object code duplication if multiple instantiations exist differing in
  * the context (i.e., introspective + caching level) only. Maybe this could be
@@ -442,8 +438,11 @@ class function_request_intf : public id_interface
  * instantiation will correspond to all C++ functions having the same
  * signature, so it must be combined with the function's address to achieve
  * that uniqueness.
- * Uniqueness is relevant when serializing or hashing function_request_impl
- * objects.
+ * This uniqeness is relevant when deserializing a type-erased request. Its
+ * uuid will identify both the function_request_impl class, and (if
+ * relevant) the C++ function. This implies a two-step process: first a
+ * function_request_impl object is created of the specified class, then that
+ * object's function member is set to the correct (pointer) value.
  */
 template<
     typename Value,
@@ -464,41 +463,36 @@ class function_request_impl : public Intf
     function_request_impl(request_uuid uuid, Function function, Args... args)
         : uuid_{std::move(uuid)}, args_{std::move(args)...}
     {
-        if (uuid_.serializable())
+        // Guaranteed by the function_request_erased ctor
+        assert(uuid_.is_real());
+
+        // The uuid uniquely identifies the function.
+        // Have a single shared_ptr per function
+        // (though not really necessary).
+        auto uuid_str{uuid_.str()};
+        std::scoped_lock lock{static_mutex_};
+        auto it = matching_functions_.find(uuid_str);
+        if (it == matching_functions_.end())
         {
-            // The uuid uniquely identifies the function.
-            // Have a single shared_ptr per function
-            // (though not really necessary).
-            auto uuid_str{uuid_.str()};
-            std::scoped_lock lock{static_mutex_};
-            auto it = matching_functions_.find(uuid_str);
-            if (it == matching_functions_.end())
-            {
-                register_polymorphic_type<this_type, base_type>(uuid_);
-                function_ = std::make_shared<Function>(std::move(function));
-                matching_functions_[uuid_str] = function_;
-            }
-            else
-            {
-                function_ = matching_functions_[uuid_str];
-                // Attempts to associate more than one Function (type) with
-                // a single uuid will be caught in uuid_registry.
-                // The following check catches attempts to associate more than
-                // one C++ function with a single uuid.
-                if constexpr (func_is_plain)
-                {
-                    if (**function_ != *function)
-                    {
-                        throw conflicting_functions_uuid_error(fmt::format(
-                            "Multiple C++ functions for uuid {}", uuid_str));
-                    }
-                }
-            }
+            register_polymorphic_type<this_type, base_type>(uuid_);
+            function_ = std::make_shared<Function>(std::move(function));
+            matching_functions_[uuid_str] = function_;
         }
         else
         {
-            // The shared_ptr won't be shared in this case.
-            function_ = std::make_shared<Function>(std::move(function));
+            function_ = matching_functions_[uuid_str];
+            // Attempts to associate more than one Function (type) with
+            // a single uuid will be caught in uuid_registry.
+            // The following check catches attempts to associate more than
+            // one C++ function with a single uuid.
+            if constexpr (func_is_plain)
+            {
+                if (**function_ != *function)
+                {
+                    throw conflicting_functions_uuid_error(fmt::format(
+                        "Multiple C++ functions for uuid {}", uuid_str));
+                }
+            }
         }
     }
 
@@ -616,7 +610,6 @@ class function_request_impl : public Intf
     void
     save(Archive& archive) const
     {
-        assert(uuid_.serializable());
         // Trust archive to be save-only
         const_cast<function_request_impl*>(this)->load_save(archive);
     }
@@ -626,7 +619,6 @@ class function_request_impl : public Intf
     load(Archive& archive)
     {
         load_save(archive);
-        assert(uuid_.serializable());
         std::scoped_lock lock{static_mutex_};
         auto it = matching_functions_.find(uuid_.str());
         if (it == matching_functions_.end())
@@ -731,18 +723,7 @@ class function_request_impl : public Intf
     calc_unique_hash() const
     {
         unique_hasher hasher;
-        // A unique hash will be requested for a fully-cached request, which
-        // must have a uuid uniquely identifying the request's type, and any
-        // C++ functions that might be involved.
-        // In case of a composite request, that request will be the root of
-        // a request tree. Its uuid will also uniquely identify the type of
-        // all subrequests. Subrequests therefore need not have a uuid
-        // themselves, and generally will not have one if their caching level
-        // is "none".
-        if (uuid_.disk_cacheable())
-        {
-            update_unique_hash(hasher, uuid_);
-        }
+        update_unique_hash(hasher, uuid_);
         std::apply(
             [&hasher](auto&&... args) {
                 (update_unique_hash(hasher, args), ...);
@@ -787,6 +768,19 @@ struct request_props
  * Props::introspective is a template argument instead of being passed by value
  * because of the overhead, in object size and execution time, when resolving
  * an introspective request; see resolve_request_cached().
+ *
+ * When calculating the disk cache key (unique hash) for a type-erased
+ * function, the key should depend on the erased type; this is achieved by
+ * letting the request have a uuid. This uuid will also identify the type
+ * of non-type-erased arguments appearing in the request tree, but it cannot
+ * discriminate between e.g. two type-erased subrequests differing in their
+ * functor only. This means that these subrequests should also have a uuid,
+ * even if they themselves are not disk-cached.
+ *
+ * Conclusion: a type-erased request must have a uuid when its own caching
+ * level is disk-cached, or it could be used as a (sub-)argument of a
+ * type-erased request. The most practical solution is to require that _all_
+ * type-erased requests have a uuid.
  */
 template<typename Value, typename Props>
 class function_request_erased
@@ -805,13 +799,11 @@ class function_request_erased
     function_request_erased(Props props, Function function, Args... args)
         : title_{std::move(props.title_)}
     {
-        if constexpr (caching_level == caching_level_type::full)
+        // TODO make is_real() a compile-time thing
+        if (!props.uuid_.is_real())
         {
-            if (!props.uuid_.disk_cacheable())
-            {
-                throw missing_uuid_error{
-                    "Real uuid needed for fully-cached request"};
-            }
+            throw missing_uuid_error{
+                "Real uuid needed for type-erased request"};
         }
         using impl_type = function_request_impl<
             Value,
@@ -880,6 +872,7 @@ class function_request_erased
 
  public:
     // Interface for cereal
+    // Also for creating placeholder subrequests in the catalog.
     function_request_erased() = default;
 
     // Construct object, deserializing from a cereal archive

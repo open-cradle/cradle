@@ -20,14 +20,6 @@ template<caching_level_type Level>
 using thinknode_request_props
     = request_props<Level, true, true, thinknode_request_context>;
 
-// Coroutine returning some value of type Value; in fact, Value's default value
-template<typename Value>
-cppcoro::task<Value>
-create_default(context_intf&)
-{
-    co_return Value{};
-}
-
 namespace detail {
 
 // Upgrades a raw C string to std::string, returns everything else as-is
@@ -46,21 +38,14 @@ upgrade_raw_string(Input&& input)
 }
 
 // Creates a uuid extension reflecting an argument of type Arg.
-// Default case if Arg is not a request nor a blob
+// Default case if Arg is not a request
+// TODO generalize arg/subrequest uuid's
+// TODO easier debugging uuid conflicts
 template<typename Arg>
 std::string
 make_subreq_string()
 {
     return "-plain";
-}
-
-// Overload for Arg being a blob
-// TODO generalize arg/subrequest uuid's
-// TODO easier debugging uuid conflicts
-template<typename Arg>
-requires(std::same_as<Arg, blob>) std::string make_subreq_string()
-{
-    return "-blob";
 }
 
 // The other overloads are for Arg being a sub-request; the result depends
@@ -106,9 +91,7 @@ auto
 rq_function_thinknode_subreq()
 {
     using props_type = thinknode_request_props<Level>;
-    auto uuid{detail::make_ext_uuid("placeholder uuid", Value())};
-    return function_request_erased<Value, props_type>(
-        props_type(uuid, "placeholder title"), create_default<Value>);
+    return function_request_erased<Value, props_type>();
 }
 
 // Creates a function_request_erased object representing a

@@ -3,6 +3,7 @@
 
 #include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
+#include <fmt/format.h>
 
 #include "../../support/concurrency_testing.h"
 #include "../../support/inner_service.h"
@@ -16,6 +17,12 @@ using namespace cradle;
 namespace {
 
 static char const tag[] = "[inner][service][seri_catalog]";
+
+request_uuid
+make_test_uuid(int ext)
+{
+    return request_uuid{fmt::format("{}-{:04d}", tag, ext)};
+}
 
 auto
 create_adder(int& num_calls)
@@ -165,7 +172,7 @@ TEST_CASE("evaluate function request (V+V)*S - memory cached", tag)
 
 TEST_CASE("evaluate erased function request V+V - uncached", tag)
 {
-    request_props<caching_level_type::none> props;
+    request_props<caching_level_type::none> props{make_test_uuid(0)};
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req{rq_function_erased(props, add, 6, 1)};
@@ -174,7 +181,7 @@ TEST_CASE("evaluate erased function request V+V - uncached", tag)
 
 TEST_CASE("evaluate erased function request V+U - uncached", tag)
 {
-    request_props<caching_level_type::none> props;
+    request_props<caching_level_type::none> props{make_test_uuid(10)};
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req{rq_function_erased(props, add, 6, rq_value_up(1))};
@@ -183,7 +190,7 @@ TEST_CASE("evaluate erased function request V+U - uncached", tag)
 
 TEST_CASE("evaluate erased function request V+S - uncached", tag)
 {
-    request_props<caching_level_type::none> props;
+    request_props<caching_level_type::none> props{make_test_uuid(20)};
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req{rq_function_erased(props, add, 6, rq_value_sp(1))};
@@ -192,7 +199,7 @@ TEST_CASE("evaluate erased function request V+S - uncached", tag)
 
 TEST_CASE("evaluate erased function request S+V - uncached", tag)
 {
-    request_props<caching_level_type::none> props;
+    request_props<caching_level_type::none> props{make_test_uuid(30)};
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req{rq_function_erased(props, add, rq_value_sp(6), 1)};
@@ -201,19 +208,24 @@ TEST_CASE("evaluate erased function request S+V - uncached", tag)
 
 TEST_CASE("evaluate erased function request (V+V)*S - uncached", tag)
 {
-    request_props<caching_level_type::none> props;
+    using Props = request_props<caching_level_type::none>;
+    Props props_mul{make_test_uuid(40)};
+    Props props_add{make_test_uuid(41)};
     int num_add_calls = 0;
     auto add = create_adder(num_add_calls);
     int num_mul_calls = 0;
     auto mul = create_multiplier(num_mul_calls);
     auto req{rq_function_erased(
-        props, mul, rq_function_erased(props, add, 1, 2), rq_value_sp(3))};
+        props_mul,
+        mul,
+        rq_function_erased(props_add, add, 1, 2),
+        rq_value_sp(3))};
     test_resolve_uncached(req, 9, num_add_calls, &num_mul_calls);
 }
 
 TEST_CASE("evaluate erased function request V+V - memory cached", tag)
 {
-    request_props<caching_level_type::memory> props;
+    request_props<caching_level_type::memory> props{make_test_uuid(50)};
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req{rq_function_erased(props, add, 6, 1)};
@@ -222,7 +234,7 @@ TEST_CASE("evaluate erased function request V+V - memory cached", tag)
 
 TEST_CASE("evaluate erased function request V+U - memory cached", tag)
 {
-    request_props<caching_level_type::memory> props;
+    request_props<caching_level_type::memory> props{make_test_uuid(60)};
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req{rq_function_erased(props, add, 6, rq_value_up(1))};
@@ -231,7 +243,7 @@ TEST_CASE("evaluate erased function request V+U - memory cached", tag)
 
 TEST_CASE("evaluate erased function request V+S - memory cached", tag)
 {
-    request_props<caching_level_type::memory> props;
+    request_props<caching_level_type::memory> props{make_test_uuid(70)};
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req{rq_function_erased(props, add, 6, rq_value_sp(1))};
@@ -240,7 +252,7 @@ TEST_CASE("evaluate erased function request V+S - memory cached", tag)
 
 TEST_CASE("evaluate erased function request S+V - memory cached", tag)
 {
-    request_props<caching_level_type::memory> props;
+    request_props<caching_level_type::memory> props{make_test_uuid(80)};
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req{rq_function_erased(props, add, rq_value_sp(6), 1)};
@@ -249,21 +261,21 @@ TEST_CASE("evaluate erased function request S+V - memory cached", tag)
 
 TEST_CASE("evaluate erased function request (V+V)*S - memory cached", tag)
 {
-    request_props<caching_level_type::memory> props;
+    request_props<caching_level_type::memory> props_inner{make_test_uuid(90)};
+    request_props<caching_level_type::memory> props_main{make_test_uuid(91)};
     int num_add_calls = 0;
     auto add = create_adder(num_add_calls);
     int num_mul_calls = 0;
     auto mul = create_multiplier(num_mul_calls);
-    auto inner{rq_function_erased(props, add, 1, 2)};
-    auto req{rq_function_erased(props, mul, inner, rq_value_sp(3))};
+    auto inner{rq_function_erased(props_inner, add, 1, 2)};
+    auto req{rq_function_erased(props_main, mul, inner, rq_value_sp(3))};
     test_resolve_cached(req, 9, num_add_calls, &num_mul_calls);
 }
 
 TEST_CASE("evaluate erased function request V+V - fully cached", tag)
 {
-    request_props<caching_level_type::memory> props_mem;
-    request_props<caching_level_type::full> props_full{
-        request_uuid("uuid_6_1")};
+    request_props<caching_level_type::memory> props_mem{make_test_uuid(200)};
+    request_props<caching_level_type::full> props_full{make_test_uuid(201)};
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req_mem{rq_function_erased(props_mem, add, 6, 1)};
@@ -325,7 +337,8 @@ TEST_CASE("evaluate function requests in parallel - uncached function", tag)
     std::vector<Req> requests;
     for (int i = 0; i < num_requests; ++i)
     {
-        requests.emplace_back(rq_function_erased(Props(), add, i, i * 2));
+        Props props{make_test_uuid(100 + i)};
+        requests.emplace_back(rq_function_erased(props, add, i, i * 2));
     }
 
     auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
@@ -350,8 +363,9 @@ TEST_CASE("evaluate function requests in parallel - uncached coroutine", tag)
     std::vector<Req> requests;
     for (int i = 0; i < num_requests; ++i)
     {
+        Props props{make_test_uuid(300 + i)};
         requests.emplace_back(
-            rq_function_erased_coro<Value>(Props(), add, i, i * 2));
+            rq_function_erased_coro<Value>(props, add, i, i * 2));
     }
 
     auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
@@ -376,7 +390,8 @@ TEST_CASE("evaluate function requests in parallel - memory cached", tag)
     std::vector<Req> requests;
     for (int i = 0; i < num_requests; ++i)
     {
-        requests.emplace_back(rq_function_erased(Props(), add, i, i * 2));
+        Props props{make_test_uuid(400 + i)};
+        requests.emplace_back(rq_function_erased(props, add, i, i * 2));
     }
 
     auto res0 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
@@ -453,10 +468,12 @@ static auto add2 = [](int a, int b) { return a + b; };
 
 TEST_CASE("resolve function_request_erased with subrequest", tag)
 {
-    request_props<caching_level_type::memory> props;
-    auto req0{rq_function_erased(props, add2, 1, 2)};
-    auto req1{rq_function_erased(props, add2, req0, 3)};
-    auto req2{rq_function_erased(props, add2, req1, 4)};
+    request_props<caching_level_type::memory> props0{make_test_uuid(500)};
+    request_props<caching_level_type::memory> props1{make_test_uuid(501)};
+    request_props<caching_level_type::memory> props2{make_test_uuid(502)};
+    auto req0{rq_function_erased(props0, add2, 1, 2)};
+    auto req1{rq_function_erased(props1, add2, req0, 3)};
+    auto req2{rq_function_erased(props2, add2, req1, 4)};
     cached_request_resolution_context ctx;
 
     REQUIRE(cppcoro::sync_wait(resolve_request(ctx, req0)) == 3);

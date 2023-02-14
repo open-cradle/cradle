@@ -14,12 +14,16 @@ namespace cradle {
 // Preventing collisions between all possible disk cache keys is crucial.
 //
 // A new-style disk-cached request must have a uuid.
-// - The uuid defines the types of the request, any subrequests, and all
-//   requests' arguments. So by making the uuid part of the hash, there is
-//   no need to record any additional type information.
-// - Subrequests could also have a uuid. As the top request's uuid already
-//   defines the complete type, including the subrequests' uuids in the hash
-//   is not really needed; this optimization doesn't seem worthwhile, though.
+// - The uuid defines the class types of the request and its arguments, and
+//   the same for any non-type-erased subrequests.
+// - Any type-erased subrequest (even if not disk-cached) must also have a
+//   uuid.
+// - The collection of all these uuids defines the class types of all requests,
+//   and all their arguments. So by making these uuids part of the hash, all
+//   type information is recorded.
+// - Non-type-erased subrequests could also have a uuid. Including them in
+//   the hash is not really needed, but this optimization does not seem
+//   worthwhile.
 // - The hash must cover all argument values.
 // - If an argument is some kind of variant like a dynamic, the hash must
 //   include the discriminator; see typing/core/unique_hash.h.
