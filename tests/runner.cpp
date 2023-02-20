@@ -12,6 +12,9 @@
 // things.
 #define CATCH_CONFIG_CPP11_NO_NULLPTR
 
+// Uncomment to have one-line messages
+//#define CATCH_CONFIG_DEFAULT_REPORTER "compact"
+
 // The Catch "main" code triggers these in Visual C++.
 #if defined(_MSC_VER)
 #pragma warning(disable : 4244)

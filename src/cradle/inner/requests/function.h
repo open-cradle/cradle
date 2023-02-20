@@ -2,6 +2,7 @@
 #define CRADLE_INNER_REQUESTS_FUNCTION_H
 
 #include <cassert>
+#include <concepts>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -872,7 +873,8 @@ class function_request_erased
 
  public:
     // Interface for cereal
-    // Also for creating placeholder subrequests in the catalog.
+
+    // Used for creating placeholder subrequests in the catalog.
     function_request_erased() = default;
 
     // Construct object, deserializing from a cereal archive
@@ -978,6 +980,158 @@ auto rq_function_erased_coro(Props props, Function function, Args... args)
 {
     return function_request_erased<Value, Props>{
         std::move(props), std::move(function), std::move(args)...};
+}
+
+/*
+ * Template arguments
+ * ==================
+ *
+ * An argument to a function_request_erased object corresponds to some type,
+ * e.g. std::string or blob. The option of having the argument be some kind
+ * of subrequest will often be a requirement; in addition, the option of it
+ * being a simple value would often be convenient.
+ *
+ * The major problem with allowing both is that they lead to different types
+ * of the main function_request_erased template class. Each variant needs its
+ * own uuid, and must be registered separately. If several arguments can
+ * have a template type, the number of combinations quickly becomes
+ * unmanageable.
+ *
+ * The solution to this problem is that a template argument nominally is a
+ * function_request_erased object itself. It may also be a plain value, in
+ * which case the framework will convert it to an internal
+ * function_request_erased object that simply returns that value. The end
+ * result is that the argument always is a function_request_erased object,
+ * and there is just a single main function_request_erased type.
+ *
+ * Support for this solution consists of two parts:
+ * - A TypedArg concept that checks whether a given argument is suitable
+ *   for this mechanism.
+ * - A set of normalize_arg() functions that convert an argument to the
+ *   normalized function_request_erased form.
+ */
+
+// Checks that Arg is a value of type ValueType, or a request resolving to that
+// type.
+template<typename Arg, typename ValueType>
+concept TypedArg
+    = std::convertible_to<
+          Arg,
+          ValueType> || (std::same_as<typename Arg::value_type, ValueType> && std::same_as<function_request_erased<ValueType, typename Arg::props_type>, Arg>);
+
+// Function returning the given value as-is; similar to std::identity.
+template<typename Value>
+Value
+identity_func(Value&& value)
+{
+    return std::forward<Value>(value);
+}
+
+// Coroutine returning the given value as-is.
+template<typename Value>
+cppcoro::task<Value>
+identity_coro(context_intf& ctx, Value value)
+{
+    co_return value;
+}
+
+// Contains the uuid string for a normalize_arg request. The uuid (only)
+// depends on the value type that the request resolves to.
+// Note: don't put the request_uuid itself in the struct as it depends
+// on the static Git version which is also evaluated at C++ initialization
+// time.
+// TODO put specializations in separate .h?
+template<typename Value>
+struct normalization_uuid
+{
+};
+
+template<>
+struct normalization_uuid<std::string>
+{
+    static const inline std::string uuid_str{"normalization_uuid<string>"};
+};
+
+template<>
+struct normalization_uuid<blob>
+{
+    static const inline std::string uuid_str{"normalization_uuid<blob>"};
+};
+
+template<typename Value>
+auto
+make_normalization_uuid()
+{
+    return request_uuid{normalization_uuid<Value>::uuid_str};
+}
+
+/*
+ * Converts an argument value to a rq_function_erased resolving to that value.
+ * If the argument already is a rq_function_erased, it is returned as-is.
+ *
+ * The general normalize_arg() would look like this:
+ *
+ *   template<typename Value, typename Props, typename Arg>
+ *   auto
+ *   normalize_arg(Arg const& arg);
+ *
+ * Value and Props must be specified, Arg will be deduced.
+ * Props is a request_props instantiation, and must equal the one for the main
+ * request.
+ *
+ * TODO uuid must differ between different Props types.
+ */
+
+// Normalizes a value argument in a non-coroutine context.
+template<typename Value, typename Props>
+requires(!Request<Value> && !Props::func_is_coro) auto normalize_arg(
+    Value const& arg)
+{
+    Props props{make_normalization_uuid<Value>(), "arg"};
+    return rq_function_erased(std::move(props), identity_func<Value>, arg);
+}
+
+// Normalizes a value argument in a coroutine context.
+template<typename Value, typename Props>
+requires(!Request<Value> && Props::func_is_coro) auto normalize_arg(
+    Value const& arg)
+{
+    Props props{make_normalization_uuid<Value>(), "arg"};
+    return rq_function_erased_coro<Value>(
+        std::move(props), identity_coro<Value>, arg);
+}
+
+// Normalizes a C-style string argument in a non-coroutine context.
+template<typename Value, typename Props>
+requires(
+    std::same_as<
+        Value,
+        std::string> && !Props::func_is_coro) auto normalize_arg(char const*
+                                                                     arg)
+{
+    Props props{make_normalization_uuid<Value>(), "arg"};
+    return rq_function_erased(
+        std::move(props), identity_func<std::string>, std::string{arg});
+}
+
+// Normalizes a C-style string argument in a coroutine context.
+template<typename Value, typename Props>
+requires(std::same_as<Value, std::string>&&
+             Props::func_is_coro) auto normalize_arg(char const* arg)
+{
+    Props props{make_normalization_uuid<Value>(), "arg"};
+    return rq_function_erased_coro<Value>(
+        std::move(props), identity_coro<std::string>, std::string{arg});
+}
+
+// Normalizes a function_request_erased argument (returned as-is).
+// If a subrequest is passed as argument, its Props must equal those for the
+// main request.
+template<typename Value, typename Props, typename Arg>
+requires std::same_as<function_request_erased<Value, Props>, Arg> auto
+normalize_arg(Arg const& arg)
+{
+    return arg;
 }
 
 } // namespace cradle

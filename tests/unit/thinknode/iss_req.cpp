@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iterator>
 #include <type_traits>
+#include <typeinfo>
 
 #include <cereal/archives/json.hpp>
 #include <cereal/types/string.hpp>
@@ -48,23 +49,31 @@ identity(Value&& value)
     return std::forward<Value>(value);
 }
 
+request_uuid
+make_uuid()
+{
+    static int next_id{};
+    return request_uuid{fmt::format("{}-{}", tag, next_id++)};
+}
+
 // Creates a type-erased, uncached, request for an immediate value in Thinknode
 // context.
-template<typename Value>
+template<caching_level_type Level, typename Value>
 auto
 rq_function_thinknode_value(Value&& value)
 {
-    static int next_id{};
-    request_uuid uuid{fmt::format("{}-value-{}", tag, next_id++)};
-    using props_type = request_props<caching_level_type::none, false, false>;
+    using props_type = thinknode_request_props<Level>;
     return function_request_erased<Value, props_type>(
-        props_type{uuid}, identity<Value>, std::forward<Value>(value));
+        props_type{make_uuid(), "rq_function_thinknode_value"},
+        identity_coro<Value>,
+        std::forward<Value>(value));
 }
 
-static auto
+template<caching_level_type Level>
+auto
 rq_function_thinknode_value(char const* const value)
 {
-    return rq_function_thinknode_value<std::string>(value);
+    return rq_function_thinknode_value<Level, std::string>(value);
 }
 
 template<typename Request>
@@ -121,12 +130,13 @@ template<caching_level_type Level>
 auto
 make_post_iss_request_subreq(std::string payload = "payload")
 {
-    auto make_blob_function
-        = [](std::string const& payload) { return make_blob(payload); };
+    auto make_blob_coro = [](context_intf& ctx, std::string const& payload)
+        -> cppcoro::task<blob> { co_return make_blob(payload); };
     std::string uuid_text{fmt::format("uuid_100_{}", static_cast<int>(Level))};
-    request_props<Level> props{request_uuid(uuid_text)};
-    auto make_blob_request
-        = rq_function_erased(props, make_blob_function, rq_value(payload));
+    thinknode_request_props<Level> props{
+        request_uuid(uuid_text), "make_blob_coro"};
+    auto make_blob_request = rq_function_erased_coro<blob>(
+        props, make_blob_coro, rq_value(payload));
     return rq_post_iss_object<Level>(
         "123",
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
@@ -426,12 +436,11 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - value, fully cached", tag)
 
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - subreq, fully cached", tag)
 {
-    auto arg_request{rq_function_thinknode_value("abc")};
+    constexpr caching_level_type level = caching_level_type::full;
+    auto arg_request{rq_function_thinknode_value<level>("abc")};
     test_retrieve_immutable_object(
-        rq_retrieve_immutable_object<
-            caching_level_type::full,
-            decltype(arg_request)>,
-        rq_function_thinknode_value("abc"));
+        rq_retrieve_immutable_object<level, decltype(arg_request)>,
+        rq_function_thinknode_value<level>("abc"));
 }
 
 TEST_CASE(
@@ -493,4 +502,32 @@ TEST_CASE("Composite request serialization", tag)
         deserialize_function<decltype(req2)>,
         test_request,
         "composite.json");
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT creation - template arg", tag)
+{
+    constexpr caching_level_type level = caching_level_type::full;
+    std::string const context_id{"123"};
+    auto coro = [](context_intf& ctx) -> cppcoro::task<std::string> {
+        co_return std::string{"my_immutable_id}"};
+    };
+    auto req0{rq_retrieve_immutable_object<level>(
+        context_id,
+        rq_function_erased_coro<std::string>(
+            thinknode_request_props<level>{make_uuid(), "arg"}, coro))};
+    // The second argument in req1 will be "normalized" to the same thing
+    // passed to req0.
+    auto req1{
+        rq_retrieve_immutable_object<level>(context_id, "my_immutable_id")};
+
+    REQUIRE(typeid(req0) == typeid(req1));
+    REQUIRE(req0.get_uuid().str() == req1.get_uuid().str());
+
+#if 0
+// TODO support arguments from any request kind
+    auto req2{rq_retrieve_immutable_object<level>(context_id,
+        rq_value(std::string{"my_immutable_id}"}))};
+    REQUIRE(typeid(req0) == typeid(req2));
+    REQUIRE(req0.get_uuid().str() == req2.get_uuid().str());
+#endif
 }

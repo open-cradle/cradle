@@ -49,35 +49,18 @@ register_thinknode_seri_resolvers()
     auto sample_thinknode_info{
         make_thinknode_type_info_with_nil_type(thinknode_nil_type())};
 
-    // Two versions: immutable_id is either a plain string, or a subrequest
+    // Note that all value-or-subrequest arguments are values here, so that
+    // the "normalizing" subrequests also get registered.
+    // A (maybe better) alternative would be to register these subrequests
+    // independently.
     register_tn_resolver(rq_retrieve_immutable_object<level>(
         "sample context id", "sample immutable id"));
-    register_tn_resolver(rq_retrieve_immutable_object<level>(
-        "sample context id",
-        rq_function_thinknode_subreq<level, std::string>()));
-
-    // Two versions: object_id is either a plain blob, or a subrequest
     register_tn_resolver(rq_post_iss_object<level>(
         "sample context id", sample_thinknode_info, blob()));
-    register_tn_resolver(rq_post_iss_object<level>(
-        "sample context id",
-        sample_thinknode_info,
-        rq_function_thinknode_subreq<level, blob>()));
-
-    // Two versions: object_id is either a plain string, or a subrequest
     register_tn_resolver(rq_get_iss_object_metadata<level>(
         "sample context id", "sample object id"));
-    register_tn_resolver(rq_get_iss_object_metadata<level>(
-        "sample context id",
-        rq_function_thinknode_subreq<level, std::string>()));
-
-    // Two versions: object_id is either a plain string, or a subrequest
     register_tn_resolver(rq_resolve_iss_object_to_immutable<level>(
         "sample context id", "sample object id", false));
-    register_tn_resolver(rq_resolve_iss_object_to_immutable<level>(
-        "sample context id",
-        rq_function_thinknode_subreq<level, std::string>(),
-        false));
 }
 
 } // namespace cradle

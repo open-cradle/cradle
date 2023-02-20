@@ -15,7 +15,7 @@ serialize_request(Req const& req)
     std::stringstream os;
     {
         cereal::JSONOutputArchive oarchive(os);
-        // Assumes Req::save() to exist. The official way would be
+        // Assumes Req::save() to exist. The canonical way would be
         //   oarchive(req);
         // but this adds a redundant outer "value0".
         req.save(oarchive);

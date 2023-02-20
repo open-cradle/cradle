@@ -43,9 +43,7 @@ TEST_CASE("request_uuid ctor - bad base", "[uuid]")
 {
     auto matcher = Catch::StartsWith("Invalid character(s) in base uuid ");
     REQUIRE_THROWS_WITH(new request_uuid("b+ase"), matcher);
-    REQUIRE_THROWS_WITH(new request_uuid("b/ase"), matcher);
     REQUIRE_THROWS_WITH(new request_uuid("b+ase", "vers"), matcher);
-    REQUIRE_THROWS_WITH(new request_uuid("b/ase", "vers"), matcher);
 }
 
 TEST_CASE("compare request_id's", "[uuid]")
@@ -59,26 +57,4 @@ TEST_CASE("compare request_id's", "[uuid]")
     REQUIRE(x <= x);
     REQUIRE(y > x);
     REQUIRE(y >= x);
-}
-
-TEST_CASE("combined_uuid - normal", "[uuid]")
-{
-    request_uuid main_uuid{"mbase", "mver"};
-    request_uuid sub_uuid{"sbase", "sver"};
-
-    auto res = combined_uuid(main_uuid, sub_uuid);
-
-    REQUIRE(res.str() == "mbase+mver/sbase+sver");
-    REQUIRE(res.is_real());
-}
-
-TEST_CASE("combined_uuid - no sub", "[uuid]")
-{
-    request_uuid main_uuid{"mbase", "mver"};
-    request_uuid sub_uuid;
-
-    auto res = combined_uuid(main_uuid, sub_uuid);
-
-    REQUIRE(res.str() == "mbase+mver");
-    REQUIRE(res.is_real());
 }

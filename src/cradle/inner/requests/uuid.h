@@ -151,10 +151,6 @@ update_unique_hash(unique_hasher& hasher, request_uuid const& uuid)
     update_unique_hash(hasher, uuid.str());
 }
 
-// Combines the uuid's of a main request and a subrequest
-request_uuid
-combined_uuid(request_uuid const& main_uuid, request_uuid const& sub_uuid);
-
 } // namespace cradle
 
 #endif
