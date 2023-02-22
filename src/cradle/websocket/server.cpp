@@ -51,6 +51,7 @@
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/apm.h>
+#include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/disk_cache_serialization.h>
 #include <cradle/thinknode/domain.h>

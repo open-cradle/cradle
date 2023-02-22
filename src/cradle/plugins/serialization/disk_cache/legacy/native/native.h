@@ -9,9 +9,10 @@
 
 #include <cppcoro/fmap.hpp>
 
-#include <cradle/inner/service/disk_cached.h>
 #include <cradle/inner/service/disk_cached_blob.h>
 #include <cradle/inner/service/resources.h>
+#include <cradle/thinknode/caching.h>
+#include <cradle/thinknode/disk_cached.h>
 #include <cradle/typing/core/dynamic.h>
 #include <cradle/typing/core/type_definitions.h>
 

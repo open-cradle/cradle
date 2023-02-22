@@ -14,6 +14,7 @@
 #include <cradle/plugins/serialization/disk_cache/preferred/cereal/cereal.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/client/registry.h>
+#include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/thinknode/seri_catalog.h>
 #include <cradle/typing/encodings/msgpack.h>

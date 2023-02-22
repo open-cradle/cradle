@@ -68,8 +68,7 @@ target_link_libraries(test_lib_inner PUBLIC
 add_executable(inner_test_runner)
 add_dependencies(inner_test_runner rpclib_server)
 target_sources(inner_test_runner PRIVATE
-    support/inner_service.cpp
-    support/inner_disk_cached.cpp)
+    support/inner_service.cpp)
 target_link_libraries(inner_test_runner PRIVATE
     test_lib_runner
     test_lib_inner)

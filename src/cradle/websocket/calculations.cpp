@@ -19,6 +19,7 @@
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
+#include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/supervisor.h>

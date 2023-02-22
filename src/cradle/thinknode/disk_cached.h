@@ -1,12 +1,11 @@
-#ifndef CRADLE_INNER_SERVICE_DISK_CACHED_H
-#define CRADLE_INNER_SERVICE_DISK_CACHED_H
+#ifndef CRADLE_THINKNODE_DISK_CACHED_H
+#define CRADLE_THINKNODE_DISK_CACHED_H
 
-#include <optional>
+#include <functional>
 
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/core/id.h>
-#include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/service/resources.h>
 
 namespace cradle {

@@ -2,6 +2,7 @@
 #define CRADLE_THINKNODE_CALC_H
 
 #include <cppcoro/async_generator.hpp>
+#include <cppcoro/shared_task.hpp>
 
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/thinknode/context.h>
