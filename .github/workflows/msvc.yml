@@ -67,7 +67,7 @@ jobs:
 
     - name: Install Conan
       run: |
-        pip install conan
+        pip install conan==1.59.0
 
     - name: Download preprocessed headers
       uses: actions/download-artifact@v3
