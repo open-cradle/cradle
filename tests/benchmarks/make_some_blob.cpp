@@ -42,8 +42,7 @@ register_remote_services(std::string const& proxy_name)
         static std::shared_ptr<rpclib_client> rpclib_client;
         if (!rpclib_client)
         {
-            // TODO pass non-default config?
-            rpclib_client = register_rpclib_client(service_config());
+            rpclib_client = register_rpclib_client(make_inner_tests_config());
         }
     }
     else

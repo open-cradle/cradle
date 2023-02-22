@@ -5,6 +5,9 @@
 
 namespace cradle {
 
+service_config
+make_outer_tests_config();
+
 // Initialize a service for unit testing purposes.
 void
 init_test_service(service_config& core);

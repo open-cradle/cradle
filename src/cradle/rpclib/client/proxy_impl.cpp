@@ -92,11 +92,12 @@ call_resolve_sync(
 } // namespace
 
 rpclib_client_impl::rpclib_client_impl(service_config const& config)
-    : port_(RPCLIB_PORT),
-      coro_thread_pool_{cppcoro::static_thread_pool(
-          static_cast<uint32_t>(config.get_number_or_default(
-              rpclib_config_keys::CLIENT_CONCURRENCY, 22)))}
+    : coro_thread_pool_{cppcoro::static_thread_pool(
+        static_cast<uint32_t>(config.get_number_or_default(
+            rpclib_config_keys::CLIENT_CONCURRENCY, 22)))}
 {
+    testing_ = config.get_bool_or_default(generic_config_keys::TESTING, false);
+    port_ = testing_ ? RPCLIB_PORT_TESTING : RPCLIB_PORT_PRODUCTION;
     if (!logger_)
     {
         logger_ = create_logger("rpclib_client");
@@ -227,9 +228,13 @@ rpclib_client_impl::start_server()
     }
     std::string path{get_rpclib_server_path()};
     logger_->info("starting {}", path);
-    // child constructor takes Args&& which is rather inflexible.
-    // Maybe boost::process is not the best choice after all.
-    auto child = boost::process::child(path, "--log-level", "warn", group_);
+    std::vector<std::string> child_args{"--log-level", "warn"};
+    if (testing_)
+    {
+        child_args.push_back("--testing");
+    }
+    auto child = boost::process::child(
+        boost::process::exe = path, boost::process::args = child_args, group_);
     logger_->info("started child process");
     wait_until_server_running();
     child_ = std::move(child);

@@ -8,6 +8,9 @@
 
 namespace cradle {
 
+service_config
+make_inner_tests_config();
+
 void
 init_test_inner_service(inner_resources& resources);
 

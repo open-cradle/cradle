@@ -22,6 +22,7 @@
 #include <cradle/typing/utilities/testing.h>
 
 #include "../support/inner_service.h"
+#include "../support/outer_service.h"
 #include "benchmark_support.h"
 
 using namespace cradle;
@@ -75,8 +76,7 @@ register_remote_services(
         static std::shared_ptr<rpclib_client> rpclib_client;
         if (!rpclib_client)
         {
-            // TODO pass non-default config?
-            rpclib_client = register_rpclib_client(service_config());
+            rpclib_client = register_rpclib_client(make_outer_tests_config());
         }
         // TODO should body be blob or string?
         auto const& body{response.body};

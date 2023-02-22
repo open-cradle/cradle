@@ -31,6 +31,8 @@ struct cli_options
 {
     std::string log_level{"info"};
     bool ignore_env_log_level{false};
+    bool testing{false};
+    rpclib_port_t port{RPCLIB_PORT_PRODUCTION};
 };
 
 static cli_options
@@ -46,7 +48,11 @@ parse_options(int argc, char const* const* argv)
         ("version",
             "show version information")
         ("log-level", po::value<std::string>(),
-            "logging level (SPDLOG_LEVEL format)");
+            "logging level (SPDLOG_LEVEL format)")
+        ("testing",
+            "set testing environment")
+        ("port", po::value<rpclib_port_t>(),
+            "port number");
     // clang-format on
 
     po::variables_map vm;
@@ -73,6 +79,15 @@ parse_options(int argc, char const* const* argv)
         options.log_level = vm["log-level"].as<string>();
         options.ignore_env_log_level = true;
     }
+    if (vm.count("testing"))
+    {
+        options.testing = true;
+        options.port = RPCLIB_PORT_TESTING;
+    }
+    if (vm.count("port"))
+    {
+        options.port = vm["port"].as<rpclib_port_t>();
+    }
 
     return options;
 }
@@ -83,14 +98,21 @@ run_server(cli_options const& options)
     initialize_logging(options.log_level, options.ignore_env_log_level);
     auto my_logger = create_logger("rpclib_server");
 
-    // TODO load the config_map from somewhere
     // Activate the only disk storage plugin we currently have.
-    service_config_map config_map;
     activate_local_disk_cache_plugin();
+
+    // TODO load the config_map from somewhere
+    service_config_map config_map;
     config_map[inner_config_keys::DISK_CACHE_FACTORY]
         = local_disk_cache_config_values::PLUGIN_NAME;
-    config_map[local_disk_cache_config_keys::DIRECTORY] = "server_cache";
-    config_map[blob_cache_config_keys::DIRECTORY] = "server_cache";
+    std::string cache_dir{
+        options.testing ? "server_cache_testing" : "server_cache_production"};
+    config_map[local_disk_cache_config_keys::DIRECTORY] = cache_dir;
+    config_map[blob_cache_config_keys::DIRECTORY] = cache_dir;
+    if (options.testing)
+    {
+        config_map[generic_config_keys::TESTING] = true;
+    }
 
     service_core service;
     service_config config{config_map};
@@ -99,7 +121,7 @@ run_server(cli_options const& options)
 
     register_and_initialize_all_domains();
 
-    rpc::server srv(RPCLIB_PORT);
+    rpc::server srv(options.port);
     my_logger->info("listening on port {}", srv.port());
 
     // TODO we need a session concept and a "start session" / "register"
@@ -111,9 +133,13 @@ run_server(cli_options const& options)
             return cppcoro::sync_wait(
                 handle_resolve_sync(hctx, domain_name, seri_req));
         });
-    srv.bind("mock_http", [&](std::string const& body) {
-        return cppcoro::sync_wait(handle_mock_http(hctx, body));
-    });
+    if (options.testing)
+    {
+        // No mocking in production server
+        srv.bind("mock_http", [&](std::string const& body) {
+            return cppcoro::sync_wait(handle_mock_http(hctx, body));
+        });
+    }
     srv.bind("ack_response", [&](int response_id) {
         return cppcoro::sync_wait(handle_ack_response(hctx, response_id));
     });

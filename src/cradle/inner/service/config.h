@@ -106,6 +106,14 @@ class service_config
     get_value_or_default(std::string const& key, T const& default_value) const;
 };
 
+// Generic configuration keys
+struct generic_config_keys
+{
+    // (Optional boolean)
+    // true in testing (non-production) context
+    inline static std::string const TESTING{"testing"};
+};
+
 } // namespace cradle
 
 #endif
