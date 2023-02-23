@@ -1,12 +1,12 @@
-#ifndef CRADLE_PLUGINS_DISK_CACHE_STORAGE_LOCAL_LOCAL_DISK_CACHE_H
-#define CRADLE_PLUGINS_DISK_CACHE_STORAGE_LOCAL_LOCAL_DISK_CACHE_H
+#ifndef CRADLE_PLUGINS_SECONDARY_CACHE_LOCAL_LOCAL_DISK_CACHE_H
+#define CRADLE_PLUGINS_SECONDARY_CACHE_LOCAL_LOCAL_DISK_CACHE_H
 
 #include <cppcoro/static_thread_pool.hpp>
 #include <thread-pool/thread_pool.hpp>
 
+#include <cradle/inner/caching/secondary_cache_intf.h>
 #include <cradle/inner/service/config.h>
-#include <cradle/inner/service/disk_cache_intf.h>
-#include <cradle/plugins/disk_cache/storage/local/ll_disk_cache.h>
+#include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
 
 namespace cradle {
 
@@ -30,22 +30,23 @@ struct local_disk_cache_config_keys
 
 struct local_disk_cache_config_values
 {
-    // Value for the inner_config_keys::DISK_CACHE_FACTORY config
+    // Value for the inner_config_keys::SECONDARY_CACHE_FACTORY config
     inline static std::string const PLUGIN_NAME{"local_disk_cache"};
 };
 
-class local_disk_cache : public disk_cache_intf
+class local_disk_cache : public secondary_cache_intf
 {
  public:
     local_disk_cache(service_config const& config);
 
-    cppcoro::task<blob>
-    disk_cached_blob(
-        captured_id key,
-        std::function<cppcoro::task<blob>()> create_task) override;
-
     void
     reset(service_config const& config) override;
+
+    cppcoro::task<blob>
+    read(std::string key) override;
+
+    cppcoro::task<void>
+    write(std::string key, blob value) override;
 
     ll_disk_cache&
     get_ll_disk_cache()

@@ -1,27 +1,27 @@
 #include <map>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
+#include <cradle/inner/caching/secondary_cache_intf.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/fs/types.h>
-#include <cradle/inner/service/disk_cache_intf.h>
 #include <cradle/inner/service/resources.h>
 
 namespace cradle {
 
-static std::map<std::string, std::unique_ptr<disk_cache_factory>>
-    disk_cache_factories;
+static std::map<std::string, std::unique_ptr<secondary_cache_factory>>
+    secondary_cache_factories;
 
 void
-register_disk_cache_factory(
-    std::string const& key, std::unique_ptr<disk_cache_factory> factory)
+register_secondary_cache_factory(
+    std::string const& key, std::unique_ptr<secondary_cache_factory> factory)
 {
-    disk_cache_factories.emplace(key, std::move(factory));
+    secondary_cache_factories.emplace(key, std::move(factory));
 }
 
 static immutable_cache_config
@@ -36,7 +36,7 @@ void
 inner_resources::inner_initialize(service_config const& config)
 {
     create_memory_cache(config);
-    create_disk_cache(config);
+    create_secondary_cache(config);
     blob_dir_ = std::make_unique<blob_file_directory>(config);
 }
 
@@ -48,18 +48,17 @@ inner_resources::create_memory_cache(service_config const& config)
 }
 
 void
-inner_resources::create_disk_cache(service_config const& config)
+inner_resources::create_secondary_cache(service_config const& config)
 {
-    auto key
-        = config.get_mandatory_string(inner_config_keys::DISK_CACHE_FACTORY);
-    auto factory = disk_cache_factories.find(key);
-    if (factory == disk_cache_factories.end())
+    auto key = config.get_mandatory_string(
+        inner_config_keys::SECONDARY_CACHE_FACTORY);
+    auto factory = secondary_cache_factories.find(key);
+    if (factory == secondary_cache_factories.end())
     {
-        std::ostringstream os;
-        os << "No disk cache factory \"" << key << "\"";
-        throw config_error(os.str());
+        throw config_error{
+            fmt::format("No secondary cache factory \"{}\"", key)};
     }
-    disk_cache_ = factory->second->create(config);
+    secondary_cache_ = factory->second->create(config);
 }
 
 void
@@ -76,9 +75,9 @@ inner_resources::inner_reset_memory_cache(service_config const& config)
 }
 
 void
-inner_resources::inner_reset_disk_cache(service_config const& config)
+inner_resources::inner_reset_secondary_cache(service_config const& config)
 {
-    disk_cache_->reset(config);
+    secondary_cache_->reset(config);
 }
 
 std::shared_ptr<blob_file_writer>

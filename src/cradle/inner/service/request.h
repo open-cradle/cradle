@@ -10,42 +10,42 @@
 
 #include <cradle/inner/caching/immutable.h>
 #include <cradle/inner/caching/immutable/cache.h>
+#include <cradle/inner/caching/secondary_cache_intf.h>
+#include <cradle/inner/caching/secondary_cache_serialization.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/disk_cache_intf.h>
-#include <cradle/inner/service/disk_cache_serialization.h>
-#include <cradle/inner/service/disk_cached_blob.h>
 #include <cradle/inner/service/remote.h>
 #include <cradle/inner/service/resources.h>
+#include <cradle/inner/service/secondary_cached_blob.h>
 
 namespace cradle {
 
-// Resolves a memory-cached request using some sort of disk cache.
-// A memory-cached request needs no disk cache, so it can be resolved
+// Resolves a memory-cached request using some sort of secondary cache.
+// A memory-cached request needs no secondary cache, so it can be resolved
 // right away (by calling the request's function).
 template<typename Ctx, MemoryCachedRequest Req>
 requires ContextMatchingRequest<Ctx, Req>
     cppcoro::task<typename Req::value_type>
-    resolve_disk_cached(Ctx& ctx, Req const& req)
+    resolve_secondary_cached(Ctx& ctx, Req const& req)
 {
     return req.resolve(ctx);
 }
 
-// Resolves a fully-cached request using some sort of disk cache, and some
+// Resolves a fully-cached request using some sort of secondary cache, and some
 // sort of serialization.
 template<typename Ctx, FullyCachedRequest Req>
 requires ContextMatchingRequest<Ctx, Req>
     cppcoro::task<typename Req::value_type>
-    resolve_disk_cached(Ctx& ctx, Req const& req)
+    resolve_secondary_cached(Ctx& ctx, Req const& req)
 {
     using Value = typename Req::value_type;
     inner_resources& resources{ctx.get_resources()};
     captured_id const& key{req.get_captured_id()};
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
-        co_return serialize_disk_cache_value(co_await req.resolve(ctx));
+        co_return serialize_secondary_cache_value(co_await req.resolve(ctx));
     };
-    co_return deserialize_disk_cache_value<Value>(
-        co_await disk_cached_blob(resources, key, create_blob_task));
+    co_return deserialize_secondary_cache_value<Value>(
+        co_await secondary_cached_blob(resources, key, create_blob_task));
 }
 
 // This function, being a coroutine, takes key by value.
@@ -62,7 +62,7 @@ requires ContextMatchingRequest<Ctx, Req>
     // cache and key could be retrieved from ctx and req, respectively.
     try
     {
-        auto value = co_await resolve_disk_cached(ctx, req);
+        auto value = co_await resolve_secondary_cached(ctx, req);
         record_immutable_cache_value(cache, *key, deep_sizeof(value));
         co_return value;
     }

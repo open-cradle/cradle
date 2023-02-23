@@ -1,5 +1,5 @@
-#ifndef CRADLE_THINKNODE_DISK_CACHED_H
-#define CRADLE_THINKNODE_DISK_CACHED_H
+#ifndef CRADLE_THINKNODE_SECONDARY_CACHED_H
+#define CRADLE_THINKNODE_SECONDARY_CACHED_H
 
 #include <functional>
 
@@ -10,14 +10,14 @@
 
 namespace cradle {
 
-// Resolves an "old-style" request (a fully_cached() call), using the disk
+// Resolves an "old-style" request (a fully_cached() call), using the secondary
 // cache provided by the given resources, and some sort of serialization.
 // CRADLE inner only declares this template function; a plugin should
 // provide its definition.
 // This could be a coroutine.
 template<typename Value>
 cppcoro::task<Value>
-disk_cached(
+secondary_cached(
     inner_resources& resources,
     captured_id key,
     std::function<cppcoro::task<Value>()> create_task);

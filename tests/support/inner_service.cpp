@@ -3,8 +3,8 @@
 #include <cradle/inner/fs/utilities.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache_plugin.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache_plugin.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/client/registry.h>
 
@@ -14,7 +14,7 @@ static std::string tests_cache_dir{"tests_cache"};
 static service_config_map const inner_config_map{
     {generic_config_keys::TESTING, true},
     {inner_config_keys::MEMORY_CACHE_UNUSED_SIZE_LIMIT, 0x40'00'00'00U},
-    {inner_config_keys::DISK_CACHE_FACTORY,
+    {inner_config_keys::SECONDARY_CACHE_FACTORY,
      local_disk_cache_config_values::PLUGIN_NAME},
     {local_disk_cache_config_keys::DIRECTORY, tests_cache_dir},
     {local_disk_cache_config_keys::SIZE_LIMIT, 0x40'00'00'00U},
@@ -40,7 +40,7 @@ init_test_inner_service(inner_resources& resources)
 void
 inner_reset_disk_cache(inner_resources& resources)
 {
-    resources.inner_reset_disk_cache(make_inner_tests_config());
+    resources.inner_reset_secondary_cache(make_inner_tests_config());
 }
 
 cached_request_resolution_context::cached_request_resolution_context()

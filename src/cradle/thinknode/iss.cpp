@@ -9,7 +9,7 @@
 #include <cradle/inner/utilities/text.h>
 #include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/calc.h>
-#include <cradle/thinknode/disk_cache_serialization.h>
+#include <cradle/thinknode/secondary_cache_serialization.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/encodings/msgpack.h>
 #include <cradle/typing/io/http_requests.hpp>

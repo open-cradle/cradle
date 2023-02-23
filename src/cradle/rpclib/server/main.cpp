@@ -18,9 +18,9 @@
 #include <cradle/inner/encodings/msgpack_adaptors_rpclib.h>
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/utilities/logging.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache_plugin.h>
 #include <cradle/plugins/domain/all/all_domains.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache_plugin.h>
 #include <cradle/rpclib/common/common.h>
 #include <cradle/rpclib/server/handlers.h>
 #include <cradle/typing/service/core.h>
@@ -103,7 +103,7 @@ run_server(cli_options const& options)
 
     // TODO load the config_map from somewhere
     service_config_map config_map;
-    config_map[inner_config_keys::DISK_CACHE_FACTORY]
+    config_map[inner_config_keys::SECONDARY_CACHE_FACTORY]
         = local_disk_cache_config_values::PLUGIN_NAME;
     std::string cache_dir{
         options.testing ? "server_cache_testing" : "server_cache_production"};

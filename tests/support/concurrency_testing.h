@@ -8,7 +8,7 @@
 #include <utility>
 
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 
 namespace cradle {
 
@@ -52,7 +52,8 @@ inline void
 sync_wait_write_disk_cache(inner_resources& service)
 {
     auto& write_pool
-        = static_cast<local_disk_cache&>(service.disk_cache()).write_pool();
+        = static_cast<local_disk_cache&>(service.secondary_cache())
+              .write_pool();
 
     if (!occurs_soon([&] { return write_pool.get_tasks_total() == 0; }))
     {

@@ -10,7 +10,7 @@
 #include "../../support/request.h"
 #include <cradle/inner/service/request.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/serialization/disk_cache/preferred/cereal/cereal.h>
+#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 
 using namespace cradle;
 
@@ -423,7 +423,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     auto add{create_adder(num_add_calls)};
     cached_request_resolution_context ctx{};
     auto& ll_cache
-        = static_cast<local_disk_cache&>(ctx.get_resources().disk_cache())
+        = static_cast<local_disk_cache&>(ctx.get_resources().secondary_cache())
               .get_ll_disk_cache();
     std::vector<Req> requests;
     for (int i = 0; i < num_requests; ++i)

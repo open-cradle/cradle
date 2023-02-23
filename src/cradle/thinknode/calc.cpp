@@ -6,8 +6,8 @@
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
 #include <cradle/thinknode/caching.h>
-#include <cradle/thinknode/disk_cache_serialization.h>
 #include <cradle/thinknode/iss.h>
+#include <cradle/thinknode/secondary_cache_serialization.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/unique_hash.h>
 #include <cradle/typing/encodings/json.h>

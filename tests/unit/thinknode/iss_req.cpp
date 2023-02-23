@@ -21,7 +21,7 @@
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/service/request.h>
-#include <cradle/plugins/serialization/disk_cache/preferred/cereal/cereal.h>
+#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/typing/io/mock_http.h>
 #include <cradle/typing/service/core.h>

@@ -3,7 +3,7 @@
 #include "test_session.h"
 #include <cradle/external/external_api_testing.h>
 #include <cradle/external_api.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache_plugin.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache_plugin.h>
 
 using namespace cradle;
 

@@ -7,8 +7,8 @@
 #include <cradle/inner/service/config_map_json.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/utilities/logging.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache_plugin.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache_plugin.h>
 #include <cradle/version_info.h>
 
 using namespace cradle;
@@ -82,7 +82,7 @@ try
 
     // Activate the only disk storage plugin we currently have.
     activate_local_disk_cache_plugin();
-    config_map[inner_config_keys::DISK_CACHE_FACTORY]
+    config_map[inner_config_keys::SECONDARY_CACHE_FACTORY]
         = local_disk_cache_config_values::PLUGIN_NAME;
 
     service_config config{config_map};

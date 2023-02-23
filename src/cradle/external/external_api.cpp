@@ -3,7 +3,7 @@
 #include <cradle/external/external_api_impl.h>
 #include <cradle/external_api.h>
 #include <cradle/inner/service/config_map_json.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/iam.h>
 #include <cradle/thinknode/iss.h>
@@ -49,7 +49,7 @@ api_service_impl::api_service_impl(std::string json_text)
 {
     service_config_map config_map{
         read_config_map_from_json(std::move(json_text))};
-    config_map[inner_config_keys::DISK_CACHE_FACTORY]
+    config_map[inner_config_keys::SECONDARY_CACHE_FACTORY]
         = local_disk_cache_config_values::PLUGIN_NAME;
     service_config config{config_map};
     service_core_.initialize(config);

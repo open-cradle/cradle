@@ -46,18 +46,18 @@
 #include <cradle/inner/utilities/functional.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/inner/utilities/text.h>
-#include <cradle/plugins/disk_cache/storage/local/ll_disk_cache.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
+#include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/apm.h>
 #include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/calc.h>
-#include <cradle/thinknode/disk_cache_serialization.h>
 #include <cradle/thinknode/domain.h>
 #include <cradle/thinknode/iam.h>
 #include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/iss_req.h>
+#include <cradle/thinknode/secondary_cache_serialization.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/fmt_format.h>
 #include <cradle/typing/core/unique_hash.h>
@@ -1496,7 +1496,7 @@ process_message(websocket_server_impl& server, client_request request)
         case client_message_content_tag::CACHE_INSERT: {
             auto const& insertion = as_cache_insert(content);
             auto& ll_disk_cache{
-                static_cast<local_disk_cache&>(server.core.disk_cache())
+                static_cast<local_disk_cache&>(server.core.secondary_cache())
                     .get_ll_disk_cache()};
             ll_disk_cache.insert(insertion.key, insertion.value);
             send_response(
@@ -1509,7 +1509,7 @@ process_message(websocket_server_impl& server, client_request request)
         case client_message_content_tag::CACHE_QUERY: {
             auto const& key = as_cache_query(content);
             auto& ll_disk_cache{
-                static_cast<local_disk_cache&>(server.core.disk_cache())
+                static_cast<local_disk_cache&>(server.core.secondary_cache())
                     .get_ll_disk_cache()};
             auto entry = ll_disk_cache.find(key);
             send_response(

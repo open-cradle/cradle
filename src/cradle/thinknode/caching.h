@@ -10,7 +10,7 @@
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/thinknode/disk_cached.h>
+#include <cradle/thinknode/secondary_cached.h>
 
 namespace cradle {
 
@@ -75,7 +75,7 @@ fully_cached(
     // id_interface object, but this has not always been so.
     return cached<Value>(
         resources, key, [&resources, task_creator](captured_id const& key1) {
-            return disk_cached<Value>(
+            return secondary_cached<Value>(
                 resources, key1, std::move(task_creator));
         });
 }

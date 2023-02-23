@@ -15,16 +15,15 @@
 #include <boost/crc.hpp>
 #endif
 
-#include <cradle/inner/core/get_unique_string.h>
+#include <cradle/inner/caching/secondary_cache_intf.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/encodings/lz4.h>
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/fs/types.h>
-#include <cradle/inner/service/disk_cache_intf.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 
 namespace cradle {
 
@@ -79,13 +78,10 @@ local_disk_cache::reset(service_config const& config)
     ll_cache_.reset(make_ll_disk_cache_config(config));
 }
 
-// This is a coroutine so takes id_key by value.
+// This is a coroutine so takes key by value.
 cppcoro::task<blob>
-local_disk_cache::disk_cached_blob(
-    captured_id id_key, std::function<cppcoro::task<blob>()> create_task)
+local_disk_cache::read(std::string key)
 {
-    std::string key{get_unique_string(*id_key)};
-    // Check the cache for an existing value.
     try
     {
         auto entry = ll_cache_.find(key);
@@ -135,27 +131,27 @@ local_disk_cache::disk_cached_blob(
         spdlog::get("cradle")->warn("error reading disk cache entry {}", key);
     }
     spdlog::get("cradle")->debug("disk cache miss on {}", key);
+    co_return blob{};
+}
 
-    // We didn't get it from the cache, so actually create the task to compute
-    // the result.
-    auto result = co_await create_task();
-
-    // Cache the result.
-    write_pool_.push_task([&ll_cache = ll_cache_, key, result] {
+cppcoro::task<void>
+local_disk_cache::write(std::string key, blob value)
+{
+    write_pool_.push_task([&ll_cache = ll_cache_, key, value] {
         try
         {
-            if (result.size() > 1024)
+            if (value.size() > 1024)
             {
                 size_t max_compressed_size
-                    = lz4::max_compressed_size(result.size());
+                    = lz4::max_compressed_size(value.size());
 
                 std::unique_ptr<uint8_t[]> compressed_data(
                     new uint8_t[max_compressed_size]);
                 size_t actual_compressed_size = lz4::compress(
                     compressed_data.get(),
                     max_compressed_size,
-                    result.data(),
-                    result.size());
+                    value.data(),
+                    value.size());
 
                 auto cache_id = ll_cache.initiate_insert(key);
                 {
@@ -170,17 +166,16 @@ local_disk_cache::disk_cached_blob(
                         actual_compressed_size);
                 }
                 boost::crc_32_type crc;
-                crc.process_bytes(result.data(), result.size());
-                ll_cache.finish_insert(
-                    cache_id, crc.checksum(), result.size());
+                crc.process_bytes(value.data(), value.size());
+                ll_cache.finish_insert(cache_id, crc.checksum(), value.size());
             }
             else
             {
                 ll_cache.insert(
                     key,
                     base64_encode(
-                        reinterpret_cast<uint8_t const*>(result.data()),
-                        result.size(),
+                        reinterpret_cast<uint8_t const*>(value.data()),
+                        value.size(),
                         get_mime_base64_character_set()));
             }
         }
@@ -194,7 +189,7 @@ local_disk_cache::disk_cached_blob(
         }
     });
 
-    co_return result;
+    co_return;
 }
 
 } // namespace cradle

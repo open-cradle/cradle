@@ -1,4 +1,4 @@
-#include <cradle/plugins/disk_cache/storage/local/ll_disk_cache.h>
+#include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
 
 #include <chrono>
 #include <filesystem>

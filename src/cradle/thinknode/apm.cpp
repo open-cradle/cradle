@@ -2,7 +2,7 @@
 
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/thinknode/caching.h>
-#include <cradle/thinknode/disk_cache_serialization.h>
+#include <cradle/thinknode/secondary_cache_serialization.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/io/http_requests.hpp>
 

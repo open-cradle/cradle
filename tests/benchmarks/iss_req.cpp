@@ -11,7 +11,7 @@
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/service/request.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/serialization/disk_cache/preferred/cereal/cereal.h>
+#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/caching.h>

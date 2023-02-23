@@ -10,7 +10,6 @@
 #include <cradle/inner/introspection/tasklet_impl.h>
 #include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/service/resources.h>
-//#include <cradle/plugins/disk_cache/serialization/native/native.h>
 
 using namespace cradle;
 
