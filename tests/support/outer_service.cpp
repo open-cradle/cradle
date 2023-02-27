@@ -17,9 +17,7 @@ static service_config_map const outer_config_map{
      local_disk_cache_config_values::PLUGIN_NAME},
     {local_disk_cache_config_keys::DIRECTORY, tests_cache_dir},
     {local_disk_cache_config_keys::SIZE_LIMIT, 0x40'00'00'00U},
-    {typing_config_keys::REQUEST_CONCURRENCY, 2U},
-    {typing_config_keys::COMPUTE_CONCURRENCY, 2U},
-    {typing_config_keys::HTTP_CONCURRENCY, 2U}};
+    {inner_config_keys::HTTP_CONCURRENCY, 2U}};
 
 service_config
 make_outer_tests_config()

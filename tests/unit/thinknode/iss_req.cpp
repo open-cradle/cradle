@@ -18,12 +18,12 @@
 #include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/introspection/tasklet_info.h>
+#include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/service/request.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
-#include <cradle/typing/io/mock_http.h>
 #include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
@@ -227,7 +227,7 @@ test_post_iss_requests_parallel(
     if constexpr (level >= caching_level_type::full)
     {
         sync_wait_write_disk_cache(service);
-        service.inner_reset_memory_cache();
+        service.reset_memory_cache();
 
         // Resolve using disk cache
         auto res2 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
@@ -400,7 +400,7 @@ test_retrieve_immutable_object_parallel(
     if constexpr (level >= caching_level_type::full)
     {
         sync_wait_write_disk_cache(service);
-        service.inner_reset_memory_cache();
+        service.reset_memory_cache();
 
         // Resolve using disk cache
         auto res2 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));

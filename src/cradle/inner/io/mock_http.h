@@ -1,10 +1,10 @@
-#ifndef CRADLE_TYPING_IO_MOCK_HTTP_H
-#define CRADLE_TYPING_IO_MOCK_HTTP_H
+#ifndef CRADLE_INNER_IO_MOCK_HTTP_H
+#define CRADLE_INNER_IO_MOCK_HTTP_H
 
 #include <memory>
 #include <mutex>
 
-#include <cradle/typing/io/http_requests.hpp>
+#include <cradle/inner/io/http_requests.h>
 
 namespace cradle {
 

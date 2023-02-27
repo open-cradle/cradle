@@ -9,7 +9,7 @@
 namespace cradle {
 
 struct immutable_cache;
-struct service_core;
+class service_core;
 class tasklet_tracker;
 
 struct thinknode_request_context : public cached_introspective_context_intf,

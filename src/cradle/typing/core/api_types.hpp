@@ -1,8 +1,8 @@
 #ifndef CRADLE_TYPING_API_TYPES_HPP
 #define CRADLE_TYPING_API_TYPES_HPP
 
+#include <cradle/inner/core/monitoring.h>
 #include <cradle/typing/core/flags.h>
-#include <cradle/typing/core/monitoring.h>
 #include <cradle/typing/core/type_definitions.h>
 #include <cradle/typing/core/upgrades.hpp>
 

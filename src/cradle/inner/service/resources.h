@@ -11,9 +11,14 @@
 #include <cradle/inner/blob_file/blob_file_dir.h>
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/caching/secondary_cache_intf.h>
+#include <cradle/inner/introspection/tasklet.h>
+#include <cradle/inner/io/http_requests.h>
 #include <cradle/inner/service/config.h>
 
 namespace cradle {
+
+class inner_resources;
+class inner_resources_impl;
 
 // Configuration keys for the inner resources
 struct inner_config_keys
@@ -30,6 +35,10 @@ struct inner_config_keys
     // register_secondary_cache_factory().
     inline static std::string const SECONDARY_CACHE_FACTORY{
         "secondary_cache/factory"};
+
+    // (Optional integer)
+    // How many concurrent threads to use for HTTP requests
+    inline static std::string const HTTP_CONCURRENCY{"http_concurrency"};
 };
 
 // Factory of secondary_cache_intf objects.
@@ -40,7 +49,7 @@ class secondary_cache_factory
     virtual ~secondary_cache_factory() = default;
 
     virtual std::unique_ptr<secondary_cache_intf>
-    create(service_config const& config) = 0;
+    create(inner_resources& resources, service_config const& config) = 0;
 };
 
 // Registers a secondary cache factory, identified by a key.
@@ -53,48 +62,60 @@ class inner_resources
 {
  public:
     // Creates an object that needs an inner_initialize() call
-    inner_resources() = default;
+    inner_resources();
 
-    virtual ~inner_resources() = default;
+    virtual ~inner_resources();
 
     void
     inner_initialize(service_config const& config);
 
     void
-    inner_reset_memory_cache();
+    reset_memory_cache();
 
     void
-    inner_reset_memory_cache(service_config const& config);
+    reset_memory_cache(service_config const& config);
 
     void
-    inner_reset_secondary_cache(service_config const& config);
+    reset_secondary_cache(service_config const& config);
 
     cradle::immutable_cache&
-    memory_cache()
-    {
-        return *memory_cache_;
-    }
+    memory_cache();
 
     secondary_cache_intf&
-    secondary_cache()
-    {
-        return *secondary_cache_;
-    }
+    secondary_cache();
 
     std::shared_ptr<blob_file_writer>
     make_blob_file_writer(std::size_t size);
 
+    inner_resources_impl&
+    impl()
+    {
+        return *impl_;
+    }
+
  private:
-    std::unique_ptr<cradle::immutable_cache> memory_cache_;
-    std::unique_ptr<secondary_cache_intf> secondary_cache_;
-    std::unique_ptr<blob_file_directory> blob_dir_;
-
-    void
-    create_memory_cache(service_config const& config);
-
-    void
-    create_secondary_cache(service_config const& config);
+    std::unique_ptr<inner_resources_impl> impl_;
 };
+
+http_connection_interface&
+http_connection_for_thread(inner_resources& resources);
+
+cppcoro::task<http_response>
+async_http_request(
+    inner_resources& resources,
+    http_request request,
+    tasklet_tracker* client = nullptr);
+
+// Initialize a service for unit testing purposes.
+void
+init_test_service(inner_resources& resources);
+
+// Set up HTTP mocking for a service.
+// This returns the mock_http_session that's been associated with the service.
+struct mock_http_session;
+mock_http_session&
+enable_http_mocking(
+    inner_resources& resources, bool http_is_synchronous = false);
 
 } // namespace cradle
 

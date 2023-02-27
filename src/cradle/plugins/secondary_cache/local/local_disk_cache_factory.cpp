@@ -5,7 +5,8 @@
 namespace cradle {
 
 std::unique_ptr<secondary_cache_intf>
-local_disk_cache_factory::create(service_config const& config)
+local_disk_cache_factory::create(
+    inner_resources& resources, service_config const& config)
 {
     return std::make_unique<local_disk_cache>(config);
 }

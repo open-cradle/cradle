@@ -5,6 +5,7 @@
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/fmt_format.h>
+#include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/requests/domain.h>
 #include <cradle/inner/service/seri_req.h>
 #include <cradle/rpclib/server/handlers.h>

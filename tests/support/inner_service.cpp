@@ -38,9 +38,9 @@ init_test_inner_service(inner_resources& resources)
 }
 
 void
-inner_reset_disk_cache(inner_resources& resources)
+reset_disk_cache(inner_resources& resources)
 {
-    resources.inner_reset_secondary_cache(make_inner_tests_config());
+    resources.reset_secondary_cache(make_inner_tests_config());
 }
 
 cached_request_resolution_context::cached_request_resolution_context()
@@ -51,7 +51,7 @@ cached_request_resolution_context::cached_request_resolution_context()
 void
 cached_request_resolution_context::reset_memory_cache()
 {
-    resources.inner_reset_memory_cache(make_inner_tests_config());
+    resources.reset_memory_cache(make_inner_tests_config());
 }
 
 void

@@ -4,9 +4,9 @@
 
 #include <cradle/typing/utilities/testing.h>
 
+#include <cradle/inner/core/monitoring.h>
 #include <cradle/inner/utilities/environment.h>
 #include <cradle/inner/utilities/errors.h>
-#include <cradle/typing/core/monitoring.h>
 #include <cradle/typing/encodings/json.h>
 
 // Include this again to clean up preprocessor definitions.

@@ -35,9 +35,7 @@ get_local_compute_pool_for_image(
     service_core& service,
     std::pair<std::string, thinknode_provider_image_info> const& tag)
 {
-    return service.internals()
-        .local_compute_pool.try_emplace(tag, 4)
-        .first->second;
+    return service.get_local_compute_pool_for_image(tag);
 }
 
 namespace uncached {

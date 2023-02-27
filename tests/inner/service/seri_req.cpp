@@ -17,9 +17,9 @@ static void
 test_resolve(bool remotely)
 {
     register_testing_seri_resolvers();
-    inner_resources service;
-    init_test_inner_service(service);
-    testing_request_context ctx{service, nullptr, remotely};
+    inner_resources resources;
+    init_test_inner_service(resources);
+    testing_request_context ctx{resources, nullptr, remotely};
     if (remotely)
     {
         ensure_loopback_service();

@@ -1,4 +1,4 @@
-#include <cradle/typing/io/mock_http.h>
+#include <cradle/inner/io/mock_http.h>
 
 #include <cradle/inner/utilities/errors.h>
 

@@ -7,6 +7,7 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
+#include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/service/request.h>
@@ -18,7 +19,6 @@
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/thinknode/seri_catalog.h>
 #include <cradle/typing/encodings/msgpack.h>
-#include <cradle/typing/io/mock_http.h>
 #include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
@@ -158,11 +158,11 @@ BM_try_resolve_thinknode_request(
                     }
                     if constexpr (need_empty_memory_cache)
                     {
-                        service.inner_reset_memory_cache();
+                        service.reset_memory_cache();
                     }
                     if constexpr (need_empty_disk_cache)
                     {
-                        inner_reset_disk_cache(service);
+                        reset_disk_cache(service);
                     }
                     if constexpr (pause_timing)
                     {

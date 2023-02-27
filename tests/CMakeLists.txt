@@ -66,7 +66,6 @@ target_link_libraries(test_lib_inner PUBLIC
 
 # Add the inner test runner.
 add_executable(inner_test_runner)
-add_dependencies(inner_test_runner rpclib_server)
 target_sources(inner_test_runner PRIVATE
     support/inner_service.cpp)
 target_link_libraries(inner_test_runner PRIVATE
@@ -78,6 +77,7 @@ add_custom_target(
     inner_tests
     COMMAND $<TARGET_FILE:inner_test_runner>
     DEPENDS inner_test_runner)
+add_dependencies(inner_tests rpclib_server)
 add_test(
     NAME inner_tests
     COMMAND ${CMAKE_COMMAND}
@@ -144,7 +144,6 @@ add_test(
 
 # Add a runner covering all unit tests (including external and inner).
 add_executable(all_unit_tests_runner)
-add_dependencies(all_unit_tests_runner rpclib_server)
 target_sources(all_unit_tests_runner PRIVATE
     support/inner_service.cpp
     support/outer_service.cpp
@@ -169,6 +168,7 @@ add_custom_target(
     COMMAND ${CMAKE_COMMAND} -E chdir all-unit-testing ${CMAKE_COMMAND} -E env CRADLE_DEPLOY_DIR=${CMAKE_CURRENT_BINARY_DIR}/deploy CRADLE_THINKNODE_API_TOKEN=${API_TOKEN} CRADLE_THINKNODE_DOCKER_AUTH=${DOCKER_AUTH} $<TARGET_FILE:all_unit_tests_runner>
     WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
     DEPENDS all_unit_tests_runner)
+add_dependencies(all_unit_tests rpclib_server)
 add_test(
     NAME all_unit_tests
     COMMAND ${CMAKE_COMMAND}
@@ -204,7 +204,6 @@ target_link_libraries(test_lib_benchmark PUBLIC
     benchmark::benchmark)
 
 add_executable(benchmark_test_runner)
-add_dependencies(benchmark_test_runner rpclib_server)
 target_sources(benchmark_test_runner PRIVATE
     support/inner_service.cpp 
     support/outer_service.cpp)
@@ -217,6 +216,7 @@ add_custom_target(
     benchmark_tests
     COMMAND $<TARGET_FILE:benchmark_test_runner>
     DEPENDS benchmark_test_runner)
+add_dependencies(benchmark_tests rpclib_server)
 add_test(
     NAME benchmark_tests
     COMMAND ${CMAKE_COMMAND}

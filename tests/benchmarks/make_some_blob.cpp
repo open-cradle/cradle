@@ -57,10 +57,10 @@ void
 BM_try_resolve_testing_request(
     benchmark::State& state, Req const& req, std::string const& proxy_name)
 {
-    inner_resources service;
-    init_test_inner_service(service);
+    inner_resources resources;
+    init_test_inner_service(resources);
     bool remotely = proxy_name.size() > 0;
-    testing_request_context ctx{service, nullptr, remotely};
+    testing_request_context ctx{resources, nullptr, remotely};
     if (remotely)
     {
         register_remote_services(proxy_name);
@@ -74,7 +74,7 @@ BM_try_resolve_testing_request(
             benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
             if constexpr (caching_level == caching_level_type::full)
             {
-                sync_wait_write_disk_cache(service);
+                sync_wait_write_disk_cache(resources);
             }
         }
         co_return;
@@ -107,11 +107,11 @@ BM_try_resolve_testing_request(
                     }
                     if constexpr (need_empty_memory_cache)
                     {
-                        service.inner_reset_memory_cache();
+                        resources.reset_memory_cache();
                     }
                     if constexpr (need_empty_disk_cache)
                     {
-                        inner_reset_disk_cache(service);
+                        reset_disk_cache(resources);
                     }
                     if constexpr (pause_timing)
                     {
@@ -198,7 +198,7 @@ BENCHMARK(BM_resolve_make_some_blob<caching_level_type::memory, false>)
 #if 0
 /*
 Current problems with benchmarking disk caching:
-(a) The disk cache should be cleared between runs, but inner_reset_disk_cache() does not do that.
+(a) The disk cache should be cleared between runs, but reset_disk_cache() does not do that.
 (b) A race condition: issue #231.
 */
 BENCHMARK(BM_resolve_make_some_blob<caching_level_type::full, true>)

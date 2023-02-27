@@ -6,6 +6,7 @@
 #include <picosha2.h>
 
 #include <cradle/inner/core/sha256_hash_id.h>
+#include <cradle/inner/utilities/for_async.h>
 #include <cradle/inner/utilities/text.h>
 #include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/calc.h>

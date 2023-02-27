@@ -22,7 +22,7 @@ class domain
     name() const = 0;
 
     virtual std::shared_ptr<context_intf>
-    make_local_context(inner_resources& service) = 0;
+    make_local_context(inner_resources& resources) = 0;
 };
 
 void

@@ -38,6 +38,7 @@
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/introspection/tasklet.h>
+#include <cradle/inner/io/http_requests.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/service/request.h>
@@ -64,7 +65,6 @@
 #include <cradle/typing/encodings/json.h>
 #include <cradle/typing/encodings/msgpack.h>
 #include <cradle/typing/encodings/yaml.h>
-#include <cradle/typing/io/http_requests.hpp>
 #include <cradle/typing/utilities/diff.hpp>
 #include <cradle/typing/utilities/logging.h>
 #include <cradle/websocket/calculations.h>
@@ -1815,15 +1815,16 @@ process_message_with_error_handling(
     catch (bad_http_status_code& e)
     {
         spdlog::get("cradle")->error(e.what());
+        auto req{make_prep_http_request(
+            get_required_error_info<attempted_http_request_info>(e))};
+        auto resp{make_prep_http_response(
+            get_required_error_info<http_response_info>(e))};
         send_response(
             server,
             request,
             make_server_message_content_with_error(
                 make_error_response_with_bad_status_code(
-                    make_http_failure_info(
-                        get_required_error_info<attempted_http_request_info>(
-                            e),
-                        get_required_error_info<http_response_info>(e)))));
+                    make_http_failure_info(req, resp))));
     }
     catch (std::exception& e)
     {

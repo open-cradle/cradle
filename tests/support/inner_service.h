@@ -15,7 +15,7 @@ void
 init_test_inner_service(inner_resources& resources);
 
 void
-inner_reset_disk_cache(inner_resources& resources);
+reset_disk_cache(inner_resources& resources);
 
 struct uncached_request_resolution_context : public context_intf
 {

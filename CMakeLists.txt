@@ -338,6 +338,7 @@ target_link_libraries(cradle_inner PUBLIC
     Boost::headers
     cereal::cereal
     cppcoro
+    CURL::libcurl
     fmt::fmt
     lz4::lz4
     msgpack::msgpack
@@ -404,7 +405,6 @@ target_link_libraries(cradle_typing PUBLIC
     Boost::headers
     Catch2::Catch2
     cppcoro
-    CURL::libcurl
     nlohmann_json::nlohmann_json
     spdlog::spdlog
     yaml-cpp::yaml-cpp)

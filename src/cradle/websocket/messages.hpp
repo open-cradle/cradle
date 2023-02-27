@@ -312,8 +312,8 @@ struct websocket_client_message
 api(struct)
 struct http_failure_info
 {
-    cradle::http_request attempted_request;
-    cradle::http_response response;
+    cradle::prep_http_request attempted_request;
+    cradle::prep_http_response response;
 };
 
 api(union)

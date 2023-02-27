@@ -49,10 +49,10 @@ occurs_soon(Condition&& condition, int wait_time_in_ms = 1000)
 // Data is written to the disk cache in a background thread;
 // wait until all these write operations have completed.
 inline void
-sync_wait_write_disk_cache(inner_resources& service)
+sync_wait_write_disk_cache(inner_resources& resources)
 {
     auto& write_pool
-        = static_cast<local_disk_cache&>(service.secondary_cache())
+        = static_cast<local_disk_cache&>(resources.secondary_cache())
               .write_pool();
 
     if (!occurs_soon([&] { return write_pool.get_tasks_total() == 0; }))

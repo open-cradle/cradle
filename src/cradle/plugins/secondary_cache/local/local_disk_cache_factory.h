@@ -9,7 +9,7 @@ class local_disk_cache_factory : public secondary_cache_factory
 {
  public:
     std::unique_ptr<secondary_cache_intf>
-    create(service_config const& config) override;
+    create(inner_resources& resources, service_config const& config) override;
 };
 
 } // namespace cradle
