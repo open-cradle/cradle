@@ -135,3 +135,6 @@ cmake --build build --config Release --target unit_tests
 (There is also an `integration_tests` target, but that is a bit outdated at the
 moment, and it's not really clear that the current form has any purpose in the
 project moving forward.)
+
+## Documentation
+More [documentation](docs/README.md).

@@ -140,9 +140,10 @@ inner_resources_impl::make_blob_file_writer(std::size_t size)
 }
 
 http_connection_interface&
-inner_resources_impl::http_connection_for_thread()
+inner_resources_impl::http_connection_for_thread(http_request const* request)
 {
-    if (mock_http_)
+    if (mock_http_
+        && (request == nullptr || mock_http_->enabled_for(*request)))
     {
         if (http_is_synchronous_)
         {
@@ -176,7 +177,7 @@ inner_resources_impl::async_http_request(
     tasklet_run tasklet_run(tasklet);
     null_check_in check_in;
     null_progress_reporter reporter;
-    co_return http_connection_for_thread().perform_request(
+    co_return http_connection_for_thread(&request).perform_request(
         check_in, reporter, request);
 }
 

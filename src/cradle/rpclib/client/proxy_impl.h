@@ -44,6 +44,7 @@ class rpclib_client_impl
     inline static std::shared_ptr<spdlog::logger> logger_;
     bool testing_;
     uint16_t port_;
+    std::string secondary_cache_factory_;
     cppcoro::static_thread_pool coro_thread_pool_;
 
     // On Windows, localhost and 127.0.0.1 are not the same:

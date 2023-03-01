@@ -32,6 +32,12 @@ mock_http_session::set_canned_response(http_response const& response)
 }
 
 bool
+mock_http_session::enabled_for(http_request const& request) const
+{
+    return request.url.find("://localhost") == std::string::npos;
+}
+
+bool
 mock_http_session::is_complete() const
 {
     return script_.empty();

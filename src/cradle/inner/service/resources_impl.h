@@ -41,8 +41,11 @@ class inner_resources_impl
     std::shared_ptr<blob_file_writer>
     make_blob_file_writer(std::size_t size);
 
+    // Passing request will cause it to be mocked only if mocking is enabled,
+    // and the request is not of a "do not mock" class.
+    // Requests to a local server should never be mocked.
     http_connection_interface&
-    http_connection_for_thread();
+    http_connection_for_thread(http_request const* request = nullptr);
 
     cppcoro::task<http_response>
     async_http_request(http_request request, tasklet_tracker* client);

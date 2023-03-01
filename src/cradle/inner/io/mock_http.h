@@ -48,6 +48,12 @@ struct mock_http_session
     void
     set_canned_response(http_response const& response);
 
+    // Returns true if mocking is enabled for the specified request.
+    // Mocking is always disabled for requests to a local server
+    // (e.g., for HTTP-based caching).
+    bool
+    enabled_for(http_request const& request) const;
+
     // Have all exchanges in the script been executed?
     bool
     is_complete() const;

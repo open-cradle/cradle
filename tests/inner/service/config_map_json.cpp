@@ -4,7 +4,9 @@
 
 using namespace cradle;
 
-TEST_CASE("correct JSON config", "[encodings][config_map_json]")
+static char const tag[] = "[service][config_map_json]";
+
+TEST_CASE("correct JSON config", tag)
 {
     std::string json_text{
         R"(
@@ -21,7 +23,7 @@ TEST_CASE("correct JSON config", "[encodings][config_map_json]")
     REQUIRE(read_config_map_from_json(json_text) == expected);
 }
 
-TEST_CASE("Docker JSON config", "[encodings][config_map_json]")
+TEST_CASE("Docker JSON config", tag)
 {
     std::string json_text{
         R"(
@@ -40,7 +42,7 @@ TEST_CASE("Docker JSON config", "[encodings][config_map_json]")
     REQUIRE(read_config_map_from_json(json_text) == expected);
 }
 
-TEST_CASE("corrupt JSON", "[encodings][config_map_json]")
+TEST_CASE("corrupt JSON", tag)
 {
     std::string json_text{
         R"(
@@ -51,7 +53,7 @@ TEST_CASE("corrupt JSON", "[encodings][config_map_json]")
     REQUIRE_THROWS(read_config_map_from_json(json_text));
 }
 
-TEST_CASE("value with unsupported type", "[encodings][config_map_json]")
+TEST_CASE("JSON value with unsupported type", tag)
 {
     std::string json_text{
         R"(

@@ -19,20 +19,23 @@
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/domain/all/all_domains.h>
+#include <cradle/plugins/secondary_cache/all_plugins.h>
+#include <cradle/plugins/secondary_cache/http/http_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
-#include <cradle/plugins/secondary_cache/local/local_disk_cache_plugin.h>
 #include <cradle/rpclib/common/common.h>
 #include <cradle/rpclib/server/handlers.h>
 #include <cradle/typing/service/core.h>
 
 using namespace cradle;
 
+// TODO maybe this should be a config_map?
 struct cli_options
 {
     std::string log_level{"info"};
     bool ignore_env_log_level{false};
     bool testing{false};
     rpclib_port_t port{RPCLIB_PORT_PRODUCTION};
+    std::string secondary_cache{local_disk_cache_config_values::PLUGIN_NAME};
 };
 
 static cli_options
@@ -52,7 +55,9 @@ parse_options(int argc, char const* const* argv)
         ("testing",
             "set testing environment")
         ("port", po::value<rpclib_port_t>(),
-            "port number");
+            "port number")
+        ("secondary-cache", po::value<std::string>(),
+            "secondary cache plugin");
     // clang-format on
 
     po::variables_map vm;
@@ -64,6 +69,14 @@ parse_options(int argc, char const* const* argv)
         std::cout << fmt::format("Usage: {} [OPTION]...\n", argv[0]);
         std::cout << "Interprets CRADLE RPC commands.\n\n";
         std::cout << desc;
+        auto names{get_secondary_storage_plugin_names()};
+        std::string joined_names("(none)");
+        if (names.size() > 0)
+        {
+            joined_names = boost::algorithm::join(names, ", ");
+        }
+        std::cout << "\nAvailable secondary cache(s): " << joined_names
+                  << "\n";
         std::exit(0);
     }
 
@@ -88,8 +101,33 @@ parse_options(int argc, char const* const* argv)
     {
         options.port = vm["port"].as<rpclib_port_t>();
     }
+    if (vm.count("secondary-cache"))
+    {
+        options.secondary_cache = vm["secondary-cache"].as<string>();
+    }
 
     return options;
+}
+
+// TODO load the config_map from somewhere
+static service_config_map
+create_config_map(cli_options const& options)
+{
+    service_config_map config_map;
+
+    if (options.testing)
+    {
+        config_map[generic_config_keys::TESTING] = true;
+    }
+    config_map[inner_config_keys::SECONDARY_CACHE_FACTORY]
+        = options.secondary_cache;
+    std::string cache_dir{
+        options.testing ? "server_cache_testing" : "server_cache_production"};
+    config_map[local_disk_cache_config_keys::DIRECTORY] = cache_dir;
+    config_map[blob_cache_config_keys::DIRECTORY] = cache_dir;
+    config_map[http_cache_config_keys::PORT] = 9090U;
+
+    return config_map;
 }
 
 static void
@@ -98,24 +136,10 @@ run_server(cli_options const& options)
     initialize_logging(options.log_level, options.ignore_env_log_level);
     auto my_logger = create_logger("rpclib_server");
 
-    // Activate the only disk storage plugin we currently have.
-    activate_local_disk_cache_plugin();
-
-    // TODO load the config_map from somewhere
-    service_config_map config_map;
-    config_map[inner_config_keys::SECONDARY_CACHE_FACTORY]
-        = local_disk_cache_config_values::PLUGIN_NAME;
-    std::string cache_dir{
-        options.testing ? "server_cache_testing" : "server_cache_production"};
-    config_map[local_disk_cache_config_keys::DIRECTORY] = cache_dir;
-    config_map[blob_cache_config_keys::DIRECTORY] = cache_dir;
-    if (options.testing)
-    {
-        config_map[generic_config_keys::TESTING] = true;
-    }
+    activate_all_secondary_storage_plugins();
 
     service_core service;
-    service_config config{config_map};
+    service_config config{create_config_map(options)};
     service.initialize(config);
     rpclib_handler_context hctx{service, *my_logger};
 

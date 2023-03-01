@@ -2,6 +2,7 @@
 #include <typeinfo>
 
 #include <cppcoro/schedule_on.hpp>
+#include <fmt/format.h>
 #include <rpc/client.h>
 #include <rpc/rpc_error.h>
 
@@ -9,6 +10,7 @@
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/encodings/msgpack_adaptors_rpclib.h>
 #include <cradle/inner/requests/uuid.h>
+#include <cradle/inner/service/resources.h>
 #include <cradle/inner/utilities/logging.h>
 
 #include <cradle/rpclib/client/proxy.h>
@@ -98,6 +100,8 @@ rpclib_client_impl::rpclib_client_impl(service_config const& config)
 {
     testing_ = config.get_bool_or_default(generic_config_keys::TESTING, false);
     port_ = testing_ ? RPCLIB_PORT_TESTING : RPCLIB_PORT_PRODUCTION;
+    secondary_cache_factory_ = config.get_mandatory_string(
+        inner_config_keys::SECONDARY_CACHE_FACTORY);
     if (!logger_)
     {
         logger_ = create_logger("rpclib_client");
@@ -227,12 +231,19 @@ rpclib_client_impl::start_server()
         return;
     }
     std::string path{get_rpclib_server_path()};
-    logger_->info("starting {}", path);
     std::vector<std::string> child_args{"--log-level", "warn"};
     if (testing_)
     {
         child_args.push_back("--testing");
     }
+    child_args.push_back("--secondary-cache");
+    child_args.push_back(secondary_cache_factory_);
+    std::string cmd{path};
+    for (auto const& arg : child_args)
+    {
+        cmd += fmt::format(" {}", arg);
+    }
+    logger_->info("starting {}", cmd);
     auto child = boost::process::child(
         boost::process::exe = path, boost::process::args = child_args, group_);
     logger_->info("started child process");

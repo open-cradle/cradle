@@ -78,6 +78,7 @@ conan_cmake_configure(
         cereal/1.3.2
         benchmark/1.6.1
         rpclib/2.3.0
+        tomlplusplus/3.3.0
     OPTIONS
         boost:without_chrono=True
         boost:without_container=True
@@ -156,6 +157,7 @@ find_package(lz4 REQUIRED)
 find_package(cereal REQUIRED)
 find_package(benchmark REQUIRED)
 find_package(rpclib REQUIRED)
+find_package(tomlplusplus REQUIRED)
 
 # Add the given linker options on anything that gets linked.
 macro(add_link_options )
@@ -344,11 +346,12 @@ target_link_libraries(cradle_inner PUBLIC
     msgpack::msgpack
     OpenSSL::OpenSSL
     simdjson::simdjson
-    spdlog::spdlog)
+    spdlog::spdlog
+    tomlplusplus::tomlplusplus)
 
 # A library for the plugins depending on the inner library
 file(GLOB_RECURSE srcs_plugins_inner CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/secondary_cache/local/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/secondary_cache/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/testing/*.cpp")
 add_library(cradle_plugins_inner STATIC ${srcs_plugins_inner})
 add_dependencies(cradle_plugins_inner preprocessing)
