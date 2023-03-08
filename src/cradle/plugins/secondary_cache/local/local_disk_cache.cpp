@@ -16,6 +16,7 @@
 #endif
 
 #include <cradle/inner/caching/secondary_cache_intf.h>
+#include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/encodings/base64.h>
@@ -33,14 +34,6 @@ read_file_contents(
 {
     co_await read_pool.schedule();
     co_return read_file_contents(path);
-}
-
-static std::string
-blob_to_string(blob const& x)
-{
-    std::ostringstream os;
-    os << "<blob - size: " << x.size() << " bytes>";
-    return os.str();
 }
 
 static struct ll_disk_cache_config
@@ -93,8 +86,7 @@ local_disk_cache::read(std::string key)
             {
                 blob x{base64_decode(
                     *entry->value, get_mime_base64_character_set())};
-                spdlog::get("cradle")->debug(
-                    "deserialized: {}", blob_to_string(x));
+                spdlog::get("cradle")->debug("deserialized: {}", x);
                 co_return x;
             }
             else

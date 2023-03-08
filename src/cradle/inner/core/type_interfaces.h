@@ -180,6 +180,11 @@ make_blob(byte_vector v, std::size_t size);
 std::shared_ptr<byte_vector_owner>
 make_shared_buffer(std::size_t size);
 
+// Convert to a string that is identical to the blob, byte by byte
+std::string
+to_string(blob const& x);
+
+// Convert to something informational
 std::ostream&
 operator<<(std::ostream& s, blob const& b);
 

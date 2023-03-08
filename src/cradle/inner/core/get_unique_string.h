@@ -30,8 +30,22 @@ namespace cradle {
 //
 // In case of an old-style Thinknode request, id must be a sha256_hashed_id
 // calculated for that request.
+
+// The hash can be used as index for storing different serialized values:
+// RESULT - the value resulting from resolving the request
+// REQUEST - the request itself
+// If the same storage can hold request results, or the requests themselves,
+// the hash should differ between these categories.
+enum class unique_string_purpose
+{
+    RESULT,
+    REQUEST
+};
+
 std::string
-get_unique_string(id_interface const& id);
+get_unique_string(
+    id_interface const& id,
+    unique_string_purpose purpose = unique_string_purpose::RESULT);
 
 } // namespace cradle
 

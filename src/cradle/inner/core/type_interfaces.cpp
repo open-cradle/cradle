@@ -77,6 +77,13 @@ make_shared_buffer(std::size_t size)
     return std::make_shared<byte_vector_owner>(byte_vector(size));
 }
 
+// TODO try to optimize for string_owner
+std::string
+to_string(blob const& x)
+{
+    return std::string{reinterpret_cast<char const*>(x.data()), x.size()};
+}
+
 // Decides whether a blob can be interpreted as a printable string
 static bool
 is_printable(blob const& b)
