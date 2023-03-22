@@ -36,7 +36,9 @@ blob_file_directory::allocate_file()
     return result;
 }
 
-// Finds the lowest file_id for which no "blob_{file_id}" file yet exists.
+// Finds the highest file_id for which a "blob_{file_id}" file exists,
+// and sets next_file_id_ to that value, plus 1 (or to 0 if there isn't
+// any blob file yet).
 void
 blob_file_directory::scan_directory()
 {

@@ -16,11 +16,6 @@
 
 namespace cradle {
 
-template<typename Archive>
-void
-save_blob_data(Archive& archive, void const* data, std::size_t size);
-
-template<>
 inline void
 save_blob_data(
     cereal::BinaryOutputArchive& archive, void const* data, std::size_t size)
@@ -33,7 +28,6 @@ save_blob_data(
 // stored as base64 in JSON and XML. JSON stores non-printable bytes
 // as e.g. "\u0001" (500% overhead), so base64 (33% overhead) might be
 // more efficient.
-template<>
 inline void
 save_blob_data(
     cereal::JSONOutputArchive& archive, void const* data, std::size_t size)
@@ -58,11 +52,6 @@ save(Archive& archive, blob const& x)
     }
 }
 
-template<typename Archive>
-void
-load_blob_data(Archive& archive, void* data, std::size_t size);
-
-template<>
 inline void
 load_blob_data(
     cereal::BinaryInputArchive& archive, void* data, std::size_t size)
@@ -70,7 +59,6 @@ load_blob_data(
     archive.loadBinary(data, size);
 }
 
-template<>
 inline void
 load_blob_data(cereal::JSONInputArchive& archive, void* data, std::size_t size)
 {

@@ -2,6 +2,7 @@
 #define CRADLE_RPCLIB_CLIENT_PROXY_IMPL_H
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <tuple>
 
@@ -43,6 +44,7 @@ class rpclib_client_impl
  private:
     inline static std::shared_ptr<spdlog::logger> logger_;
     bool testing_;
+    std::optional<std::string> deploy_dir_;
     uint16_t port_;
     std::string secondary_cache_factory_;
     cppcoro::static_thread_pool coro_thread_pool_;

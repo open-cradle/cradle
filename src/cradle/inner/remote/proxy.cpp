@@ -23,7 +23,12 @@ remote_proxy_registry::register_proxy(std::shared_ptr<remote_proxy> proxy)
 std::shared_ptr<remote_proxy>
 remote_proxy_registry::find_proxy(std::string const& name)
 {
-    return proxies_[name];
+    auto it = proxies_.find(name);
+    if (it == proxies_.end())
+    {
+        return std::shared_ptr<remote_proxy>{};
+    }
+    return it->second;
 }
 
 void

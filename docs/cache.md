@@ -6,7 +6,6 @@ CRADLE caches objects whenever possible; there are two levels:
 
 The main local disk-based cache is formed by an SQLite database, which also contains small blobs.
 Large blobs are compressed via LZ4 and stored in a file.
-It looks like the LRU mechanism is not active for this disk cache.
 
 For all types of secondary storage, structured data is first serialized into a form similar to the MessagePack
 serialization used between client and CRADLE.

@@ -170,7 +170,7 @@ value_to_msgpack_blob(dynamic const& v)
     write_msgpack_value(packer, v);
     std::byte const* data = as_bytes(sbuffer.data());
     size_t size = sbuffer.size();
-    return blob{wrapper, data, size};
+    return blob{std::move(wrapper), data, size};
 }
 
 } // namespace cradle

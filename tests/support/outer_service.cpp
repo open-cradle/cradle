@@ -1,4 +1,5 @@
 #include "outer_service.h"
+#include <cradle/deploy_dir.h>
 #include <cradle/inner/fs/types.h>
 #include <cradle/inner/fs/utilities.h>
 #include <cradle/inner/service/config.h>
@@ -12,6 +13,7 @@ namespace cradle {
 static std::string tests_cache_dir{"tests_cache"};
 static service_config_map const outer_config_map{
     {generic_config_keys::TESTING, true},
+    {generic_config_keys::DEPLOY_DIR, get_deploy_dir()},
     {inner_config_keys::MEMORY_CACHE_UNUSED_SIZE_LIMIT, 0x40'00'00'00U},
     {inner_config_keys::SECONDARY_CACHE_FACTORY,
      local_disk_cache_config_values::PLUGIN_NAME},

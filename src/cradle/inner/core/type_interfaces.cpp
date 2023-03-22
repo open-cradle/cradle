@@ -48,14 +48,18 @@ blob
 make_blob(std::string s)
 {
     auto owner{std::make_shared<string_owner>(std::move(s))};
-    return blob{owner, owner->data(), owner->size()};
+    auto data{owner->data()};
+    auto size{owner->size()};
+    return blob{std::move(owner), data, size};
 }
 
 blob
 make_blob(byte_vector v)
 {
     auto owner{std::make_shared<byte_vector_owner>(std::move(v))};
-    return blob{owner, owner->bytes(), owner->size()};
+    auto bytes{owner->bytes()};
+    auto size{owner->size()};
+    return blob{std::move(owner), bytes, size};
 }
 
 blob
@@ -63,7 +67,8 @@ make_blob(byte_vector v, std::size_t size)
 {
     assert(size <= v.size());
     auto owner{std::make_shared<byte_vector_owner>(std::move(v))};
-    return blob{owner, owner->bytes(), size};
+    auto bytes{owner->bytes()};
+    return blob{std::move(owner), bytes, size};
 }
 
 std::shared_ptr<byte_vector_owner>

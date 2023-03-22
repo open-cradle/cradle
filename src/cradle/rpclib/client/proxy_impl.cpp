@@ -1,6 +1,7 @@
 #include <chrono>
 #include <typeinfo>
 
+#include <boost/filesystem.hpp>
 #include <cppcoro/schedule_on.hpp>
 #include <fmt/format.h>
 #include <rpc/client.h>
@@ -99,6 +100,7 @@ rpclib_client_impl::rpclib_client_impl(service_config const& config)
             rpclib_config_keys::CLIENT_CONCURRENCY, 22)))}
 {
     testing_ = config.get_bool_or_default(generic_config_keys::TESTING, false);
+    deploy_dir_ = config.get_optional_string(generic_config_keys::DEPLOY_DIR);
     port_ = testing_ ? RPCLIB_PORT_TESTING : RPCLIB_PORT_PRODUCTION;
     secondary_cache_factory_ = config.get_mandatory_string(
         inner_config_keys::SECONDARY_CACHE_FACTORY);
@@ -226,11 +228,13 @@ rpclib_client_impl::wait_until_server_running()
 void
 rpclib_client_impl::start_server()
 {
+    namespace bf = boost::filesystem;
+    namespace bp = boost::process;
     if (server_is_running())
     {
         return;
     }
-    std::string path{get_rpclib_server_path()};
+    std::string server_name{"rpclib_server"};
     std::vector<std::string> child_args{"--log-level", "warn"};
     if (testing_)
     {
@@ -238,14 +242,24 @@ rpclib_client_impl::start_server()
     }
     child_args.push_back("--secondary-cache");
     child_args.push_back(secondary_cache_factory_);
-    std::string cmd{path};
+    std::string cmd;
+    bf::path path;
+    if (deploy_dir_)
+    {
+        cmd = fmt::format("{}/{}{}", *deploy_dir_, server_name, get_exe_ext());
+        path = bf::path{cmd};
+    }
+    else
+    {
+        cmd = server_name;
+        path = bp::search_path(server_name);
+    }
     for (auto const& arg : child_args)
     {
         cmd += fmt::format(" {}", arg);
     }
     logger_->info("starting {}", cmd);
-    auto child = boost::process::child(
-        boost::process::exe = path, boost::process::args = child_args, group_);
+    auto child = bp::child(bp::exe = path, bp::args = child_args, group_);
     logger_->info("started child process");
     wait_until_server_running();
     child_ = std::move(child);
@@ -256,6 +270,11 @@ rpclib_client_impl::stop_server()
 {
     if (!child_.valid())
     {
+        return;
+    }
+    if (!testing_)
+    {
+        logger_->info("keep rpclib process running");
         return;
     }
     logger_->info("killing rpclib process");

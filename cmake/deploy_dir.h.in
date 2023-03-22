@@ -6,9 +6,15 @@
 namespace cradle {
 
 inline std::string
-get_rpclib_server_path()
+get_deploy_dir()
 {
-    return "@deploy_dir@/rpclib_server@exe_ext@";
+    return "@deploy_dir@";
+}
+
+inline std::string
+get_exe_ext()
+{
+    return "@exe_ext@";
 }
 
 } // namespace cradle

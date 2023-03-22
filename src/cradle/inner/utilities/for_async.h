@@ -15,7 +15,7 @@ for_async(Sequence sequence, Function&& function)
     auto const end = sequence.end();
     while (i != end)
     {
-        std::forward<Function>(function)(*i);
+        function(*i);
         (void) co_await ++i;
     }
 }

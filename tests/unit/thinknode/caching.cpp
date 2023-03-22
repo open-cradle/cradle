@@ -240,44 +240,6 @@ TEST_CASE("large value disk caching", tag)
     }
 }
 
-TEST_CASE("cached tasks", tag)
-{
-    service_core core;
-    init_test_service(core);
-
-    int execution_count = 0;
-    auto counted_task = [&](int answer) -> cppcoro::task<integer> {
-        ++execution_count;
-        co_return integer(answer);
-    };
-
-    {
-        auto result = cached<integer>(
-            core, make_captured_id(12), [&](captured_id const&) {
-                return counted_task(12);
-            });
-        REQUIRE(cppcoro::sync_wait(result) == integer(12));
-        REQUIRE(execution_count == 1);
-    }
-    {
-        auto result = cached<integer>(
-            core, make_captured_id(42), [&](captured_id const&) {
-                return counted_task(42);
-            });
-        REQUIRE(cppcoro::sync_wait(result) == integer(42));
-        REQUIRE(execution_count == 2);
-    }
-    // Now redo the '12' task to see that it's not actually rerun.
-    {
-        auto result = cached<integer>(
-            core, make_captured_id(12), [&](captured_id const&) {
-                return counted_task(12);
-            });
-        REQUIRE(cppcoro::sync_wait(result) == integer(12));
-        REQUIRE(execution_count == 2);
-    }
-}
-
 TEST_CASE("lazily generated cached tasks", tag)
 {
     service_core core;

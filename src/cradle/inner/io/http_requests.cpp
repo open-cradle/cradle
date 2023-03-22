@@ -24,17 +24,17 @@ get_value_id(http_request_method value)
     switch (value)
     {
         case http_request_method::POST:
-            return "post";
+            return "POST";
         case http_request_method::GET:
-            return "get";
+            return "GET";
         case http_request_method::PUT:
-            return "put";
+            return "PUT";
         case http_request_method::DELETE:
-            return "delete";
+            return "DELETE";
         case http_request_method::PATCH:
-            return "patch";
+            return "PATCH";
         case http_request_method::HEAD:
-            return "head";
+            return "HEAD";
     }
     CRADLE_THROW(
         cradle::invalid_enum_value() << cradle::enum_id_info(

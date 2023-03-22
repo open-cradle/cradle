@@ -84,6 +84,12 @@ try
     config_map.try_emplace(
         inner_config_keys::SECONDARY_CACHE_FACTORY,
         local_disk_cache_config_values::PLUGIN_NAME);
+    // All servers should be in the same deployment directory
+    auto server_dir{
+        std::filesystem::weakly_canonical(std::filesystem::path(argv[0]))
+            .remove_filename()};
+    config_map.try_emplace(
+        generic_config_keys::DEPLOY_DIR, server_dir.string());
 
     service_config config{config_map};
     websocket_server server(config);
