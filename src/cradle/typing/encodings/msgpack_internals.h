@@ -17,25 +17,43 @@
 #include <boost/endian/conversion.hpp>
 #include <boost/numeric/conversion/cast.hpp>
 
+#include <msgpack.hpp>
+
 #include <cradle/typing/encodings/msgpack.h>
 
-// Include msgpack-c, disabling any warnings that it would trigger.
-#define MSGPACK_USE_CPP11
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#include <msgpack.hpp>
-#pragma GCC diagnostic pop
-#elif defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4702)
-#include <msgpack.hpp>
-#pragma warning(pop)
-#else
-#include <msgpack.hpp>
-#endif
-
 namespace cradle {
+
+class sbuffer_wrapper : public data_owner
+{
+ public:
+    ~sbuffer_wrapper() = default;
+
+    auto&
+    sbuffer()
+    {
+        return wrapped_;
+    }
+
+ private:
+    msgpack::sbuffer wrapped_;
+};
+
+class object_handle_wrapper : public data_owner
+{
+ public:
+    object_handle_wrapper(uint8_t const* data, size_t size);
+
+    ~object_handle_wrapper() = default;
+
+    msgpack::object_handle&
+    handle()
+    {
+        return handle_;
+    }
+
+ private:
+    msgpack::object_handle handle_;
+};
 
 template<class Buffer>
 void

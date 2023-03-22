@@ -22,33 +22,28 @@ TEST_CASE("request_uuid ctor - default", "[uuid]")
 {
     request_uuid res;
     REQUIRE(res.str() == "");
-    REQUIRE(!res.disk_cacheable());
-    REQUIRE(!res.serializable());
+    REQUIRE(!res.is_real());
 }
 
 TEST_CASE("request_uuid ctor - Git version", "[uuid]")
 {
     request_uuid res{"base"};
     REQUIRE(res.str().starts_with("base+"));
-    REQUIRE(res.disk_cacheable());
-    REQUIRE(res.serializable());
+    REQUIRE(res.is_real());
 }
 
 TEST_CASE("request_uuid ctor - explicit version", "[uuid]")
 {
     request_uuid res{"base", "vers"};
     REQUIRE(res.str() == "base+vers");
-    REQUIRE(res.disk_cacheable());
-    REQUIRE(res.serializable());
+    REQUIRE(res.is_real());
 }
 
 TEST_CASE("request_uuid ctor - bad base", "[uuid]")
 {
     auto matcher = Catch::StartsWith("Invalid character(s) in base uuid ");
     REQUIRE_THROWS_WITH(new request_uuid("b+ase"), matcher);
-    REQUIRE_THROWS_WITH(new request_uuid("b/ase"), matcher);
     REQUIRE_THROWS_WITH(new request_uuid("b+ase", "vers"), matcher);
-    REQUIRE_THROWS_WITH(new request_uuid("b/ase", "vers"), matcher);
 }
 
 TEST_CASE("compare request_id's", "[uuid]")
@@ -62,28 +57,4 @@ TEST_CASE("compare request_id's", "[uuid]")
     REQUIRE(x <= x);
     REQUIRE(y > x);
     REQUIRE(y >= x);
-}
-
-TEST_CASE("combined_uuid - normal", "[uuid]")
-{
-    request_uuid main_uuid{"mbase", "mver"};
-    request_uuid sub_uuid{"sbase", "sver"};
-
-    auto res = combined_uuid(main_uuid, sub_uuid);
-
-    REQUIRE(res.str() == "mbase+mver/sbase+sver");
-    REQUIRE(res.disk_cacheable());
-    REQUIRE(res.serializable());
-}
-
-TEST_CASE("combined_uuid - no sub", "[uuid]")
-{
-    request_uuid main_uuid{"mbase", "mver"};
-    request_uuid sub_uuid;
-
-    auto res = combined_uuid(main_uuid, sub_uuid);
-
-    REQUIRE(res.str() == "mbase+mver");
-    REQUIRE(res.disk_cacheable());
-    REQUIRE(res.serializable());
 }

@@ -6,4 +6,4 @@ export CXX=`which g++-10`
 mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
-make server
+make websocket_server

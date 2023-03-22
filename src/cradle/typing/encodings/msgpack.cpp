@@ -1,14 +1,20 @@
 #include <cradle/typing/encodings/msgpack.h>
 
+#include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/utilities/text.h>
 #include <cradle/typing/encodings/msgpack_internals.h>
 
 namespace cradle {
 
-template<class OwnedData>
-dynamic
+object_handle_wrapper::object_handle_wrapper(uint8_t const* data, size_t size)
+    : handle_{msgpack::unpack(reinterpret_cast<char const*>(data), size)}
+{
+}
+
+static dynamic
 read_msgpack_value(
-    std::shared_ptr<OwnedData> const& ownership, msgpack::object const& object)
+    std::shared_ptr<data_owner> const& ownership,
+    msgpack::object const& object)
 {
     switch (object.type)
     {
@@ -29,8 +35,8 @@ read_msgpack_value(
             return s;
         }
         case msgpack::type::BIN:
-            return make_blob(
-                ownership, as_bytes(object.via.bin.ptr), object.via.bin.size);
+            return blob{
+                ownership, as_bytes(object.via.bin.ptr), object.via.bin.size};
         case msgpack::type::ARRAY: {
             size_t size = object.via.array.size;
             dynamic_array array;
@@ -114,11 +120,8 @@ parse_msgpack_value(uint8_t const* data, size_t size)
     // all their data, so in order to do that, we create a shared_ptr to the
     // object handle and pass that in as the ownership_holder for the blobs to
     // use.
-    msgpack::object_handle handle
-        = msgpack::unpack(reinterpret_cast<char const*>(data), size);
-    auto shared_handle
-        = std::make_shared<msgpack::object_handle>(std::move(handle));
-    return read_msgpack_value(shared_handle, shared_handle->get());
+    auto wrapper{std::make_shared<object_handle_wrapper>(data, size)};
+    return read_msgpack_value(wrapper, wrapper->handle().get());
 }
 
 dynamic
@@ -140,15 +143,13 @@ msgpack_unpack_reference_type(msgpack::type::object_type type, size_t, void*)
 
 dynamic
 parse_msgpack_value(
-    std::shared_ptr<char const> const& data_owner,
-    uint8_t const* data,
-    size_t size)
+    std::shared_ptr<data_owner> const& owner, uint8_t const* data, size_t size)
 {
     msgpack::object_handle handle = msgpack::unpack(
         reinterpret_cast<char const*>(data),
         size,
         msgpack_unpack_reference_type);
-    return read_msgpack_value(data_owner, handle.get());
+    return read_msgpack_value(owner, handle.get());
 }
 
 string
@@ -163,12 +164,13 @@ value_to_msgpack_string(dynamic const& v)
 blob
 value_to_msgpack_blob(dynamic const& v)
 {
-    std::shared_ptr<msgpack::sbuffer> sbuffer(new msgpack::sbuffer);
-    msgpack::packer<msgpack::sbuffer> packer(*sbuffer);
+    auto wrapper{std::make_shared<sbuffer_wrapper>()};
+    auto& sbuffer{wrapper->sbuffer()};
+    msgpack::packer<msgpack::sbuffer> packer(sbuffer);
     write_msgpack_value(packer, v);
-    std::byte const* data = as_bytes(sbuffer->data());
-    size_t size = sbuffer->size();
-    return make_blob(std::move(sbuffer), data, size);
+    std::byte const* data = as_bytes(sbuffer.data());
+    size_t size = sbuffer.size();
+    return blob{std::move(wrapper), data, size};
 }
 
 } // namespace cradle

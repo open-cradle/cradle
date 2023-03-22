@@ -1,6 +1,7 @@
 #ifndef CRADLE_TYPING_ENCODINGS_MSGPACK_H
 #define CRADLE_TYPING_ENCODINGS_MSGPACK_H
 
+#include <cradle/inner/core/type_interfaces.h>
 #include <cradle/typing/core.h>
 
 // This file provides functions for converting dynamic values to and from
@@ -19,7 +20,7 @@ parse_msgpack_value(string const& msgpack);
 // data rather than copying them.
 dynamic
 parse_msgpack_value(
-    std::shared_ptr<char const> const& data_owner,
+    std::shared_ptr<data_owner> const& owner,
     uint8_t const* data,
     size_t size);
 

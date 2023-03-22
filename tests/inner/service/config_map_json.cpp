@@ -4,15 +4,17 @@
 
 using namespace cradle;
 
-TEST_CASE("correct JSON config", "[encodings][config_map_json]")
+static char const tag[] = "[service][config_map_json]";
+
+TEST_CASE("correct JSON config", tag)
 {
     std::string json_text{
         R"(
-        [
-            { "key": "port", "value": 41071 },
-            { "key": "open", "value": false },
-            { "key": "disk_cache/directory", "value": "some_dir" }
-        ]
+        {
+            "port": 41071,
+            "open": false,
+            "disk_cache/directory": "some_dir"
+        }
         )"};
     service_config_map expected{
         {"port", 41071U},
@@ -21,57 +23,43 @@ TEST_CASE("correct JSON config", "[encodings][config_map_json]")
     REQUIRE(read_config_map_from_json(json_text) == expected);
 }
 
-TEST_CASE("corrupt JSON", "[encodings][config_map_json]")
+TEST_CASE("Docker JSON config", tag)
 {
     std::string json_text{
         R"(
-        [
-            { "key": "port", "value": 41071
+        {
+            "disk_cache": {
+                "directory": "/var/cache/cradle",
+                "size_limit": 6000000000
+            },
+            "open": true
+        }
+        )"};
+    service_config_map expected{
+        {"disk_cache/directory", "/var/cache/cradle"},
+        {"disk_cache/size_limit", 6000000000UL},
+        {"open", true}};
+    REQUIRE(read_config_map_from_json(json_text) == expected);
+}
+
+TEST_CASE("corrupt JSON", tag)
+{
+    std::string json_text{
+        R"(
+        {
+            "port": 41071
         ]
         )"};
     REQUIRE_THROWS(read_config_map_from_json(json_text));
 }
 
-TEST_CASE("value with unsupported type", "[encodings][config_map_json]")
+TEST_CASE("JSON value with unsupported type", tag)
 {
     std::string json_text{
         R"(
-        [
-            { "key": "port", "value": [] }
-        ]
-        )"};
-    REQUIRE_THROWS(read_config_map_from_json(json_text));
-}
-
-TEST_CASE("object with bad number of entries", "[encodings][config_map_json]")
-{
-    std::string json_text{
-        R"(
-        [
-            { "key": "port", "value": 41071, "extra": "extra" }
-        ]
-        )"};
-    REQUIRE_THROWS(read_config_map_from_json(json_text));
-}
-
-TEST_CASE("object with missing key", "[encodings][config_map_json]")
-{
-    std::string json_text{
-        R"(
-        [
-            { "no_key": "port", "value": 41071 }
-        ]
-        )"};
-    REQUIRE_THROWS(read_config_map_from_json(json_text));
-}
-
-TEST_CASE("object with missing value", "[encodings][config_map_json]")
-{
-    std::string json_text{
-        R"(
-        [
-            { "key": "port", "no_value": 41071 }
-        ]
+        {
+            "port": []
+        }
         )"};
     REQUIRE_THROWS(read_config_map_from_json(json_text));
 }

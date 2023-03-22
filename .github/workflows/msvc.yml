@@ -67,7 +67,7 @@ jobs:
 
     - name: Install Conan
       run: |
-        pip install conan
+        pip install conan==1.59.0
 
     - name: Download preprocessed headers
       uses: actions/download-artifact@v3
@@ -82,12 +82,14 @@ jobs:
         -DEXTERNALLY_PREPROCESSED_DIRECTORY=preprocessed
         -DLOCAL_DOCKER_TESTING=OFF
 
-    - name: Build & Test
-      run: >
-        python python/generate_config.py $Env:CRADLE_THINKNODE_API_TOKEN
+    - name: Build
+      run: |
+        cmake --build build --config ${{matrix.config}} -j4
 
-        cmake --build build --config ${{matrix.config}}
-        --target all_unit_tests -j4
+    - name: Test
+      run: |
+        python python/generate_config.py $Env:CRADLE_THINKNODE_API_TOKEN
+        cmake --build build --config ${{matrix.config}} --target all_unit_tests -j4
 
     - name: Benchmarks
       if: ${{ matrix.config == 'Release' }}

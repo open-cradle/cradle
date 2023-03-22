@@ -5,4 +5,4 @@ set -x -e
 virtualenv "$@" --prompt="(cradle) " .venv
 source .venv/bin/activate
 python --version
-pip install conan gcovr pytest websocket-client msgpack
+pip install conan==1.59.0 gcovr pytest websocket-client msgpack

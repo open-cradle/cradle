@@ -1,0 +1,47 @@
+# CRADLE configuration template
+#
+# All possible keys should be here but the file may be outdated.
+# Unrecognized entries are silently ignored.
+# The shown values should be the defaults.
+
+# true in testing (non-production) context
+testing = false
+
+# Whether or not the Websocket server should be open to connections from
+# other machines
+open = false
+
+# The port on which the Websocket server will listen
+port = 41071
+
+# How many concurrent threads to use for HTTP requests
+http_concurrency = 36
+
+[memory_cache]
+# The maximum amount of memory to use for caching results that are no
+# longer in use, in bytes
+unused_size_limit = 0x40000000
+
+[secondary_cache]
+# The secondary cache to use
+# Options: "local_disk_cache", "http_cache"
+factory = "local_disk_cache"
+
+[disk_cache]
+directory = "/home/user/.cache/cradle"
+size_limit = 0x40000000
+num_threads_read_pool = 2
+num_threads_write_pool = 2
+
+[http_cache]
+# HTTP port
+port = 9090
+
+[blob_cache]
+directory = "/home/user/.cache/cradle"
+
+[rpclib]
+# How many concurrent threads to use for the rpclib client
+client_concurrency = 22
+# How many concurrent threads to use for the rpclib server
+server_concurrency = 22

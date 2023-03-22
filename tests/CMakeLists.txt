@@ -3,6 +3,7 @@
 add_library(test_lib_runner OBJECT
     runner.cpp)
 target_link_libraries(test_lib_runner PUBLIC
+    cradle_inner
     Catch2::Catch2
     spdlog::spdlog)
 
@@ -18,15 +19,20 @@ file(GLOB_RECURSE test_srcs_unit CONFIGURE_DEPENDS
     "unit/*.cpp")
 add_library(test_lib_unit OBJECT ${test_srcs_unit})
 target_link_libraries(test_lib_unit PUBLIC
-    cradle_outer
-    cradle_inner
-    cradle_plugins
+    cradle_websocket
+    cradle_plugins_typing
+    cradle_plugins_inner
     fakeit::fakeit)
 
 # Add the unit test runner.
 add_executable(unit_test_runner)
 target_sources(unit_test_runner PRIVATE
-    support/outer_service.cpp)
+    support/inner_service.cpp
+    support/outer_service.cpp
+    support/thinknode.cpp)
+target_include_directories(unit_test_runner PUBLIC
+    ${generated_src_dirs}
+    src)
 target_link_libraries(unit_test_runner PRIVATE
     test_lib_runner
     test_lib_unit)
@@ -49,18 +55,19 @@ add_test(
 
 # Define an object library covering the source files in inner/.
 file(GLOB_RECURSE test_srcs_inner CONFIGURE_DEPENDS
-    "inner/*.cpp")
+    "inner/*.cpp"
+    "rpclib/*.cpp")
 add_library(test_lib_inner OBJECT ${test_srcs_inner})
 target_link_libraries(test_lib_inner PUBLIC
-    cradle_plugins
+    cradle_plugins_inner
+    cradle_rpclib_client
     cradle_inner
     Catch2::Catch2)
 
 # Add the inner test runner.
 add_executable(inner_test_runner)
 target_sources(inner_test_runner PRIVATE
-    support/inner_service.cpp
-    support/inner_disk_cached.cpp)
+    support/inner_service.cpp)
 target_link_libraries(inner_test_runner PRIVATE
     test_lib_runner
     test_lib_inner)
@@ -70,6 +77,7 @@ add_custom_target(
     inner_tests
     COMMAND $<TARGET_FILE:inner_test_runner>
     DEPENDS inner_test_runner)
+add_dependencies(inner_tests rpclib_server)
 add_test(
     NAME inner_tests
     COMMAND ${CMAKE_COMMAND}
@@ -81,17 +89,19 @@ file(GLOB_RECURSE test_srcs_external CONFIGURE_DEPENDS
     "external/*.cpp")
 add_library(test_lib_external OBJECT ${test_srcs_external})
 target_link_libraries(test_lib_external PUBLIC
-    cradle_outer
-    cradle_inner
-    cradle_plugins)
+    cradle_external
+    cradle_plugins_inner)
 
 # Add the external test runner.
 add_executable(external_test_runner)
 target_sources(external_test_runner PRIVATE
     support/outer_service.cpp)
+target_include_directories(external_test_runner PUBLIC
+    ${generated_src_dirs}
+    src)
 target_link_libraries(external_test_runner PRIVATE
-    test_lib_runner
-    test_lib_external)
+    test_lib_external
+    test_lib_runner)
 
 # Add the external testing target.
 add_custom_target(
@@ -109,12 +119,14 @@ file(GLOB_RECURSE test_srcs_plugins CONFIGURE_DEPENDS
     "plugins/*.cpp")
 add_library(test_lib_plugins OBJECT ${test_srcs_plugins})
 target_link_libraries(test_lib_plugins PUBLIC
-    cradle_plugins
-    cradle_outer
-    cradle_inner)
+    cradle_external
+    cradle_plugins_typing
+    cradle_plugins_inner)
 
 # Add the plugins test runner.
 add_executable(plugins_test_runner)
+target_sources(plugins_test_runner PRIVATE
+    support/inner_service.cpp)
 target_link_libraries(plugins_test_runner PRIVATE
     test_lib_runner
     test_lib_plugins)
@@ -133,8 +145,12 @@ add_test(
 # Add a runner covering all unit tests (including external and inner).
 add_executable(all_unit_tests_runner)
 target_sources(all_unit_tests_runner PRIVATE
-    support/inner_service.cpp 
-    support/outer_service.cpp)
+    support/inner_service.cpp
+    support/outer_service.cpp
+    support/thinknode.cpp)
+target_include_directories(all_unit_tests_runner PUBLIC
+    ${generated_src_dirs}
+    src)
 target_link_libraries(all_unit_tests_runner
     test_lib_runner
     test_lib_unit
@@ -152,6 +168,7 @@ add_custom_target(
     COMMAND ${CMAKE_COMMAND} -E chdir all-unit-testing ${CMAKE_COMMAND} -E env CRADLE_DEPLOY_DIR=${CMAKE_CURRENT_BINARY_DIR}/deploy CRADLE_THINKNODE_API_TOKEN=${API_TOKEN} CRADLE_THINKNODE_DOCKER_AUTH=${DOCKER_AUTH} $<TARGET_FILE:all_unit_tests_runner>
     WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
     DEPENDS all_unit_tests_runner)
+add_dependencies(all_unit_tests rpclib_server)
 add_test(
     NAME all_unit_tests
     COMMAND ${CMAKE_COMMAND}
@@ -183,8 +200,7 @@ file(GLOB_RECURSE test_srcs_benchmark CONFIGURE_DEPENDS
     "benchmarks/*.cpp")
 add_library(test_lib_benchmark OBJECT ${test_srcs_benchmark})
 target_link_libraries(test_lib_benchmark PUBLIC
-    cradle_outer
-    cradle_inner
+    cradle_external
     benchmark::benchmark)
 
 add_executable(benchmark_test_runner)
@@ -193,12 +209,14 @@ target_sources(benchmark_test_runner PRIVATE
     support/outer_service.cpp)
 target_link_libraries(benchmark_test_runner PRIVATE
     test_lib_benchmark
-    cradle_plugins)
+    cradle_plugins_typing
+    cradle_plugins_inner)
 
 add_custom_target(
     benchmark_tests
     COMMAND $<TARGET_FILE:benchmark_test_runner>
     DEPENDS benchmark_test_runner)
+add_dependencies(benchmark_tests rpclib_server)
 add_test(
     NAME benchmark_tests
     COMMAND ${CMAKE_COMMAND}

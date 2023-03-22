@@ -84,16 +84,10 @@ class request_uuid
         return str_;
     }
 
-    // Indicates whether a request with this uuid can be disk-cached
+    // Indicates whether this is a "real" (non-empty, non-placeholder) uuid.
+    // A request with a real uuid can be disk-cached and serialized.
     bool
-    disk_cacheable() const
-    {
-        return !str_.empty();
-    }
-
-    // Indicates whether a request with this uuid can be serialized
-    bool
-    serializable() const
+    is_real() const
     {
         return !str_.empty();
     }
@@ -156,10 +150,6 @@ update_unique_hash(unique_hasher& hasher, request_uuid const& uuid)
 {
     update_unique_hash(hasher, uuid.str());
 }
-
-// Combines the uuid's of a main request and a subrequest
-request_uuid
-combined_uuid(request_uuid const& main_uuid, request_uuid const& sub_uuid);
 
 } // namespace cradle
 

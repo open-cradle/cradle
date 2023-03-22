@@ -4,11 +4,12 @@
 
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/file_io.h>
-#include <cradle/inner/service/config_map_json.h>
+#include <cradle/inner/service/config_map_file.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache.h>
-#include <cradle/plugins/disk_cache/storage/local/local_disk_cache_plugin.h>
-#include <cradle/version_info.hpp>
+#include <cradle/inner/utilities/logging.h>
+#include <cradle/plugins/secondary_cache/all_plugins.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
+#include <cradle/version_info.h>
 
 using namespace cradle;
 
@@ -74,13 +75,21 @@ try
 
     service_config_map config_map;
     if (config_path)
-        config_map
-            = read_config_map_from_json(read_file_contents(*config_path));
+        config_map = read_config_map_from_file(*config_path);
+    initialize_logging();
 
-    // Activate the only disk storage plugin we currently have.
-    activate_local_disk_cache_plugin();
-    config_map[inner_config_keys::DISK_CACHE_FACTORY]
-        = local_disk_cache_config_values::PLUGIN_NAME;
+    activate_all_secondary_storage_plugins();
+
+    // Default values for mandatory options
+    config_map.try_emplace(
+        inner_config_keys::SECONDARY_CACHE_FACTORY,
+        local_disk_cache_config_values::PLUGIN_NAME);
+    // All servers should be in the same deployment directory
+    auto server_dir{
+        std::filesystem::weakly_canonical(std::filesystem::path(argv[0]))
+            .remove_filename()};
+    config_map.try_emplace(
+        generic_config_keys::DEPLOY_DIR, server_dir.string());
 
     service_config config{config_map};
     websocket_server server(config);

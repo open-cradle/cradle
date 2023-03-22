@@ -2,8 +2,8 @@
 Introspection demo. Example usage:
 
 Terminal A; C++ development branch, root directory:
-    Start server, e.g.
-    $ ./build-debug/server
+    Start WebSocket server, e.g.
+    $ ./build-debug/websocket_server
 Terminal B; directory "python", in Python virtual environment:
     $ python3 scripts/introspection_demo.py [-a]
     and repeat to see what's happening

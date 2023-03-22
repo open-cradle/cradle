@@ -127,7 +127,7 @@ class Session:
         command = cmd.QueryRequestsMetaInfoCommand(self.context_id)
         return self.impl.perform_command(command)
 
-    def resolve_request(self, req_data: cmd.Object) -> cmd.Object:
-        print('RESOLVE REQUEST', file=sys.stderr)
-        command = cmd.ResolveRequestCommand(self.context_id, req_data)
+    def resolve_request(self, req_data: cmd.Object, remote: bool) -> cmd.Object:
+        print(f'RESOLVE REQUEST {remote=}', file=sys.stderr)
+        command = cmd.ResolveRequestCommand(self.context_id, req_data, remote)
         return self.impl.perform_command(command)

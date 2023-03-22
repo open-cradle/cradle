@@ -2,7 +2,7 @@
 
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/caching/immutable/internals.h>
-#include <cradle/inner/core/unique_hash.h>
+#include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/utilities/text.h>
 
 using std::string;

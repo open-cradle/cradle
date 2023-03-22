@@ -12,11 +12,11 @@
 
 #include <cradle/thinknode/supervisor.h>
 
+#include <cradle/inner/core/monitoring.h>
 #include <cradle/inner/utilities/environment.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/thinknode/ipc.h>
 #include <cradle/thinknode/messages.h>
-#include <cradle/typing/core/monitoring.h>
 #include <cradle/typing/encodings/json.h>
 #include <cradle/typing/io/http_requests.hpp>
 #include <cradle/typing/service/core.h>

@@ -11,6 +11,9 @@ namespace cradle {
 
 // A generic id_interface implementation, representing an arbitrary sequence
 // of arguments.
+// Used for calculating the disk cache key for old-style requests. To prevent
+// collisions with new-style requests, one of the arguments (normally the first
+// one) should be a uuid.
 template<class... Args>
 struct sha256_hashed_id : id_interface
 {

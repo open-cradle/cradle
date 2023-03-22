@@ -19,6 +19,7 @@
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
+#include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/supervisor.h>
@@ -44,7 +45,7 @@ perform_lambda_calc(
     auto app = string{"any"};
     auto image = make_thinknode_provider_image_info_with_tag("unused");
     auto pool_name = std::string{"lambda@"} + app;
-    context_tasklet tasklet_guard{ctx, pool_name, "lambda func"};
+    tasklet_context tasklet_guard{ctx, pool_name, "lambda func"};
     co_await get_local_compute_pool_for_image(
         ctx.service, std::make_pair(app, image))
         .schedule();

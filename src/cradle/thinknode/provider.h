@@ -1,9 +1,9 @@
 #ifndef CRADLE_THINKNODE_PROVIDER_H
 #define CRADLE_THINKNODE_PROVIDER_H
 
+#include <cradle/inner/core/monitoring.h>
 #include <cradle/thinknode/types.hpp>
 #include <cradle/typing/core.h>
-#include <cradle/typing/core/monitoring.h>
 
 namespace cradle {
 

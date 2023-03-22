@@ -52,9 +52,9 @@ static cradle::repository_info const version_info{\n\
 ")
 
 # Generate the header file.
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated/src/cradle/")
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src/cradle/")
 set(header_file
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/src/cradle/version_info.hpp")
+    "${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src/cradle/version_info.h")
 
 if(EXISTS "${header_file}")
     file(READ "${header_file}" old_cpp_code)
