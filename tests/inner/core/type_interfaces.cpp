@@ -2,7 +2,7 @@
 
 #include <catch2/catch.hpp>
 
-#include "../support/regular.h"
+#include "../../support/regular.h"
 #include <cradle/inner/utilities/text.h>
 
 using std::optional;

@@ -46,13 +46,23 @@ string(JOIN "-" tag "${tag}")
 # Generate the C++ code to represent all this.
 set(cpp_code "\
 // AUTOMATICALLY GENERATED!! - See version.cmake.\n\
-#include <cradle/typing/utilities/git.h>\n\
+#include <cradle/inner/utilities/git.h>\n\
 static cradle::repository_info const version_info{\n\
   \"${commit_hash}\", ${is_dirty}, \"${tag}\", ${commits_since_tag} };\n\
 ")
 
 # Generate the header file.
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated/src/cradle/")
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src/cradle/")
 set(header_file
-    "${CMAKE_CURRENT_BINARY_DIR}/generated/src/cradle/version_info.hpp")
-file(GENERATE OUTPUT "${header_file}" CONTENT "${cpp_code}")
+    "${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src/cradle/version_info.h")
+
+if(EXISTS "${header_file}")
+    file(READ "${header_file}" old_cpp_code)
+    if("${cpp_code}" STREQUAL "${old_cpp_code}")
+        message(VERBOSE "Keeping ${header_file}")
+        return()
+    endif()
+endif()
+
+message(VERBOSE "Generating ${header_file}")
+file(WRITE "${header_file}" "${cpp_code}")

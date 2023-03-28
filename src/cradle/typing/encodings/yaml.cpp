@@ -13,9 +13,9 @@
 #include <yaml-cpp/yaml.h>
 #endif
 
+#include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/utilities/text.h>
-#include <cradle/typing/utilities/arrays.h>
 
 namespace cradle {
 
@@ -157,17 +157,15 @@ read_yaml_value(YAML::Node const& yaml)
                     string encoded = yaml_blob.as<string>();
                     size_t max_decoded_size
                         = get_base64_decoded_length(encoded.length());
-                    std::byte* data = new std::byte[max_decoded_size];
-                    std::shared_ptr<std::byte const> ptr(
-                        data, array_deleter<std::byte>());
+                    byte_vector decoded(max_decoded_size);
                     std::size_t decoded_size;
                     base64_decode(
-                        reinterpret_cast<uint8_t*>(data),
+                        decoded.data(),
                         &decoded_size,
                         encoded.c_str(),
                         encoded.length(),
                         get_mime_base64_character_set());
-                    return blob(ptr, decoded_size);
+                    return make_blob(std::move(decoded), decoded_size);
                 }
                 else
                 {
@@ -297,23 +295,6 @@ value_to_yaml(dynamic const& v)
     return out.c_str();
 }
 
-// Decide if we should print the contents of a blob as part of a diagnostic
-// output.
-static bool
-is_printable(blob const& x)
-{
-    if (x.size() > 1024)
-        return false;
-
-    for (size_t i = 0; i != x.size(); ++i)
-    {
-        if (reinterpret_cast<unsigned char const*>(x.data())[i] > 127)
-            return false;
-    }
-
-    return true;
-}
-
 static void
 emit_diagnostic_yaml_value(YAML::Emitter& out, dynamic const& v)
 {
@@ -347,20 +328,9 @@ emit_diagnostic_yaml_value(YAML::Emitter& out, dynamic const& v)
             break;
         }
         case value_type::BLOB: {
-            blob const& x = cast<blob>(v);
-            if (x.size() != 0 && is_printable(x))
-            {
-                out << YAML::Literal
-                    << "<blob>\n"
-                           + string(
-                               reinterpret_cast<char const*>(x.data()),
-                               x.size());
-            }
-            else
-            {
-                out << "<blob - size: " + lexical_cast<string>(x.size())
-                           + " bytes>";
-            }
+            std::ostringstream os;
+            os << cast<blob>(v);
+            out << os.str();
             break;
         }
         case value_type::DATETIME:

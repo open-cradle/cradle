@@ -2,7 +2,7 @@
 
 #include "test_session.h"
 #include <cradle/external_api.h>
-#include <cradle/typing/io/mock_http.h>
+#include <cradle/inner/io/mock_http.h>
 #include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
@@ -24,7 +24,8 @@ TEST_CASE("copy_calculation", "[external]")
               R"({ "bucket": "my_bucket_id", "contents": [] })")},
          // It's already at the destination, no need to copy
          {make_get_request(
-              "https://mgh.thinknode.io/api/v1.0/calc/61e53771010054e512d49dce6f3ebd8b?context=456",
+              "https://mgh.thinknode.io/api/v1.0/calc/"
+              "61e53771010054e512d49dce6f3ebd8b?context=456",
               {{"Authorization", "Bearer xyz"},
                {"Accept", "application/json"}}),
           make_http_200_response(

@@ -1,7 +1,6 @@
 #ifndef CRADLE_INNER_REQUESTS_VALUE_H
 #define CRADLE_INNER_REQUESTS_VALUE_H
 
-#include <concepts>
 #include <memory>
 #include <utility>
 
@@ -10,11 +9,13 @@
 #include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/uuid.h>
 
 namespace cradle {
 
 /**
  * Request for an immediate value. No caching, no introspection.
+ * Satisfies concept UncachedRequest.
  */
 template<typename Value>
 class value_request
@@ -25,6 +26,7 @@ class value_request
 
     static constexpr caching_level_type caching_level{
         caching_level_type::none};
+    static constexpr bool introspective{false};
 
     value_request(Value const& value) : value_{value}
     {
@@ -32,6 +34,13 @@ class value_request
 
     value_request(Value&& value) : value_{std::move(value)}
     {
+    }
+
+    request_uuid
+    get_uuid() const
+    {
+        // Zero uuid information
+        return request_uuid();
     }
 
     Value
@@ -46,14 +55,16 @@ class value_request
         update_unique_hash(hasher, value_);
     }
 
-    // VS2019 build fails with
-    // resolve(UncachedContext auto& ctx) const
-    template<UncachedContext Ctx>
+    template<Context Ctx>
     cppcoro::task<Value>
     resolve(Ctx& ctx) const
     {
         co_return value_;
     }
+
+ public:
+    // cereal interface
+    value_request() = default;
 
     template<typename Archive>
     void
@@ -105,16 +116,24 @@ rq_value_sp(Value&& value)
     return std::make_shared<value_request<Value>>(std::forward<Value>(value));
 }
 
-// For memory cache, ordered map
+// operator==() and operator<() are used:
+// - For memory cache, ordered map (currently not selected)
+// - When a value request is an argument to another request
+//
+// Value should support operator==() and operator<(), but not necessarily all
+// comparison operators demanded by the std::equality_comparable and
+// std::totally_ordered concepts.
+// The comparison operators that it does implement should comprise a
+// consistent ordering relation.
 template<typename Value>
-requires std::equality_comparable<Value> bool
+bool
 operator==(value_request<Value> const& lhs, value_request<Value> const& rhs)
 {
     return lhs.get_value() == rhs.get_value();
 }
 
 template<typename Value>
-requires std::totally_ordered<Value> bool
+bool
 operator<(value_request<Value> const& lhs, value_request<Value> const& rhs)
 {
     return lhs.get_value() < rhs.get_value();

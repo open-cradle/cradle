@@ -113,7 +113,7 @@ class tasklet_info
 };
 
 /**
- * Retrieves information on all introspected tasklets
+ * Retrieves information on all introspective tasklets
  *
  * This function will be called from a websocket thread that is different from
  * the threads on which the coroutines run, that generate this information. One

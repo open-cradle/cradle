@@ -256,30 +256,25 @@ TEST_CASE("basic YAML encoding", "[encodings][yaml]")
 TEST_CASE("diagnostic YAML encoding", "[encodings][yaml]")
 {
     auto empty_blob = make_string_literal_blob("");
-    test_diagnostic_yaml_encoding(empty_blob, "\"<blob - size: 0 bytes>\"");
+    test_diagnostic_yaml_encoding(empty_blob, "0-bytes blob");
 
     auto small_blob = make_string_literal_blob("small blob");
-    test_diagnostic_yaml_encoding(
-        small_blob,
-        R"( |
-            <blob>
-            small blob
-        )");
+    test_diagnostic_yaml_encoding(small_blob, R"("10-bytes blob: smallblob")");
 
-    auto large_blob = make_static_blob(nullptr, 16384);
+    byte_vector large_vector(16384);
+    auto large_blob{make_blob(large_vector)};
     test_diagnostic_yaml_encoding(
-        large_blob, "\"<blob - size: 16384 bytes>\"");
+        large_blob,
+        R"("16384-bytes blob: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ... 00 00 00 00")");
 
     auto unprintable_blob = make_string_literal_blob("\xf1wxyz");
     test_diagnostic_yaml_encoding(
-        unprintable_blob, "\"<blob - size: 5 bytes>\"");
+        unprintable_blob, R"("5-bytes blob: f1 77 78 79 7a")");
 
     test_diagnostic_yaml_encoding(
         dynamic_map({{false, small_blob}, {0.125, "xyz"}}),
         R"(
-            false: |
-              <blob>
-              small blob
+            false: "10-bytes blob: smallblob"
             0.125: xyz
         )");
 

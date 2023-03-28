@@ -4,12 +4,12 @@
 #include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 
-#include "../introspection/tasklet_testing.h"
-#include "../support/core.h"
+#include "../../support/inner_service.h"
+#include "../../support/tasklet_testing.h"
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/introspection/tasklet_impl.h>
 #include <cradle/inner/introspection/tasklet_info.h>
-#include <cradle/inner/service/core.h>
+#include <cradle/inner/service/resources.h>
 
 using namespace cradle;
 
@@ -128,29 +128,4 @@ TEST_CASE("tasklet_await", "[introspection]")
     REQUIRE(events1[2].details() == "awaiting... 87");
     REQUIRE(events1[3].what() == tasklet_event_type::AFTER_CO_AWAIT);
     REQUIRE(events1[3].details() == "");
-}
-
-TEST_CASE("shared_task_for_cacheable", "[introspection]")
-{
-    clean_tasklet_admin_fixture fixture;
-    inner_service_core core;
-    init_test_inner_service(core);
-
-    captured_id cache_key{make_captured_id(87)};
-    auto task_creator = []() -> cppcoro::task<blob> {
-        co_return make_blob(std::string("314"));
-    };
-    auto client = create_tasklet_tracker("client_pool", "client_title");
-    auto me = make_shared_task_for_cacheable<blob>(
-        core, std::move(cache_key), task_creator, client, "my summary");
-    auto res = cppcoro::sync_wait(
-        [&]() -> cppcoro::task<blob> { co_return co_await me; }());
-
-    REQUIRE(res == make_blob(std::string("314")));
-    auto events = latest_tasklet_info().events();
-    REQUIRE(events.size() == 3);
-    REQUIRE(events[0].what() == tasklet_event_type::SCHEDULED);
-    REQUIRE(events[1].what() == tasklet_event_type::BEFORE_CO_AWAIT);
-    REQUIRE(events[1].details() == "my summary 87");
-    REQUIRE(events[2].what() == tasklet_event_type::AFTER_CO_AWAIT);
 }

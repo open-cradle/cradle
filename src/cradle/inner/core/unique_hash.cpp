@@ -2,18 +2,9 @@
 #include <iomanip>
 #include <sstream>
 
-#include <cradle/inner/core/id.h>
 #include <cradle/inner/core/unique_hash.h>
 
 namespace cradle {
-
-std::string
-get_unique_string(id_interface const& id)
-{
-    unique_hasher hasher;
-    id.update_hash(hasher);
-    return hasher.get_string();
-}
 
 std::string
 unique_hasher::get_string()
@@ -41,14 +32,12 @@ unique_hasher::finish()
 void
 update_unique_hash(unique_hasher& hasher, std::string const& val)
 {
-    update_unique_hash(hasher, val.size());
     hasher.encode_bytes(val.data(), val.size());
 }
 
 void
 update_unique_hash(unique_hasher& hasher, blob const& val)
 {
-    update_unique_hash(hasher, val.size());
     hasher.encode_bytes(val.data(), val.size());
 }
 

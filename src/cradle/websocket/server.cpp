@@ -17,18 +17,14 @@
 #include <boost/crc.hpp>
 #endif
 
+#include <cereal/archives/json.hpp>
+
 #include <picosha2.h>
 
 #include <websocketpp/config/asio_no_tls.hpp>
 #include <websocketpp/server.hpp>
 
-#include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
-#ifdef _WIN32
-#include <spdlog/sinks/wincolor_sink.h>
-#else
-#include <spdlog/sinks/ansicolor_sink.h>
-#endif
 
 #include <cppcoro/async_scope.hpp>
 #include <cppcoro/schedule_on.hpp>
@@ -37,25 +33,38 @@
 #include <cppcoro/task.hpp>
 #include <cppcoro/when_all.hpp>
 
-#include <cradle/inner/caching/disk_cache.h>
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/introspection/tasklet.h>
+#include <cradle/inner/io/http_requests.h>
+#include <cradle/inner/remote/proxy.h>
+#include <cradle/inner/requests/function.h>
+#include <cradle/inner/service/request.h>
+#include <cradle/inner/service/seri_req.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
+#include <cradle/inner/utilities/logging.h>
 #include <cradle/inner/utilities/text.h>
+#include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
+#include <cradle/rpclib/client/proxy.h>
+#include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/apm.h>
+#include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/calc.h>
+#include <cradle/thinknode/domain.h>
 #include <cradle/thinknode/iam.h>
 #include <cradle/thinknode/iss.h>
+#include <cradle/thinknode/iss_req.h>
+#include <cradle/thinknode/secondary_cache_serialization.h>
 #include <cradle/thinknode/utilities.h>
+#include <cradle/typing/core/fmt_format.h>
 #include <cradle/typing/core/unique_hash.h>
 #include <cradle/typing/encodings/json.h>
 #include <cradle/typing/encodings/msgpack.h>
 #include <cradle/typing/encodings/yaml.h>
-#include <cradle/typing/io/http_requests.hpp>
 #include <cradle/typing/utilities/diff.hpp>
 #include <cradle/typing/utilities/logging.h>
 #include <cradle/websocket/calculations.h>
@@ -180,7 +189,9 @@ struct client_request
 
 struct websocket_server_impl
 {
-    server_config config;
+    service_config config;
+    std::shared_ptr<spdlog::logger> logger;
+    // TODO another http_request_system singleton in typing/service/core.cpp
     http_request_system http_system;
     ws_server_type ws;
     client_connection_list clients;
@@ -1425,12 +1436,17 @@ send_response(
 
 static thinknode_request_context
 make_thinknode_request_context(
-    websocket_server_impl& server, client_request& request)
+    websocket_server_impl& server,
+    client_request& request,
+    bool remotely = false)
 {
-    return thinknode_request_context{
+    thinknode_request_context ctx{
         server.core,
         get_client(server.clients, request.client).session,
-        request.tasklet};
+        request.tasklet,
+        remotely};
+    ctx.proxy_name("rpclib");
+    return ctx;
 }
 
 static cppcoro::task<>
@@ -1456,6 +1472,10 @@ process_message(websocket_server_impl& server, client_request request)
                 client.name = registration.name;
                 client.session = registration.session;
             });
+            // TODO keep reference to thinknode_domain object?
+            thinknode_domain dom;
+            dom.initialize();
+            dom.set_session(registration.session);
             send_response(
                 server,
                 request,
@@ -1475,8 +1495,10 @@ process_message(websocket_server_impl& server, client_request request)
         }
         case client_message_content_tag::CACHE_INSERT: {
             auto const& insertion = as_cache_insert(content);
-            server.core.inner_internals().disk_cache.insert(
-                insertion.key, insertion.value);
+            auto& ll_disk_cache{
+                static_cast<local_disk_cache&>(server.core.secondary_cache())
+                    .get_ll_disk_cache()};
+            ll_disk_cache.insert(insertion.key, insertion.value);
             send_response(
                 server,
                 request,
@@ -1486,7 +1508,10 @@ process_message(websocket_server_impl& server, client_request request)
         }
         case client_message_content_tag::CACHE_QUERY: {
             auto const& key = as_cache_query(content);
-            auto entry = server.core.inner_internals().disk_cache.find(key);
+            auto& ll_disk_cache{
+                static_cast<local_disk_cache&>(server.core.secondary_cache())
+                    .get_ll_disk_cache()};
+            auto entry = ll_disk_cache.find(key);
             send_response(
                 server,
                 request,
@@ -1737,6 +1762,40 @@ process_message(websocket_server_impl& server, client_request request)
                     response));
             break;
         }
+        case client_message_content_tag::REQUESTS_META_INFO_QUERY: {
+            std::string git_version = request_uuid::get_git_version();
+            auto response = make_requests_meta_info_response(git_version);
+            send_response(
+                server,
+                request,
+                make_server_message_content_with_requests_meta_info_response(
+                    response));
+            break;
+        }
+        case client_message_content_tag::RESOLVE_REQUEST: {
+            auto const& rr = as_resolve_request(content);
+            server.logger->info("resolve {}", rr.remote ? "remote" : "local");
+            // serialized will be response, serialized as msgpack
+            auto ctx{
+                make_thinknode_request_context(server, request, rr.remote)};
+            auto seri_result
+                = co_await resolve_serialized_request(ctx, rr.json_text);
+            blob seri_value = seri_result.value();
+            // TODO msgpack -> dynamic -> msgpack
+            // - First conversion here
+            // - Second in value_to_msgpack_string(), above
+            dynamic response = parse_msgpack_value(
+                reinterpret_cast<uint8_t const*>(seri_value.data()),
+                seri_value.size());
+            seri_result.on_deserialized();
+            server.logger->info("dynamic response {}", response);
+            send_response(
+                server,
+                request,
+                make_server_message_content_with_resolve_request_response(
+                    response));
+            break;
+        }
         default:
         case client_message_content_tag::KILL: {
             break;
@@ -1756,15 +1815,16 @@ process_message_with_error_handling(
     catch (bad_http_status_code& e)
     {
         spdlog::get("cradle")->error(e.what());
+        auto req{make_prep_http_request(
+            get_required_error_info<attempted_http_request_info>(e))};
+        auto resp{make_prep_http_response(
+            get_required_error_info<http_response_info>(e))};
         send_response(
             server,
             request,
             make_server_message_content_with_error(
                 make_error_response_with_bad_status_code(
-                    make_http_failure_info(
-                        get_required_error_info<attempted_http_request_info>(
-                            e),
-                        get_required_error_info<http_response_info>(e)))));
+                    make_http_failure_info(req, resp))));
     }
     catch (std::exception& e)
     {
@@ -1843,14 +1903,17 @@ on_message(
 }
 
 static void
-initialize(websocket_server_impl& server, server_config const& config)
+initialize(websocket_server_impl& server, service_config const& config)
 {
     server.config = config;
+    server.logger = create_logger("ws_server");
 
-    server.core.reset(config);
+    server.core.initialize(config);
 
     server.ws.clear_access_channels(websocketpp::log::alevel::all);
     server.ws.init_asio();
+    // TODO following line under evaluation, for development only
+    server.ws.set_reuse_addr(true);
     server.ws.set_open_handler(
         [&](connection_hdl hdl) { on_open(server, hdl); });
     server.ws.set_close_handler(
@@ -1860,28 +1923,10 @@ initialize(websocket_server_impl& server, server_config const& config)
             on_message(server, hdl, message);
         });
 
-    // Create and register the logger.
-    if (!spdlog::get("cradle"))
-    {
-        std::vector<spdlog::sink_ptr> sinks;
-#ifdef _WIN32
-        sinks.push_back(
-            std::make_shared<spdlog::sinks::wincolor_stdout_sink_mt>());
-#else
-        sinks.push_back(
-            std::make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>());
-#endif
-        auto log_path = get_user_logs_dir(none, "cradle") / "log";
-        sinks.push_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-            log_path.string(), 262144, 2));
-        auto combined_logger = std::make_shared<spdlog::logger>(
-            "cradle", begin(sinks), end(sinks));
-        spdlog::register_logger(combined_logger);
-        spdlog::set_pattern("[%H:%M:%S:%e] [thread %t] %v");
-    }
+    register_rpclib_client(config);
 }
 
-websocket_server::websocket_server(server_config const& config)
+websocket_server::websocket_server(service_config const& config)
 {
     impl_ = new websocket_server_impl;
     initialize(*impl_, config);
@@ -1900,8 +1945,10 @@ void
 websocket_server::listen()
 {
     auto& server = *impl_;
-    bool open = server.config.open ? *server.config.open : false;
-    auto port = server.config.port ? *server.config.port : 41071;
+    bool open
+        = server.config.get_bool_or_default(server_config_keys::OPEN, false);
+    auto port
+        = server.config.get_number_or_default(server_config_keys::PORT, 41071);
     if (open)
     {
         server.ws.listen(port);

@@ -3,14 +3,9 @@
 
 #include <string>
 
-#include <cppcoro/shared_task.hpp>
-
 #include <cradle/inner/core/id.h>
 
 namespace cradle {
-
-struct id_interface;
-struct inner_service_core;
 
 /**
  * Tracks a "tasklet": a conceptual task, implemented as a coroutine
@@ -43,7 +38,8 @@ class tasklet_tracker
 
  public:
     virtual int
-    own_id() const = 0;
+    own_id() const
+        = 0;
 
     virtual void
     on_running()
@@ -138,64 +134,6 @@ class tasklet_await
         }
     }
 };
-
-namespace detail {
-
-/*
- * Coroutine co_await'ing a shared task and tracking this
- *
- * cache_key must be available after the initial suspension point, so ownership
- * must be inside this function.
- */
-template<typename Value>
-cppcoro::shared_task<Value>
-shared_task_wrapper(
-    cppcoro::shared_task<Value> shared_task,
-    tasklet_tracker* client,
-    captured_id cache_key,
-    std::string summary)
-{
-    client->on_before_await(summary, *cache_key);
-    auto res = co_await shared_task;
-    client->on_after_await();
-    co_return res;
-}
-
-} // namespace detail
-
-/**
- * Makes a shared task producing some cacheable object, on behalf of a tasklet
- * client
- *
- * - Is or wraps a cppcoro::shared_task<Value> object.
- * - The cacheable object is identified by a captured_id.
- * - client will be nullptr while introspection is disabled.
- *
- * This construct has to be used when needing to co_await on a coroutine that
- * calculates the cache key. If co_await and key calculation are co-located, a
- * direct tasklet_await is also possible. (Both options are currently in use.)
- */
-template<typename Value, typename TaskCreator>
-cppcoro::shared_task<Value>
-make_shared_task_for_cacheable(
-    inner_service_core& service,
-    captured_id const& cache_key,
-    TaskCreator task_creator,
-    tasklet_tracker* client,
-    std::string summary)
-{
-    auto shared_task
-        = fully_cached<Value>(service, cache_key, std::move(task_creator));
-    if (client)
-    {
-        return detail::shared_task_wrapper<Value>(
-            std::move(shared_task), client, cache_key, std::move(summary));
-    }
-    else
-    {
-        return shared_task;
-    }
-}
 
 } // namespace cradle
 

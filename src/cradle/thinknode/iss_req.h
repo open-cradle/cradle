@@ -1,315 +1,129 @@
 #ifndef CRADLE_THINKNODE_ISS_REQ_H
 #define CRADLE_THINKNODE_ISS_REQ_H
 
-#include <tuple>
+// ISS requests implemented using function_request_erased.
+// The requests' functionality is implemented via coroutine functions
+// (declared in iss_req_common.h).
 
 #include <cereal/types/string.hpp>
 #include <cppcoro/task.hpp>
+#include <fmt/format.h>
 
 #include <cradle/inner/requests/function.h>
-#include <cradle/inner/requests/value.h>
 #include <cradle/thinknode/iss.h>
-#include <cradle/thinknode/request.h>
-#include <cradle/typing/encodings/msgpack.h>
 
 namespace cradle {
 
-cppcoro::task<std::string>
-resolve_my_post_iss_object_request(
-    thinknode_request_context& ctx,
-    std::string const& api_url,
-    std::string const& context_id,
-    std::string const& url_type_string,
-    blob const& object_data);
+// Properties for a Thinknode request:
+// - The function is a coroutine
+// - Always introspective
+// TODO consider fixing Level to "full"
+template<caching_level_type Level>
+using thinknode_request_props
+    = request_props<Level, true, true, thinknode_request_context>;
 
-template<Request ObjectDataRequest>
-requires(std::same_as<typename ObjectDataRequest::value_type, blob>)
-    // The identity of a request object is formed by:
-    // - The get_uuid() value, defining the class
-    // - The values passed to serialize() (and to compare())
-    class my_post_iss_object_request_base
+// Assumes that properties other than Level are as in thinknode_request_props
+template<caching_level_type Level>
+request_uuid
+make_tn_uuid(std::string const& base)
 {
- public:
+    char const* ext{};
+    if constexpr (Level == caching_level_type::none)
+    {
+        ext = "none";
+    }
+    else if constexpr (Level == caching_level_type::memory)
+    {
+        ext = "mem";
+    }
+    else
+    {
+        ext = "full";
+    }
+    return request_uuid{fmt::format("{}-{}", base, ext)};
+}
+
+// Creates a function_request_erased object representing a
+// "post ISS object" request,
+// where object_data is either a blob, or a subrequest yielding a blob.
+template<caching_level_type Level, typename ObjectData>
+    requires TypedArg<ObjectData, blob>
+auto
+rq_post_iss_object(
+    std::string context_id, thinknode_type_info schema, ObjectData object_data)
+{
+    using props_type = thinknode_request_props<Level>;
+    auto uuid{make_tn_uuid<Level>("rq_post_iss_object")};
+    std::string title{"post_iss_object"};
+    std::string url_type_template{get_url_type_template(schema)};
+    return rq_function_erased_coro<std::string>(
+        props_type{std::move(uuid), std::move(title)},
+        post_iss_object_uncached_template_url,
+        std::move(context_id),
+        std::move(url_type_template),
+        normalize_arg<blob, props_type>(std::move(object_data)));
+}
+
+// Creates a function_request_erased object representing a
+// "retrieve immutable object" request,
+// where immutable_id is either a plain string, or a subrequest yielding a
+// string.
+// TODO is perfectly forwarding immutable_id possible?
+template<caching_level_type Level, typename ImmutableId>
+    requires TypedArg<ImmutableId, std::string>
+auto
+rq_retrieve_immutable_object(std::string context_id, ImmutableId immutable_id)
+{
+    using value_type = blob;
+    using props_type = thinknode_request_props<Level>;
+    auto uuid{make_tn_uuid<Level>("rq_retrieve_immutable_object")};
+    std::string title{"retrieve_immutable_object"};
+    return rq_function_erased_coro<value_type>(
+        props_type{std::move(uuid), std::move(title)},
+        retrieve_immutable_blob_uncached,
+        std::move(context_id),
+        normalize_arg<std::string, props_type>(std::move(immutable_id)));
+}
+
+// Creates a function_request_erased object representing a
+// "get ISS object metadata" request,
+// where object_id is either a plain string, or a subrequest yielding a string.
+template<caching_level_type Level, typename ObjectId>
+    requires TypedArg<ObjectId, std::string>
+auto
+rq_get_iss_object_metadata(std::string context_id, ObjectId object_id)
+{
+    using props_type = thinknode_request_props<Level>;
+    using value_type = std::map<std::string, std::string>;
+    auto uuid{make_tn_uuid<Level>("rq_get_iss_object_metadata")};
+    std::string title{"get_iss_object_metadata"};
+    return rq_function_erased_coro<value_type>(
+        props_type(std::move(uuid), std::move(title)),
+        get_iss_object_metadata_uncached,
+        std::move(context_id),
+        normalize_arg<std::string, props_type>(std::move(object_id)));
+}
+
+// Creates a function_request_erased object representing a
+// "resolve ISS object to immutable" request,
+// where object_id is either a plain string, or a subrequest yielding a
+// string.
+template<caching_level_type Level, typename ObjectId>
+    requires TypedArg<ObjectId, std::string>
+auto
+rq_resolve_iss_object_to_immutable(
+    std::string context_id, ObjectId object_id, bool ignore_upgrades)
+{
+    using props_type = thinknode_request_props<Level>;
     using value_type = std::string;
-
-    my_post_iss_object_request_base(
-        std::string api_url,
-        std::string context_id,
-        thinknode_type_info schema,
-        ObjectDataRequest object_data_request)
-        : api_url_{api_url},
-          context_id_{std::move(context_id)},
-          url_type_string_{get_url_type_string(api_url, schema)},
-          object_data_request_{std::move(object_data_request)}
-    {
-    }
-
-    cppcoro::task<std::string>
-    resolve(thinknode_request_context& ctx) const
-    {
-        auto object_data = co_await object_data_request_.resolve(ctx);
-        co_return co_await resolve_my_post_iss_object_request(
-            ctx, api_url_, context_id_, url_type_string_, object_data);
-    }
-
-    // Return a string that uniquely identifies this class and its current
-    // implementation. When the class's behaviour changes, then so should
-    // this string.
-    std::string
-    get_uuid() const
-    {
-        return "my_post_iss_object_request";
-    }
-
-    std::string
-    get_introspection_title() const
-    {
-        return "my_post_iss_object_request";
-    }
-
-    // Used when (de-)serializing this object (planned),
-    // and for calculating its hashes.
-    template<typename Archive>
-    void
-    serialize(Archive& archive)
-    {
-        archive(api_url_, context_id_, url_type_string_, object_data_request_);
-    }
-
-    // Compares against another request object, returning <0, 0, or >0.
-    // The values passed to comparator are the same as in serialize();
-    // it would be nice if we could somehow get rid of this duplication.
-    template<typename Comparator>
-    int
-    compare(
-        Comparator& comparator,
-        my_post_iss_object_request_base const& other) const
-    {
-        return comparator(
-            api_url_,
-            other.api_url_,
-            context_id_,
-            other.context_id_,
-            url_type_string_,
-            other.url_type_string_,
-            object_data_request_,
-            other.object_data_request_);
-    }
-
- private:
-    std::string api_url_;
-    std::string context_id_;
-    // Or a request that can calculate url_type_string_ from schema and
-    // api_url? It's now always evaluated and maybe the value is not needed.
-    std::string url_type_string_;
-    ObjectDataRequest object_data_request_;
-};
-
-template<caching_level_type level, Request ObjectDataRequest>
-using my_post_iss_object_request = thinknode_request_container<
-    level,
-    my_post_iss_object_request_base<ObjectDataRequest>>;
-
-// Create a request to post an ISS object, where the data are retrieved
-// by resolving another request, and return the request's ID.
-template<caching_level_type level, Request ObjectDataRequest>
-requires(std::same_as<typename ObjectDataRequest::value_type, blob>) auto rq_post_iss_object(
-    std::string api_url,
-    std::string context_id,
-    thinknode_type_info schema,
-    ObjectDataRequest object_data_request)
-{
-    return my_post_iss_object_request<level, ObjectDataRequest>{
-        std::move(api_url),
+    auto uuid{make_tn_uuid<Level>("rq_resolve_iss_object_to_immutable")};
+    std::string title{"resolve_iss_object_to_immutable"};
+    return rq_function_erased_coro<value_type>(
+        props_type(std::move(uuid), std::move(title)),
+        resolve_iss_object_to_immutable_uncached,
         std::move(context_id),
-        std::move(schema),
-        std::move(object_data_request)};
-}
-
-// Create a request to post an ISS object from a raw blob of data
-// (e.g. encoded in MessagePack format), and return its ID.
-template<caching_level_type level>
-auto
-rq_post_iss_object(
-    std::string api_url,
-    std::string context_id,
-    thinknode_type_info schema,
-    blob object_data)
-{
-    using ObjectDataRequest = value_request<blob>;
-    return rq_post_iss_object<level, ObjectDataRequest>(
-        std::move(api_url),
-        std::move(context_id),
-        std::move(schema),
-        rq_value(object_data));
-}
-
-// Create a request to post an ISS object and return its ID.
-template<caching_level_type level>
-auto
-rq_post_iss_object(
-    std::string api_url,
-    std::string context_id,
-    thinknode_type_info schema,
-    dynamic data)
-{
-    return rq_post_iss_object<level>(
-        std::move(api_url),
-        std::move(context_id),
-        std::move(schema),
-        rq_value(value_to_msgpack_blob(data)));
-}
-
-template<caching_level_type level, Request ObjectDataRequest>
-requires(std::same_as<typename ObjectDataRequest::value_type, blob>) auto rq_post_iss_object_erased(
-    std::string api_url,
-    std::string context_id,
-    thinknode_type_info schema,
-    ObjectDataRequest object_data_request)
-{
-    using erased_type = thinknode_request_erased<level, std::string>;
-    using impl_type = thinknode_request_impl<
-        my_post_iss_object_request_base<ObjectDataRequest>>;
-    return erased_type{std::make_shared<impl_type>(
-        std::move(api_url),
-        std::move(context_id),
-        std::move(schema),
-        std::move(object_data_request))};
-}
-
-template<caching_level_type level>
-auto
-rq_post_iss_object_erased(
-    std::string api_url,
-    std::string context_id,
-    thinknode_type_info schema,
-    blob object_data)
-{
-    return rq_post_iss_object_erased<level>(
-        std::move(api_url),
-        std::move(context_id),
-        std::move(schema),
-        rq_value(object_data));
-}
-
-// Differences to retrieve_immutable_blob_uncached():
-// - Context is type-erased, like the request
-// - Additional api_url argument passed by the framework
-cppcoro::task<blob>
-retrieve_immutable_blob_uncached_erased(
-    context_intf& ctx,
-    std::string api_url,
-    std::string context_id,
-    std::string immutable_id);
-
-template<Request ImmutableIdRequest>
-requires(std::same_as<
-         typename ImmutableIdRequest::value_type,
-         std::string>) class my_retrieve_immutable_object_request_base
-{
- public:
-    using value_type = blob;
-
-    my_retrieve_immutable_object_request_base(
-        std::string api_url,
-        std::string context_id,
-        ImmutableIdRequest immutable_id_request)
-        : api_url_{std::move(api_url)},
-          context_id_{std::move(context_id)},
-          immutable_id_request_{std::move(immutable_id_request)}
-    {
-    }
-
-    cppcoro::task<blob>
-    resolve(thinknode_request_context& ctx) const
-    {
-        auto immutable_id = co_await immutable_id_request_.resolve(ctx);
-        co_return co_await retrieve_immutable_blob_uncached(
-            ctx, context_id_, immutable_id);
-    }
-
-    std::string
-    get_uuid() const
-    {
-        return "my_retrieve_immutable_object_request";
-    }
-
-    std::string
-    get_introspection_title() const
-    {
-        return "my_retrieve_immutable_object_request";
-    }
-
-    template<typename Archive>
-    void
-    serialize(Archive& archive)
-    {
-        archive(api_url_, context_id_, immutable_id_request_);
-    }
-
-    template<typename Comparator>
-    int
-    compare(
-        Comparator& comparator,
-        my_retrieve_immutable_object_request_base const& other) const
-    {
-        return comparator(
-            api_url_,
-            other.api_url_,
-            context_id_,
-            other.context_id_,
-            immutable_id_request_,
-            other.immutable_id_request_);
-    }
-
- private:
-    std::string api_url_;
-    std::string context_id_;
-    ImmutableIdRequest immutable_id_request_;
-};
-
-template<caching_level_type level, Request ImmutableIdRequest>
-requires(std::same_as<typename ImmutableIdRequest::value_type, std::string>) auto rq_retrieve_immutable_object(
-    std::string api_url,
-    std::string context_id,
-    ImmutableIdRequest immutable_id_request)
-{
-    using erased_type = thinknode_request_erased<level, blob>;
-    using impl_type = thinknode_request_impl<
-        my_retrieve_immutable_object_request_base<ImmutableIdRequest>>;
-    return erased_type{std::make_shared<impl_type>(
-        std::move(api_url),
-        std::move(context_id),
-        std::move(immutable_id_request))};
-}
-
-// Implementation using my_retrieve_immutable_object_request_base and mixin
-template<caching_level_type level>
-auto
-rq_retrieve_immutable_object(
-    std::string api_url, std::string context_id, std::string immutable_id)
-{
-    return rq_retrieve_immutable_object<level>(
-        std::move(api_url), std::move(context_id), rq_value(immutable_id));
-}
-
-// Implementation using function_request_erased, not needing
-// class my_retrieve_immutable_object_request_base
-template<caching_level_type level>
-auto
-rq_retrieve_immutable_object_func_prev(
-    std::string api_url, std::string context_id, std::string immutable_id)
-{
-    using value_type = blob;
-    std::string uuid{"my_retrieve_immutable_object_request"};
-    std::string title{"my_retrieve_immutable_object_request"};
-    return rq_function_erased_coro_uuid_intrsp<level, value_type>(
-        std::move(uuid),
-        std::move(title),
-        retrieve_immutable_blob_uncached_erased,
-        std::move(api_url),
-        std::move(context_id),
-        rq_value(immutable_id));
+        normalize_arg<std::string, props_type>(std::move(object_id)),
+        ignore_upgrades);
 }
 
 template<caching_level_type Level>

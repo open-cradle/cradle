@@ -3,6 +3,7 @@
 
 #include <array>
 #include <concepts>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <optional>
@@ -14,7 +15,7 @@
 namespace cradle {
 
 template<typename T>
-requires std::integral<T> || std::floating_point<T>
+    requires std::integral<T> || std::floating_point<T>
 inline size_t
 deep_sizeof(T x)
 {
@@ -95,17 +96,63 @@ as_bytes(T const* ptr)
 size_t
 hash_value(blob const& x);
 
-// Make a blob using a shared_ptr to another type that owns the actual
-// content.
-template<class OwnedType>
-blob
-make_blob(std::shared_ptr<OwnedType> ptr, std::byte const* data, size_t size)
+// Blob data owner where the data is stored in a byte_vector
+class byte_vector_owner : public data_owner
 {
-    // Here we are leveraging shared_ptr's flexibility to provide ownership of
-    // another object (of an arbitrary type) while storing a pointer to data
-    // inside that object.
-    return blob(std::shared_ptr<std::byte const>(std::move(ptr), data), size);
-}
+ public:
+    byte_vector_owner(byte_vector value) : value_{std::move(value)}
+    {
+    }
+
+    ~byte_vector_owner() = default;
+
+    std::uint8_t*
+    data()
+    {
+        return value_.data();
+    }
+
+    std::byte*
+    bytes()
+    {
+        return reinterpret_cast<std::byte*>(value_.data());
+    }
+
+    size_t
+    size() const
+    {
+        return value_.size();
+    }
+
+ private:
+    byte_vector value_;
+};
+
+// Blob data owner where the data is stored in a string
+class string_owner : public data_owner
+{
+ public:
+    string_owner(std::string value) : value_{std::move(value)}
+    {
+    }
+
+    ~string_owner() = default;
+
+    std::byte const*
+    data() const
+    {
+        return as_bytes(value_.c_str());
+    }
+
+    size_t
+    size() const
+    {
+        return value_.size();
+    }
+
+ private:
+    std::string value_;
+};
 
 // Make a blob that holds a pointer to some statically allocated data.
 blob
@@ -119,9 +166,22 @@ make_string_literal_blob(char const* data);
 blob
 make_blob(std::string s);
 
-// Make a blob that holds the contents of a byte vector.
+// Make a blob that holds the contents of a byte vector, where the blob size
+// equals the vector size.
 blob
 make_blob(byte_vector v);
+
+// Make a blob that holds the contents of a byte vector, where the blob size
+// may be smaller than the vector size.
+blob
+make_blob(byte_vector v, std::size_t size);
+
+// Create a data buffer that can be filled and attached to a blob
+std::shared_ptr<byte_vector_owner>
+make_shared_buffer(std::size_t size);
+
+std::ostream&
+operator<<(std::ostream& s, blob const& b);
 
 } // namespace cradle
 

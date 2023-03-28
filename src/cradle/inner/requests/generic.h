@@ -2,6 +2,7 @@
 #define CRADLE_INNER_REQUESTS_GENERIC_H
 
 #include <concepts>
+#include <memory>
 #include <string>
 
 #include <cppcoro/task.hpp>
@@ -11,7 +12,8 @@
 namespace cradle {
 
 struct immutable_cache;
-struct inner_service_core;
+class inner_resources;
+class request_uuid;
 class tasklet_tracker;
 
 enum class caching_level_type
@@ -22,12 +24,17 @@ enum class caching_level_type
 };
 
 template<typename T>
-concept Request = requires
-{
-    std::same_as<typename T::element_type, T>;
-    typename T::value_type;
-    std::same_as<decltype(T::caching_level), caching_level_type>;
-};
+concept Request
+    = requires {
+          std::same_as<typename T::element_type, T>;
+          typename T::value_type;
+          std::same_as<decltype(T::caching_level), caching_level_type>;
+          std::same_as<decltype(T::introspective), bool>;
+      } && requires(T const& req) {
+               {
+                   req.get_uuid()
+                   } -> std::convertible_to<request_uuid>;
+           };
 
 // unique_ptr<Request> or shared_ptr<Request>
 template<typename T>
@@ -37,22 +44,15 @@ template<typename T>
 concept RequestOrPtr = Request<T> || RequestPtr<T>;
 
 template<typename T>
-concept UncachedRequest
-    = Request<T>&& T::caching_level == caching_level_type::none;
+concept UncachedRequest = Request<T> && T::caching_level ==
+caching_level_type::none;
 
 template<typename T>
 concept UncachedRequestPtr = UncachedRequest<typename T::element_type>;
 
-template<typename T>
-concept UncachedRequestOrPtr = UncachedRequest<T> || UncachedRequestPtr<T>;
-
 template<typename Req>
-concept CachedRequest
-    = Request<Req>&& Req::caching_level != caching_level_type::none&& requires
-{
-    std::same_as<decltype(Req::introspective), bool>;
-}
-&&requires(Req const& req)
+concept CachedRequest = Request<Req>&& Req::caching_level
+                        != caching_level_type::none&& requires(Req const& req)
 {
     {
         req.get_captured_id()
@@ -61,12 +61,15 @@ concept CachedRequest
 };
 
 template<typename Req>
+concept MemoryCachedRequest
+    = CachedRequest<Req>&& Req::caching_level == caching_level_type::memory;
+
+template<typename Req>
 concept FullyCachedRequest
     = CachedRequest<Req>&& Req::caching_level == caching_level_type::full;
 
 template<typename Req>
-concept IntrospectiveRequest
-    = CachedRequest<Req>&& Req::introspective&& requires(Req const& req)
+concept IntrospectiveRequest = Req::introspective&& requires(Req const& req)
 {
     {
         req.get_introspection_title()
@@ -74,75 +77,20 @@ concept IntrospectiveRequest
     ->std::convertible_to<std::string>;
 };
 
-template<typename T>
-concept CachedRequestPtr = CachedRequest<typename T::element_type>;
+template<typename Req>
+concept NonIntrospectiveRequest = !Req::introspective;
 
-template<typename T>
-concept CachedRequestOrPtr = CachedRequest<T> || CachedRequestPtr<T>;
+template<typename Req>
+concept CachedIntrospectiveRequest
+    = CachedRequest<Req>&& IntrospectiveRequest<Req>;
 
-template<typename T>
-concept RequestContext = true;
+template<typename Req>
+concept CachedNonIntrospectiveRequest
+    = CachedRequest<Req>&& NonIntrospectiveRequest<Req>;
 
-template<typename T>
-concept UncachedContext = true;
-
-template<typename Ctx>
-concept CachedContext = requires(Ctx& ctx)
-{
-    {
-        ctx.get_service()
-    }
-    ->std::convertible_to<inner_service_core&>;
-    {
-        ctx.get_cache()
-    }
-    ->std::convertible_to<immutable_cache&>;
-};
-
-template<typename Ctx>
-concept IntrospectiveContext = CachedContext<Ctx>&& requires(Ctx& ctx)
-{
-    {
-        ctx.get_tasklet()
-    }
-    ->std::convertible_to<tasklet_tracker const*>;
-};
-
-template<typename Ctx, typename Req>
-concept MatchingContextRequest = requires(Req const& req, Ctx& ctx)
-{
-    {
-        req.resolve(ctx)
-    }
-    ->std::same_as<cppcoro::task<typename Req::value_type>>;
-};
-
-template<typename Ctx, typename Req>
-concept UncachedContextRequest = UncachedContext<Ctx>&& UncachedRequest<Req>&&
-    MatchingContextRequest<Ctx, Req>;
-
-template<typename Ctx, typename Req>
-concept CachedContextRequest = CachedContext<Ctx>&& CachedRequest<Req>&&
-    MatchingContextRequest<Ctx, Req>;
-
-template<typename Ctx, typename Req>
-concept FullyCachedContextRequest = CachedContext<Ctx>&&
-    FullyCachedRequest<Req>&& MatchingContextRequest<Ctx, Req>;
-
-template<typename Ctx, typename Req>
-concept IntrospectiveContextRequest = IntrospectiveContext<Ctx>&&
-    IntrospectiveRequest<Req>&& MatchingContextRequest<Ctx, Req>;
-
-// Primary template, used for non-request types; should be specialized for each
-// kind of request
-//
-// It would be convenient if we could use concepts here:
-//    template<RequestOrPtr Req>
-//    struct arg_type_struct
-//    {
-//        using value_type = typename Req::element_type::value_type;
-//    };
-// but compilers say no.
+// Contains the type of an argument to an rq_function-like call.
+// Primary template, used for non-request types; should be specialized
+// for each kind of request (in other .h files).
 template<typename T>
 struct arg_type_struct
 {
@@ -153,50 +101,170 @@ struct arg_type_struct
 template<typename T>
 using arg_type = typename arg_type_struct<T>::value_type;
 
+// Generic context interface, can be used for resolving uncached
+// non-introspective requests
 class context_intf
 {
  public:
     virtual ~context_intf() = default;
 
-    // Only implemented in cached context
-    // TODO create cached_context_intf class
-    virtual inner_service_core&
-    get_service()
+    // Indicates if non-trivial requests should be resolved remotely
+    // Should return true only if this is a remotable_context_intf
+    virtual bool
+    remotely() const = 0;
+};
+
+// Context interface needed for resolving a cached request
+class cached_context_intf : public virtual context_intf
+{
+ public:
+    virtual ~cached_context_intf() = default;
+
+    virtual inner_resources&
+    get_resources()
         = 0;
 
-    // Only implemented in cached context
     virtual immutable_cache&
     get_cache()
         = 0;
+};
 
-    // Only implemented in cached context
+// Context interface needed for resolving an introspective request
+class introspective_context_intf : public virtual context_intf
+{
+ public:
+    virtual ~introspective_context_intf() = default;
+
     virtual tasklet_tracker*
     get_tasklet()
         = 0;
 
-    // Only implemented in cached context
     virtual void
     push_tasklet(tasklet_tracker* tasklet)
         = 0;
 
-    // Only implemented in cached context
     virtual void
     pop_tasklet()
         = 0;
 };
 
-class context_tasklet
+// Context interface needed for resolving a request that is both cached and
+// introspective
+class cached_introspective_context_intf : public cached_context_intf,
+                                          public introspective_context_intf
 {
  public:
-    context_tasklet(
-        context_intf& ctx,
+    virtual ~cached_introspective_context_intf() = default;
+};
+
+// Context interface needed for remotely resolving requests
+// Requests will still be resolved locally if remotely() returns false.
+class remote_context_intf : public virtual context_intf
+{
+ public:
+    virtual ~remote_context_intf() = default;
+
+    virtual std::string const&
+    proxy_name() const = 0;
+
+    virtual std::string const&
+    domain_name() const = 0;
+
+    // Creates a clone of *this that differs only in its remotely() returning
+    // false
+    virtual std::unique_ptr<remote_context_intf>
+    local_clone() const = 0;
+
+    // TODO return request serialization method
+    // TODO return response serialization method
+};
+
+// If ctx is remote, convert to remote_context_intf
+// otherwise, return nullptr
+remote_context_intf*
+to_remote_context_intf(context_intf& ctx);
+
+// Defines the context_intf derived class needed for resolving a request
+// characterized by Intrsp and Level.
+// Primary template first, followed by the four partial specializations for
+// all (is request introspective?, is request cached?) combinations.
+template<bool Intrsp, caching_level_type Level>
+struct ctx_type_helper;
+
+template<caching_level_type Level>
+struct ctx_type_helper<false, Level>
+{
+    // Resolving a cached function request requires a cached context.
+    using type = cached_context_intf;
+};
+
+template<caching_level_type Level>
+struct ctx_type_helper<true, Level>
+{
+    // Resolving a cached+introspective function request requires a
+    // cached+introspective context.
+    using type = cached_introspective_context_intf;
+};
+
+template<>
+struct ctx_type_helper<false, caching_level_type::none>
+{
+    // An uncached function request can be resolved using any kind of context.
+    using type = context_intf;
+};
+
+template<>
+struct ctx_type_helper<true, caching_level_type::none>
+{
+    // Resolving an introspective function request requires an introspective
+    // context.
+    using type = introspective_context_intf;
+};
+
+// The minimal context type needed for resolving a request characterized by
+// Intrsp and Level
+template<bool Intrsp, caching_level_type Level>
+using ctx_type_for_props = typename ctx_type_helper<Intrsp, Level>::type;
+
+// The minimal context type needed for resolving request Req
+template<Request Req>
+using ctx_type_for_req = typename ctx_type_helper<Req::introspective, Req::caching_level>::type;
+
+// The most generic/minimal context
+template<typename Ctx>
+concept Context = std::convertible_to<Ctx&, context_intf&>;
+
+// Context Ctx can be used for resolving a request characterized by Intrsp and
+// Level
+template<typename Ctx, bool Intrsp, caching_level_type Level>
+concept ContextMatchingProps
+    = std::convertible_to<Ctx&, ctx_type_for_props<Intrsp, Level>&>;
+
+// Context Ctx can be used for resolving request Req
+template<typename Ctx, typename Req>
+concept ContextMatchingRequest
+    = std::convertible_to<Ctx&, ctx_type_for_req<Req>&>&& requires(
+        Req const& req, Ctx& ctx)
+{
+    {
+        req.resolve(ctx)
+    }
+    ->std::same_as<cppcoro::task<typename Req::value_type>>;
+};
+
+// tasklet_tracker context, ending when the destructor is called
+class tasklet_context
+{
+ public:
+    tasklet_context(
+        introspective_context_intf& ctx,
         std::string const& pool_name,
         std::string const& title);
 
-    ~context_tasklet();
+    ~tasklet_context();
 
  private:
-    context_intf* ctx_{nullptr};
+    introspective_context_intf* ctx_{nullptr};
 };
 
 } // namespace cradle

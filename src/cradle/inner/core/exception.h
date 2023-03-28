@@ -71,6 +71,17 @@ struct not_implemented_error : public std::logic_error
     }
 };
 
+// invalid_enum_value is thrown when an enum's raw (integer) value is invalid.
+CRADLE_DEFINE_EXCEPTION(invalid_enum_value)
+CRADLE_DEFINE_ERROR_INFO(std::string, enum_id)
+CRADLE_DEFINE_ERROR_INFO(int, enum_value)
+
+// invalid_enum_string is thrown when attempting to convert a string value to
+// an enum and the string doesn't match any of the enum's cases.
+CRADLE_DEFINE_EXCEPTION(invalid_enum_string)
+// Note that this also uses the enum_id info declared above.
+CRADLE_DEFINE_ERROR_INFO(std::string, enum_string)
+
 } // namespace cradle
 
 #endif

@@ -7,7 +7,7 @@
 
 #include <catch2/catch.hpp>
 
-#include "../support/ids.h"
+#include "../../support/ids.h"
 #include <cradle/inner/core/sha256_hash_id.h>
 
 using namespace cradle;

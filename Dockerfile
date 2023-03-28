@@ -14,4 +14,4 @@ COPY ./docker-config.json /root/.config/cradle/config.json
 WORKDIR /cradle
 VOLUME ["/var/cache/cradle"]
 EXPOSE 41071
-ENTRYPOINT ["/cradle/server"]
+ENTRYPOINT ["/cradle/websocket_server"]

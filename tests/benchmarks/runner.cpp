@@ -1,8 +1,21 @@
 #include <benchmark/benchmark.h>
 
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/spdlog.h>
+#include <cradle/inner/utilities/logging.h>
 
-auto the_logger = spdlog::stdout_color_mt("cradle");
+int
+main(int argc, char** argv)
+{
+    benchmark::Initialize(&argc, argv);
+    if (benchmark::ReportUnrecognizedArguments(argc, argv))
+    {
+        return 1;
+    }
 
-BENCHMARK_MAIN();
+    // Can be overruled by setting SPDLOG_LEVEL, e.g.
+    //   export SPDLOG_LEVEL=debug
+    cradle::initialize_logging("warn");
+
+    benchmark::RunSpecifiedBenchmarks();
+    benchmark::Shutdown();
+    return 0;
+}

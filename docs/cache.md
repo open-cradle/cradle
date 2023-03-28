@@ -1,14 +1,13 @@
 # Cache
-CRADLE caches objects in its local caches whenever possible; there are two levels:
+CRADLE caches objects whenever possible; there are two levels:
 
-* A memory-based one (default size: 1GB)
-* A disk-based one (default size: 4GB).
-  The main disk-based cache is formed by an SQLite database, which also contains small blobs.
-  Large blobs are compressed via LZ4 and stored in a file.
+* A primary memory cache (default size: 4GB)
+* A secondary cache: a local disk cache (default size: 4GB) or a [remote cache](remote_cache.md)
 
-  It looks like the LRU mechanism is not active for this cache.
+The main local disk-based cache is formed by an SQLite database, which also contains small blobs.
+Large blobs are compressed via LZ4 and stored in a file.
 
-In all cases, structured data is first serialized into a form similar to the MessagePack
+For all types of secondary storage, structured data is first serialized into a form similar to the MessagePack
 serialization used between client and CRADLE.
 (Preferred way forward: no serialization, CRADLE need not understand the data format,
 it can store raw data.)

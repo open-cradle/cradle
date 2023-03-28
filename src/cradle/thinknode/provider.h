@@ -1,9 +1,9 @@
 #ifndef CRADLE_THINKNODE_PROVIDER_H
 #define CRADLE_THINKNODE_PROVIDER_H
 
+#include <cradle/inner/core/monitoring.h>
 #include <cradle/thinknode/types.hpp>
 #include <cradle/typing/core.h>
-#include <cradle/typing/core/monitoring.h>
 
 namespace cradle {
 
@@ -17,7 +17,8 @@ struct provider_app_interface
         check_in_interface& check_in,
         progress_reporter_interface& reporter,
         std::string const& name,
-        dynamic_array const& args) const = 0;
+        dynamic_array const& args) const
+        = 0;
 };
 
 // Implement a calculation provider for an API.

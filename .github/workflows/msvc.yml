@@ -13,12 +13,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
     - name: Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
           ~/.conan/data
@@ -40,7 +40,7 @@ jobs:
         cmake --build build --target preprocessing -j4
 
     - name: Upload preprocessed headers
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: preprocessed
         path: build/generated
@@ -54,12 +54,12 @@ jobs:
         config: [Debug, Release]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
 
     - name: Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
           C:/.conan/data
@@ -67,10 +67,10 @@ jobs:
 
     - name: Install Conan
       run: |
-        pip install conan
+        pip install conan==1.59.0
 
     - name: Download preprocessed headers
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: preprocessed
         path: preprocessed
@@ -82,12 +82,14 @@ jobs:
         -DEXTERNALLY_PREPROCESSED_DIRECTORY=preprocessed
         -DLOCAL_DOCKER_TESTING=OFF
 
-    - name: Build & Test
-      run: >
-        python python/generate_config.py $Env:CRADLE_THINKNODE_API_TOKEN
+    - name: Build
+      run: |
+        cmake --build build --config ${{matrix.config}} -j4
 
-        cmake --build build --config ${{matrix.config}}
-        --target all_unit_tests -j4
+    - name: Test
+      run: |
+        python python/generate_config.py $Env:CRADLE_THINKNODE_API_TOKEN
+        cmake --build build --config ${{matrix.config}} --target all_unit_tests -j4
 
     - name: Benchmarks
       if: ${{ matrix.config == 'Release' }}

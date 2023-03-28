@@ -1,18 +1,29 @@
 #include <benchmark/benchmark.h>
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/value.h>
-#include <cradle/inner/service/core.h>
+#include <cradle/inner/service/resources.h>
+#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 
-#include "../inner/support/core.h"
-#include "support.h"
+#include "../support/inner_service.h"
+#include "benchmark_support.h"
 
 using namespace cradle;
 
 static auto add = [](int a, int b) { return a + b; };
+
+namespace {
+
+request_uuid
+make_uuid()
+{
+    static int next_id{};
+    return request_uuid{fmt::format("benchmark-{}", next_id++)};
+}
 
 template<int H>
 auto
@@ -45,6 +56,8 @@ create_triangular_tree()
             create_triangular_tree<level, H - 1>());
     }
 }
+
+} // namespace
 
 template<int H>
 void
@@ -302,28 +315,31 @@ template<caching_level_type level, int H>
 auto
 create_thin_tree_erased()
 {
+    request_props<level> props{make_uuid()};
     if constexpr (H == 1)
     {
-        return rq_function_erased<level>(add, 2, 1);
+        return rq_function_erased(props, add, 2, 1);
     }
     else
     {
-        return rq_function_erased<level>(
-            add, create_thin_tree_erased<level, H - 1>(), 1);
+        return rq_function_erased(
+            props, add, create_thin_tree_erased<level, H - 1>(), 1);
     }
 }
 
 template<caching_level_type level, int H>
-requires(
-    level != caching_level_type::full) auto create_triangular_tree_erased()
+    requires(level != caching_level_type::full)
+auto create_triangular_tree_erased()
 {
+    request_props<level> props{make_uuid()};
     if constexpr (H == 1)
     {
-        return rq_function_erased<level>(add, 2, 1);
+        return rq_function_erased(props, add, 2, 1);
     }
     else
     {
-        return rq_function_erased<level>(
+        return rq_function_erased(
+            props,
             add,
             create_triangular_tree_erased<level, H - 1>(),
             create_triangular_tree_erased<level, H - 1>());
@@ -331,17 +347,18 @@ requires(
 }
 
 template<caching_level_type level, int H>
-requires(
-    level == caching_level_type::full) auto create_triangular_tree_erased()
+    requires(level == caching_level_type::full)
+auto create_triangular_tree_erased()
 {
+    request_props<level, false, false> props{make_uuid()};
     if constexpr (H == 1)
     {
-        return rq_function_erased_uuid<level>("add_uuid", add, 2, 1);
+        return rq_function_erased(props, add, 2, 1);
     }
     else
     {
-        return rq_function_erased_uuid<level>(
-            "add_uuid",
+        return rq_function_erased(
+            props,
             add,
             create_triangular_tree_erased<level, H - 1>(),
             create_triangular_tree_erased<level, H - 1>());
@@ -350,23 +367,22 @@ requires(
 
 template<caching_level_type level, int H>
 auto
-create_triangular_tree_erased_introspected()
+create_triangular_tree_erased_introspective()
 {
     if constexpr (H == 1)
     {
-        std::string title{"add 2+1"};
-        return rq_function_erased_intrsp<level>(title, add, 2, 1);
+        request_props<level, false, true> props{make_uuid(), "add 2+1"};
+        return rq_function_erased(props, add, 2, 1);
     }
     else
     {
-        std::stringstream ss;
-        ss << "add H" << H;
-        std::string title{ss.str()};
-        return rq_function_erased_intrsp<level>(
-            title,
+        std::string title{fmt::format("add H{}", H)};
+        request_props<level, false, true> props{make_uuid(), title};
+        return rq_function_erased(
+            props,
             add,
-            create_triangular_tree_erased_introspected<level, H - 1>(),
-            create_triangular_tree_erased_introspected<level, H - 1>());
+            create_triangular_tree_erased_introspective<level, H - 1>(),
+            create_triangular_tree_erased_introspective<level, H - 1>());
     }
 }
 
@@ -429,7 +445,7 @@ BM_create_tri_tree_erased_intrsp(benchmark::State& state)
     for (auto _ : state)
     {
         benchmark::DoNotOptimize(
-            create_triangular_tree_erased_introspected<level, H>());
+            create_triangular_tree_erased_introspective<level, H>());
     }
 }
 

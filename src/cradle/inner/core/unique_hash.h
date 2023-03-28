@@ -13,34 +13,10 @@
 
 namespace cradle {
 
-struct id_interface;
-
-// Get a string that is unique for the given ID (based on its hash).
-// The primary purpose of these strings is to act as keys in the disk cache.
-// That cache can contain items for all kinds of requests, including
-// old-style Thinknode ones, and maybe even more.
-//
-// Preventing collisions is important.
-// - Collisions between different types of requests will not appear assuming
-//   their hash includes a uuid.
-// - The number and types of a request's arguments are fixed, so also there
-//   collisions cannot happen. (typing/core/unique_hash.h hashes dynamics,
-//   taking types into account.)
-//
-// id should be one of:
-// - A captured_id belonging to a fully-cached request (so carrying a uuid
-//   at least in that request, possibly more in subrequests); or
-// - A sha256_hashed_id calculated for an old-style Thinknode request
-//
-// An optimization for the first case could be to base the ultimate hash
-// value only on the top request's uuid, but it doesn't seem worthwhile.
-std::string
-get_unique_string(id_interface const& id);
-
 // Creates a cryptographic-strength hash value that should prevent collisions
 // between different items written to the disk cache.
-// Collisions between values that happen to have the same bitwise
-// representation are prevented by prefixing them with their type.
+// The hash function is assumed to be so strong that collisions will not occur
+// between different byte sequences fed to the hasher.
 class unique_hasher
 {
  public:
@@ -109,7 +85,7 @@ class unique_hasher
 };
 
 template<typename T>
-requires std::integral<T> || std::floating_point<T>
+    requires std::integral<T> || std::floating_point<T>
 void
 update_unique_hash(unique_hasher& hasher, T val)
 {
@@ -122,32 +98,6 @@ update_unique_hash(unique_hasher& hasher, std::string const& val);
 
 void
 update_unique_hash(unique_hasher& hasher, blob const& val);
-
-// A wrapper around unique_hasher, transforming it into something that can be
-// passed to cereal's serialize().
-class unique_functor
-{
- public:
-    template<typename Arg0, typename... Args>
-    void
-    operator()(Arg0&& arg0, Args&&... args)
-    {
-        update_unique_hash(hasher_, std::forward<Arg0>(arg0));
-        if constexpr (sizeof...(args) > 0)
-        {
-            operator()(args...);
-        }
-    }
-
-    void
-    get_result(unique_hasher::result_t& result)
-    {
-        hasher_.get_result(result);
-    }
-
- private:
-    unique_hasher hasher_;
-};
 
 } // namespace cradle
 

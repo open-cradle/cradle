@@ -12,7 +12,18 @@ class Session:
     def __init__(self):
         self.impl = conn.Connection()
         self.context_id = self.impl.context_id
+        self._git_version = None
         self.registration()
+
+    @property
+    def api_url(self) -> str:
+        return self.impl.api_url
+
+    @property
+    def git_version(self) -> str:
+        if self._git_version is None:
+            self._git_version = self.query_requests_meta_info()['git_version']
+        return self._git_version
 
     def registration(self) -> None:
         command = cmd.RegistrationCommand(self.context_id,
@@ -109,3 +120,14 @@ class Session:
         """Receive a response for a started request (whatever its type)."""
         print('RECEIVE RESPONSE', file=sys.stderr)
         return self.impl.receive_response(command)
+
+    def query_requests_meta_info(self) -> cmd.Object:
+        '''Retrieve info on the requests subsystem'''
+        print('QUERY REQUESTS META INFO', file=sys.stderr)
+        command = cmd.QueryRequestsMetaInfoCommand(self.context_id)
+        return self.impl.perform_command(command)
+
+    def resolve_request(self, req_data: cmd.Object, remote: bool) -> cmd.Object:
+        print(f'RESOLVE REQUEST {remote=}', file=sys.stderr)
+        command = cmd.ResolveRequestCommand(self.context_id, req_data, remote)
+        return self.impl.perform_command(command)

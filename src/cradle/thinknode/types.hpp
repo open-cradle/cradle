@@ -3,8 +3,7 @@
 
 #include <vector>
 
-#include <cradle/inner/requests/generic.h>
-#include <cradle/typing/core.h>
+#include <cradle/inner/core/id.h>
 
 namespace cradle {
 
@@ -25,39 +24,6 @@ struct thinknode_session
 {
     std::string api_url;
     std::string access_token;
-};
-
-struct immutable_cache;
-struct service_core;
-class tasklet_tracker;
-
-struct thinknode_request_context : public context_intf
-{
-    service_core& service;
-    thinknode_session session;
-
-    thinknode_request_context(
-        service_core& service,
-        thinknode_session session,
-        tasklet_tracker* tasklet);
-
-    inner_service_core&
-    get_service() override;
-
-    immutable_cache&
-    get_cache() override;
-
-    tasklet_tracker*
-    get_tasklet() override;
-
-    void
-    push_tasklet(tasklet_tracker* tasklet) override;
-
-    void
-    pop_tasklet() override;
-
- private:
-    std::vector<tasklet_tracker*> tasklets_;
 };
 
 struct thinknode_array_info;

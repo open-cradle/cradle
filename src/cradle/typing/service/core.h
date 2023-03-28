@@ -1,103 +1,45 @@
 #ifndef CRADLE_TYPING_SERVICE_CORE_H
 #define CRADLE_TYPING_SERVICE_CORE_H
 
+// Services exposed by the typing subsystem.
+
 #include <memory>
+#include <string>
+#include <utility>
 
-#include <cppcoro/fmap.hpp>
+#include <cppcoro/static_thread_pool.hpp>
 
-#include <cradle/inner/service/core.h>
-#include <cradle/typing/io/http_requests.hpp>
-#include <cradle/typing/service/internals.h>
-#include <cradle/typing/service/types.hpp>
+#include <cradle/inner/service/config.h>
+#include <cradle/inner/service/resources.h>
+#include <cradle/thinknode/types.hpp>
 
 namespace cradle {
 
-namespace detail {
+class service_core_impl;
 
-struct service_core_internals;
-
-}
-
-struct service_core : public inner_service_core
+class service_core : public inner_resources
 {
-    service_core() : inner_service_core()
-    {
-    }
-    service_core(service_config const& config) : inner_service_core()
-    {
-        reset(config);
-    }
+ public:
+    service_core();
+
+    service_core(service_config const& config);
+
     ~service_core();
 
     void
-    reset();
-    void
-    reset(service_config const& config);
+    initialize(service_config const& config);
 
-    detail::service_core_internals&
-    internals()
-    {
-        return *impl_;
-    }
+    cppcoro::static_thread_pool&
+    get_local_compute_pool_for_image(
+        std::pair<std::string, thinknode_provider_image_info> const& tag);
 
  private:
-    std::unique_ptr<detail::service_core_internals> impl_;
+    std::unique_ptr<service_core_impl> impl_;
 };
-
-http_connection_interface&
-http_connection_for_thread(service_core& core);
-
-cppcoro::task<http_response>
-async_http_request(
-    service_core& core,
-    http_request request,
-    tasklet_tracker* client = nullptr);
-
-template<>
-cppcoro::task<dynamic>
-disk_cached(
-    inner_service_core& core,
-    captured_id key,
-    std::function<cppcoro::task<dynamic>()> create_task);
-
-template<class Value>
-cppcoro::task<Value>
-disk_cached(
-    inner_service_core& core,
-    captured_id key,
-    std::function<cppcoro::task<Value>()> create_task)
-{
-    return cppcoro::make_task(cppcoro::fmap(
-        CRADLE_LAMBDIFY(from_dynamic<Value>),
-        disk_cached<dynamic>(
-            core, key, [create_task = std::move(create_task)]() {
-                return cppcoro::make_task(cppcoro::fmap(
-                    CRADLE_LAMBDIFY(to_dynamic<Value>), create_task()));
-            })));
-}
 
 // Initialize a service for unit testing purposes.
 void
 init_test_service(service_core& core);
-
-// Set up HTTP mocking for a service.
-// This returns the mock_http_session that's been associated with the service.
-struct mock_http_session;
-mock_http_session&
-enable_http_mocking(service_core& core);
-
-template<class Sequence, class Function>
-cppcoro::task<>
-for_async(Sequence sequence, Function&& function)
-{
-    auto i = co_await sequence.begin();
-    auto const end = sequence.end();
-    while (i != end)
-    {
-        std::forward<Function>(function)(*i);
-        (void) co_await ++i;
-    }
-}
 
 } // namespace cradle
 

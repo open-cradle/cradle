@@ -2,13 +2,15 @@
 #define CRADLE_WEBSOCKET_CALCULATIONS_H
 
 #include <cradle/inner/introspection/tasklet.h>
+#include <cradle/thinknode/context.h>
 #include <cradle/typing/service/core.h>
 #include <cradle/websocket/types.hpp>
 
 namespace cradle {
 
 template<class Return, class... Args>
-auto make_function_id(Return (*ptr)(Args... args))
+auto
+make_function_id(Return (*ptr)(Args... args))
 {
     return make_captured_id(ptr);
 }

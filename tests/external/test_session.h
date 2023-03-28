@@ -2,7 +2,7 @@
 #define TESTS_EXTERNAL_TEST_SESSION_H
 
 #include <cradle/external_api.h>
-#include <cradle/typing/io/mock_http.h>
+#include <cradle/inner/io/mock_http.h>
 #include <memory>
 
 class external_test_session

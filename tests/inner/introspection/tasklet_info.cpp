@@ -1,7 +1,7 @@
 #include <catch2/catch.hpp>
 
-#include "../introspection/tasklet_testing.h"
-#include "../support/core.h"
+#include "../../support/inner_service.h"
+#include "../../support/tasklet_testing.h"
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/introspection/tasklet_impl.h>
 #include <cradle/inner/introspection/tasklet_info.h>

@@ -4,7 +4,7 @@
 
 #include "test_session.h"
 #include <cradle/external_api.h>
-#include <cradle/typing/io/mock_http.h>
+#include <cradle/inner/io/mock_http.h>
 #include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
@@ -19,12 +19,14 @@ TEST_CASE("get_iss_object", "[external]")
     auto& mock_http = test_session.enable_http_mocking();
     mock_http.set_script(
         {{make_get_request(
-              "https://mgh.thinknode.io/api/v1.0/iss/my_object_id/immutable?context=123&ignore_upgrades=false",
+              "https://mgh.thinknode.io/api/v1.0/iss/my_object_id/"
+              "immutable?context=123&ignore_upgrades=false",
               {{"Authorization", "Bearer xyz"},
                {"Accept", "application/json"}}),
           make_http_200_response(R"({ "id": "my_immutable_id" })")},
          {make_get_request(
-              "https://mgh.thinknode.io/api/v1.0/iss/immutable/my_immutable_id?context=123",
+              "https://mgh.thinknode.io/api/v1.0/iss/immutable/"
+              "my_immutable_id?context=123",
               {{"Authorization", "Bearer xyz"},
                {"Accept", "application/octet-stream"}}),
           make_http_200_response(blob_value.c_str())}});

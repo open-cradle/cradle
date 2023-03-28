@@ -11,6 +11,7 @@
 
 #include <boost/static_assert.hpp>
 
+#include <cradle/inner/core/type_interfaces.h>
 #include <cradle/typing/io/endian.h>
 #include <cradle/typing/io/raw_memory_io.h>
 
@@ -63,11 +64,12 @@ read_message(tcp::socket& socket, uint8_t ipc_version)
 
     // Read the body.
     auto body_length = boost::numeric_cast<size_t>(header.body_length);
-    std::shared_ptr<uint8_t[]> body_buffer(new uint8_t[body_length]);
-    boost::asio::read(
-        socket, boost::asio::buffer(body_buffer.get(), body_length));
+    auto body_buffer{make_shared_buffer(body_length)};
+    auto body_data{body_buffer->data()};
+    boost::asio::read(socket, boost::asio::buffer(body_data, body_length));
     IncomingMessage message;
-    read_message_body(&message, header.code, body_buffer, body_length);
+    read_message_body(
+        &message, header.code, body_buffer, body_data, body_length);
     return message;
 }
 

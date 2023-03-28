@@ -17,6 +17,7 @@
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
+#include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/supervisor.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/dynamic.h>
@@ -34,9 +35,7 @@ get_local_compute_pool_for_image(
     service_core& service,
     std::pair<std::string, thinknode_provider_image_info> const& tag)
 {
-    return service.internals()
-        .local_compute_pool.try_emplace(tag, 4)
-        .first->second;
+    return service.get_local_compute_pool_for_image(tag);
 }
 
 namespace uncached {
@@ -55,7 +54,7 @@ perform_local_function_calc(
     auto const image = as_private(*version_info.manifest->provider).image;
 
     auto pool_name = std::string{"local@"} + app;
-    context_tasklet tasklet_guard{ctx, pool_name, "local calc"};
+    tasklet_context tasklet_guard{ctx, pool_name, "local calc"};
     co_await get_local_compute_pool_for_image(
         ctx.service, std::make_pair(app, image))
         .schedule();

@@ -5,10 +5,9 @@
 // - More types here.
 #include <cradle/typing/core/type_interfaces.h>
 
-#include <cradle/typing/utilities/testing.h>
-
 #include <cradle/inner/utilities/text.h>
-#include <cradle/typing/service/types.hpp>
+#include <cradle/typing/core/api_types.hpp>
+#include <cradle/typing/utilities/testing.h>
 
 using namespace cradle;
 
@@ -168,7 +167,7 @@ TEST_CASE("generated type interfaces", "[core][types]")
     {
         INFO("Test a generated structure type.");
         test_regular_value_pair(
-            service_disk_cache_config(some(string("abc")), 12),
-            service_disk_cache_config(some(string("def")), 1));
+            api_named_type_reference(string("app0"), string("name0")),
+            api_named_type_reference(string("app1"), string("name1")));
     }
 }

@@ -2,7 +2,8 @@
 
 #include "test_session.h"
 #include <cradle/external_api.h>
-#include <cradle/typing/io/mock_http.h>
+#include <cradle/inner/io/http_requests.h>
+#include <cradle/inner/io/mock_http.h>
 #include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
@@ -29,7 +30,8 @@ TEST_CASE("copy_iss_object", "[external]")
          // Shallow copy
          {make_http_request(
               http_request_method::POST,
-              "https://mgh.thinknode.io/api/v1.0/iss/my_object_id/buckets/my_bucket_id?context=456",
+              "https://mgh.thinknode.io/api/v1.0/iss/my_object_id/buckets/"
+              "my_bucket_id?context=456",
               {{"Authorization", "Bearer xyz"}},
               blob()),
           make_http_200_response("")},
