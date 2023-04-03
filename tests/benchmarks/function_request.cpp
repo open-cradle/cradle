@@ -5,6 +5,7 @@
 #include <spdlog/spdlog.h>
 
 #include <cradle/inner/requests/function.h>
+#include <cradle/inner/requests/function_deprecated.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
