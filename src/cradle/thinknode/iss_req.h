@@ -55,7 +55,7 @@ rq_post_iss_object(
     auto uuid{make_tn_uuid<Level>("rq_post_iss_object")};
     std::string title{"post_iss_object"};
     std::string url_type_template{get_url_type_template(schema)};
-    return rq_function_erased_coro<std::string>(
+    return rq_function_erased(
         props_type{std::move(uuid), std::move(title)},
         post_iss_object_uncached_template_url,
         std::move(context_id),
@@ -72,11 +72,10 @@ template<caching_level_type Level, typename ImmutableId>
 requires TypedArg<ImmutableId, std::string> auto
 rq_retrieve_immutable_object(std::string context_id, ImmutableId immutable_id)
 {
-    using value_type = blob;
     using props_type = thinknode_request_props<Level>;
     auto uuid{make_tn_uuid<Level>("rq_retrieve_immutable_object")};
     std::string title{"retrieve_immutable_object"};
-    return rq_function_erased_coro<value_type>(
+    return rq_function_erased(
         props_type{std::move(uuid), std::move(title)},
         retrieve_immutable_blob_uncached,
         std::move(context_id),
@@ -91,10 +90,9 @@ requires TypedArg<ObjectId, std::string> auto
 rq_get_iss_object_metadata(std::string context_id, ObjectId object_id)
 {
     using props_type = thinknode_request_props<Level>;
-    using value_type = std::map<std::string, std::string>;
     auto uuid{make_tn_uuid<Level>("rq_get_iss_object_metadata")};
     std::string title{"get_iss_object_metadata"};
-    return rq_function_erased_coro<value_type>(
+    return rq_function_erased(
         props_type(std::move(uuid), std::move(title)),
         get_iss_object_metadata_uncached,
         std::move(context_id),
@@ -111,10 +109,9 @@ rq_resolve_iss_object_to_immutable(
     std::string context_id, ObjectId object_id, bool ignore_upgrades)
 {
     using props_type = thinknode_request_props<Level>;
-    using value_type = std::string;
     auto uuid{make_tn_uuid<Level>("rq_resolve_iss_object_to_immutable")};
     std::string title{"resolve_iss_object_to_immutable"};
-    return rq_function_erased_coro<value_type>(
+    return rq_function_erased(
         props_type(std::move(uuid), std::move(title)),
         resolve_iss_object_to_immutable_uncached,
         std::move(context_id),

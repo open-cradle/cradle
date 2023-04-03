@@ -365,8 +365,7 @@ TEST_CASE("evaluate function requests in parallel - uncached coroutine", tag)
     for (int i = 0; i < num_requests; ++i)
     {
         Props props{make_test_uuid(300 + i)};
-        requests.emplace_back(
-            rq_function_erased_coro<Value>(props, add, i, i * 2));
+        requests.emplace_back(rq_function_erased(props, add, i, i * 2));
     }
 
     auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));

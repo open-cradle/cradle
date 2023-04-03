@@ -25,7 +25,7 @@ template<caching_level_type Level>
 auto
 rq_make_some_blob(std::size_t size, bool shared)
 {
-    return rq_function_erased_coro<blob>(
+    return rq_function_erased(
         testing_request_props<Level>(
             request_uuid{"make_some_blob"}, std::string{"make_some_blob"}),
         make_some_blob,

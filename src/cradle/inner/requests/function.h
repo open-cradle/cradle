@@ -644,11 +644,15 @@ auto rq_function_erased(Props props, Function function, Args... args)
 }
 
 // Creates a type-erased request for a function that is a coroutine.
-// Value cannot be derived in this case so must be explicitly specified.
-template<typename Value, typename Props, typename Function, typename... Args>
-    requires(Props::func_is_coro)
-auto rq_function_erased_coro(Props props, Function function, Args... args)
+template<typename Props, typename Function, typename... Args>
+requires(Props::func_is_coro) auto rq_function_erased(
+    Props props, Function function, Args... args)
 {
+    using CtxRef = std::add_lvalue_reference_t<typename Props::ctx_type>;
+    // Rely on the coroutine returning cppcoro::task<Value>,
+    // which is a class that has a value_type member
+    using Value = typename std::
+        invoke_result_t<Function, CtxRef, arg_type<Args>...>::value_type;
     return function_request_erased<Value, Props>{
         std::move(props), std::move(function), std::move(args)...};
 }
@@ -768,8 +772,7 @@ requires(!Request<Value> && Props::func_is_coro) auto normalize_arg(
     Value const& arg)
 {
     Props props{make_normalization_uuid<Value>(), "arg"};
-    return rq_function_erased_coro<Value>(
-        std::move(props), identity_coro<Value>, arg);
+    return rq_function_erased(std::move(props), identity_coro<Value>, arg);
 }
 
 // Normalizes a C-style string argument in a non-coroutine context.
@@ -791,7 +794,7 @@ requires(std::same_as<Value, std::string>&&
              Props::func_is_coro) auto normalize_arg(char const* arg)
 {
     Props props{make_normalization_uuid<Value>(), "arg"};
-    return rq_function_erased_coro<Value>(
+    return rq_function_erased(
         std::move(props), identity_coro<std::string>, std::string{arg});
 }
 

@@ -177,8 +177,8 @@ TEST_CASE("compare function_request_erased: identical C++ functions", tag)
     constexpr bool is_coro{true};
     request_props<caching_level_type::memory, is_coro> props{
         make_test_uuid("0050")};
-    auto req_a0{rq_function_erased_coro<std::string>(props, coro_a)};
-    auto req_a1{rq_function_erased_coro<std::string>(props, coro_a)};
+    auto req_a0{rq_function_erased(props, coro_a)};
+    auto req_a1{rq_function_erased(props, coro_a)};
 
     REQUIRE(req_a0.equals(req_a1));
 
@@ -198,8 +198,8 @@ TEST_CASE("compare function_request_erased: different C++ functions", tag)
         make_test_uuid("0061")};
     // req_a and req_b have the same signature (type), but refer to different
     // C++ functions.
-    auto req_a{rq_function_erased_coro<std::string>(props_a, coro_a)};
-    auto req_b{rq_function_erased_coro<std::string>(props_b, coro_b)};
+    auto req_a{rq_function_erased(props_a, coro_a)};
+    auto req_b{rq_function_erased(props_b, coro_b)};
 
     REQUIRE(!req_a.equals(req_b));
 
@@ -219,10 +219,8 @@ TEST_CASE(
         make_test_uuid("0070")};
     // req_a and req_b have the same signature (type), refer to different
     // C++ functions, but take different args.
-    auto req_a{rq_function_erased_coro<std::string>(
-        props, make_string, std::string{"a"})};
-    auto req_b{rq_function_erased_coro<std::string>(
-        props, make_string, std::string{"b"})};
+    auto req_a{rq_function_erased(props, make_string, std::string{"a"})};
+    auto req_b{rq_function_erased(props, make_string, std::string{"b"})};
 
     REQUIRE(!req_a.equals(req_b));
 

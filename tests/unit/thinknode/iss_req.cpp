@@ -135,8 +135,8 @@ make_post_iss_request_subreq(std::string payload = "payload")
     std::string uuid_text{fmt::format("uuid_100_{}", static_cast<int>(Level))};
     thinknode_request_props<Level> props{
         request_uuid(uuid_text), "make_blob_coro"};
-    auto make_blob_request = rq_function_erased_coro<blob>(
-        props, make_blob_coro, rq_value(payload));
+    auto make_blob_request
+        = rq_function_erased(props, make_blob_coro, rq_value(payload));
     return rq_post_iss_object<Level>(
         "123",
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
@@ -513,7 +513,7 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT creation - template arg", tag)
     };
     auto req0{rq_retrieve_immutable_object<level>(
         context_id,
-        rq_function_erased_coro<std::string>(
+        rq_function_erased(
             thinknode_request_props<level>{make_uuid(), "arg"}, coro))};
     // The second argument in req1 will be "normalized" to the same thing
     // passed to req0.

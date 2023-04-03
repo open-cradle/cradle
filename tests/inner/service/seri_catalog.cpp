@@ -38,7 +38,7 @@ auto
 rq_local(Function function, std::string const& title)
 {
     constexpr auto level{caching_level_type::memory};
-    return rq_function_erased_coro<std::string>(
+    return rq_function_erased(
         local_props<level>(request_uuid{title}, title), std::move(function));
 }
 
