@@ -17,7 +17,10 @@
 
 #include <cereal/types/memory.hpp>
 #include <cereal/types/tuple.hpp>
+#include <cppcoro/operation_cancelled.hpp>
+#include <cppcoro/schedule_on.hpp>
 #include <cppcoro/task.hpp>
+#include <cppcoro/when_all.hpp>
 #include <fmt/format.h>
 
 #include <cradle/inner/core/exception.h>
@@ -68,6 +71,33 @@ class missing_uuid_error : public uuid_error
     using uuid_error::uuid_error;
 };
 
+// Visits a request's argument if it's not a subrequest.
+template<typename Val>
+void
+visit_arg(req_visitor_intf& visitor, std::size_t ix, Val const& val)
+{
+    visitor.visit_val_arg(ix);
+}
+
+// Visits a subrequest, and recursively visits its arguments.
+// TODO seems useful only if req's function is a coro. Not for value_request
+template<Request Req>
+void
+visit_arg(req_visitor_intf& visitor, std::size_t ix, Req const& req)
+{
+    auto sub_visitor = visitor.visit_req_arg(ix);
+    req.visit(*sub_visitor);
+}
+
+// Recursively visits all arguments of a request, and its subrequests.
+template<typename Args, std::size_t... Ix>
+auto
+visit_args(
+    req_visitor_intf& visitor, Args const& args, std::index_sequence<Ix...>)
+{
+    (visit_arg(visitor, Ix, std::get<Ix>(args)), ...);
+}
+
 /*
  * The interface type exposing the functionality that function_request_erased
  * requires outside its constructor.
@@ -87,9 +117,34 @@ class function_request_intf : public id_interface
     get_uuid() const
         = 0;
 
+    virtual void
+    visit(req_visitor_intf& visitor) const = 0;
+
     virtual cppcoro::task<Value>
     resolve(Ctx& ctx) const = 0;
 };
+
+template<typename Ctx, typename Args, std::size_t... Ix>
+auto
+make_sync_sub_tasks(Ctx& ctx, Args const& args, std::index_sequence<Ix...>)
+{
+    return std::make_tuple(resolve_request(ctx, std::get<Ix>(args))...);
+}
+
+template<typename Ctx, typename Args, std::size_t... Ix>
+auto
+make_async_sub_tasks(Ctx& ctx, Args const& args, std::index_sequence<Ix...>)
+{
+    return std::make_tuple(
+        resolve_request(ctx.get_sub(Ix), std::get<Ix>(args))...);
+}
+
+template<typename Tuple, std::size_t... Ix>
+auto
+when_all_wrapper(Tuple&& tasks, std::index_sequence<Ix...>)
+{
+    return cppcoro::when_all(std::get<Ix>(std::forward<Tuple>(tasks))...);
+}
 
 /*
  * The actual type created by function_request_erased, but visible only in its
@@ -125,12 +180,14 @@ template<
 class function_request_impl : public Intf
 {
  public:
-    static constexpr bool func_is_coro = AsCoro;
-    static constexpr bool func_is_plain
-        = std::is_function_v<std::remove_pointer_t<Function>>;
     using this_type = function_request_impl;
     using base_type = Intf;
     using context_type = typename Intf::context_type;
+
+    static constexpr bool func_is_coro = AsCoro;
+    static constexpr bool func_is_plain
+        = std::is_function_v<std::remove_pointer_t<Function>>;
+    static constexpr bool is_async = LocalAsyncContext<context_type>;
 
     function_request_impl(request_uuid uuid, Function function, Args... args)
         : uuid_{std::move(uuid)}, args_{std::move(args)...}
@@ -236,6 +293,13 @@ class function_request_impl : public Intf
         return uuid_;
     }
 
+    void
+    visit(req_visitor_intf& visitor) const override
+    {
+        using Indices = std::index_sequence_for<Args...>;
+        visit_args(visitor, args_, Indices{});
+    }
+
     cppcoro::task<Value>
     resolve(context_type& ctx) const override
     {
@@ -256,16 +320,53 @@ class function_request_impl : public Intf
                 },
                 args_);
         }
+        else if constexpr (!is_async)
+        {
+            using Indices = std::index_sequence_for<Args...>;
+            auto sub_tasks = make_sync_sub_tasks(ctx, args_, Indices{});
+            co_return co_await std::apply(
+                *function_,
+                std::tuple_cat(
+                    std::tie(ctx),
+                    co_await when_all_wrapper(
+                        std::move(sub_tasks), Indices{})));
+        }
         else
         {
-            co_return co_await std::apply(
-                [&](auto&&... args) -> cppcoro::task<Value> {
-                    co_return co_await (*function_)(
-                        ctx,
-                        (co_await resolve_request(
-                            ctx, std::forward<decltype(args)>(args)))...);
-                },
-                args_);
+            // Throws on error or cancellation.
+            // If a subtask throws (because of cancellation or otherwise),
+            // the main task will wait until all other subtasks have finished
+            // (or thrown).
+            // This justifies passing contexts around by reference.
+            try
+            {
+                using Indices = std::index_sequence_for<Args...>;
+                auto sub_tasks = make_async_sub_tasks(ctx, args_, Indices{});
+                ctx.update_status(async_status::SUBS_RUNNING);
+                auto sub_results = co_await when_all_wrapper(
+                    std::move(sub_tasks), Indices{});
+                ctx.update_status(async_status::SELF_RUNNING);
+                // Rescheduling allows tasks to run in parallel.
+                // However, for simple tasks (e.g. identity_coro) it probably
+                // isn't any good.
+                // TODO make schedule() call conditional
+                co_await ctx.get_thread_pool().schedule();
+                auto result = co_await std::apply(
+                    *function_,
+                    std::tuple_cat(std::tie(ctx), std::move(sub_results)));
+                ctx.update_status(async_status::FINISHED);
+                co_return result;
+            }
+            catch (cppcoro::operation_cancelled const&)
+            {
+                ctx.update_status(async_status::CANCELLED);
+                throw;
+            }
+            catch (std::exception const&)
+            {
+                ctx.update_status(async_status::ERROR);
+                throw;
+            }
         }
     }
 
@@ -458,14 +559,14 @@ template<typename Value, typename Props>
 class function_request_erased
 {
  public:
-    static constexpr caching_level_type caching_level = Props::level;
-    static constexpr bool introspective = Props::introspective;
-
     using element_type = function_request_erased;
     using value_type = Value;
     using ctx_type = typename Props::ctx_type;
     using intf_type = function_request_intf<ctx_type, Value>;
     using props_type = Props;
+
+    static constexpr caching_level_type caching_level = Props::level;
+    static constexpr bool introspective = Props::introspective;
 
     template<typename Function, typename... Args>
     function_request_erased(Props props, Function function, Args... args)
@@ -525,6 +626,12 @@ class function_request_erased
     get_uuid() const
     {
         return impl_->get_uuid();
+    }
+
+    void
+    visit(req_visitor_intf& visitor) const
+    {
+        impl_->visit(visitor);
     }
 
     template<typename Ctx>
@@ -716,9 +823,17 @@ identity_coro(context_intf& ctx, Value value)
 // on the static Git version which is also evaluated at C++ initialization
 // time.
 // TODO put specializations in separate .h?
+// TODO is it possible to raise a compile-time error when instantiating
+// the generic template?
 template<typename Value>
 struct normalization_uuid
 {
+};
+
+template<>
+struct normalization_uuid<int>
+{
+    static const inline std::string uuid_str{"normalization_uuid<int>"};
 };
 
 template<>

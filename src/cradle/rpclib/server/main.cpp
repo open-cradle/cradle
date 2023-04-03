@@ -141,6 +141,7 @@ run_server(cli_options const& options)
     service_core service;
     service_config config{create_config_map(options)};
     service.initialize(config);
+    service.ensure_async_db();
     rpclib_handler_context hctx{service, *my_logger};
 
     register_and_initialize_all_domains();
@@ -168,6 +169,27 @@ run_server(cli_options const& options)
         return cppcoro::sync_wait(handle_ack_response(hctx, response_id));
     });
     srv.bind("ping", []() { return request_uuid::get_git_version(); });
+
+    srv.bind(
+        "submit_async",
+        [&](std::string const& domain_name, std::string const& seri_req) {
+            return handle_submit_async(hctx, domain_name, seri_req);
+        });
+    srv.bind("get_sub_contexts", [&](async_id aid) {
+        return handle_get_sub_contexts(hctx, aid);
+    });
+    srv.bind("get_async_status", [&](async_id aid) {
+        return handle_get_async_status(hctx, aid);
+    });
+    srv.bind("get_async_response", [&](async_id root_aid) {
+        return handle_get_async_response(hctx, root_aid);
+    });
+    srv.bind("request_cancellation", [&](async_id aid) {
+        return handle_request_cancellation(hctx, aid);
+    });
+    srv.bind("finish_async", [&](async_id root_aid) {
+        return handle_finish_async(hctx, root_aid);
+    });
 
     auto num_threads = config.get_number_or_default(
         rpclib_config_keys::SERVER_CONCURRENCY, 22);

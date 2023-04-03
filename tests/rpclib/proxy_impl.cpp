@@ -12,5 +12,5 @@ TEST_CASE("git version mismatch", "[rpclib]")
     auto client = ensure_rpclib_service();
     auto& impl{client->pimpl()};
 
-    REQUIRE_THROWS_AS(impl.verify_git_version("bad version"), rpclib_error);
+    REQUIRE_THROWS_AS(impl.verify_git_version("bad version"), remote_error);
 }

@@ -7,12 +7,15 @@
 #include <memory>
 #include <optional>
 
+#include <cppcoro/static_thread_pool.hpp>
+
 #include <cradle/inner/blob_file/blob_file.h>
 #include <cradle/inner/blob_file/blob_file_dir.h>
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/caching/secondary_cache_intf.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/io/http_requests.h>
+#include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/service/config.h>
 
 namespace cradle {
@@ -39,6 +42,11 @@ struct inner_config_keys
     // (Optional integer)
     // How many concurrent threads to use for HTTP requests
     inline static std::string const HTTP_CONCURRENCY{"http_concurrency"};
+
+    // (Optional integer)
+    // How many concurrent threads to use for locally resolving asynchronous
+    // requests in parallel
+    inline static std::string const ASYNC_CONCURRENCY{"async_concurrency"};
 };
 
 // Factory of secondary_cache_intf objects.
@@ -86,6 +94,17 @@ class inner_resources
 
     std::shared_ptr<blob_file_writer>
     make_blob_file_writer(std::size_t size);
+
+    void
+    ensure_async_db();
+
+    // Returns pointer to async_db instance if available (i.e., on an
+    // RPC server), nullptr otherwise
+    async_db*
+    get_async_db();
+
+    cppcoro::static_thread_pool&
+    get_async_thread_pool();
 
     inner_resources_impl&
     impl()

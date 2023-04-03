@@ -1,5 +1,5 @@
-#ifndef CRADLE_INNER_REMOTE_PROXY_IMPL_H
-#define CRADLE_INNER_REMOTE_PROXY_IMPL_H
+#ifndef CRADLE_INNER_REMOTE_PROXY_REGISTRY_H
+#define CRADLE_INNER_REMOTE_PROXY_REGISTRY_H
 
 #include <memory>
 #include <string>
@@ -18,7 +18,7 @@ class remote_proxy_registry
     void
     register_proxy(std::shared_ptr<remote_proxy> proxy);
 
-    std::shared_ptr<remote_proxy>
+    remote_proxy&
     find_proxy(std::string const& name);
 
  private:

@@ -1778,8 +1778,8 @@ process_message(websocket_server_impl& server, client_request request)
             // serialized will be response, serialized as msgpack
             auto ctx{
                 make_thinknode_request_context(server, request, rr.remote)};
-            auto seri_result
-                = co_await resolve_serialized_request(ctx, rr.json_text);
+            auto seri_result = co_await resolve_serialized_request(
+                ctx, std::move(rr.json_text));
             blob seri_value = seri_result.value();
             // TODO msgpack -> dynamic -> msgpack
             // - First conversion here

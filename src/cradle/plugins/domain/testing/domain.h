@@ -20,6 +20,21 @@ class testing_domain : public domain
     make_local_context(inner_resources& service) override;
 };
 
+class atst_domain : public domain
+{
+ public:
+    ~atst_domain() = default;
+
+    void
+    initialize() override;
+
+    std::string
+    name() const override;
+
+    std::shared_ptr<context_intf>
+    make_local_context(inner_resources& service) override;
+};
+
 } // namespace cradle
 
 #endif

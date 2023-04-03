@@ -9,6 +9,8 @@
 
 namespace cradle {
 
+// A remote "resolve request" command includes a domain name, which specifies
+// the context class that should be used for resolving the request.
 class domain
 {
  public:
@@ -28,6 +30,7 @@ class domain
 void
 register_domain(std::shared_ptr<domain> const& dom);
 
+// Throws if not found
 std::shared_ptr<domain>
 find_domain(std::string const& name);
 

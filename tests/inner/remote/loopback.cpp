@@ -10,7 +10,9 @@
 
 using namespace cradle;
 
-static void
+namespace {
+
+void
 test_make_some_blob(bool shared)
 {
     constexpr auto caching_level{caching_level_type::full};
@@ -30,6 +32,8 @@ test_make_some_blob(bool shared)
     REQUIRE(response.data()[0xff] == static_cast<std::byte>(0x55));
     REQUIRE(response.data()[9999] == static_cast<std::byte>(0x35));
 }
+
+} // namespace
 
 TEST_CASE("plain blob across loopback", "[inner][remote]")
 {

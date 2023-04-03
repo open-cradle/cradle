@@ -12,23 +12,14 @@
 
 namespace cradle {
 
-// Clients shouldn't refer to rpc::rpc_error as that would #include the msgpack
-// inside the rpclib library
-class rpclib_error : public std::logic_error
-{
- public:
-    rpclib_error(std::string const& what) : std::logic_error(what)
-    {
-    }
-
-    rpclib_error(std::string const& what, std::string const& msg)
-        : std::logic_error(fmt::format("{}: {}", what, msg))
-    {
-    }
-};
-
 class rpclib_client_impl;
 
+// Coroutines should throw remote_error on error.
+// The rpclib library throws rpc::rpc_error so these should be translated to
+// remote_error.
+// Clients cannot refer to rpc::rpc_error anyway as that would #include the
+// msgpack implementation inside the rpclib library, conflicting with the main
+// one.
 class rpclib_client : public remote_proxy
 {
  public:
@@ -39,9 +30,38 @@ class rpclib_client : public remote_proxy
     std::string
     name() const override;
 
-    // Throws rpclib_error
+    spdlog::logger&
+    get_logger() override;
+
+    cppcoro::static_thread_pool&
+    get_coro_thread_pool() override
+    {
+        return coro_thread_pool_;
+    }
+
     cppcoro::task<serialized_result>
-    resolve_request(remote_context_intf& ctx, std::string seri_req) override;
+    resolve_sync(
+        remote_context_intf& ctx,
+        std::string domain_name,
+        std::string seri_req) override;
+
+    cppcoro::task<async_id>
+    submit_async(std::string domain_name, std::string seri_req) override;
+
+    cppcoro::task<remote_context_spec_list>
+    get_sub_contexts(async_id aid) override;
+
+    cppcoro::task<async_status>
+    get_async_status(async_id aid) override;
+
+    cppcoro::task<serialized_result>
+    get_async_response(async_id root_aid) override;
+
+    cppcoro::task<void>
+    request_cancellation(async_id aid) override;
+
+    cppcoro::task<void>
+    finish_async(async_id root_aid) override;
 
     // Instructs the RPC server to mock all HTTP requests, returning a 200
     // response with response_body for each.
@@ -63,6 +83,7 @@ class rpclib_client : public remote_proxy
     }
 
  private:
+    cppcoro::static_thread_pool coro_thread_pool_;
     std::unique_ptr<rpclib_client_impl> pimpl_;
 };
 

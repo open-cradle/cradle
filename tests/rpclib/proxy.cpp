@@ -13,25 +13,6 @@
 
 using namespace cradle;
 
-TEST_CASE("construct rpclib_error, one arg", "[rpclib]")
-{
-    auto exc{rpclib_error("argX")};
-
-    std::string what(exc.what());
-
-    REQUIRE(what.find("argX") != std::string::npos);
-}
-
-TEST_CASE("construct rpclib_error, two args", "[rpclib]")
-{
-    auto exc{rpclib_error("argX", "argY")};
-
-    std::string what(exc.what());
-
-    REQUIRE(what.find("argX") != std::string::npos);
-    REQUIRE(what.find("argY") != std::string::npos);
-}
-
 TEST_CASE("client name", "[rpclib]")
 {
     auto client = ensure_rpclib_service();
@@ -90,14 +71,14 @@ TEST_CASE("sending bad request", "[rpclib]")
 {
     constexpr auto remotely{true};
     std::string proxy_name{"rpclib"};
-    ensure_rpclib_service();
     inner_resources service;
     init_test_inner_service(service);
     testing_request_context ctx{service, nullptr, remotely};
     ctx.proxy_name(proxy_name);
-
     auto client = ensure_rpclib_service();
+
     REQUIRE_THROWS_AS(
-        cppcoro::sync_wait(client->resolve_request(ctx, "bad request")),
-        rpclib_error);
+        cppcoro::sync_wait(
+            client->resolve_sync(ctx, "bad domain", "bad request")),
+        remote_error);
 }

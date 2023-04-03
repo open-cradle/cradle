@@ -27,7 +27,7 @@ namespace cradle {
  * currently(?), this will be a MessagePack string.
  */
 cppcoro::task<serialized_result>
-resolve_serialized_request(context_intf& ctx, std::string const& seri_req);
+resolve_serialized_request(context_intf& ctx, std::string seri_req);
 
 } // namespace cradle
 

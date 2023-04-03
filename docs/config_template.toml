@@ -17,6 +17,10 @@ port = 41071
 # How many concurrent threads to use for HTTP requests
 http_concurrency = 36
 
+# How many concurrent threads to use for locally resolving asynchronous
+# requests in parallel
+async_concurrency = 20
+
 [memory_cache]
 # The maximum amount of memory to use for caching results that are no
 # longer in use, in bytes

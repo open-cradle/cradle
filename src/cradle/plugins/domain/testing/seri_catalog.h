@@ -6,6 +6,9 @@ namespace cradle {
 void
 register_testing_seri_resolvers();
 
+void
+register_atst_seri_resolvers();
+
 } // namespace cradle
 
 #endif

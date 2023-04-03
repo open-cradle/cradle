@@ -43,6 +43,13 @@ class value_request
         return request_uuid();
     }
 
+    // How useful is this?
+    void
+    visit(req_visitor_intf& visitor) const
+    {
+        visitor.visit_val_arg(0);
+    }
+
     Value
     get_value() const
     {

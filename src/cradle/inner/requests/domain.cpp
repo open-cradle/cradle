@@ -1,4 +1,7 @@
+#include <stdexcept>
 #include <unordered_map>
+
+#include <fmt/format.h>
 
 #include <cradle/inner/requests/domain.h>
 
@@ -36,7 +39,12 @@ domain_registry::do_register(std::shared_ptr<domain> const& dom)
 std::shared_ptr<domain>
 domain_registry::find(std::string const& name)
 {
-    return domains_[name];
+    auto it = domains_.find(name);
+    if (it == domains_.end())
+    {
+        throw std::domain_error(fmt::format("unknown domain {}", name));
+    }
+    return it->second;
 }
 
 void

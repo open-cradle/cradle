@@ -23,4 +23,24 @@ testing_domain::make_local_context(inner_resources& service)
     return std::make_shared<testing_request_context>(service, nullptr);
 }
 
+void
+atst_domain::initialize()
+{
+    register_atst_seri_resolvers();
+}
+
+std::string
+atst_domain::name() const
+{
+    return "atst";
+}
+
+std::shared_ptr<context_intf>
+atst_domain::make_local_context(inner_resources& service)
+{
+    auto tree_ctx{std::make_shared<atst_tree_context>(service)};
+    bool const is_req{true};
+    return std::make_shared<local_atst_context>(tree_ctx, is_req);
+}
+
 } // namespace cradle

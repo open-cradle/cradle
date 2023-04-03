@@ -33,6 +33,28 @@ rq_make_some_blob(std::size_t size, bool shared)
         shared);
 }
 
+template<caching_level_type Level>
+using atst_request_props
+    = request_props<Level, true, true, local_atst_context>;
+
+cppcoro::task<int>
+cancellable_coro(local_async_context_intf& ctx, int loops, int delay);
+
+template<caching_level_type Level, typename Loops, typename Delay>
+auto
+rq_cancellable_coro(Loops loops, Delay delay)
+{
+    using props_type = atst_request_props<Level>;
+    // TODO uuid should depend on Level
+    request_uuid uuid{"cancellable_coro"};
+    std::string title{"cancellable_coro"};
+    return rq_function_erased(
+        props_type(std::move(uuid), std::move(title)),
+        cancellable_coro,
+        normalize_arg<int, props_type>(std::move(loops)),
+        normalize_arg<int, props_type>(std::move(delay)));
+}
+
 } // namespace cradle
 
 #endif

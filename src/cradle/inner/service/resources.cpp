@@ -3,7 +3,6 @@
 #include <string>
 #include <thread>
 
-#include <cppcoro/schedule_on.hpp>
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
@@ -83,6 +82,24 @@ inner_resources::make_blob_file_writer(std::size_t size)
     return impl_->make_blob_file_writer(size);
 }
 
+void
+inner_resources::ensure_async_db()
+{
+    impl_->ensure_async_db();
+}
+
+async_db*
+inner_resources::get_async_db()
+{
+    return impl_->get_async_db();
+}
+
+cppcoro::static_thread_pool&
+inner_resources::get_async_thread_pool()
+{
+    return impl_->get_async_thread_pool();
+}
+
 http_connection_interface&
 http_connection_for_thread(inner_resources& resources)
 {
@@ -107,7 +124,10 @@ inner_resources_impl::inner_resources_impl(
     : blob_dir_{std::make_unique<blob_file_directory>(config)},
       http_pool_{cppcoro::static_thread_pool(
           static_cast<uint32_t>(config.get_number_or_default(
-              inner_config_keys::HTTP_CONCURRENCY, 36)))}
+              inner_config_keys::HTTP_CONCURRENCY, 36)))},
+      async_pool_{cppcoro::static_thread_pool(
+          static_cast<uint32_t>(config.get_number_or_default(
+              inner_config_keys::ASYNC_CONCURRENCY, 20)))}
 {
     create_memory_cache(config);
     create_secondary_cache(resources, config);
@@ -190,6 +210,21 @@ inner_resources_impl::enable_http_mocking(bool http_is_synchronous)
         http_is_synchronous_ = http_is_synchronous;
     }
     return *mock_http_;
+}
+
+void
+inner_resources_impl::ensure_async_db()
+{
+    if (!async_db_instance_)
+    {
+        async_db_instance_ = std::make_unique<async_db>();
+    }
+}
+
+async_db*
+inner_resources_impl::get_async_db()
+{
+    return async_db_instance_ ? &*async_db_instance_ : nullptr;
 }
 
 void

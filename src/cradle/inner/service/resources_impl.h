@@ -53,12 +53,28 @@ class inner_resources_impl
     mock_http_session&
     enable_http_mocking(bool http_is_synchronous);
 
+    void
+    ensure_async_db();
+
+    cppcoro::static_thread_pool&
+    get_async_thread_pool()
+    {
+        return async_pool_;
+    }
+
+    // Returns pointer to async_db instance if available (i.e., on an
+    // RPC server), nullptr otherwise
+    async_db*
+    get_async_db();
+
  private:
     std::unique_ptr<cradle::immutable_cache> memory_cache_;
     std::unique_ptr<secondary_cache_intf> secondary_cache_;
     std::unique_ptr<blob_file_directory> blob_dir_;
+    std::unique_ptr<async_db> async_db_instance_;
 
     cppcoro::static_thread_pool http_pool_;
+    cppcoro::static_thread_pool async_pool_;
 
     std::unique_ptr<mock_http_session> mock_http_;
 

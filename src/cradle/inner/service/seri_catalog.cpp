@@ -15,11 +15,11 @@ seri_catalog::instance()
 }
 
 cppcoro::task<serialized_result>
-seri_catalog::resolve(context_intf& ctx, std::string const& seri_req)
+seri_catalog::resolve(context_intf& ctx, std::string seri_req)
 {
     auto uuid_str{find_uuid_str(seri_req)};
     auto resolver{find_resolver(uuid_str)};
-    return resolver->resolve(ctx, seri_req);
+    return resolver->resolve(ctx, std::move(seri_req));
 }
 
 std::string
