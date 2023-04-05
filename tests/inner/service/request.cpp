@@ -10,6 +10,7 @@
 #include "../../support/request.h"
 #include <cradle/inner/requests/function_deprecated.h>
 #include <cradle/inner/service/request.h>
+#include <cradle/inner/service/request_deprecated.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 

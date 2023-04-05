@@ -209,35 +209,6 @@ requires RemoteAsyncContext<Ctx>
     return resolve_remote_to_value(ctx, req);
 }
 
-// Following functions are deprecated (for function_deprecated.h only)
-template<typename Ctx, UncachedRequest Req>
-requires ContextMatchingRequest<Ctx, Req> auto
-resolve_request(Ctx& ctx, std::unique_ptr<Req> const& req)
-{
-    return req->resolve(ctx);
-}
-
-template<typename Ctx, CachedRequest Req>
-requires ContextMatchingRequest<Ctx, Req> auto
-resolve_request(Ctx& ctx, std::unique_ptr<Req> const& req)
-{
-    return resolve_request_cached(ctx, *req);
-}
-
-template<typename Ctx, UncachedRequest Req>
-requires ContextMatchingRequest<Ctx, Req> auto
-resolve_request(Ctx& ctx, std::shared_ptr<Req> const& req)
-{
-    return req->resolve(ctx);
-}
-
-template<typename Ctx, CachedRequest Req>
-requires ContextMatchingRequest<Ctx, Req> auto
-resolve_request(Ctx& ctx, std::shared_ptr<Req> const& req)
-{
-    return resolve_request_cached(ctx, *req);
-}
-
 } // namespace cradle
 
 #endif
