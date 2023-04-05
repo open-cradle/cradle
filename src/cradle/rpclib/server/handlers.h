@@ -75,6 +75,9 @@ handle_get_sub_contexts(rpclib_handler_context& hctx, async_id aid);
 int
 handle_get_async_status(rpclib_handler_context& hctx, async_id aid);
 
+std::string
+handle_get_async_error_message(rpclib_handler_context& hctx, async_id aid);
+
 rpclib_response
 handle_get_async_response(rpclib_handler_context& hctx, async_id root_aid);
 

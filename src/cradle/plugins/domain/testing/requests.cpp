@@ -1,3 +1,5 @@
+#include <cstdlib>
+
 #include <spdlog/spdlog.h>
 
 #include <cradle/inner/blob_file/blob_file.h>
@@ -41,20 +43,24 @@ cppcoro::task<int>
 cancellable_coro(local_async_context_intf& ctx, int loops, int delay)
 {
     async_id ctx_id{ctx.get_id()};
-    cppcoro::cancellation_token token{ctx.get_cancellation_token()};
     auto logger = spdlog::get("cradle");
     logger->info(
         "cancellable_coro(ctx {}, loops={}, delay={})", ctx_id, loops, delay);
     int i = 0;
-    for (; i < loops; ++i)
+    for (; i < std::abs(loops); ++i)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(delay));
-        if (token.is_cancellation_requested())
+        if (ctx.is_cancellation_requested())
         {
             logger->info(
                 "cancellable_coro(ctx {}): throwing cancelled", ctx_id);
         }
-        token.throw_if_cancellation_requested();
+        ctx.throw_if_cancellation_requested();
+    }
+    if (loops < 0)
+    {
+        logger->info("cancellable_coro(ctx {}): throwing error", ctx_id);
+        throw async_error{"cancellable_coro() failed"};
     }
     int res = i + delay;
     logger->info("cancellable_coro(ctx {}): co_return {}", ctx_id, res);

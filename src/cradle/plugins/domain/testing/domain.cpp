@@ -38,9 +38,21 @@ atst_domain::name() const
 std::shared_ptr<context_intf>
 atst_domain::make_local_context(inner_resources& service)
 {
-    auto tree_ctx{std::make_shared<atst_tree_context>(service)};
+    auto tree_ctx{std::make_shared<local_atst_tree_context>(service)};
     bool const is_req{true};
     return std::make_shared<local_atst_context>(tree_ctx, is_req);
+}
+
+void
+register_and_initialize_testing_domains()
+{
+    std::vector<std::shared_ptr<domain>> domains{
+        std::make_shared<testing_domain>(), std::make_shared<atst_domain>()};
+    for (auto& domain : domains)
+    {
+        register_domain(domain);
+        domain->initialize();
+    }
 }
 
 } // namespace cradle

@@ -37,11 +37,12 @@ rpclib_client::resolve_sync(
 }
 
 cppcoro::task<async_id>
-rpclib_client::submit_async(std::string domain_name, std::string seri_req)
+rpclib_client::submit_async(
+    remote_context_intf& ctx, std::string domain_name, std::string seri_req)
 {
     co_await coro_thread_pool_.schedule();
     co_return pimpl_->submit_async(
-        std::move(domain_name), std::move(seri_req));
+        ctx, std::move(domain_name), std::move(seri_req));
 }
 
 cppcoro::task<remote_context_spec_list>
@@ -56,6 +57,13 @@ rpclib_client::get_async_status(async_id aid)
 {
     co_await coro_thread_pool_.schedule();
     co_return pimpl_->get_async_status(aid);
+}
+
+cppcoro::task<std::string>
+rpclib_client::get_async_error_message(async_id aid)
+{
+    co_await coro_thread_pool_.schedule();
+    co_return pimpl_->get_async_error_message(aid);
 }
 
 cppcoro::task<serialized_result>

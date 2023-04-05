@@ -59,7 +59,7 @@ struct thinknode_request_context : public cached_introspective_context_intf,
         return domain_name_;
     }
 
-    std::unique_ptr<remote_context_intf>
+    std::shared_ptr<remote_context_intf>
     local_clone() const override;
 
     std::string const&

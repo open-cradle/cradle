@@ -5,6 +5,7 @@
 
 #include "../support/concurrency_testing.h"
 #include <cradle/inner/service/request.h>
+#include <cradle/inner/service/request_deprecated.h>
 
 namespace cradle {
 

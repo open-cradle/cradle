@@ -141,6 +141,9 @@ requires ContextMatchingRequest<Ctx, Req>
 }
 
 // Public interface starts here
+// All resolve_request() variants are blocking. Progress of an asynchronous
+// request can be monitored via its context tree.
+// All throw async_cancelled when an asynchronous request is cancelled.
 
 // If second arg is a request, one of the following templates will subsume.
 // (Maybe that arg should be Val&& but then the mechanism doesn't work.)
@@ -205,7 +208,6 @@ requires RemoteAsyncContext<Ctx>
 {
     // Even if Req is a CachedRequest, its result will not be cached locally.
     // Caching and introspection are for the server.
-    // TODO? cache remote results, differentiate (un)cached RemoteAsyncContext
     return resolve_remote_to_value(ctx, req);
 }
 

@@ -45,7 +45,10 @@ class test_proxy : public remote_proxy
     }
 
     cppcoro::task<async_id>
-    submit_async(std::string domain_name, std::string seri_req) override
+    submit_async(
+        remote_context_intf& ctx,
+        std::string domain_name,
+        std::string seri_req) override
     {
         throw not_implemented_error{"test_proxy::submit_async()"};
     }
@@ -60,6 +63,12 @@ class test_proxy : public remote_proxy
     get_async_status(async_id aid) override
     {
         throw not_implemented_error{"test_proxy::get_async_status()"};
+    }
+
+    cppcoro::task<std::string>
+    get_async_error_message(async_id aid) override
+    {
+        throw not_implemented_error{"test_proxy::get_async_error_message()"};
     }
 
     cppcoro::task<serialized_result>

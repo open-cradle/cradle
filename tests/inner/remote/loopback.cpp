@@ -19,9 +19,9 @@ test_make_some_blob(bool shared)
     constexpr auto remotely{true};
     std::string proxy_name{"loopback"};
     register_testing_seri_resolvers();
-    ensure_loopback_service();
     inner_resources service;
     init_test_inner_service(service);
+    ensure_loopback_service(service);
     testing_request_context ctx{service, nullptr, remotely};
     ctx.proxy_name(proxy_name);
 

@@ -35,6 +35,12 @@ class atst_domain : public domain
     make_local_context(inner_resources& service) override;
 };
 
+/*
+ * Registers and initializes the testing domains.
+ */
+void
+register_and_initialize_testing_domains();
+
 } // namespace cradle
 
 #endif

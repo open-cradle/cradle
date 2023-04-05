@@ -7,6 +7,8 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/context.h>
 
+// TODO make everything thread-safe
+
 namespace cradle {
 
 testing_request_context::testing_request_context(
@@ -70,10 +72,10 @@ testing_request_context::proxy_name() const
     return proxy_name_;
 }
 
-std::unique_ptr<remote_context_intf>
+std::shared_ptr<remote_context_intf>
 testing_request_context::local_clone() const
 {
-    return std::make_unique<testing_request_context>(service, nullptr);
+    return std::make_shared<testing_request_context>(service, nullptr);
 }
 
 std::shared_ptr<blob_file_writer>
@@ -97,7 +99,7 @@ allocate_async_id()
 } // namespace
 
 local_atst_context::local_atst_context(
-    std::shared_ptr<atst_tree_context> tree_ctx, bool is_req)
+    std::shared_ptr<local_atst_tree_context> tree_ctx, bool is_req)
     : tree_ctx_{std::move(tree_ctx)},
       is_req_{is_req},
       id_{allocate_async_id()},
@@ -109,6 +111,19 @@ local_atst_context::local_atst_context(
         id_,
         is_req ? "REQ" : "VAL",
         status_);
+}
+
+cppcoro::task<async_status>
+local_atst_context::get_status_coro()
+{
+    co_return get_status();
+}
+
+cppcoro::task<void>
+local_atst_context::request_cancellation_coro()
+{
+    request_cancellation();
+    co_return;
 }
 
 std::unique_ptr<req_visitor_intf>
@@ -154,7 +169,6 @@ local_atst_context::get_status()
 void
 local_atst_context::update_status(async_status status)
 {
-    // TODO make thread-safe
     auto logger = spdlog::get("cradle");
     logger->info(
         "local_atst_context::update_status {}: {} -> {}",
@@ -172,6 +186,19 @@ local_atst_context::update_status(async_status status)
     status_ = status;
 }
 
+void
+local_atst_context::update_status_error(std::string const& errmsg)
+{
+    auto logger = spdlog::get("cradle");
+    logger->info(
+        "local_atst_context::update_status_error {}: {} -> ERROR: {}",
+        id_,
+        status_,
+        errmsg);
+    status_ = async_status::ERROR;
+    errmsg_ = errmsg;
+}
+
 // TODO check status
 // - FINISHED: proceed
 // - ERROR: proceed?
@@ -180,6 +207,22 @@ blob
 local_atst_context::get_value()
 {
     return future_.get();
+}
+
+bool
+local_atst_context::is_cancellation_requested() const noexcept
+{
+    auto token{tree_ctx_->get_cancellation_token()};
+    return token.is_cancellation_requested();
+}
+
+void
+local_atst_context::throw_if_cancellation_requested() const
+{
+    if (is_cancellation_requested())
+    {
+        throw async_cancelled{fmt::format("async {} cancelled", id_)};
+    }
 }
 
 local_atst_context_tree_builder::local_atst_context_tree_builder(
@@ -215,74 +258,114 @@ local_atst_context_tree_builder::visit_req_arg(std::size_t ix)
     return sub_builder;
 }
 
-remote_atst_context::remote_atst_context(bool is_root, bool is_req)
-    : is_root_{is_root}, is_req_{is_req}, id_{allocate_async_id()}
+proxy_atst_tree_context::proxy_atst_tree_context(
+    inner_resources& inner, std::string const& proxy_name)
+    : inner_(inner), proxy_name_{proxy_name}
 {
 }
 
-remote_atst_context::~remote_atst_context()
+remote_proxy&
+proxy_atst_tree_context::get_proxy() const
 {
+    if (!proxy_)
+    {
+        proxy_ = std::make_unique<remote_proxy*>(&find_proxy(proxy_name_));
+    }
+    return **proxy_;
+}
+
+proxy_atst_context::proxy_atst_context(
+    std::shared_ptr<proxy_atst_tree_context> tree_ctx,
+    bool is_root,
+    bool is_req)
+    : tree_ctx_{std::move(tree_ctx)},
+      is_root_{is_root},
+      is_req_{is_req},
+      id_{allocate_async_id()}
+{
+}
+
+proxy_atst_context::~proxy_atst_context()
+{
+    // Clean up the context tree on the server once per proxy context tree
     if (is_root_ && remote_id_ != NO_ASYNC_ID)
     {
-        auto& proxy{get_proxy()};
-        // TODO handle finish_async throwing exception
-        cppcoro::sync_wait(proxy.finish_async(remote_id_));
+        // Destructor must not throw
+        try
+        {
+            auto& proxy{get_proxy()};
+            cppcoro::sync_wait(proxy.finish_async(remote_id_));
+        }
+        catch (std::exception& e)
+        {
+            // TODO? put logger in proxy_atst_tree_context
+            auto logger = spdlog::get("cradle");
+            logger->error("~proxy_atst_context() caught {}", e.what());
+        }
     }
 }
 
-std::unique_ptr<remote_context_intf>
-remote_atst_context::local_clone() const
+std::string const&
+proxy_atst_context::proxy_name() const
 {
-    throw not_implemented_error();
+    return tree_ctx_->get_proxy_name();
 }
 
-async_status
-remote_atst_context::get_status()
+std::shared_ptr<local_async_context_intf>
+proxy_atst_context::local_async_clone() const
 {
-    auto& proxy{get_proxy()};
-    if (remote_id_ == NO_ASYNC_ID)
-    {
-        // TODO for now, assume remote_id will soon be received
-        return async_status::CREATED;
-    }
-    return cppcoro::sync_wait(proxy.get_async_status(remote_id_));
+    return std::make_shared<local_atst_context>(
+        std::make_shared<local_atst_tree_context>(
+            tree_ctx_->get_inner_resources()),
+        is_req_);
+}
+
+std::shared_ptr<remote_context_intf>
+proxy_atst_context::local_clone() const
+{
+    throw not_implemented_error{"proxy_atst_context::local_clone()"};
+}
+
+static cppcoro::task<async_status>
+async_status_value_coro(async_status status)
+{
+    co_return status;
 }
 
 cppcoro::task<async_status>
-remote_atst_context::get_status_coro()
+proxy_atst_context::get_status_coro()
 {
     auto& proxy{get_proxy()};
     if (remote_id_ == NO_ASYNC_ID)
     {
-        // TODO for now, assume remote_id will soon be received
-        co_return async_status::CREATED;
+        // Assume remote_id will soon be received
+        return async_status_value_coro(async_status::CREATED);
     }
-    co_return co_await proxy.get_async_status(remote_id_);
+    return proxy.get_async_status(remote_id_);
 }
 
-void
-remote_atst_context::request_cancellation()
+static cppcoro::task<void>
+do_nothing_coro()
 {
-    cppcoro::sync_wait(request_cancellation_coro());
+    co_return;
 }
 
 cppcoro::task<void>
-remote_atst_context::request_cancellation_coro()
+proxy_atst_context::request_cancellation_coro()
 {
     auto& proxy{get_proxy()};
     if (remote_id_ == NO_ASYNC_ID)
     {
-        // TODO cancellation should still be possible
-        throw std::logic_error(
-            "remote_atst_context::request_cancellation(): not set");
+        cancellation_pending_ = true;
+        return do_nothing_coro();
     }
     return proxy.request_cancellation(remote_id_);
 }
 
 remote_async_context_intf&
-remote_atst_context::add_sub(async_id sub_remote_id, bool is_req)
+proxy_atst_context::add_sub(async_id sub_remote_id, bool is_req)
 {
-    auto sub = std::make_unique<remote_atst_context>(false, is_req);
+    auto sub = std::make_unique<proxy_atst_context>(tree_ctx_, false, is_req);
     sub->set_remote_id(sub_remote_id);
     auto& result{*sub};
     subs_.push_back(std::move(sub));
@@ -290,21 +373,20 @@ remote_atst_context::add_sub(async_id sub_remote_id, bool is_req)
 }
 
 async_id
-remote_atst_context::get_remote_id()
+proxy_atst_context::get_remote_id()
 {
     if (remote_id_ == NO_ASYNC_ID)
     {
-        throw std::logic_error(
-            "remote_atst_context::get_remote_id(): not set");
+        throw std::logic_error("proxy_atst_context::get_remote_id(): not set");
     }
     return remote_id_;
 }
 
 // Throws if proxy was not registered
 remote_proxy&
-remote_atst_context::get_proxy()
+proxy_atst_context::get_proxy()
 {
-    return find_proxy(proxy_name_);
+    return tree_ctx_->get_proxy();
 }
 
 } // namespace cradle

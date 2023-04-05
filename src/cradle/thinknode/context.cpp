@@ -74,10 +74,10 @@ thinknode_request_context::proxy_name() const
     return proxy_name_;
 }
 
-std::unique_ptr<remote_context_intf>
+std::shared_ptr<remote_context_intf>
 thinknode_request_context::local_clone() const
 {
-    return std::make_unique<thinknode_request_context>(
+    return std::make_shared<thinknode_request_context>(
         service, session, nullptr);
 }
 

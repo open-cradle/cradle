@@ -101,4 +101,15 @@ create_logger(std::string const& name)
     return logger;
 }
 
+std::shared_ptr<spdlog::logger>
+ensure_logger(std::string const& name)
+{
+    auto logger = spdlog::get(name);
+    if (!logger)
+    {
+        logger = create_logger(name);
+    }
+    return logger;
+}
+
 } // namespace cradle

@@ -75,7 +75,8 @@ rpclib_client_impl::resolve_sync(std::string domain_name, std::string seri_req)
 }
 
 async_id
-rpclib_client_impl::submit_async(std::string domain_name, std::string seri_req)
+rpclib_client_impl::submit_async(
+    remote_context_intf& ctx, std::string domain_name, std::string seri_req)
 {
     logger_->debug("submit_async");
     auto aid = do_rpc_call(
@@ -103,6 +104,16 @@ rpclib_client_impl::get_async_status(async_id aid)
     async_status status{status_value};
     logger_->debug("async_status for {}: {}", aid, status);
     return status;
+}
+
+std::string
+rpclib_client_impl::get_async_error_message(async_id aid)
+{
+    logger_->debug("get_async_error_message {}", aid);
+    auto errmsg
+        = do_rpc_call("get_async_error_message", aid).as<std::string>();
+    logger_->debug("async_error_message for {}: {}", aid, errmsg);
+    return errmsg;
 }
 
 serialized_result

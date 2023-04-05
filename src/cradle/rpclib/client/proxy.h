@@ -46,13 +46,19 @@ class rpclib_client : public remote_proxy
         std::string seri_req) override;
 
     cppcoro::task<async_id>
-    submit_async(std::string domain_name, std::string seri_req) override;
+    submit_async(
+        remote_context_intf& ctx,
+        std::string domain_name,
+        std::string seri_req) override;
 
     cppcoro::task<remote_context_spec_list>
     get_sub_contexts(async_id aid) override;
 
     cppcoro::task<async_status>
     get_async_status(async_id aid) override;
+
+    cppcoro::task<std::string>
+    get_async_error_message(async_id aid) override;
 
     cppcoro::task<serialized_result>
     get_async_response(async_id root_aid) override;

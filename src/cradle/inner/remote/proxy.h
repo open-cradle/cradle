@@ -82,8 +82,13 @@ class remote_proxy
     // the root request in the request tree. Other remote contexts will likely
     // be constructed only when the request is deserialized, and that could
     // take some time.
+    // TODO passing resources instead of ctx might be more general
     virtual cppcoro::task<async_id>
-    submit_async(std::string domain_name, std::string seri_req) = 0;
+    submit_async(
+        remote_context_intf& ctx,
+        std::string domain_name,
+        std::string seri_req)
+        = 0;
 
     // Returns the specification of the child contexts of the context subtree
     // of which aid is the root.
@@ -95,6 +100,11 @@ class remote_proxy
     // Returns the status of the remote context specified by aid.
     virtual cppcoro::task<async_status>
     get_async_status(async_id aid) = 0;
+
+    // Returns an error message
+    // Should be called only when status == ERROR
+    virtual cppcoro::task<std::string>
+    get_async_error_message(async_id aid) = 0;
 
     // Returns the value that request resolution calculated. root_aid should
     // be the return value of a former submit_async() call. The status of the

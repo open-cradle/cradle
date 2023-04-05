@@ -5,6 +5,7 @@
 
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/proxy.h>
+#include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/remote.h>
 
 namespace cradle {
@@ -34,12 +35,14 @@ wait_until_async_done(
         }
         else if (status == async_status::CANCELLED)
         {
-            throw remote_error("remote async cancelled");
+            throw async_cancelled(
+                fmt::format("remote async {} cancelled", remote_id));
         }
         else if (status == async_status::ERROR)
         {
-            // TODO get error reason
-            throw remote_error("remote async failed");
+            std::string errmsg
+                = co_await proxy.get_async_error_message(remote_id);
+            throw async_error(errmsg);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -155,7 +158,7 @@ populate_remote_ctx_tree(
 cppcoro::task<serialized_result>
 resolve_async(
     remote_proxy& proxy,
-    remote_async_context_intf& ctx,
+    remote_async_context_intf& root_ctx,
     std::string domain_name,
     std::string seri_req)
 {
@@ -163,10 +166,15 @@ resolve_async(
     logger.debug("resolve_async");
     co_await proxy.get_coro_thread_pool().schedule();
     auto remote_id = co_await proxy.submit_async(
-        std::move(domain_name), std::move(seri_req));
-    ctx.set_remote_id(remote_id);
+        root_ctx, std::move(domain_name), std::move(seri_req));
+    root_ctx.set_remote_id(remote_id);
+    if (root_ctx.cancellation_pending())
+    {
+        co_await proxy.request_cancellation(remote_id);
+        throw remote_error{"cancelled"};
+    }
     co_await wait_until_subs_available(proxy, remote_id);
-    co_await populate_remote_ctx_tree(proxy, ctx);
+    co_await populate_remote_ctx_tree(proxy, root_ctx);
     co_await wait_until_async_finished(proxy, remote_id);
     co_return co_await proxy.get_async_response(remote_id);
 }

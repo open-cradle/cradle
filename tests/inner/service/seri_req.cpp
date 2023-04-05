@@ -22,7 +22,7 @@ test_resolve(bool remotely)
     testing_request_context ctx{resources, nullptr, remotely};
     if (remotely)
     {
-        ensure_loopback_service();
+        ensure_loopback_service(resources);
         ctx.proxy_name("loopback");
     }
 

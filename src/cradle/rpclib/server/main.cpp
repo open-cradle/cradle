@@ -181,6 +181,9 @@ run_server(cli_options const& options)
     srv.bind("get_async_status", [&](async_id aid) {
         return handle_get_async_status(hctx, aid);
     });
+    srv.bind("get_async_error_message", [&](async_id aid) {
+        return handle_get_async_error_message(hctx, aid);
+    });
     srv.bind("get_async_response", [&](async_id root_aid) {
         return handle_get_async_response(hctx, root_aid);
     });

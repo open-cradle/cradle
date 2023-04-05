@@ -57,9 +57,9 @@ cached_request_resolution_context::reset_memory_cache()
 }
 
 void
-ensure_loopback_service()
+ensure_loopback_service(inner_resources& resources)
 {
-    register_loopback_service();
+    register_loopback_service(resources);
 }
 
 std::shared_ptr<rpclib_client>

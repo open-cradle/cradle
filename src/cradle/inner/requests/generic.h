@@ -4,9 +4,9 @@
 #include <concepts>
 #include <future>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
-#include <cppcoro/cancellation_token.hpp>
 #include <cppcoro/static_thread_pool.hpp>
 #include <cppcoro/task.hpp>
 
@@ -193,7 +193,7 @@ class remote_context_intf : public virtual context_intf
 
     // Creates a clone of *this that differs only in its remotely() returning
     // false
-    virtual std::unique_ptr<remote_context_intf>
+    virtual std::shared_ptr<remote_context_intf>
     local_clone() const = 0;
 
     // TODO return request serialization method
@@ -227,6 +227,18 @@ using async_id = uint64_t;
 
 static constexpr async_id NO_ASYNC_ID{~async_id{}};
 
+// Thrown when an asynchronous request resolution is cancelled
+class async_cancelled : public std::runtime_error
+{
+    using runtime_error::runtime_error;
+};
+
+// Thrown when an asynchronous request resolution failed
+class async_error : public std::runtime_error
+{
+    using runtime_error::runtime_error;
+};
+
 // Context for an asynchronously operating coroutine.
 // Fine-grained: one object will be created for each task (coro);
 // these objects form a tree with the same topology as the request tree.
@@ -248,14 +260,12 @@ class async_context_intf : public virtual context_intf
     get_num_subs() const = 0;
 
     // Gets the status of this task
-    virtual async_status
-    get_status()
-        = 0;
+    virtual cppcoro::task<async_status>
+    get_status_coro() = 0;
 
     // Requests cancellation of all tasks in the same context tree
-    virtual void
-    request_cancellation()
-        = 0;
+    virtual cppcoro::task<void>
+    request_cancellation_coro() = 0;
 };
 
 // Context for an asynchronous task running on the local machine
@@ -276,11 +286,33 @@ class local_async_context_intf : public async_context_intf
     virtual std::unique_ptr<req_visitor_intf>
     make_ctx_tree_builder() = 0;
 
+    // Gets the status of this task
+    virtual async_status
+    get_status()
+        = 0;
+
+    // Gets the error message for this task
+    // Should be called only when get_status() returns ERROR
+    virtual std::string
+    get_error_message()
+        = 0;
+
     // Updates the status of this task
     // If status == FINISHED, also recursively updates subtasks
     // (needed if this task's result came from a cache)
+    // TODO need to the the same if status == ERROR?
+    // TODO keep history of an async request e.g.
+    // TODO vector<tuple<async_status, timestamp>>
+    // TODO plus extra info for ERROR status
+    // TODO this could replace introspection
     virtual void
     update_status(async_status status)
+        = 0;
+
+    // Updates the status of this task to "ERROR", and store an associated
+    // error message
+    virtual void
+    update_status_error(std::string const& errmsg)
         = 0;
 
     // Returns a thread pool that can be used by a caller that is able to
@@ -303,11 +335,19 @@ class local_async_context_intf : public async_context_intf
     get_value()
         = 0;
 
-    // Gets a cancellation token representing the cancellation request
-    // status for the context tree
-    virtual cppcoro::cancellation_token
-    get_cancellation_token()
+    // Requests cancellation of all tasks in the same context tree
+    virtual void
+    request_cancellation()
         = 0;
+
+    // Returns true if cancellation has been requested on this context or
+    // another one in the same context tree
+    virtual bool
+    is_cancellation_requested() const noexcept = 0;
+
+    // Throws async_cancelled if cancellation was requested
+    virtual void
+    throw_if_cancellation_requested() const = 0;
 };
 
 // Context for an asynchronous task running on a (remote) server.
@@ -318,6 +358,10 @@ class remote_async_context_intf : public async_context_intf,
 {
  public:
     virtual ~remote_async_context_intf() = default;
+
+    // Creates a "local" counterpart of this object
+    virtual std::shared_ptr<local_async_context_intf>
+    local_async_clone() const = 0;
 
     virtual remote_async_context_intf&
     add_sub(async_id sub_remote_id, bool is_req)
@@ -333,18 +377,19 @@ class remote_async_context_intf : public async_context_intf,
     set_remote_id(async_id remote_id)
         = 0;
 
-    // may throw if remote_id wasn't set
+    // Returns the remote id.
+    // Should be called only if the remote id has been set (by the caller,
+    // presumably).
     virtual async_id
     get_remote_id()
         = 0;
 
-    // Gets the status of this task
-    virtual cppcoro::task<async_status>
-    get_status_coro() = 0;
-
-    // Requests cancellation of all tasks in the same context tree
-    virtual cppcoro::task<void>
-    request_cancellation_coro() = 0;
+    // Returns true if cancellation was requested before the remote_id became
+    // available.
+    // The caller should forward the request to the server.
+    virtual bool
+    cancellation_pending()
+        = 0;
 };
 
 // Convert ctx to local_async_context_intf*, or return nullptr if the

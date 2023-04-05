@@ -35,7 +35,7 @@ register_testing_seri_resolvers()
 void
 register_atst_seri_resolvers()
 {
-    constexpr caching_level_type level = caching_level_type::full;
+    constexpr caching_level_type level = caching_level_type::memory;
     register_atst_resolver(rq_cancellable_coro<level>(0, 0));
 }
 

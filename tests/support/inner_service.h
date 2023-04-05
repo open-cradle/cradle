@@ -72,7 +72,7 @@ using request_resolution_context =
 
 // Ensure that the "remote" loopback service is available
 void
-ensure_loopback_service();
+ensure_loopback_service(inner_resources& resources);
 
 // Ensure that an rpclib client and server are available; returns the client
 std::shared_ptr<rpclib_client>

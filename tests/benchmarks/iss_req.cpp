@@ -54,7 +54,9 @@ BENCHMARK(BM_create_post_iss_request<caching_level_type::full>)
 
 static void
 register_remote_services(
-    std::string const& proxy_name, http_response const& response)
+    inner_resources& resources,
+    std::string const& proxy_name,
+    http_response const& response)
 {
     static bool registered_resolvers = false;
     if (!registered_resolvers)
@@ -67,7 +69,7 @@ register_remote_services(
         static bool registered_loopback;
         if (!registered_loopback)
         {
-            register_loopback_service();
+            register_loopback_service(resources);
             registered_loopback = true;
         }
     }
@@ -114,7 +116,7 @@ BM_try_resolve_thinknode_request(
     thinknode_request_context ctx{service, session, nullptr, remotely};
     if (remotely)
     {
-        register_remote_services(proxy_name, response);
+        register_remote_services(service, proxy_name, response);
         ctx.proxy_name(proxy_name);
     }
 

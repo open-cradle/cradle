@@ -17,7 +17,6 @@
 
 #include <cereal/types/memory.hpp>
 #include <cereal/types/tuple.hpp>
-#include <cppcoro/operation_cancelled.hpp>
 #include <cppcoro/schedule_on.hpp>
 #include <cppcoro/task.hpp>
 #include <cppcoro/when_all.hpp>
@@ -357,14 +356,14 @@ class function_request_impl : public Intf
                 ctx.update_status(async_status::FINISHED);
                 co_return result;
             }
-            catch (cppcoro::operation_cancelled const&)
+            catch (async_cancelled const&)
             {
                 ctx.update_status(async_status::CANCELLED);
                 throw;
             }
-            catch (std::exception const&)
+            catch (std::exception const& e)
             {
-                ctx.update_status(async_status::ERROR);
+                ctx.update_status_error(e.what());
                 throw;
             }
         }

@@ -165,7 +165,7 @@ test_post_iss_requests_parallel(
     if (remotely)
     {
         ensure_thinknode_seri_resolvers();
-        ensure_loopback_service();
+        ensure_loopback_service(service);
     }
 
     mock_http_script script;

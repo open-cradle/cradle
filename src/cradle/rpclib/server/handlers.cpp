@@ -2,7 +2,6 @@
 #include <future>
 #include <stdexcept>
 
-#include <cppcoro/operation_cancelled.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <rpc/this_handler.h>
 
@@ -114,9 +113,9 @@ resolve_async(
                   resolve_serialized_request(*actx, std::move(seri_req)))
                   .value();
     }
-    catch (cppcoro::operation_cancelled const&)
+    catch (async_cancelled const&)
     {
-        logger.warn("resolve_async: caught operation_cancelled");
+        logger.warn("resolve_async: caught async_cancelled");
         actx->update_status(async_status::CANCELLED);
         // Re-throwing causes the exception to be stored with the future
         throw;
@@ -124,7 +123,7 @@ resolve_async(
     catch (std::exception& e)
     {
         logger.warn("resolve_async: caught error {}", e.what());
-        actx->update_status(async_status::ERROR);
+        actx->update_status_error(e.what());
         // Re-throwing causes the exception to be stored with the future
         throw;
     }
@@ -215,6 +214,24 @@ catch (std::exception& e)
 {
     handle_exception(hctx, e);
     return int{};
+}
+
+std::string
+handle_get_async_error_message(rpclib_handler_context& hctx, async_id aid)
+try
+{
+    auto& db{hctx.get_async_db()};
+    auto& logger{hctx.logger()};
+    logger.info("handle_get_async_error_message {}", aid);
+    auto actx{db.find(aid)};
+    auto errmsg = actx->get_error_message();
+    logger.info("handle_get_async_error_message -> {}", errmsg);
+    return errmsg;
+}
+catch (std::exception& e)
+{
+    handle_exception(hctx, e);
+    return std::string{};
 }
 
 rpclib_response
