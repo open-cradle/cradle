@@ -138,6 +138,13 @@ BM_try_resolve_thinknode_request(
         auto loop = [&]() -> cppcoro::task<void> {
             for (int i = 0; i < num_loops; ++i)
             {
+// Visual C++ 14.30 (2022) seems to be overly eager in reporting unused
+// variables. (If the variable is only used in a path that is never taken for
+// some values of constexpr variables, it complains.)
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4189)
+#endif
                 constexpr bool need_empty_memory_cache
                     = caching_level == caching_level_type::full || storing;
                 constexpr bool need_empty_disk_cache
@@ -170,6 +177,9 @@ BM_try_resolve_thinknode_request(
                     }
                 }
                 benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
             }
             co_return;
         };
