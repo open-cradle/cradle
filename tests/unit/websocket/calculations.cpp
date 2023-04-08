@@ -148,7 +148,7 @@ TEST_CASE("individual calcs", "[calcs][ws]")
                {"prefix", ""},
                {"suffix", ""}}}}));
 
-#ifdef LOCAL_DOCKER_TESTING
+#ifdef CRADLE_LOCAL_DOCKER_TESTING
     // function
     REQUIRE(
         eval(make_calculation_request_with_function(make_function_application(
@@ -328,7 +328,7 @@ TEST_CASE("mixed calcs", "[calcs][ws]")
             trc, "5dadeb4a004073e81b5e096255e83652", request));
     };
 
-#ifdef LOCAL_DOCKER_TESTING
+#ifdef CRADLE_LOCAL_DOCKER_TESTING
     auto local_calc
         = make_calculation_request_with_function(make_function_application(
             "mgh",

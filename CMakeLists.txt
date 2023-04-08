@@ -1,8 +1,20 @@
 cmake_minimum_required(VERSION 3.14)
 project(cradle)
 
+# CRADLE_IS_MAIN_PROJECT defines whether we are building CRADLE as the main
+# project or as a dependency of another project.
+if(NOT DEFINED CRADLE_IS_MAIN_PROJECT)
+    if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+        set(CRADLE_IS_MAIN_PROJECT ON)
+    else()
+        set(CRADLE_IS_MAIN_PROJECT OFF)
+    endif()
+endif()
+
+# Define dependency-management options.
+option(CRADLE_USE_CONAN "Use Conan for loading dependencies" OFF)
+
 # Define the options for using the preprocessor.
-# TODO: Add a Docker option.
 set(PREPROCESSOR_USAGE_OPTIONS Native External)
 set(PREPROCESSOR_USAGE Native CACHE STRING
     "How the preprocessor should be invoked")
@@ -11,15 +23,26 @@ set_property(CACHE PREPROCESSOR_USAGE PROPERTY
 set(EXTERNALLY_PREPROCESSED_DIRECTORY "" CACHE STRING
     "If PREPROCESSOR_USAGE is External, this is the directory that contains the externally preprocessed files.")
 
-# Define the option for local Docker testing.
-set(LOCAL_DOCKER_TESTING ON CACHE BOOL
-    "Whether or not to enable testing that requires a local Docker instance")
-if(LOCAL_DOCKER_TESTING)
-    add_compile_options(-DLOCAL_DOCKER_TESTING)
+# Define test generation options.
+option(
+    CRADLE_ENABLE_TESTING
+    "Generate targets for testing CRADLE"
+    ${CRADLE_IS_MAIN_PROJECT})
+if (${CRADLE_ENABLE_TESTING})
+    enable_testing()
+endif()
+cmake_dependent_option(
+    CRADLE_LOCAL_DOCKER_TESTING
+    "Enable testing that requires a local Docker instance"
+    ON
+    "CRADLE_ENABLE_TESTING"
+    OFF)
+if(CRADLE_LOCAL_DOCKER_TESTING)
+    add_compile_options(-DCRADLE_LOCAL_DOCKER_TESTING)
 endif()
 
-set(GPROF_PROFILING OFF CACHE BOOL
-    "Enable CPU profiling using gprof")
+# Define profiling options.
+option(CRADLE_GPROF_PROFILING "Enable CPU profiling using gprof" OFF)
 
 # Detect the compiler.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -133,11 +156,6 @@ FetchContent_Declare(fetched_cppcoro
     GIT_TAG master)
 FetchContent_MakeAvailable(fetched_cppcoro)
 
-FetchContent_Declare(fetched_thread_pool
-    GIT_REPOSITORY https://github.com/bshoshany/thread-pool
-    GIT_TAG v2.0.0)
-FetchContent_MakeAvailable(fetched_thread_pool)
-
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}")
 
 find_package(Boost REQUIRED COMPONENTS
@@ -229,10 +247,7 @@ if(IS_MSVC)
     add_definitions(/DWIN32_LEAN_AND_MEAN /DVC_EXTRALEAN /DNORASTEROPS /DOEMRESOURCE /DNOATOM /DNOCLIPBOARD /DNOCOLOR /DNOCTRLMGR /DNODRAWTEXT /DNOGDI /DNOKERNEL /DNOMINMAX /DNOSOUND /DNOKANJI /DNOHELP /DNOPROFILER /DNODEFERWINDOWPOS /DNOMCX)
 endif()
 
-# Ensure that add_test() has effect.
-enable_testing()
-
-if((IS_GCC OR IS_CLANG) AND GPROF_PROFILING)
+if((IS_GCC OR IS_CLANG) AND CRADLE_GPROF_PROFILING)
     message(STATUS "Enabling CPU profiling using gprof")
     add_compile_options(-pg)
     string(APPEND CMAKE_EXE_LINKER_FLAGS " -pg")
