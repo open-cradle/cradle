@@ -28,15 +28,13 @@ option(
     CRADLE_ENABLE_TESTING
     "Generate targets for testing CRADLE"
     ${CRADLE_IS_MAIN_PROJECT})
-if (${CRADLE_ENABLE_TESTING})
+if(CRADLE_ENABLE_TESTING)
     enable_testing()
 endif()
-cmake_dependent_option(
+option(
     CRADLE_LOCAL_DOCKER_TESTING
     "Enable testing that requires a local Docker instance"
-    ON
-    "CRADLE_ENABLE_TESTING"
-    OFF)
+    ${CRADLE_ENABLE_TESTING})
 if(CRADLE_LOCAL_DOCKER_TESTING)
     add_compile_options(-DCRADLE_LOCAL_DOCKER_TESTING)
 endif()
