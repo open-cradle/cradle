@@ -542,29 +542,29 @@ add_custom_command(TARGET rpclib_server POST_BUILD
 add_custom_target(servers)
 add_dependencies(servers websocket_server rpclib_server)
 
-# Retrieve the token info if it exists
-if (DEFINED ENV{CRADLE_THINKNODE_API_TOKEN})
-    set(API_TOKEN $ENV{CRADLE_THINKNODE_API_TOKEN})
-elseif (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.token")
-    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/.token" API_TOKEN)
-else()
-    message(WARNING "Couldn't find API token.")
-    set(API_TOKEN "(missing)")
-endif()
-string(REGEX REPLACE "\n" "" API_TOKEN "${API_TOKEN}")
-
-# Retrieve the Docker auth info if it exists
-if (DEFINED ENV{CRADLE_THINKNODE_DOCKER_AUTH})
-    set(DOCKER_AUTH $ENV{CRADLE_THINKNODE_DOCKER_AUTH})
-elseif (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.docker-auth")
-    file(READ "${CMAKE_CURRENT_SOURCE_DIR}/.docker-auth" DOCKER_AUTH)
-else()
-    message(WARNING "Couldn't find Docker auth string.")
-    set(DOCKER_AUTH "(missing)")
-endif()
-string(REGEX REPLACE "\n" "" DOCKER_AUTH "${DOCKER_AUTH}")
-
 if (CRADLE_ENABLE_TESTING)
+    # Retrieve the token info if it exists
+    if (DEFINED ENV{CRADLE_THINKNODE_API_TOKEN})
+        set(API_TOKEN $ENV{CRADLE_THINKNODE_API_TOKEN})
+    elseif (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.token")
+        file(READ "${CMAKE_CURRENT_SOURCE_DIR}/.token" API_TOKEN)
+    else()
+        message(WARNING "Couldn't find API token.")
+        set(API_TOKEN "(missing)")
+    endif()
+    string(REGEX REPLACE "\n" "" API_TOKEN "${API_TOKEN}")
+
+    # Retrieve the Docker auth info if it exists
+    if (DEFINED ENV{CRADLE_THINKNODE_DOCKER_AUTH})
+        set(DOCKER_AUTH $ENV{CRADLE_THINKNODE_DOCKER_AUTH})
+    elseif (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.docker-auth")
+        file(READ "${CMAKE_CURRENT_SOURCE_DIR}/.docker-auth" DOCKER_AUTH)
+    else()
+        message(WARNING "Couldn't find Docker auth string.")
+        set(DOCKER_AUTH "(missing)")
+    endif()
+    string(REGEX REPLACE "\n" "" DOCKER_AUTH "${DOCKER_AUTH}")
+
     add_subdirectory(tests)
     add_subdirectory(python)
 endif()
