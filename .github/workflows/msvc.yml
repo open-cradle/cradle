@@ -36,7 +36,7 @@ jobs:
         ${CXX} --version
         scripts/set-up-python.sh --python=python3
         source .venv/bin/activate
-        cmake -Bbuild -DCMAKE_BUILD_TYPE=Debug .
+        cmake -Bbuild -DCMAKE_BUILD_TYPE=Debug -DCRADLE_USE_CONAN=ON .
         cmake --build build --target preprocessing -j4
 
     - name: Upload preprocessed headers
