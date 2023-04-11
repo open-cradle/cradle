@@ -78,6 +78,7 @@ jobs:
     - name: Configure
       run: >
         cmake -Bbuild -DCMAKE_BUILD_TYPE=${{matrix.config}}
+        -DCRADLE_USE_CONAN=ON
         -DPREPROCESSOR_USAGE=External
         -DEXTERNALLY_PREPROCESSED_DIRECTORY=preprocessed
         -DCRADLE_LOCAL_DOCKER_TESTING=OFF

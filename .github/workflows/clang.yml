@@ -43,7 +43,8 @@ jobs:
         ${CXX} --version
         scripts/set-up-python.sh --python=python3
         source .venv/bin/activate
-        cmake -Bbuild -DCMAKE_BUILD_TYPE=${{matrix.config}} .
+        cmake -Bbuild -DCRADLE_USE_CONAN=ON \
+          -DCMAKE_BUILD_TYPE=${{matrix.config}} .
 
     - name: Build
       run: |

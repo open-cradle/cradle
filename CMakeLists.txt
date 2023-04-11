@@ -68,71 +68,73 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 add_custom_target(version_info
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.cmake)
 
-# Download/include CMake/Conan integration.
-if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake")
-    message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
-    file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/0.18.1/conan.cmake"
-                  "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake"
-                  TLS_VERIFY ON)
+if (CRADLE_USE_CONAN)
+    # Download/include CMake/Conan integration.
+    if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake")
+        message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+        file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/0.18.1/conan.cmake"
+                    "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake"
+                    TLS_VERIFY ON)
+    endif()
+    include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
+
+    # Invoke Conan.
+    conan_cmake_configure(
+        REQUIRES
+            boost/1.77.0
+            catch2/2.13.4
+            nlohmann_json/3.9.1
+            msgpack/3.3.0
+            libcurl/7.75.0
+            openssl/1.1.1j
+            sqlite3/3.35.2
+            fakeit/2.0.7
+            websocketpp/0.8.2
+            zlib/1.2.12
+            bzip2/1.0.8
+            yaml-cpp/0.6.3
+            spdlog/1.10.0
+            simdjson/0.9.1
+            lz4/1.9.3
+            fmt/8.1.1
+            cereal/1.3.2
+            benchmark/1.6.1
+            rpclib/2.3.0
+            tomlplusplus/3.3.0
+        OPTIONS
+            boost:without_chrono=True
+            boost:without_container=True
+            boost:without_context=True
+            boost:without_contract=True
+            boost:without_coroutine=True
+            boost:without_fiber=True
+            boost:without_graph=True
+            boost:without_graph_parallel=True
+            boost:without_iostreams=True
+            boost:without_json=True
+            boost:without_locale=True
+            boost:without_log=True
+            boost:without_mpi=True
+            boost:without_nowide=True
+            boost:without_serialization=True
+            boost:without_stacktrace=True
+            boost:without_test=True
+            boost:without_thread=True
+            boost:without_timer=True
+            boost:without_type_erasure=True
+            boost:without_wave=True
+            fakeit:integration=catch
+            *:shared=False
+        GENERATORS cmake_find_package)
+
+    conan_cmake_autodetect(settings)
+
+    conan_cmake_install(
+        PATH_OR_REFERENCE .
+        BUILD missing
+        REMOTE conancenter
+        SETTINGS ${settings})
 endif()
-include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
-
-# Invoke Conan.
-conan_cmake_configure(
-    REQUIRES
-        boost/1.77.0
-        catch2/2.13.4
-        nlohmann_json/3.9.1
-        msgpack/3.3.0
-        libcurl/7.75.0
-        openssl/1.1.1j
-        sqlite3/3.35.2
-        fakeit/2.0.7
-        websocketpp/0.8.2
-        zlib/1.2.12
-        bzip2/1.0.8
-        yaml-cpp/0.6.3
-        spdlog/1.10.0
-        simdjson/0.9.1
-        lz4/1.9.3
-        fmt/8.1.1
-        cereal/1.3.2
-        benchmark/1.6.1
-        rpclib/2.3.0
-        tomlplusplus/3.3.0
-    OPTIONS
-        boost:without_chrono=True
-        boost:without_container=True
-        boost:without_context=True
-        boost:without_contract=True
-        boost:without_coroutine=True
-        boost:without_fiber=True
-        boost:without_graph=True
-        boost:without_graph_parallel=True
-        boost:without_iostreams=True
-        boost:without_json=True
-        boost:without_locale=True
-        boost:without_log=True
-        boost:without_mpi=True
-        boost:without_nowide=True
-        boost:without_serialization=True
-        boost:without_stacktrace=True
-        boost:without_test=True
-        boost:without_thread=True
-        boost:without_timer=True
-        boost:without_type_erasure=True
-        boost:without_wave=True
-        fakeit:integration=catch
-        *:shared=False
-    GENERATORS cmake_find_package)
-
-conan_cmake_autodetect(settings)
-
-conan_cmake_install(
-    PATH_OR_REFERENCE .
-    BUILD missing
-    REMOTE conancenter
-    SETTINGS ${settings})
 
 include(FetchContent)
 
@@ -325,8 +327,10 @@ add_custom_command(
 file(GLOB_RECURSE srcs_third_party CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/*.cpp")
 add_library(lib_third_party STATIC ${srcs_third_party})
-target_compile_definitions(
-    lib_third_party PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
+if (CRADLE_USE_CONAN)
+    target_compile_definitions(
+        lib_third_party PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
+endif()
 target_include_directories(lib_third_party PUBLIC
     src/third-party)
 
@@ -335,8 +339,10 @@ file(GLOB_RECURSE srcs_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/inner/*.cpp")
 add_library(cradle_inner STATIC ${srcs_inner})
 add_dependencies(cradle_inner version_info)
-target_compile_definitions(
-    cradle_inner PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
+if (CRADLE_USE_CONAN)
+    target_compile_definitions(
+        cradle_inner PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
+endif()
 # simdjson.h "local variable is initialized but not referenced"
 # Only when building from Visual Studio GUI, not from command line?!
 # TODO use recent simdjson
