@@ -368,13 +368,10 @@ file(GLOB_RECURSE srcs_plugins_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/testing/*.cpp")
 add_library(cradle_plugins_inner STATIC ${srcs_plugins_inner})
 add_dependencies(cradle_plugins_inner preprocessing)
-target_compile_definitions(
-    cradle_plugins_inner PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 target_include_directories(cradle_plugins_inner PUBLIC
     include
     ${generated_src_dirs}
-    src
-    src/third-party)
+    src)
 target_link_libraries(cradle_plugins_inner PUBLIC
     cradle_inner
     lib_third_party
@@ -391,8 +388,6 @@ add_library(cradle_rpclib_client STATIC)
 target_sources(cradle_rpclib_client PRIVATE
     ${srcs_rpclib_client}
     ${deploy_dir_file})
-target_compile_definitions(
-    cradle_rpclib_client PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 target_include_directories(cradle_rpclib_client PRIVATE
     include
     ${intgen_src_dir}
@@ -410,8 +405,6 @@ file(GLOB_RECURSE srcs_typing CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/typing/*.cpp")
 add_library(cradle_typing STATIC ${srcs_typing} ${headers})
 target_sources(cradle_typing PRIVATE ${generated_headers} ${generated_srcs})
-target_compile_definitions(
-    cradle_typing PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 target_include_directories(cradle_typing PUBLIC
     include
     ${generated_src_dirs}
@@ -430,8 +423,6 @@ file(GLOB_RECURSE srcs_plugins_typing CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/serialization/secondary_cache/legacy/native/*.cpp")
 add_library(cradle_plugins_typing STATIC ${srcs_plugins_typing})
 add_dependencies(cradle_plugins_typing preprocessing)
-target_compile_definitions(
-    cradle_plugins_typing PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 target_include_directories(cradle_plugins_typing PUBLIC
     include
     ${generated_src_dirs}
@@ -445,8 +436,6 @@ file(GLOB_RECURSE srcs_thinknode CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/thinknode/*.cpp")
 add_library(cradle_thinknode STATIC ${srcs_thinknode} ${headers})
 target_sources(cradle_thinknode PRIVATE ${generated_headers} ${generated_srcs})
-target_compile_definitions(
-    cradle_thinknode PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 target_include_directories(cradle_thinknode PUBLIC
     include
     ${generated_src_dirs}
@@ -464,8 +453,6 @@ target_link_libraries(cradle_thinknode PUBLIC
 file(GLOB_RECURSE srcs_plugins_thinknode CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/all/*.cpp")
 add_library(cradle_plugins_thinknode STATIC ${srcs_plugins_thinknode})
-target_compile_definitions(
-    cradle_plugins_thinknode PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 target_include_directories(cradle_plugins_thinknode PUBLIC
     ${generated_src_dirs}
     src)
@@ -487,8 +474,6 @@ if(IS_MSVC)
         APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4996 /wd4127 /wd4267 /wd4244")
 endif()
 target_sources(cradle_websocket PRIVATE ${generated_headers} ${generated_srcs})
-target_compile_definitions(
-    cradle_websocket PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 target_include_directories(cradle_websocket PUBLIC
     include
     ${generated_src_dirs}
@@ -508,8 +493,6 @@ file(GLOB_RECURSE srcs_external CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/external/*.cpp")
 add_library(cradle_external STATIC ${srcs_external} ${headers})
 target_sources(cradle_external PRIVATE ${generated_headers} ${generated_srcs})
-target_compile_definitions(
-    cradle_external PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 target_include_directories(cradle_external PUBLIC
     include
     ${generated_src_dirs}
