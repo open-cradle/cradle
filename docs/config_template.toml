@@ -18,7 +18,7 @@ port = 41071
 http_concurrency = 36
 
 # How many concurrent threads to use for locally resolving asynchronous
-# requests in parallel
+# requests in parallel (coroutines)
 async_concurrency = 20
 
 [memory_cache]
@@ -49,3 +49,11 @@ directory = "/home/user/.cache/cradle"
 client_concurrency = 22
 # How many concurrent threads to use for the rpclib server
 server_concurrency = 22
+# How many asynchronous root requests can run in parallel,
+# on the rpclib server
+async_concurrency = 16
+
+[loopback]
+# How many asynchronous root requests can run in parallel,
+# on the loopback service
+async_concurrency = 16

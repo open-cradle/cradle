@@ -1,3 +1,4 @@
+#include <cassert>
 #include <mutex>
 #include <stdexcept>
 
@@ -99,16 +100,22 @@ allocate_async_id()
 } // namespace
 
 local_atst_context::local_atst_context(
-    std::shared_ptr<local_atst_tree_context> tree_ctx, bool is_req)
+    std::shared_ptr<local_atst_tree_context> tree_ctx,
+    local_atst_context* parent,
+    bool is_req)
     : tree_ctx_{std::move(tree_ctx)},
+      parent_{parent},
       is_req_{is_req},
       id_{allocate_async_id()},
-      status_{is_req ? async_status::CREATED : async_status::FINISHED}
+      status_{is_req ? async_status::CREATED : async_status::FINISHED},
+      num_subs_not_running_{0}
 {
     auto logger = spdlog::get("cradle");
+    auto parent_id = parent ? parent->get_id() : 0;
     logger->info(
-        "local_atst_context {} ({}): created, status {}",
+        "local_atst_context {} (parent {}, {}): created, status {}",
         id_,
+        parent_id,
         is_req ? "REQ" : "VAL",
         status_);
 }
@@ -132,18 +139,59 @@ local_atst_context::make_ctx_tree_builder()
     return std::make_unique<local_atst_context_tree_builder>(*this);
 }
 
+bool
+local_atst_context::decide_reschedule()
+{
+    auto logger = spdlog::get("cradle");
+    if (!is_req_)
+    {
+        // Violating this function's precondition
+        logger->error(
+            "local_atst_context {} decide_reschedule() but not a request",
+            id_);
+        assert(false);
+        return false;
+    }
+    else if (!parent_)
+    {
+        // The root request is already running on a dedicated thread
+        logger->debug(
+            "local_atst_context {} decide_reschedule() = false due to root "
+            "request",
+            id_);
+        return false;
+    }
+    else
+    {
+        // Let the parent decide: its last subrequest to start running can
+        // continue on the parent's thread, the other ones should reschedule
+        bool res = parent_->decide_reschedule_sub();
+        logger->debug(
+            "local_atst_context {} decide_reschedule() = {} due to parent",
+            id_,
+            res);
+        return res;
+    }
+}
+
+bool
+local_atst_context::decide_reschedule_sub()
+{
+    // Return true if there will be at least one more sub to start running,
+    // after the current one
+    return num_subs_not_running_.fetch_sub(1) > 1;
+}
+
 void
 local_atst_context::add_sub(
     std::size_t ix, std::shared_ptr<local_atst_context> sub)
 {
     assert(ix == subs_.size());
+    if (sub->is_req())
+    {
+        num_subs_not_running_ += 1;
+    }
     subs_.push_back(std::move(sub));
-}
-
-void
-local_atst_context::set_future(std::future<blob> future)
-{
-    future_ = std::move(future);
 }
 
 async_status
@@ -171,10 +219,7 @@ local_atst_context::update_status(async_status status)
 {
     auto logger = spdlog::get("cradle");
     logger->info(
-        "local_atst_context::update_status {}: {} -> {}",
-        id_,
-        status_,
-        status);
+        "local_atst_context {} update_status {} -> {}", id_, status_, status);
     // Invariant: if this status is FINISHED, then all subs too
     if (status_ != async_status::FINISHED && status == async_status::FINISHED)
     {
@@ -199,14 +244,22 @@ local_atst_context::update_status_error(std::string const& errmsg)
     errmsg_ = errmsg;
 }
 
-// TODO check status
-// - FINISHED: proceed
-// - ERROR: proceed?
-// - other: not allowed - error
-blob
-local_atst_context::get_value()
+void
+local_atst_context::set_result(blob result)
 {
-    return future_.get();
+    result_ = std::move(result);
+}
+
+blob
+local_atst_context::get_result()
+{
+    if (status_ != async_status::FINISHED)
+    {
+        throw std::logic_error(fmt::format(
+            "local_atst_context::get_result() called for status {}", status_));
+    }
+    // TODO maybe store shared_ptr<blob>
+    return result_;
 }
 
 bool
@@ -235,7 +288,8 @@ void
 local_atst_context_tree_builder::visit_val_arg(std::size_t ix)
 {
     auto tree_ctx{actx_.get_tree_context()};
-    auto sub_ctx = std::make_shared<local_atst_context>(tree_ctx, false);
+    auto sub_ctx
+        = std::make_shared<local_atst_context>(tree_ctx, &actx_, false);
     actx_.add_sub(ix, sub_ctx);
     if (auto* db = tree_ctx->get_async_db())
     {
@@ -247,7 +301,8 @@ std::unique_ptr<req_visitor_intf>
 local_atst_context_tree_builder::visit_req_arg(std::size_t ix)
 {
     auto tree_ctx{actx_.get_tree_context()};
-    auto sub_ctx = std::make_shared<local_atst_context>(tree_ctx, true);
+    auto sub_ctx
+        = std::make_shared<local_atst_context>(tree_ctx, &actx_, true);
     auto sub_builder{
         std::make_unique<local_atst_context_tree_builder>(*sub_ctx)};
     actx_.add_sub(ix, sub_ctx);
@@ -311,12 +366,14 @@ proxy_atst_context::proxy_name() const
     return tree_ctx_->get_proxy_name();
 }
 
+// Will be called for a root context only
 std::shared_ptr<local_async_context_intf>
 proxy_atst_context::local_async_clone() const
 {
     return std::make_shared<local_atst_context>(
         std::make_shared<local_atst_tree_context>(
             tree_ctx_->get_inner_resources()),
+        nullptr,
         is_req_);
 }
 

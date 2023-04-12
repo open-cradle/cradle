@@ -12,8 +12,11 @@
 
 namespace cradle {
 
-loopback_service::loopback_service(inner_resources& resources)
-    : resources_{resources}
+loopback_service::loopback_service(
+    service_config const& config, inner_resources& resources)
+    : resources_{resources},
+      async_pool_{static_cast<BS::concurrency_t>(config.get_number_or_default(
+          loopback_config_keys::ASYNC_CONCURRENCY, 16))}
 {
     if (!logger_)
     {
@@ -52,7 +55,7 @@ loopback_service::resolve_sync(
     co_return result;
 }
 
-static blob
+static void
 resolve_async(
     loopback_service* loopback,
     std::shared_ptr<local_async_context_intf> actx,
@@ -60,37 +63,30 @@ resolve_async(
 {
     auto& logger{loopback->get_logger()};
     logger.info("resolve_async start");
-    blob res;
     // TODO update status to STARTED or so
     try
     {
-        res = cppcoro::sync_wait(
-                  resolve_serialized_request(*actx, std::move(seri_req)))
-                  .value();
+        blob res = cppcoro::sync_wait(
+                       resolve_serialized_request(*actx, std::move(seri_req)))
+                       .value();
+        logger.info("resolve_async done: {}", res);
+        if (actx->get_status() != async_status::FINISHED)
+        {
+            logger.error(
+                "resolve_async finished but status is {}", actx->get_status());
+        }
+        actx->set_result(std::move(res));
     }
     catch (async_cancelled const&)
     {
         logger.warn("resolve_async: caught async_cancelled");
         actx->update_status(async_status::CANCELLED);
-        // Re-throwing causes the exception to be stored with the future
-        // (although it currently won't retrieved from there).
-        throw;
     }
     catch (std::exception& e)
     {
         logger.warn("resolve_async: caught error {}", e.what());
         actx->update_status_error(e.what());
-        // Re-throwing causes the exception to be stored with the future
-        // (although it currently won't retrieved from there).
-        throw;
     }
-    logger.info("resolve_async done: {}", res);
-    if (actx->get_status() != async_status::FINISHED)
-    {
-        logger.error(
-            "resolve_async finished but status is {}", actx->get_status());
-    }
-    return res;
 }
 
 cppcoro::task<async_id>
@@ -102,9 +98,9 @@ loopback_service::submit_async(
     auto actx{to_remote_async_context_intf(ctx)->local_async_clone()};
     get_async_db().add(actx);
     // TODO update status to SUBMITTED
-    std::future<blob> my_future
-        = async_pool_.submit(resolve_async, this, actx, seri_req);
-    actx->set_future(std::move(my_future));
+    // This function should return asap.
+    // Need to dispatch a thread calling the blocking cppcoro::sync_wait().
+    async_pool_.push_task(resolve_async, this, actx, seri_req);
     async_id aid = actx->get_id();
     logger_->info("async_id {}", aid);
     co_return aid;
@@ -158,7 +154,7 @@ loopback_service::get_async_response(async_id root_aid)
 {
     logger_->info("handle_get_async_response {}", root_aid);
     auto actx{get_async_db().find(root_aid)};
-    co_return serialized_result{actx->get_value()};
+    co_return serialized_result{actx->get_result()};
 }
 
 cppcoro::task<void>
@@ -190,9 +186,10 @@ loopback_service::get_async_db()
 }
 
 void
-register_loopback_service(inner_resources& resources)
+register_loopback_service(
+    service_config const& config, inner_resources& resources)
 {
-    auto proxy{std::make_shared<loopback_service>(resources)};
+    auto proxy{std::make_shared<loopback_service>(config, resources)};
     register_proxy(proxy);
 }
 

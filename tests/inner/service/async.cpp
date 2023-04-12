@@ -1,3 +1,4 @@
+#include <functional>
 #include <thread>
 
 #include <catch2/catch.hpp>
@@ -273,7 +274,7 @@ namespace {
 
 // Requests cancellation of all coroutines sharing the context resources
 // for ctx
-cppcoro::task<int>
+cppcoro::task<void>
 checker_coro(async_context_intf& ctx)
 {
     auto logger = ensure_logger("checker");
@@ -298,25 +299,32 @@ checker_coro(async_context_intf& ctx)
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
-    co_return 0;
+    co_return;
 }
 
-template<typename Ctx, typename Req>
+void
+checker_func(async_context_intf& ctx)
+{
+    cppcoro::sync_wait(checker_coro(ctx));
+}
+
+template<AsyncContext Ctx, typename Req>
 cppcoro::task<void>
 test_cancel_async_coro(Ctx& ctx, Req const& req)
 {
-    REQUIRE_THROWS_AS(
-        co_await cppcoro::when_all(
-            resolve_request(ctx, req), checker_coro(ctx)),
-        async_cancelled);
+    REQUIRE_THROWS_AS(co_await resolve_request(ctx, req), async_cancelled);
     REQUIRE(co_await ctx.get_status_coro() == async_status::CANCELLED);
 }
 
-template<typename Ctx, typename Req>
+template<AsyncContext Ctx, typename Req>
 void
 test_cancel_async(Ctx& ctx, Req const& req)
 {
+    // Run the checker coroutine on a separate thread, independent from the
+    // ones under test
+    std::thread checker_thread(checker_func, std::ref(ctx));
     cppcoro::sync_wait(test_cancel_async_coro(ctx, req));
+    checker_thread.join();
 }
 
 void

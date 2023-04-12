@@ -40,7 +40,7 @@ atst_domain::make_local_context(inner_resources& service)
 {
     auto tree_ctx{std::make_shared<local_atst_tree_context>(service)};
     bool const is_req{true};
-    return std::make_shared<local_atst_context>(tree_ctx, is_req);
+    return std::make_shared<local_atst_context>(tree_ctx, nullptr, is_req);
 }
 
 void

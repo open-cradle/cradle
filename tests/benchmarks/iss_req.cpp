@@ -69,7 +69,7 @@ register_remote_services(
         static bool registered_loopback;
         if (!registered_loopback)
         {
-            register_loopback_service(resources);
+            register_loopback_service(make_inner_tests_config(), resources);
             registered_loopback = true;
         }
     }

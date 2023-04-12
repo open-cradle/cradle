@@ -345,11 +345,12 @@ class function_request_impl : public Intf
                 auto sub_results = co_await when_all_wrapper(
                     std::move(sub_tasks), Indices{});
                 ctx.update_status(async_status::SELF_RUNNING);
-                // Rescheduling allows tasks to run in parallel.
-                // However, for simple tasks (e.g. identity_coro) it probably
-                // isn't any good.
-                // TODO make schedule() call conditional
-                co_await ctx.get_thread_pool().schedule();
+                // Rescheduling allows tasks to run in parallel, but is not
+                // always opportune
+                if (ctx.decide_reschedule())
+                {
+                    co_await ctx.get_thread_pool().schedule();
+                }
                 auto result = co_await std::apply(
                     *function_,
                     std::tuple_cat(std::tie(ctx), std::move(sub_results)));

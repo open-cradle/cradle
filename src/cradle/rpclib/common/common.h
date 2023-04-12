@@ -20,6 +20,12 @@ struct rpclib_config_keys
     // How many concurrent threads to use for the rpclib server
     inline static std::string const SERVER_CONCURRENCY{
         "rpclib/server_concurrency"};
+
+    // (Optional integer)
+    // How many asynchronous root requests can run in parallel,
+    // on the rpclib server
+    inline static std::string const ASYNC_CONCURRENCY{
+        "rpclib/async_concurrency"};
 };
 
 // Response to "resolve" request

@@ -18,7 +18,10 @@ namespace cradle {
 class rpclib_handler_context
 {
  public:
-    rpclib_handler_context(service_core& service, spdlog::logger& logger);
+    rpclib_handler_context(
+        service_config const& config,
+        service_core& service,
+        spdlog::logger& logger);
 
     service_core&
     service()

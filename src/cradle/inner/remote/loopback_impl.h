@@ -15,7 +15,7 @@ namespace cradle {
 class loopback_service : public remote_proxy
 {
  public:
-    loopback_service(inner_resources& resources);
+    loopback_service(service_config const& config, inner_resources& resources);
 
     std::string
     name() const override;

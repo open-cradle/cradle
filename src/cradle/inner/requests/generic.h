@@ -2,7 +2,6 @@
 #define CRADLE_INNER_REQUESTS_GENERIC_H
 
 #include <concepts>
-#include <future>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -286,6 +285,15 @@ class local_async_context_intf : public async_context_intf
     virtual std::unique_ptr<req_visitor_intf>
     make_ctx_tree_builder() = 0;
 
+    // Returns a hint indicating whether rescheduling execution for this
+    // context on another thread might improve performance due to increased
+    // parallelism.
+    // Should be called only for real requests (is_req() returning true).
+    // Should be called only once per context (i.e., may have side effects).
+    virtual bool
+    decide_reschedule()
+        = 0;
+
     // Gets the status of this task
     virtual async_status
     get_status()
@@ -315,24 +323,19 @@ class local_async_context_intf : public async_context_intf
     update_status_error(std::string const& errmsg)
         = 0;
 
-    // Returns a thread pool that can be used by a caller that is able to
-    // co_await on the task.
+    // Returns a thread pool that can be used by a caller
     virtual cppcoro::static_thread_pool&
     get_thread_pool()
         = 0;
 
-    // If the caller cannot co_await on the task, it should submit it on a
-    // thread pool supporting futures, and associate the future with this
-    // context object. Once the task has finished, its value can be retrieved
-    // using get_value().
-    // This will be the case for the root request on an RPC server.
+    // Sets the result of a finished task
     virtual void
-    set_future(std::future<blob> future)
+    set_result(blob result)
         = 0;
 
-    // Returns the value of a finished task that was associated with a future
+    // Returns the value of a finished task
     virtual blob
-    get_value()
+    get_result()
         = 0;
 
     // Requests cancellation of all tasks in the same context tree

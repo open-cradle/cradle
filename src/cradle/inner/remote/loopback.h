@@ -5,6 +5,16 @@
 
 namespace cradle {
 
+// Configuration keys for the loopback service
+struct loopback_config_keys
+{
+    // (Optional integer)
+    // How many asynchronous root requests can run in parallel,
+    // on the loopback service
+    inline static std::string const ASYNC_CONCURRENCY{
+        "loopback/async_concurrency"};
+};
+
 /**
  * Registers the loopback service
  *
@@ -15,7 +25,8 @@ namespace cradle {
  * (so the new resources will be the active ones).
  */
 void
-register_loopback_service(inner_resources& resources);
+register_loopback_service(
+    service_config const& config, inner_resources& resources);
 
 } // namespace cradle
 

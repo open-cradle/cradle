@@ -1,6 +1,7 @@
 #ifndef CRADLE_PLUGINS_DOMAIN_TESTING_CONTEXT_H
 #define CRADLE_PLUGINS_DOMAIN_TESTING_CONTEXT_H
 
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -126,7 +127,9 @@ class local_atst_context : public virtual cached_introspective_context_intf,
 {
  public:
     local_atst_context(
-        std::shared_ptr<local_atst_tree_context> tree_ctx, bool is_req);
+        std::shared_ptr<local_atst_tree_context> tree_ctx,
+        local_atst_context* parent,
+        bool is_req);
 
     local_atst_context(local_atst_context&) = delete;
     void
@@ -207,6 +210,9 @@ class local_atst_context : public virtual cached_introspective_context_intf,
     std::unique_ptr<req_visitor_intf>
     make_ctx_tree_builder() override;
 
+    bool
+    decide_reschedule() override;
+
     async_status
     get_status() override;
 
@@ -241,10 +247,10 @@ class local_atst_context : public virtual cached_introspective_context_intf,
     throw_if_cancellation_requested() const override;
 
     void
-    set_future(std::future<blob> future) override;
+    set_result(blob result) override;
 
     blob
-    get_value() override;
+    get_result() override;
 
     // Other
     void
@@ -256,16 +262,21 @@ class local_atst_context : public virtual cached_introspective_context_intf,
         return tree_ctx_;
     }
 
+    bool
+    decide_reschedule_sub();
+
  private:
     std::shared_ptr<local_atst_tree_context> tree_ctx_;
+    local_atst_context* parent_;
     bool is_req_;
     async_id id_;
     async_status status_;
     std::string errmsg_;
+    blob result_;
     // Using shared_ptr ensures that local_atst_context objects are not
     // relocated during tree build-up / visit.
     std::vector<std::shared_ptr<local_atst_context>> subs_;
-    std::future<blob> future_;
+    std::atomic<int> num_subs_not_running_;
 };
 
 class local_atst_context_tree_builder : public req_visitor_intf
@@ -291,7 +302,8 @@ std::shared_ptr<local_atst_context>
 make_local_async_ctx_tree(
     std::shared_ptr<local_atst_tree_context> tree_ctx, Req const& req)
 {
-    auto root_ctx{std::make_shared<local_atst_context>(tree_ctx, true)};
+    auto root_ctx{
+        std::make_shared<local_atst_context>(tree_ctx, nullptr, true)};
     if (auto* db = tree_ctx->get_async_db())
     {
         db->add(root_ctx);

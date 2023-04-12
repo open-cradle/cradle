@@ -142,7 +142,7 @@ run_server(cli_options const& options)
     service_config config{create_config_map(options)};
     service.initialize(config);
     service.ensure_async_db();
-    rpclib_handler_context hctx{service, *my_logger};
+    rpclib_handler_context hctx{config, service, *my_logger};
 
     register_and_initialize_all_domains();
 
