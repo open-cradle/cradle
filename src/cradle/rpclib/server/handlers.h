@@ -3,9 +3,9 @@
 
 #include <string>
 
+#include <BS_thread_pool.hpp>
 #include <cppcoro/task.hpp>
 #include <spdlog/spdlog.h>
-#include <thread-pool/thread_pool.hpp>
 
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/remote/async_db.h>
@@ -32,7 +32,7 @@ class rpclib_handler_context
         return logger_;
     }
 
-    thread_pool&
+    BS::thread_pool&
     async_pool()
     {
         return async_pool_;
@@ -48,7 +48,7 @@ class rpclib_handler_context
  private:
     service_core& service_;
     spdlog::logger& logger_;
-    thread_pool async_pool_;
+    BS::thread_pool async_pool_;
 };
 
 cppcoro::task<rpclib_response>

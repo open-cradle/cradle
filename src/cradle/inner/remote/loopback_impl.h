@@ -3,8 +3,8 @@
 
 #include <memory>
 
+#include <BS_thread_pool.hpp>
 #include <spdlog/spdlog.h>
-#include <thread-pool/thread_pool.hpp>
 
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/remote/proxy.h>
@@ -60,7 +60,7 @@ class loopback_service : public remote_proxy
     inner_resources& resources_;
     inline static std::shared_ptr<spdlog::logger> logger_;
     cppcoro::static_thread_pool coro_thread_pool_;
-    thread_pool async_pool_;
+    BS::thread_pool async_pool_;
 
     async_db&
     get_async_db();
