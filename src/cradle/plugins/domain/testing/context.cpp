@@ -2,8 +2,6 @@
 #include <mutex>
 #include <stdexcept>
 
-#include <cppcoro/sync_wait.hpp>
-
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/context.h>
@@ -349,7 +347,7 @@ proxy_atst_context::~proxy_atst_context()
         try
         {
             auto& proxy{get_proxy()};
-            cppcoro::sync_wait(proxy.finish_async(remote_id_));
+            proxy.finish_async(remote_id_);
         }
         catch (std::exception& e)
         {
@@ -383,40 +381,29 @@ proxy_atst_context::local_clone() const
     throw not_implemented_error{"proxy_atst_context::local_clone()"};
 }
 
-static cppcoro::task<async_status>
-async_status_value_coro(async_status status)
-{
-    co_return status;
-}
-
 cppcoro::task<async_status>
 proxy_atst_context::get_status_coro()
 {
-    auto& proxy{get_proxy()};
     if (remote_id_ == NO_ASYNC_ID)
     {
         // Assume remote_id will soon be received
-        return async_status_value_coro(async_status::CREATED);
+        co_return async_status::CREATED;
     }
-    return proxy.get_async_status(remote_id_);
-}
-
-static cppcoro::task<void>
-do_nothing_coro()
-{
-    co_return;
+    auto& proxy{get_proxy()};
+    co_return proxy.get_async_status(remote_id_);
 }
 
 cppcoro::task<void>
 proxy_atst_context::request_cancellation_coro()
 {
-    auto& proxy{get_proxy()};
     if (remote_id_ == NO_ASYNC_ID)
     {
         cancellation_pending_ = true;
-        return do_nothing_coro();
+        co_return;
     }
-    return proxy.request_cancellation(remote_id_);
+    auto& proxy{get_proxy()};
+    proxy.request_cancellation(remote_id_);
+    co_return;
 }
 
 remote_async_context_intf&

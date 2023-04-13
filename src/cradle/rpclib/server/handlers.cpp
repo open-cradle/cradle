@@ -1,7 +1,8 @@
-#include <cassert>
+#include <functional>
 #include <stdexcept>
 
 #include <cppcoro/sync_wait.hpp>
+#include <cppcoro/task.hpp>
 #include <rpc/this_handler.h>
 
 #include <cradle/inner/core/exception.h>
@@ -20,8 +21,9 @@ rpclib_handler_context::rpclib_handler_context(
     spdlog::logger& logger)
     : service_{service},
       logger_{logger},
-      async_pool_{static_cast<BS::concurrency_t>(config.get_number_or_default(
-          rpclib_config_keys::ASYNC_CONCURRENCY, 16))}
+      request_pool_{
+          static_cast<BS::concurrency_t>(config.get_number_or_default(
+              rpclib_config_keys::REQUEST_CONCURRENCY, 16))}
 {
 }
 
@@ -35,44 +37,50 @@ handle_exception(rpclib_handler_context& hctx, std::exception& e)
     rpc::this_handler().respond_error(e.what());
 }
 
-cppcoro::task<rpclib_response>
+static rpclib_response
+resolve_sync(
+    rpclib_handler_context& hctx,
+    std::string domain_name,
+    std::string seri_req)
+{
+    auto& service{hctx.service()};
+    auto& logger{hctx.logger()};
+    logger.info("resolve_sync {}: {}", domain_name, seri_req);
+    auto dom = find_domain(domain_name);
+    auto ctx{dom->make_local_context(service)};
+    auto seri_result = cppcoro::sync_wait(
+        resolve_serialized_request(*ctx, std::move(seri_req)));
+    // TODO try to get rid of .value()
+    blob result = seri_result.value();
+    logger.info("result {}", result);
+    // TODO if the result references blob files, then create a response_id
+    // uniquely identifying the set of those files
+    static uint32_t response_id = 0;
+    response_id += 1;
+    return rpclib_response{response_id, std::move(result)};
+}
+
+rpclib_response
 handle_resolve_sync(
     rpclib_handler_context& hctx,
     std::string domain_name,
     std::string seri_req)
 try
 {
-    blob result;
-    auto& service{hctx.service()};
-    try
-    {
-        auto& logger{hctx.logger()};
-        logger.info("resolve_sync {}: {}", domain_name, seri_req);
-        auto dom = find_domain(domain_name);
-        auto ctx{dom->make_local_context(service)};
-        auto seri_result
-            = co_await resolve_serialized_request(*ctx, std::move(seri_req));
-        // TODO try to get rid of .value()
-        result = seri_result.value();
-        logger.info("result {}", result);
-    }
-    catch (std::exception& e)
-    {
-        handle_exception(hctx, e);
-    }
-    // TODO if the result references blob files, then create a response_id
-    // uniquely identifying the set of those files
-    static uint32_t response_id = 0;
-    response_id += 1;
-    co_return rpclib_response{response_id, std::move(result)};
+    auto fut = hctx.request_pool().submit(
+        resolve_sync,
+        std::ref(hctx),
+        std::move(domain_name),
+        std::move(seri_req));
+    return fut.get();
 }
 catch (std::exception& e)
 {
     handle_exception(hctx, e);
-    co_return rpclib_response{};
+    return rpclib_response{};
 }
 
-cppcoro::task<void>
+void
 handle_ack_response(rpclib_handler_context& hctx, int response_id)
 try
 {
@@ -80,34 +88,31 @@ try
     logger.info("ack_response {}", response_id);
     // TODO release the temporary lock on the blob files referenced in
     // response #response_id
-    co_return;
 }
 catch (std::exception& e)
 {
     handle_exception(hctx, e);
 }
 
-cppcoro::task<void>
+void
 handle_mock_http(rpclib_handler_context& hctx, std::string const& body)
 try
 {
     auto& session = enable_http_mocking(hctx.service());
     session.set_canned_response(make_http_200_response(body));
-    co_return;
 }
 catch (std::exception& e)
 {
     handle_exception(hctx, e);
 }
 
-// Compilers refuse calls with rpclib_handler_context&
 static void
 resolve_async(
-    rpclib_handler_context* hctx,
+    rpclib_handler_context& hctx,
     std::shared_ptr<local_async_context_intf> actx,
     std::string seri_req)
 {
-    auto& logger{hctx->logger()};
+    auto& logger{hctx.logger()};
     logger.info("resolve_async start");
     // TODO update status to STARTED or so
     try
@@ -155,7 +160,8 @@ try
     // TODO update status to SUBMITTED
     // This function should return asap.
     // Need to dispatch a thread calling the blocking cppcoro::sync_wait().
-    hctx.async_pool().push_task(resolve_async, &hctx, actx, seri_req);
+    hctx.request_pool().push_task(
+        resolve_async, std::ref(hctx), actx, seri_req);
     async_id aid = actx->get_id();
     logger.info("async_id {}", aid);
     return aid;

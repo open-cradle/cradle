@@ -36,23 +36,17 @@ loopback_service::get_logger()
     return *logger_;
 }
 
-cppcoro::static_thread_pool&
-loopback_service::get_coro_thread_pool()
-{
-    return coro_thread_pool_;
-}
-
-cppcoro::task<serialized_result>
+serialized_result
 loopback_service::resolve_sync(
     remote_context_intf& ctx, std::string domain_name, std::string seri_req)
 {
     // TODO compare ctx arg against make_local_context() from rpclib server
     logger_->debug("resolve_sync({}): request {}", domain_name, seri_req);
     auto local_ctx{ctx.local_clone()};
-    auto result
-        = co_await resolve_serialized_request(*local_ctx, std::move(seri_req));
+    auto result = cppcoro::sync_wait(
+        resolve_serialized_request(*local_ctx, std::move(seri_req)));
     logger_->debug("response {}", result.value());
-    co_return result;
+    return result;
 }
 
 static void
@@ -89,7 +83,7 @@ resolve_async(
     }
 }
 
-cppcoro::task<async_id>
+async_id
 loopback_service::submit_async(
     remote_context_intf& ctx, std::string domain_name, std::string seri_req)
 {
@@ -103,10 +97,10 @@ loopback_service::submit_async(
     async_pool_.push_task(resolve_async, this, actx, seri_req);
     async_id aid = actx->get_id();
     logger_->info("async_id {}", aid);
-    co_return aid;
+    return aid;
 }
 
-cppcoro::task<remote_context_spec_list>
+remote_context_spec_list
 loopback_service::get_sub_contexts(async_id aid)
 {
     logger_->info("handle_get_sub_contexts {}", aid);
@@ -126,52 +120,50 @@ loopback_service::get_sub_contexts(async_id aid)
         result.push_back(
             remote_context_spec{sub_actx.get_id(), sub_actx.is_req()});
     }
-    co_return result;
+    return result;
 }
 
-cppcoro::task<async_status>
+async_status
 loopback_service::get_async_status(async_id aid)
 {
     logger_->info("handle_get_async_status {}", aid);
     auto actx{get_async_db().find(aid)};
     auto status = actx->get_status();
     logger_->info("handle_get_async_status -> {}", status);
-    co_return status;
+    return status;
 }
 
-cppcoro::task<std::string>
+std::string
 loopback_service::get_async_error_message(async_id aid)
 {
     logger_->info("handle_get_async_error_message {}", aid);
     auto actx{get_async_db().find(aid)};
     auto errmsg = actx->get_error_message();
     logger_->info("handle_get_async_error_message -> {}", errmsg);
-    co_return errmsg;
+    return errmsg;
 }
 
-cppcoro::task<serialized_result>
+serialized_result
 loopback_service::get_async_response(async_id root_aid)
 {
     logger_->info("handle_get_async_response {}", root_aid);
     auto actx{get_async_db().find(root_aid)};
-    co_return serialized_result{actx->get_result()};
+    return serialized_result{actx->get_result()};
 }
 
-cppcoro::task<void>
+void
 loopback_service::request_cancellation(async_id aid)
 {
     logger_->info("handle_request_cancellation {}", aid);
     auto actx{get_async_db().find(aid)};
     actx->request_cancellation();
-    co_return;
 }
 
-cppcoro::task<void>
+void
 loopback_service::finish_async(async_id root_aid)
 {
     logger_->info("handle_finish_async {}", root_aid);
     get_async_db().remove_tree(root_aid);
-    co_return;
 }
 
 async_db&

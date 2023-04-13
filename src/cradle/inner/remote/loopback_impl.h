@@ -23,43 +23,39 @@ class loopback_service : public remote_proxy
     spdlog::logger&
     get_logger() override;
 
-    cppcoro::static_thread_pool&
-    get_coro_thread_pool() override;
-
-    cppcoro::task<serialized_result>
+    serialized_result
     resolve_sync(
         remote_context_intf& ctx,
         std::string domain_name,
         std::string seri_req) override;
 
-    cppcoro::task<async_id>
+    async_id
     submit_async(
         remote_context_intf& ctx,
         std::string domain_name,
         std::string seri_req) override;
 
-    cppcoro::task<remote_context_spec_list>
+    remote_context_spec_list
     get_sub_contexts(async_id aid) override;
 
-    cppcoro::task<async_status>
+    async_status
     get_async_status(async_id aid) override;
 
-    cppcoro::task<std::string>
+    std::string
     get_async_error_message(async_id aid) override;
 
-    cppcoro::task<serialized_result>
+    serialized_result
     get_async_response(async_id root_aid) override;
 
-    cppcoro::task<void>
+    void
     request_cancellation(async_id aid) override;
 
-    cppcoro::task<void>
+    void
     finish_async(async_id root_aid) override;
 
  private:
     inner_resources& resources_;
     inline static std::shared_ptr<spdlog::logger> logger_;
-    cppcoro::static_thread_pool coro_thread_pool_;
     BS::thread_pool async_pool_;
 
     async_db&

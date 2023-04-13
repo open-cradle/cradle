@@ -45,13 +45,10 @@ port = 9090
 directory = "/home/user/.cache/cradle"
 
 [rpclib]
-# How many concurrent threads to use for the rpclib client
-client_concurrency = 22
-# How many concurrent threads to use for the rpclib server
-server_concurrency = 22
-# How many asynchronous root requests can run in parallel,
-# on the rpclib server
-async_concurrency = 16
+# How many root requests can run in parallel, on the rpclib server;
+# defines the size of a thread pool shared between synchronous and
+# asynchronous requests.
+request_concurrency = 16
 
 [loopback]
 # How many asynchronous root requests can run in parallel,

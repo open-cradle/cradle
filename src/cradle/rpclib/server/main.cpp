@@ -155,18 +155,17 @@ run_server(cli_options const& options)
         "resolve_sync",
         [&](std::string const& domain_name, std::string const& seri_req) {
             // TODO create origin tasklet somewhere
-            return cppcoro::sync_wait(
-                handle_resolve_sync(hctx, domain_name, seri_req));
+            return handle_resolve_sync(hctx, domain_name, seri_req);
         });
     if (options.testing)
     {
         // No mocking in production server
         srv.bind("mock_http", [&](std::string const& body) {
-            return cppcoro::sync_wait(handle_mock_http(hctx, body));
+            return handle_mock_http(hctx, body);
         });
     }
     srv.bind("ack_response", [&](int response_id) {
-        return cppcoro::sync_wait(handle_ack_response(hctx, response_id));
+        return handle_ack_response(hctx, response_id);
     });
     srv.bind("ping", []() { return request_uuid::get_git_version(); });
 
@@ -194,12 +193,7 @@ run_server(cli_options const& options)
         return handle_finish_async(hctx, root_aid);
     });
 
-    auto num_threads = config.get_number_or_default(
-        rpclib_config_keys::SERVER_CONCURRENCY, 22);
-    srv.async_run(num_threads);
-
-    // TODO find a more elegant way to wait forever
-    std::this_thread::sleep_for(std::chrono::years(1));
+    srv.run();
 
     rpc::this_server().stop();
 }

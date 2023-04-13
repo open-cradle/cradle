@@ -5,8 +5,6 @@
 #include <string>
 #include <tuple>
 
-#include <cppcoro/static_thread_pool.hpp>
-#include <cppcoro/task.hpp>
 #include <spdlog/spdlog.h>
 
 #include <cradle/inner/requests/generic.h>
@@ -44,7 +42,7 @@ using remote_context_spec_list = std::vector<remote_context_spec>;
 /*
  * Proxy for a remote (server) capable of resolving requests, synchronously
  * or asynchronously.
- * All coroutines throw on error.
+ * All remote calls throw on error.
  * TODO Only remote_error should be thrown
  */
 class remote_proxy
@@ -61,16 +59,8 @@ class remote_proxy
     get_logger()
         = 0;
 
-    // Returns a thread pool on which blocking coroutines should be scheduled.
-    // The proxy implementation will do this internally, but clients should
-    // do as well if appropriate. An example would be a loop polling a
-    // remote context's status until it satisfies some criterion.
-    virtual cppcoro::static_thread_pool&
-    get_coro_thread_pool()
-        = 0;
-
     // Resolves a request, synchronously.
-    virtual cppcoro::task<serialized_result>
+    virtual serialized_result
     resolve_sync(
         remote_context_intf& ctx,
         std::string domain_name,
@@ -83,7 +73,7 @@ class remote_proxy
     // be constructed only when the request is deserialized, and that could
     // take some time.
     // TODO passing resources instead of ctx might be more general
-    virtual cppcoro::task<async_id>
+    virtual async_id
     submit_async(
         remote_context_intf& ctx,
         std::string domain_name,
@@ -94,35 +84,41 @@ class remote_proxy
     // of which aid is the root.
     // Should be called for the root aid (returned from submit_async) only
     // when its status is SUBS_RUNNING, SELF_RUNNING or FINISHED.
-    virtual cppcoro::task<remote_context_spec_list>
-    get_sub_contexts(async_id aid) = 0;
+    virtual remote_context_spec_list
+    get_sub_contexts(async_id aid)
+        = 0;
 
     // Returns the status of the remote context specified by aid.
-    virtual cppcoro::task<async_status>
-    get_async_status(async_id aid) = 0;
+    virtual async_status
+    get_async_status(async_id aid)
+        = 0;
 
     // Returns an error message
     // Should be called only when status == ERROR
-    virtual cppcoro::task<std::string>
-    get_async_error_message(async_id aid) = 0;
+    virtual std::string
+    get_async_error_message(async_id aid)
+        = 0;
 
     // Returns the value that request resolution calculated. root_aid should
     // be the return value of a former submit_async() call. The status of the
     // root context should be FINISHED.
-    virtual cppcoro::task<serialized_result>
-    get_async_response(async_id root_aid) = 0;
+    virtual serialized_result
+    get_async_response(async_id root_aid)
+        = 0;
 
     // Requests for an asynchronous resolution to be cancelled. aid should
     // specify a context in the tree.
-    virtual cppcoro::task<void>
-    request_cancellation(async_id aid) = 0;
+    virtual void
+    request_cancellation(async_id aid)
+        = 0;
 
     // Finishes an asynchronous resolution, giving the server a chance to clean
     // up its administration associated with the resolution. Should be called
     // even when the resolution did not finish successfully (e.g. an
     // exception was thrown).
-    virtual cppcoro::task<void>
-    finish_async(async_id root_aid) = 0;
+    virtual void
+    finish_async(async_id root_aid)
+        = 0;
 };
 
 // Registers a proxy.

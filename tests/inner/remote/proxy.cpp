@@ -29,13 +29,7 @@ class test_proxy : public remote_proxy
         throw not_implemented_error{"test_proxy::get_logger()"};
     }
 
-    cppcoro::static_thread_pool&
-    get_coro_thread_pool() override
-    {
-        throw not_implemented_error{"test_proxy::get_coro_thread_pool()"};
-    }
-
-    cppcoro::task<serialized_result>
+    serialized_result
     resolve_sync(
         remote_context_intf& ctx,
         std::string domain_name,
@@ -44,7 +38,7 @@ class test_proxy : public remote_proxy
         throw not_implemented_error{"test_proxy::resolve_sync()"};
     }
 
-    cppcoro::task<async_id>
+    async_id
     submit_async(
         remote_context_intf& ctx,
         std::string domain_name,
@@ -53,37 +47,37 @@ class test_proxy : public remote_proxy
         throw not_implemented_error{"test_proxy::submit_async()"};
     }
 
-    cppcoro::task<remote_context_spec_list>
+    remote_context_spec_list
     get_sub_contexts(async_id aid) override
     {
         throw not_implemented_error{"test_proxy::get_sub_contexts()"};
     }
 
-    cppcoro::task<async_status>
+    async_status
     get_async_status(async_id aid) override
     {
         throw not_implemented_error{"test_proxy::get_async_status()"};
     }
 
-    cppcoro::task<std::string>
+    std::string
     get_async_error_message(async_id aid) override
     {
         throw not_implemented_error{"test_proxy::get_async_error_message()"};
     }
 
-    cppcoro::task<serialized_result>
+    serialized_result
     get_async_response(async_id root_aid) override
     {
         throw not_implemented_error{"test_proxy::get_async_response()"};
     }
 
-    cppcoro::task<void>
+    void
     request_cancellation(async_id aid) override
     {
         throw not_implemented_error{"test_proxy::request_cancellation()"};
     }
 
-    cppcoro::task<void>
+    void
     finish_async(async_id root_aid) override
     {
         throw not_implemented_error{"test_proxy::finish_async()"};

@@ -113,6 +113,13 @@ requires ContextMatchingRequest<Ctx, Req>
     return ptr.task();
 }
 
+template<Request Req>
+cppcoro::shared_task<typename Req::value_type>
+resolve_remote_to_value_coro(remote_context_intf& ctx, Req const& req)
+{
+    co_return resolve_remote_to_value(ctx, req);
+}
+
 // Returns the shared_task by value.
 template<typename Ctx, CachedIntrospectiveRequest Req>
 requires ContextMatchingRequest<Ctx, Req>
@@ -121,7 +128,7 @@ requires ContextMatchingRequest<Ctx, Req>
 {
     if (remote_context_intf* rem_ctx = to_remote_context_intf(ctx))
     {
-        return resolve_remote_to_value(*rem_ctx, req);
+        return resolve_remote_to_value_coro(*rem_ctx, req);
     }
     immutable_cache_ptr<typename Req::value_type> ptr{
         ctx.get_cache(),
@@ -201,14 +208,12 @@ requires ContextMatchingRequest<Ctx, Req>&& LocalAsyncContext<Ctx>
 // TODO adapt ContextMatchingRequest for Local/Remote mix
 template<typename Ctx, Request Req>
 // requires ContextMatchingRequest<Ctx, Req>&& RemoteAsyncContext<Ctx>
-requires RemoteAsyncContext<Ctx>
-    // TODO cppcoro::task ?
-    cppcoro::shared_task<typename Req::value_type>
-    resolve_request(Ctx& ctx, Req const& req)
+requires RemoteAsyncContext<Ctx> cppcoro::task<typename Req::value_type>
+resolve_request(Ctx& ctx, Req const& req)
 {
     // Even if Req is a CachedRequest, its result will not be cached locally.
     // Caching and introspection are for the server.
-    return resolve_remote_to_value(ctx, req);
+    co_return resolve_remote_to_value(ctx, req);
 }
 
 } // namespace cradle

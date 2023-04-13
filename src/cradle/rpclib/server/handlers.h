@@ -4,7 +4,6 @@
 #include <string>
 
 #include <BS_thread_pool.hpp>
-#include <cppcoro/task.hpp>
 #include <spdlog/spdlog.h>
 
 #include <cradle/inner/core/type_definitions.h>
@@ -36,9 +35,9 @@ class rpclib_handler_context
     }
 
     BS::thread_pool&
-    async_pool()
+    request_pool()
     {
-        return async_pool_;
+        return request_pool_;
     }
 
     async_db&
@@ -51,19 +50,19 @@ class rpclib_handler_context
  private:
     service_core& service_;
     spdlog::logger& logger_;
-    BS::thread_pool async_pool_;
+    BS::thread_pool request_pool_;
 };
 
-cppcoro::task<rpclib_response>
+rpclib_response
 handle_resolve_sync(
     rpclib_handler_context& hctx,
     std::string domain_name,
     std::string seri_req);
 
-cppcoro::task<void>
+void
 handle_ack_response(rpclib_handler_context& hctx, int response_id);
 
-cppcoro::task<void>
+void
 handle_mock_http(rpclib_handler_context& hctx, std::string const& body);
 
 async_id

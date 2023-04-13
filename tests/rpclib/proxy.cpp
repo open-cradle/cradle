@@ -78,7 +78,5 @@ TEST_CASE("sending bad request", "[rpclib]")
     auto client = ensure_rpclib_service();
 
     REQUIRE_THROWS_AS(
-        cppcoro::sync_wait(
-            client->resolve_sync(ctx, "bad domain", "bad request")),
-        remote_error);
+        client->resolve_sync(ctx, "bad domain", "bad request"), remote_error);
 }

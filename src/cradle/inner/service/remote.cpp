@@ -1,8 +1,6 @@
 #include <chrono>
 #include <deque>
 
-#include <cppcoro/schedule_on.hpp>
-
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/requests/generic.h>
@@ -20,7 +18,7 @@ class async_status_matcher
     virtual bool operator()(async_status) const = 0;
 };
 
-cppcoro::task<void>
+void
 wait_until_async_done(
     remote_proxy& proxy,
     async_id remote_id,
@@ -28,7 +26,7 @@ wait_until_async_done(
 {
     for (;;)
     {
-        auto status = co_await proxy.get_async_status(remote_id);
+        auto status = proxy.get_async_status(remote_id);
         if ((*matcher)(status))
         {
             break;
@@ -40,13 +38,11 @@ wait_until_async_done(
         }
         else if (status == async_status::ERROR)
         {
-            std::string errmsg
-                = co_await proxy.get_async_error_message(remote_id);
+            std::string errmsg = proxy.get_async_error_message(remote_id);
             throw async_error(errmsg);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-    co_return;
 }
 
 void
@@ -92,13 +88,12 @@ subs_available_matcher::operator()(async_status status) const
     return done;
 }
 
-cppcoro::task<void>
+void
 wait_until_subs_available(remote_proxy& proxy, async_id remote_id)
 {
     auto& logger = proxy.get_logger();
-    co_await wait_until_async_done(
+    wait_until_async_done(
         proxy, remote_id, std::make_unique<subs_available_matcher>(logger));
-    co_return;
 }
 
 class async_finished_matcher : public async_status_matcher
@@ -125,15 +120,15 @@ async_finished_matcher::operator()(async_status status) const
     return done;
 }
 
-cppcoro::task<void>
+void
 wait_until_async_finished(remote_proxy& proxy, async_id remote_id)
 {
     auto& logger = proxy.get_logger();
-    return wait_until_async_done(
+    wait_until_async_done(
         proxy, remote_id, std::make_unique<async_finished_matcher>(logger));
 }
 
-cppcoro::task<void>
+void
 populate_remote_ctx_tree(
     remote_proxy& proxy, remote_async_context_intf& root_ctx)
 {
@@ -143,8 +138,7 @@ populate_remote_ctx_tree(
     {
         auto* todo_ctx = todo_list.front();
         todo_list.pop_front();
-        auto child_specs
-            = co_await proxy.get_sub_contexts(todo_ctx->get_remote_id());
+        auto child_specs = proxy.get_sub_contexts(todo_ctx->get_remote_id());
         for (auto& spec : child_specs)
         {
             auto [sub_aid, is_req] = spec;
@@ -152,10 +146,9 @@ populate_remote_ctx_tree(
             todo_list.push_back(&sub_ctx);
         }
     }
-    co_return;
 }
 
-cppcoro::task<serialized_result>
+serialized_result
 resolve_async(
     remote_proxy& proxy,
     remote_async_context_intf& root_ctx,
@@ -164,22 +157,21 @@ resolve_async(
 {
     auto& logger = proxy.get_logger();
     logger.debug("resolve_async");
-    co_await proxy.get_coro_thread_pool().schedule();
-    auto remote_id = co_await proxy.submit_async(
+    auto remote_id = proxy.submit_async(
         root_ctx, std::move(domain_name), std::move(seri_req));
     root_ctx.set_remote_id(remote_id);
     if (root_ctx.cancellation_pending())
     {
-        co_await proxy.request_cancellation(remote_id);
+        proxy.request_cancellation(remote_id);
         throw remote_error{"cancelled"};
     }
-    co_await wait_until_subs_available(proxy, remote_id);
-    co_await populate_remote_ctx_tree(proxy, root_ctx);
-    co_await wait_until_async_finished(proxy, remote_id);
-    co_return co_await proxy.get_async_response(remote_id);
+    wait_until_subs_available(proxy, remote_id);
+    populate_remote_ctx_tree(proxy, root_ctx);
+    wait_until_async_finished(proxy, remote_id);
+    return proxy.get_async_response(remote_id);
 }
 
-cppcoro::task<serialized_result>
+serialized_result
 resolve_sync(
     remote_context_intf& ctx,
     remote_proxy& proxy,
@@ -192,25 +184,23 @@ resolve_sync(
 
 } // namespace
 
-cppcoro::task<serialized_result>
+serialized_result
 resolve_remote(remote_context_intf& ctx, std::string seri_req)
 {
     auto& proxy = find_proxy(ctx.proxy_name());
     auto& logger = proxy.get_logger();
     std::string domain_name{ctx.domain_name()};
     logger.debug("request on {}: {} ...", domain_name, seri_req.substr(0, 10));
-    cppcoro::task<serialized_result> task;
     if (auto* async_ctx = to_remote_async_context_intf(ctx))
     {
-        task = resolve_async(
+        return resolve_async(
             proxy, *async_ctx, std::move(domain_name), std::move(seri_req));
     }
     else
     {
-        task = resolve_sync(
+        return resolve_sync(
             ctx, proxy, std::move(domain_name), std::move(seri_req));
     }
-    return task;
 }
 
 } // namespace cradle

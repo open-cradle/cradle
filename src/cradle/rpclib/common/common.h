@@ -12,20 +12,11 @@ static const inline rpclib_port_t RPCLIB_PORT_TESTING = 8096;
 struct rpclib_config_keys
 {
     // (Optional integer)
-    // How many concurrent threads to use for the rpclib client
-    inline static std::string const CLIENT_CONCURRENCY{
-        "rpclib/client_concurrency"};
-
-    // (Optional integer)
-    // How many concurrent threads to use for the rpclib server
-    inline static std::string const SERVER_CONCURRENCY{
-        "rpclib/server_concurrency"};
-
-    // (Optional integer)
-    // How many asynchronous root requests can run in parallel,
-    // on the rpclib server
-    inline static std::string const ASYNC_CONCURRENCY{
-        "rpclib/async_concurrency"};
+    // How many root requests can run in parallel, on the rpclib server;
+    // defines the size of a thread pool shared between synchronous and
+    // asynchronous requests.
+    inline static std::string const REQUEST_CONCURRENCY{
+        "rpclib/request_concurrency"};
 };
 
 // Response to "resolve" request
