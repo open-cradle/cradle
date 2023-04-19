@@ -332,7 +332,8 @@ if (CRADLE_USE_CONAN)
         lib_third_party PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
 endif()
 target_include_directories(lib_third_party PUBLIC
-    src/third-party)
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/third-party>
+    $<INSTALL_INTERFACE:include/third-party>)
 
 # The library for the inner core
 file(GLOB_RECURSE srcs_inner CONFIGURE_DEPENDS
@@ -568,3 +569,28 @@ if (CRADLE_ENABLE_TESTING)
     add_subdirectory(tests)
     add_subdirectory(python)
 endif()
+
+# Describe our installation.
+
+install(
+    TARGETS
+        cradle_inner cradle_typing cradle_plugins_typing cradle_thinknode
+        cradle_plugins_thinknode cradle_websocket cradle_external
+        websocket_server rpclib_server
+    EXPORT CradleTargets
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin)
+
+# TODO: Decide how to get the version info.
+# include(CMakePackageConfigHelpers)
+# write_basic_package_version_file(
+#     CradleConfigVersion.cmake
+#     VERSION ${CRADLE_VERSION}
+#     COMPATIBILITY AnyNewerVersion)
+
+install(
+    EXPORT CradleTargets
+    FILE CradleTargets.cmake
+    NAMESPACE cradle::
+    DESTINATION lib/cmake/cradle)
