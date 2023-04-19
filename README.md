@@ -1,10 +1,10 @@
 # CRADLE
 
-[![MSVC](https://github.com/mghro/cradle/actions/workflows/msvc.yml/badge.svg)](https://github.com/mghro/cradle/actions/workflows/msvc.yml)
-[![GCC](https://github.com/mghro/cradle/actions/workflows/gcc.yml/badge.svg)](https://github.com/mghro/cradle/actions/workflows/gcc.yml)
-[![Clang](https://github.com/mghro/cradle/actions/workflows/clang.yml/badge.svg)](https://github.com/mghro/cradle/actions/workflows/clang.yml)
-[![Python](https://github.com/mghro/cradle/actions/workflows/python.yml/badge.svg)](https://github.com/mghro/cradle/actions/workflows/python.yml)
-[![Code Coverage](https://codecov.io/gh/mghro/cradle/branch/main/graph/badge.svg)](https://codecov.io/gh/mghro/cradle)
+[![MSVC](https://github.com/open-cradle/cradle/actions/workflows/msvc.yml/badge.svg)](https://github.com/open-cradle/cradle/actions/workflows/msvc.yml)
+[![GCC](https://github.com/open-cradle/cradle/actions/workflows/gcc.yml/badge.svg)](https://github.com/open-cradle/cradle/actions/workflows/gcc.yml)
+[![Clang](https://github.com/open-cradle/cradle/actions/workflows/clang.yml/badge.svg)](https://github.com/open-cradle/cradle/actions/workflows/clang.yml)
+[![Python](https://github.com/open-cradle/cradle/actions/workflows/python.yml/badge.svg)](https://github.com/open-cradle/cradle/actions/workflows/python.yml)
+[![Code Coverage](https://codecov.io/gh/open-cradle/cradle/branch/main/graph/badge.svg)](https://codecov.io/gh/open-cradle/cradle)
 
 CRADLE acts as a local proxy for Thinknode
 

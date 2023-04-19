@@ -1,7 +1,7 @@
 # Lambda captures
 
 ## GCC bug
-[Issue #170](https://github.com/mghro/cradle/issues/170): crashes occur indicating memory corruption, e.g. "double free".
+[Issue #170](https://github.com/open-cradle/cradle/issues/170): crashes occur indicating memory corruption, e.g. "double free".
 
 This looks like a gcc compiler bug, probably [this one](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=98401).
 
