@@ -42,14 +42,11 @@ namespace cradle {
  * a normal function does not. This could be split into four cases
  * (function/coroutine with/without context argument).
  *
- * This file defines the "type-erased" requests.
- * The main request object (class function_request_erased) has a shared_ptr
+ * The request classes defined in this file are "type-erased":
+ * the main request object (class function_request_erased) has a shared_ptr
  * to a function_request_intf object; that object's full type
  * (i.e., function_request_impl's template arguments) are known in
  * function_request_erased's constructor only.
- *
- * These classes intend to overcome the drawbacks of the earlier ones
- * (function_deprecated.h).
  */
 
 class conflicting_functions_uuid_error : public uuid_error

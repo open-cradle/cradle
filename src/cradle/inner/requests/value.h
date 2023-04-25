@@ -1,7 +1,6 @@
 #ifndef CRADLE_INNER_REQUESTS_VALUE_H
 #define CRADLE_INNER_REQUESTS_VALUE_H
 
-#include <memory>
 #include <utility>
 
 #include <cppcoro/task.hpp>
@@ -91,36 +90,10 @@ struct arg_type_struct<value_request<Value>>
 };
 
 template<typename Value>
-struct arg_type_struct<std::unique_ptr<value_request<Value>>>
-{
-    using value_type = Value;
-};
-
-template<typename Value>
-struct arg_type_struct<std::shared_ptr<value_request<Value>>>
-{
-    using value_type = Value;
-};
-
-template<typename Value>
 auto
 rq_value(Value&& value)
 {
     return value_request{std::forward<Value>(value)};
-}
-
-template<typename Value>
-auto
-rq_value_up(Value&& value)
-{
-    return std::make_unique<value_request<Value>>(std::forward<Value>(value));
-}
-
-template<typename Value>
-auto
-rq_value_sp(Value&& value)
-{
-    return std::make_shared<value_request<Value>>(std::forward<Value>(value));
 }
 
 // operator==() and operator<() are used:
@@ -155,40 +128,10 @@ hash_value(value_request<Value> const& req)
 }
 
 template<typename Value>
-size_t
-hash_value(std::unique_ptr<value_request<Value>> const& req)
-{
-    return invoke_hash(req->get_value());
-}
-
-template<typename Value>
-size_t
-hash_value(std::shared_ptr<value_request<Value>> const& req)
-{
-    return invoke_hash(req->get_value());
-}
-
-template<typename Value>
 void
 update_unique_hash(unique_hasher& hasher, value_request<Value> const& req)
 {
     req.update_hash(hasher);
-}
-
-template<typename Value>
-void
-update_unique_hash(
-    unique_hasher& hasher, std::unique_ptr<value_request<Value>> const& req)
-{
-    req->update_hash(hasher);
-}
-
-template<typename Value>
-void
-update_unique_hash(
-    unique_hasher& hasher, std::shared_ptr<value_request<Value>> const& req)
-{
-    req->update_hash(hasher);
 }
 
 } // namespace cradle

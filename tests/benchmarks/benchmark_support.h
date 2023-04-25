@@ -2,10 +2,11 @@
 #define CRADLE_TESTS_BENCHMARKS_BENCHMARK_SUPPORT_H
 
 #include <benchmark/benchmark.h>
+#include <cppcoro/sync_wait.hpp>
+#include <cppcoro/task.hpp>
 
 #include "../support/concurrency_testing.h"
 #include <cradle/inner/service/request.h>
-#include <cradle/inner/service/request_deprecated.h>
 
 namespace cradle {
 
@@ -26,29 +27,12 @@ call_resolve_by_ref_loop(Req const& req)
     cppcoro::sync_wait(loop());
 }
 
-template<UncachedRequestPtr Req>
-void
-call_resolve_by_ptr_loop(Req const& req)
-{
-    constexpr int num_loops = 1000;
-    uncached_request_resolution_context ctx{};
-    auto loop = [&]() -> cppcoro::task<int> {
-        int total{};
-        for (auto i = 0; i < num_loops; ++i)
-        {
-            total += co_await req->resolve(ctx);
-        }
-        co_return total;
-    };
-    cppcoro::sync_wait(loop());
-}
-
 // The purpose of the loop is to bring the sync_wait() overhead down to
 // amortized zero. However, each time the same request is resolved, meaning
 // - Any calculations cached inside the request itself (e.g., its hash), are
 // not measured
 // - Each equals() will immediately return true, so is also not really measured
-template<typename Ctx, RequestOrPtr Req>
+template<typename Ctx, Request Req>
 requires(ContextMatchingRequest<Ctx, typename Req::element_type>) void resolve_request_loop(
     benchmark::State& state, Ctx& ctx, Req const& req, int num_loops = 1000)
 {
@@ -77,7 +61,7 @@ requires(ContextMatchingRequest<Ctx, typename Req::element_type>) void resolve_r
     cppcoro::sync_wait(loop());
 }
 
-template<typename Ctx, RequestOrPtr Req>
+template<typename Ctx, Request Req>
 requires(ContextMatchingRequest<Ctx, typename Req::element_type>) void BM_resolve_request(
     benchmark::State& state, Ctx& ctx, Req const& req)
 {
