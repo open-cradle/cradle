@@ -139,11 +139,11 @@ BM_resolve_testing_request(
     }
     catch (std::exception& e)
     {
-        state.SkipWithError(e.what());
+        handle_benchmark_exception(state, e.what());
     }
     catch (...)
     {
-        state.SkipWithError("Caught unknown exception");
+        handle_benchmark_exception(state, "Caught unknown exception");
     }
 }
 

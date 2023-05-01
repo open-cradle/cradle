@@ -1,5 +1,6 @@
 #include <benchmark/benchmark.h>
 
+#include "benchmark_support.h"
 #include <cradle/inner/utilities/logging.h>
 
 int
@@ -17,5 +18,5 @@ main(int argc, char** argv)
 
     benchmark::RunSpecifiedBenchmarks();
     benchmark::Shutdown();
-    return 0;
+    return cradle::check_benchmarks_skipped_with_error();
 }

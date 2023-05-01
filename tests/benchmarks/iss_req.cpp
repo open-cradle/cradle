@@ -195,11 +195,11 @@ BM_resolve_thinknode_request(
     }
     catch (std::exception& e)
     {
-        state.SkipWithError(e.what());
+        handle_benchmark_exception(state, e.what());
     }
     catch (...)
     {
-        state.SkipWithError("Caught unknown exception");
+        handle_benchmark_exception(state, "Caught unknown exception");
     }
 }
 

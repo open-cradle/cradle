@@ -17,10 +17,10 @@
 
 namespace cradle {
 
-struct testing_request_context final
-    : public cached_introspective_context_intf,
-      public sync_context_intf,
-      public remote_context_intf
+struct testing_request_context final : public local_context_intf,
+                                       public remote_context_intf,
+                                       public sync_context_intf,
+                                       public cached_introspective_context_intf
 {
     inner_resources& service;
 

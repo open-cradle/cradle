@@ -6,9 +6,25 @@
 #include <cppcoro/task.hpp>
 
 #include "../support/concurrency_testing.h"
+#include "../support/inner_service.h"
 #include <cradle/inner/service/request.h>
 
 namespace cradle {
+
+/*
+ * Handles an exception thrown by a benchmark: marks the benchmark as skipped,
+ * and causes the program to end with an exit code.
+ */
+void
+handle_benchmark_exception(benchmark::State& state, std::string const& what);
+
+/*
+ * Reports a summary on benchmarks skipped with error.
+ * Returns intended main() exit code.
+ * Note that the benchmark library itself does not offer this functionality.
+ */
+int
+check_benchmarks_skipped_with_error();
 
 template<UncachedRequest Req>
 void
