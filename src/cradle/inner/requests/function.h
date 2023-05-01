@@ -114,7 +114,8 @@ class function_request_intf : public id_interface
         = 0;
 
     virtual void
-    visit(req_visitor_intf& visitor) const = 0;
+    visit(req_visitor_intf& visitor) const
+        = 0;
 
     virtual cppcoro::task<Value>
     resolve(Ctx& ctx) const = 0;
@@ -632,9 +633,9 @@ class function_request_erased
     }
 
     template<typename Ctx>
-    requires ContextMatchingProps<Ctx, introspective, caching_level>
-        cppcoro::task<Value>
-        resolve(Ctx& ctx) const
+        requires ContextMatchingProps<Ctx, introspective, caching_level>
+    cppcoro::task<Value>
+    resolve(Ctx& ctx) const
     {
         return impl_->resolve(ctx);
     }
@@ -749,8 +750,8 @@ auto rq_function_erased(Props props, Function function, Args... args)
 
 // Creates a type-erased request for a function that is a coroutine.
 template<typename Props, typename Function, typename... Args>
-requires(Props::func_is_coro) auto rq_function_erased(
-    Props props, Function function, Args... args)
+    requires(Props::func_is_coro)
+auto rq_function_erased(Props props, Function function, Args... args)
 {
     using CtxRef = std::add_lvalue_reference_t<typename Props::ctx_type>;
     // Rely on the coroutine returning cppcoro::task<Value>,
@@ -794,9 +795,11 @@ requires(Props::func_is_coro) auto rq_function_erased(
 // type.
 template<typename Arg, typename ValueType>
 concept TypedArg
-    = std::convertible_to<
-          Arg,
-          ValueType> || (std::same_as<typename Arg::value_type, ValueType> && std::same_as<function_request_erased<ValueType, typename Arg::props_type>, Arg>);
+    = std::convertible_to<Arg, ValueType>
+      || (std::same_as<typename Arg::value_type, ValueType>
+          && std::same_as<
+              function_request_erased<ValueType, typename Arg::props_type>,
+              Arg>);
 
 // Function returning the given value as-is; similar to std::identity.
 template<typename Value>
@@ -871,8 +874,8 @@ make_normalization_uuid()
 
 // Normalizes a value argument in a non-coroutine context.
 template<typename Value, typename Props>
-requires(!Request<Value> && !Props::func_is_coro) auto normalize_arg(
-    Value const& arg)
+    requires(!Request<Value> && !Props::func_is_coro)
+auto normalize_arg(Value const& arg)
 {
     Props props{make_normalization_uuid<Value>(), "arg"};
     return rq_function_erased(std::move(props), identity_func<Value>, arg);
@@ -880,8 +883,8 @@ requires(!Request<Value> && !Props::func_is_coro) auto normalize_arg(
 
 // Normalizes a value argument in a coroutine context.
 template<typename Value, typename Props>
-requires(!Request<Value> && Props::func_is_coro) auto normalize_arg(
-    Value const& arg)
+    requires(!Request<Value> && Props::func_is_coro)
+auto normalize_arg(Value const& arg)
 {
     Props props{make_normalization_uuid<Value>(), "arg"};
     return rq_function_erased(std::move(props), identity_coro<Value>, arg);
@@ -889,11 +892,8 @@ requires(!Request<Value> && Props::func_is_coro) auto normalize_arg(
 
 // Normalizes a C-style string argument in a non-coroutine context.
 template<typename Value, typename Props>
-requires(
-    std::same_as<
-        Value,
-        std::string> && !Props::func_is_coro) auto normalize_arg(char const*
-                                                                     arg)
+    requires(std::same_as<Value, std::string> && !Props::func_is_coro)
+auto normalize_arg(char const* arg)
 {
     Props props{make_normalization_uuid<Value>(), "arg"};
     return rq_function_erased(
@@ -902,8 +902,8 @@ requires(
 
 // Normalizes a C-style string argument in a coroutine context.
 template<typename Value, typename Props>
-requires(std::same_as<Value, std::string>&&
-             Props::func_is_coro) auto normalize_arg(char const* arg)
+    requires(std::same_as<Value, std::string> && Props::func_is_coro)
+auto normalize_arg(char const* arg)
 {
     Props props{make_normalization_uuid<Value>(), "arg"};
     return rq_function_erased(
@@ -914,7 +914,8 @@ requires(std::same_as<Value, std::string>&&
 // If a subrequest is passed as argument, its Props must equal those for the
 // main request.
 template<typename Value, typename Props, typename Arg>
-requires std::same_as<function_request_erased<Value, Props>, Arg> auto
+    requires std::same_as<function_request_erased<Value, Props>, Arg>
+auto
 normalize_arg(Arg const& arg)
 {
     return arg;

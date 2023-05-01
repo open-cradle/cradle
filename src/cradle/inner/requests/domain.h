@@ -21,7 +21,8 @@ class domain
         = 0;
 
     virtual std::string
-    name() const = 0;
+    name() const
+        = 0;
 
     virtual std::shared_ptr<context_intf>
     make_local_context(inner_resources& resources) = 0;

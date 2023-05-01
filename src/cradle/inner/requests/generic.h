@@ -44,42 +44,41 @@ concept UncachedRequest = Request<T> && T::caching_level ==
 caching_level_type::none;
 
 template<typename Req>
-concept CachedRequest = Request<Req>&& Req::caching_level
-                        != caching_level_type::none&& requires(Req const& req)
-{
-    {
-        req.get_captured_id()
-    }
-    ->std::convertible_to<captured_id const&>;
-};
+concept CachedRequest = Request<Req> && Req::caching_level !=
+caching_level_type::none&& requires(Req const& req) {
+                               {
+                                   req.get_captured_id()
+                                   }
+                                   -> std::convertible_to<captured_id const&>;
+                           };
 
 template<typename Req>
-concept MemoryCachedRequest
-    = CachedRequest<Req>&& Req::caching_level == caching_level_type::memory;
+concept MemoryCachedRequest = CachedRequest<Req> && Req::caching_level ==
+caching_level_type::memory;
 
 template<typename Req>
-concept FullyCachedRequest
-    = CachedRequest<Req>&& Req::caching_level == caching_level_type::full;
+concept FullyCachedRequest = CachedRequest<Req> && Req::caching_level ==
+caching_level_type::full;
 
 template<typename Req>
-concept IntrospectiveRequest = Req::introspective&& requires(Req const& req)
-{
-    {
-        req.get_introspection_title()
-    }
-    ->std::convertible_to<std::string>;
-};
+concept IntrospectiveRequest
+    = Req::introspective && requires(Req const& req) {
+                                {
+                                    req.get_introspection_title()
+                                    } -> std::convertible_to<std::string>;
+                            };
 
 template<typename Req>
-concept NonIntrospectiveRequest = !Req::introspective;
+concept NonIntrospectiveRequest = !
+Req::introspective;
 
 template<typename Req>
 concept CachedIntrospectiveRequest
-    = CachedRequest<Req>&& IntrospectiveRequest<Req>;
+    = CachedRequest<Req> && IntrospectiveRequest<Req>;
 
 template<typename Req>
 concept CachedNonIntrospectiveRequest
-    = CachedRequest<Req>&& NonIntrospectiveRequest<Req>;
+    = CachedRequest<Req> && NonIntrospectiveRequest<Req>;
 
 // Contains the type of an argument to an rq_function-like call.
 // Primary template, used for non-request types; should be specialized
@@ -121,7 +120,8 @@ class context_intf
     // Indicates if non-trivial requests should be resolved remotely
     // Should return true only if this is a remotable_context_intf
     virtual bool
-    remotely() const = 0;
+    remotely() const
+        = 0;
 };
 
 // Context interface needed for resolving a cached request
@@ -175,10 +175,12 @@ class remote_context_intf : public virtual context_intf
     virtual ~remote_context_intf() = default;
 
     virtual std::string const&
-    proxy_name() const = 0;
+    proxy_name() const
+        = 0;
 
     virtual std::string const&
-    domain_name() const = 0;
+    domain_name() const
+        = 0;
 
     // Creates a clone of *this that differs only in its remotely() returning
     // false
@@ -238,15 +240,18 @@ class async_context_intf : public virtual context_intf
 
     // Gets a unique id for this task
     virtual async_id
-    get_id() const = 0;
+    get_id() const
+        = 0;
 
     // Returns true for a request, false for a plain value
     virtual bool
-    is_req() const = 0;
+    is_req() const
+        = 0;
 
     // Returns the number of subtasks
     virtual std::size_t
-    get_num_subs() const = 0;
+    get_num_subs() const
+        = 0;
 
     // Gets the status of this task
     virtual cppcoro::task<async_status>
@@ -336,11 +341,13 @@ class local_async_context_intf : public async_context_intf
     // Returns true if cancellation has been requested on this context or
     // another one in the same context tree
     virtual bool
-    is_cancellation_requested() const noexcept = 0;
+    is_cancellation_requested() const noexcept
+        = 0;
 
     // Throws async_cancelled if cancellation was requested
     virtual void
-    throw_if_cancellation_requested() const = 0;
+    throw_if_cancellation_requested() const
+        = 0;
 };
 
 // Context for an asynchronous task running on a (remote) server.
@@ -444,7 +451,8 @@ using ctx_type_for_props = typename ctx_type_helper<Intrsp, Level>::type;
 
 // The minimal context type needed for resolving request Req
 template<Request Req>
-using ctx_type_for_req = typename ctx_type_helper<Req::introspective, Req::caching_level>::type;
+using ctx_type_for_req =
+    typename ctx_type_helper<Req::introspective, Req::caching_level>::type;
 
 // The most generic/minimal context
 template<typename Ctx>
@@ -459,14 +467,12 @@ concept ContextMatchingProps
 // Context Ctx can be used for resolving request Req
 template<typename Ctx, typename Req>
 concept ContextMatchingRequest
-    = std::convertible_to<Ctx&, ctx_type_for_req<Req>&>&& requires(
-        Req const& req, Ctx& ctx)
-{
-    {
-        req.resolve(ctx)
-    }
-    ->std::same_as<cppcoro::task<typename Req::value_type>>;
-};
+    = std::convertible_to<Ctx&, ctx_type_for_req<Req>&>
+      && requires(Req const& req, Ctx& ctx) {
+             {
+                 req.resolve(ctx)
+                 } -> std::same_as<cppcoro::task<typename Req::value_type>>;
+         };
 
 template<typename Ctx>
 concept AsyncContext = std::convertible_to<Ctx&, async_context_intf&>;

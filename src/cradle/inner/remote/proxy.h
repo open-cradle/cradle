@@ -52,7 +52,8 @@ class remote_proxy
 
     // Returns the name of this proxy
     virtual std::string
-    name() const = 0;
+    name() const
+        = 0;
 
     // Returns the logger associated with this proxy
     virtual spdlog::logger&

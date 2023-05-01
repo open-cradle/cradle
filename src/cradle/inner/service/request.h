@@ -24,9 +24,9 @@ namespace cradle {
 // A memory-cached request needs no secondary cache, so it can be resolved
 // right away (by calling the request's function).
 template<typename Ctx, MemoryCachedRequest Req>
-requires ContextMatchingRequest<Ctx, Req>
-    cppcoro::task<typename Req::value_type>
-    resolve_secondary_cached(Ctx& ctx, Req const& req)
+    requires ContextMatchingRequest<Ctx, Req>
+cppcoro::task<typename Req::value_type>
+resolve_secondary_cached(Ctx& ctx, Req const& req)
 {
     return req.resolve(ctx);
 }
@@ -34,9 +34,9 @@ requires ContextMatchingRequest<Ctx, Req>
 // Resolves a fully-cached request using some sort of secondary cache, and some
 // sort of serialization.
 template<typename Ctx, FullyCachedRequest Req>
-requires ContextMatchingRequest<Ctx, Req>
-    cppcoro::task<typename Req::value_type>
-    resolve_secondary_cached(Ctx& ctx, Req const& req)
+    requires ContextMatchingRequest<Ctx, Req>
+cppcoro::task<typename Req::value_type>
+resolve_secondary_cached(Ctx& ctx, Req const& req)
 {
     using Value = typename Req::value_type;
     inner_resources& resources{ctx.get_resources()};
@@ -51,13 +51,13 @@ requires ContextMatchingRequest<Ctx, Req>
 // This function, being a coroutine, takes key by value.
 // The caller should ensure that cache, ctx and req outlive the coroutine.
 template<typename Ctx, CachedRequest Req>
-requires ContextMatchingRequest<Ctx, Req>
-    cppcoro::shared_task<typename Req::value_type>
-    resolve_request_on_memory_cache_miss(
-        detail::immutable_cache_impl& cache,
-        captured_id key,
-        Ctx& ctx,
-        Req const& req)
+    requires ContextMatchingRequest<Ctx, Req>
+cppcoro::shared_task<typename Req::value_type>
+resolve_request_on_memory_cache_miss(
+    detail::immutable_cache_impl& cache,
+    captured_id key,
+    Ctx& ctx,
+    Req const& req)
 {
     // cache and key could be retrieved from ctx and req, respectively.
     try
@@ -74,13 +74,13 @@ requires ContextMatchingRequest<Ctx, Req>
 }
 
 template<typename Ctx, CachedIntrospectiveRequest Req>
-requires ContextMatchingRequest<Ctx, Req>
-    cppcoro::shared_task<typename Req::value_type>
-    resolve_request_introspective(
-        Ctx& ctx,
-        Req const& req,
-        cppcoro::shared_task<typename Req::value_type> shared_task,
-        tasklet_tracker& client)
+    requires ContextMatchingRequest<Ctx, Req>
+cppcoro::shared_task<typename Req::value_type>
+resolve_request_introspective(
+    Ctx& ctx,
+    Req const& req,
+    cppcoro::shared_task<typename Req::value_type> shared_task,
+    tasklet_tracker& client)
 {
     client.on_before_await(
         req.get_introspection_title(), *req.get_captured_id());
@@ -92,9 +92,9 @@ requires ContextMatchingRequest<Ctx, Req>
 // Returns a reference to the shared_task stored in the memory cache.
 // Not copying shared_task's looks like a worthwhile optimization.
 template<typename Ctx, CachedNonIntrospectiveRequest Req>
-requires ContextMatchingRequest<Ctx, Req>
-    cppcoro::shared_task<typename Req::value_type> const&
-    resolve_request_cached(Ctx& ctx, Req const& req)
+    requires ContextMatchingRequest<Ctx, Req>
+cppcoro::shared_task<typename Req::value_type> const&
+resolve_request_cached(Ctx& ctx, Req const& req)
 {
     if (ctx.remotely())
     {
@@ -122,9 +122,9 @@ resolve_remote_to_value_coro(remote_context_intf& ctx, Req const& req)
 
 // Returns the shared_task by value.
 template<typename Ctx, CachedIntrospectiveRequest Req>
-requires ContextMatchingRequest<Ctx, Req>
-    cppcoro::shared_task<typename Req::value_type>
-    resolve_request_cached(Ctx& ctx, Req const& req)
+    requires ContextMatchingRequest<Ctx, Req>
+cppcoro::shared_task<typename Req::value_type>
+resolve_request_cached(Ctx& ctx, Req const& req)
 {
     if (remote_context_intf* rem_ctx = to_remote_context_intf(ctx))
     {
@@ -158,15 +158,16 @@ requires ContextMatchingRequest<Ctx, Req>
 // emits unclear error messages when the intended subsuming template
 // is not selected for some reason.
 template<typename Ctx, typename Val>
-requires(!Request<Val>) cppcoro::task<Val> resolve_request(
-    Ctx& ctx, Val const& val)
+    requires(!Request<Val>)
+cppcoro::task<Val> resolve_request(Ctx& ctx, Val const& val)
 {
     // async status, if appropriate, should already be FINISHED
     co_return val;
 }
 
 template<typename Ctx, UncachedRequest Req>
-requires ContextMatchingRequest<Ctx, Req> auto
+    requires ContextMatchingRequest<Ctx, Req>
+auto
 resolve_request(Ctx& ctx, Req const& req)
 {
     // req should update async status, if appropriate
@@ -174,25 +175,25 @@ resolve_request(Ctx& ctx, Req const& req)
 }
 
 template<typename Ctx, CachedNonIntrospectiveRequest Req>
-requires(ContextMatchingRequest<Ctx, Req> && !AsyncContext<Ctx>)
-    cppcoro::shared_task<typename Req::value_type> const& resolve_request(
-        Ctx& ctx, Req const& req)
+    requires(ContextMatchingRequest<Ctx, Req> && !AsyncContext<Ctx>)
+cppcoro::shared_task<typename Req::value_type> const& resolve_request(
+    Ctx& ctx, Req const& req)
 {
     return resolve_request_cached(ctx, req);
 }
 
 template<typename Ctx, CachedIntrospectiveRequest Req>
-requires(ContextMatchingRequest<Ctx, Req> && !AsyncContext<Ctx>)
-    cppcoro::shared_task<typename Req::value_type> resolve_request(
-        Ctx& ctx, Req const& req)
+    requires(ContextMatchingRequest<Ctx, Req> && !AsyncContext<Ctx>)
+cppcoro::shared_task<typename Req::value_type> resolve_request(
+    Ctx& ctx, Req const& req)
 {
     return resolve_request_cached(ctx, req);
 }
 
 template<typename Ctx, CachedRequest Req>
-requires ContextMatchingRequest<Ctx, Req>&& LocalAsyncContext<Ctx>
-    cppcoro::shared_task<typename Req::value_type>
-    resolve_request(Ctx& ctx, Req const& req)
+    requires ContextMatchingRequest<Ctx, Req> && LocalAsyncContext<Ctx>
+cppcoro::shared_task<typename Req::value_type>
+resolve_request(Ctx& ctx, Req const& req)
 {
     auto task = resolve_request_cached(ctx, req);
     auto result = co_await task;
@@ -208,7 +209,8 @@ requires ContextMatchingRequest<Ctx, Req>&& LocalAsyncContext<Ctx>
 // TODO adapt ContextMatchingRequest for Local/Remote mix
 template<typename Ctx, Request Req>
 // requires ContextMatchingRequest<Ctx, Req>&& RemoteAsyncContext<Ctx>
-requires RemoteAsyncContext<Ctx> cppcoro::task<typename Req::value_type>
+    requires RemoteAsyncContext<Ctx>
+cppcoro::task<typename Req::value_type>
 resolve_request(Ctx& ctx, Req const& req)
 {
     // Even if Req is a CachedRequest, its result will not be cached locally.

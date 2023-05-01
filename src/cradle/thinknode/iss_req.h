@@ -47,7 +47,8 @@ make_tn_uuid(std::string const& base)
 // "post ISS object" request,
 // where object_data is either a blob, or a subrequest yielding a blob.
 template<caching_level_type Level, typename ObjectData>
-requires TypedArg<ObjectData, blob> auto
+    requires TypedArg<ObjectData, blob>
+auto
 rq_post_iss_object(
     std::string context_id, thinknode_type_info schema, ObjectData object_data)
 {
@@ -69,7 +70,8 @@ rq_post_iss_object(
 // string.
 // TODO is perfectly forwarding immutable_id possible?
 template<caching_level_type Level, typename ImmutableId>
-requires TypedArg<ImmutableId, std::string> auto
+    requires TypedArg<ImmutableId, std::string>
+auto
 rq_retrieve_immutable_object(std::string context_id, ImmutableId immutable_id)
 {
     using props_type = thinknode_request_props<Level>;
@@ -86,7 +88,8 @@ rq_retrieve_immutable_object(std::string context_id, ImmutableId immutable_id)
 // "get ISS object metadata" request,
 // where object_id is either a plain string, or a subrequest yielding a string.
 template<caching_level_type Level, typename ObjectId>
-requires TypedArg<ObjectId, std::string> auto
+    requires TypedArg<ObjectId, std::string>
+auto
 rq_get_iss_object_metadata(std::string context_id, ObjectId object_id)
 {
     using props_type = thinknode_request_props<Level>;
@@ -104,7 +107,8 @@ rq_get_iss_object_metadata(std::string context_id, ObjectId object_id)
 // where object_id is either a plain string, or a subrequest yielding a
 // string.
 template<caching_level_type Level, typename ObjectId>
-requires TypedArg<ObjectId, std::string> auto
+    requires TypedArg<ObjectId, std::string>
+auto
 rq_resolve_iss_object_to_immutable(
     std::string context_id, ObjectId object_id, bool ignore_upgrades)
 {
