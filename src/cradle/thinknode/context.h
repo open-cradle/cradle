@@ -12,8 +12,11 @@ struct immutable_cache;
 class service_core;
 class tasklet_tracker;
 
-struct thinknode_request_context : public cached_introspective_context_intf,
-                                   public remote_context_intf
+struct thinknode_request_context final
+    : public remote_context_intf,
+      public local_context_intf,
+      public sync_context_intf,
+      public cached_introspective_context_intf
 {
     service_core& service;
     thinknode_session session;
@@ -47,6 +50,12 @@ struct thinknode_request_context : public cached_introspective_context_intf,
         return remotely_;
     }
 
+    bool
+    is_async() const override
+    {
+        return false;
+    }
+
     void
     proxy_name(std::string const& name);
 
@@ -74,6 +83,8 @@ struct thinknode_request_context : public cached_introspective_context_intf,
     std::string proxy_name_;
     std::string domain_name_{"thinknode"};
 };
+
+static_assert(ValidContext<thinknode_request_context>);
 
 } // namespace cradle
 

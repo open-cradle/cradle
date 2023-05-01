@@ -9,6 +9,7 @@ resolve_remote_coro(remote_context_intf& ctx, std::string seri_req)
     co_return resolve_remote(ctx, std::move(seri_req));
 }
 
+// TODO need to refactor like resolve_request()?
 cppcoro::task<serialized_result>
 resolve_serialized_request(context_intf& ctx, std::string seri_req)
 {

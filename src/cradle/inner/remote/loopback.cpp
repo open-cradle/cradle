@@ -83,6 +83,8 @@ resolve_async(
     }
 }
 
+// TODO ctx should support remote and local; and it should support async
+// TODO split local_async_clone into general clone() and add "remote" modifier?
 async_id
 loopback_service::submit_async(
     remote_context_intf& ctx, std::string domain_name, std::string seri_req)

@@ -110,65 +110,61 @@ class req_visitor_intf
     visit_req_arg(std::size_t ix) = 0;
 };
 
-// Generic context interface, can be used for resolving uncached
-// non-introspective requests
+/*
+ * Resolving a request requires a context. A context may provide several modes
+ * for resolving:
+ * - Remote or local. A context implementation may support one or both.
+ *   - It supports remote resolving if it implements remote_context_intf.
+ *   - It supports local resolving if it implements local_context_intf.
+ * - Sync or async. A context implementation may support one or both.
+ *   - It supports synchronous resolving if it implements sync_context_intf.
+ *   - It supports asynchronous resolving if it implements async_context_intf.
+ * - Cached or uncached. A cached request can be resolved only with a context
+ *   supporting cached resolution, and such a context can also handle uncached
+ *   requests.
+ *   A context supports cached resolving if it implements cached_context_intf.
+ * - Introspective or not. An introspective request can be resolved only with a
+ *   context offering that support, and such a context can also handle
+ *   non-introspective requests.
+ *   A context supports introspective resolving if it implements
+ *   introspective_context_intf.
+ */
+
+// Generic context interface
 class context_intf
 {
  public:
     virtual ~context_intf() = default;
 
-    // Indicates if non-trivial requests should be resolved remotely
-    // Should return true only if this is a remotable_context_intf
+    // Indicates if non-trivial requests will be resolved remotely.
+    // - Will return true if the context does not support local resolution
+    // - Will return false if the context does not support remote resolution
     virtual bool
     remotely() const
         = 0;
+
+    // Indicates if non-trivial requests will be resolved asynchronously.
+    // - Will return true if the context does not support synchronous
+    //   resolution
+    // - Will return false if the context does not support asynchronous
+    //   resolution
+    virtual bool
+    is_async() const
+        = 0;
 };
 
-// Context interface needed for resolving a cached request
-class cached_context_intf : public virtual context_intf
+// A context class implementing this interface declares that it supports
+// locally resolving requests.
+class local_context_intf : public virtual context_intf
 {
  public:
-    virtual ~cached_context_intf() = default;
-
-    virtual inner_resources&
-    get_resources()
-        = 0;
-
-    virtual immutable_cache&
-    get_cache()
-        = 0;
+    virtual ~local_context_intf() = default;
 };
 
-// Context interface needed for resolving an introspective request
-class introspective_context_intf : public virtual context_intf
-{
- public:
-    virtual ~introspective_context_intf() = default;
-
-    virtual tasklet_tracker*
-    get_tasklet()
-        = 0;
-
-    virtual void
-    push_tasklet(tasklet_tracker* tasklet)
-        = 0;
-
-    virtual void
-    pop_tasklet()
-        = 0;
-};
-
-// Context interface needed for resolving a request that is both cached and
-// introspective
-class cached_introspective_context_intf : public cached_context_intf,
-                                          public introspective_context_intf
-{
- public:
-    virtual ~cached_introspective_context_intf() = default;
-};
-
-// Context interface needed for remotely resolving requests
-// Requests will still be resolved locally if remotely() returns false.
+// A context class implementing this interface declares that it supports
+// remotely resolving requests.
+// Requests will still be resolved locally if the class also implements
+// local_context_intf, and remotely() returns false.
 class remote_context_intf : public virtual context_intf
 {
  public:
@@ -191,10 +187,13 @@ class remote_context_intf : public virtual context_intf
     // TODO return response serialization method
 };
 
-// If ctx is remote, convert to remote_context_intf
-// otherwise, return nullptr
-remote_context_intf*
-to_remote_context_intf(context_intf& ctx);
+// A context class implementing this interface declares that it supports
+// synchronously resolving requests.
+class sync_context_intf : public virtual context_intf
+{
+ public:
+    virtual ~sync_context_intf() = default;
+};
 
 // Status of an asynchronous operation: a (cppcoro) task, associated
 // with a coroutine
@@ -263,7 +262,8 @@ class async_context_intf : public virtual context_intf
 };
 
 // Context for an asynchronous task running on the local machine
-class local_async_context_intf : public async_context_intf
+class local_async_context_intf : public local_context_intf,
+                                 public async_context_intf
 {
  public:
     virtual ~local_async_context_intf() = default;
@@ -392,20 +392,117 @@ class remote_async_context_intf : public async_context_intf,
         = 0;
 };
 
-// Convert ctx to local_async_context_intf*, or return nullptr if the
-// runtime type doesn't match.
-local_async_context_intf*
-to_local_async_context_intf(context_intf& ctx);
+// Context interface needed for resolving a cached request
+class cached_context_intf : public virtual context_intf
+{
+ public:
+    virtual ~cached_context_intf() = default;
 
-// Converts ctx if it is a local_async_context_intf*, or returns an empty
-// shared_ptr if the runtime type doesn't match.
-std::shared_ptr<local_async_context_intf>
-to_local_async_context_intf(std::shared_ptr<context_intf> const& ctx);
+    virtual inner_resources&
+    get_resources()
+        = 0;
 
-// Convert ctx to remote_async_context_intf*, or return nullptr if the
-// runtime type doesn't match.
-remote_async_context_intf*
-to_remote_async_context_intf(context_intf& ctx);
+    virtual immutable_cache&
+    get_cache()
+        = 0;
+};
+
+// Context interface needed for resolving an introspective request
+class introspective_context_intf : public virtual context_intf
+{
+ public:
+    virtual ~introspective_context_intf() = default;
+
+    virtual tasklet_tracker*
+    get_tasklet()
+        = 0;
+
+    virtual void
+    push_tasklet(tasklet_tracker* tasklet)
+        = 0;
+
+    virtual void
+    pop_tasklet()
+        = 0;
+};
+
+// Context interface needed for resolving a request that is both cached and
+// introspective
+// A context class that is both caching and introspective should implement this
+// interface, rather than the two individual ones. The reason is that
+// ctx_type_for_props needs a single type.
+class cached_introspective_context_intf : public cached_context_intf,
+                                          public introspective_context_intf
+{
+ public:
+    virtual ~cached_introspective_context_intf() = default;
+};
+
+// The most generic/minimal context
+template<typename Ctx>
+concept Context = std::convertible_to<Ctx&, context_intf&>;
+
+// Context that supports remote resolution only, and does not support local
+template<typename Ctx>
+concept DefinitelyRemoteContext
+    = std::is_final_v<Ctx> && std::convertible_to<Ctx&, remote_context_intf&>
+      && !
+std::convertible_to<Ctx&, local_context_intf&>;
+
+// Context that supports local resolution only, and does not support remote
+template<typename Ctx>
+concept DefinitelyLocalContext
+    = std::is_final_v<Ctx> && std::convertible_to<Ctx&, local_context_intf&>
+      && !
+std::convertible_to<Ctx&, remote_context_intf&>;
+
+template<typename Ctx>
+concept AsyncContext = std::convertible_to<Ctx&, async_context_intf&>;
+
+template<typename Ctx>
+concept DefinitelyAsyncContext
+    = std::is_final_v<Ctx> && std::convertible_to<Ctx&, async_context_intf&>
+      && !
+std::convertible_to<Ctx&, sync_context_intf&>;
+
+template<typename Ctx>
+concept DefinitelySyncContext
+    = std::is_final_v<Ctx> && std::convertible_to<Ctx&, sync_context_intf&>
+      && !
+std::convertible_to<Ctx&, async_context_intf&>;
+
+template<typename Ctx>
+concept LocalAsyncContext
+    = std::convertible_to<Ctx&, local_async_context_intf&>;
+
+template<typename Ctx>
+concept RemoteAsyncContext
+    = std::convertible_to<Ctx&, remote_async_context_intf&>;
+
+// A context that supports caching, which will happen when the request demands
+// it
+template<typename Ctx>
+concept CachingContext = std::convertible_to<Ctx&, cached_context_intf&>;
+
+// A context that supports introspection, which will happen when the request
+// demands it
+template<typename Ctx>
+concept IntrospectiveContext
+    = std::convertible_to<Ctx&, introspective_context_intf&>;
+
+// Any context implementation class should be valid
+template<typename Ctx>
+concept ValidContext
+    = Context<Ctx>
+      && (!std::is_final_v<Ctx>
+          || std::convertible_to<Ctx&, remote_context_intf&>
+          || std::convertible_to<Ctx&, local_context_intf&>)
+      && (!std::is_final_v<Ctx>
+          || std::convertible_to<Ctx&, sync_context_intf&>
+          || std::convertible_to<Ctx&, async_context_intf&>)
+      && (!std::is_final_v<Ctx> || !CachingContext<Ctx>
+          || !IntrospectiveContext<Ctx>
+          || std::convertible_to<Ctx&, cached_introspective_context_intf&>);
 
 // Defines the context_intf derived class needed for resolving a request
 // characterized by Intrsp and Level.
@@ -433,7 +530,7 @@ template<>
 struct ctx_type_helper<false, caching_level_type::none>
 {
     // An uncached function request can be resolved using any kind of context.
-    using type = context_intf;
+    using type = local_context_intf;
 };
 
 template<>
@@ -454,36 +551,26 @@ template<Request Req>
 using ctx_type_for_req =
     typename ctx_type_helper<Req::introspective, Req::caching_level>::type;
 
-// The most generic/minimal context
-template<typename Ctx>
-concept Context = std::convertible_to<Ctx&, context_intf&>;
-
-// Context Ctx can be used for resolving a request characterized by Intrsp and
-// Level
+// Context Ctx can be used for locally resolving a request characterized by
+// Intrsp and Level
 template<typename Ctx, bool Intrsp, caching_level_type Level>
 concept ContextMatchingProps
-    = std::convertible_to<Ctx&, ctx_type_for_props<Intrsp, Level>&>;
+    = Context<Ctx>
+      && (Level == caching_level_type::none || CachingContext<Ctx>)
+      && (!Intrsp || IntrospectiveContext<Ctx>);
 
-// Context Ctx can be used for resolving request Req
+// Context Ctx can be used for locally resolving request Req
 template<typename Ctx, typename Req>
 concept ContextMatchingRequest
-    = std::convertible_to<Ctx&, ctx_type_for_req<Req>&>
+    = Context<Ctx> && Request<Req>
+      && (Req::caching_level == caching_level_type::none
+          || CachingContext<Ctx>)
+      && (!Req::introspective || IntrospectiveContext<Ctx>)
       && requires(Req const& req, Ctx& ctx) {
              {
                  req.resolve(ctx)
                  } -> std::same_as<cppcoro::task<typename Req::value_type>>;
          };
-
-template<typename Ctx>
-concept AsyncContext = std::convertible_to<Ctx&, async_context_intf&>;
-
-template<typename Ctx>
-concept LocalAsyncContext
-    = std::convertible_to<Ctx&, local_async_context_intf&>;
-
-template<typename Ctx>
-concept RemoteAsyncContext
-    = std::convertible_to<Ctx&, remote_async_context_intf&>;
 
 // tasklet_tracker context, ending when the destructor is called
 class tasklet_context
@@ -499,6 +586,26 @@ class tasklet_context
  private:
     introspective_context_intf* ctx_{nullptr};
 };
+
+// If ctx is remote, convert to remote_context_intf
+// otherwise, return nullptr
+remote_context_intf*
+to_remote_context_intf(context_intf& ctx);
+
+// Convert ctx to local_async_context_intf*, or return nullptr if the
+// runtime type doesn't match.
+local_async_context_intf*
+to_local_async_context_intf(context_intf& ctx);
+
+// Converts ctx if it is a local_async_context_intf*, or returns an empty
+// shared_ptr if the runtime type doesn't match.
+std::shared_ptr<local_async_context_intf>
+to_local_async_context_intf(std::shared_ptr<context_intf> const& ctx);
+
+// Convert ctx to remote_async_context_intf*, or return nullptr if the
+// runtime type doesn't match.
+remote_async_context_intf*
+to_remote_async_context_intf(context_intf& ctx);
 
 } // namespace cradle
 

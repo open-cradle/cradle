@@ -13,12 +13,15 @@
 
 namespace cradle {
 
-// Remotely resolves a serialized request to a serialized response
+/*
+ * Remotely resolves a serialized request to a serialized response
+ */
 serialized_result
 resolve_remote(remote_context_intf& ctx, std::string seri_req);
 
 /*
- * Remotely resolves a plain request to a plain value
+ * Remotely resolves a plain (non-serialized) request to a plain
+ * (non-serialized) value
  */
 template<Request Req>
 typename Req::value_type

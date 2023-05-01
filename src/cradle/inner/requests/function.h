@@ -125,7 +125,7 @@ template<typename Ctx, typename Args, std::size_t... Ix>
 auto
 make_sync_sub_tasks(Ctx& ctx, Args const& args, std::index_sequence<Ix...>)
 {
-    return std::make_tuple(resolve_request(ctx, std::get<Ix>(args))...);
+    return std::make_tuple(resolve_request_local(ctx, std::get<Ix>(args))...);
 }
 
 template<typename Ctx, typename Args, std::size_t... Ix>
@@ -133,7 +133,7 @@ auto
 make_async_sub_tasks(Ctx& ctx, Args const& args, std::index_sequence<Ix...>)
 {
     return std::make_tuple(
-        resolve_request(ctx.get_sub(Ix), std::get<Ix>(args))...);
+        resolve_request_local(ctx.get_sub(Ix), std::get<Ix>(args))...);
 }
 
 template<typename Tuple, std::size_t... Ix>
@@ -312,7 +312,7 @@ class function_request_impl : public Intf
             // compiler crashes or runtime errors).
             co_return co_await std::apply(
                 [&](auto&&... args) -> cppcoro::task<Value> {
-                    co_return (*function_)((co_await resolve_request(
+                    co_return (*function_)((co_await resolve_request_local(
                         ctx, std::forward<decltype(args)>(args)))...);
                 },
                 args_);
@@ -511,6 +511,7 @@ template<
     bool AsCoro = false,
     bool Introspective = false,
     typename Ctx = ctx_type_for_props<Introspective, Level>>
+// TODO apply "local_" prefixes wherever applicable
 struct request_props
 {
     static constexpr caching_level_type level = Level;

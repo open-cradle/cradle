@@ -17,8 +17,10 @@
 
 namespace cradle {
 
-struct testing_request_context : public cached_introspective_context_intf,
-                                 public remote_context_intf
+struct testing_request_context final
+    : public cached_introspective_context_intf,
+      public sync_context_intf,
+      public remote_context_intf
 {
     inner_resources& service;
 
@@ -48,6 +50,12 @@ struct testing_request_context : public cached_introspective_context_intf,
         return remotely_;
     }
 
+    bool
+    is_async() const override
+    {
+        return false;
+    }
+
     void
     proxy_name(std::string const& name);
 
@@ -72,6 +80,8 @@ struct testing_request_context : public cached_introspective_context_intf,
     std::string proxy_name_;
     std::string domain_name_{"testing"};
 };
+
+static_assert(ValidContext<testing_request_context>);
 
 // Tree-level context, shared by all request-level contexts in a tree.
 // Used for local contexts only.
@@ -122,8 +132,8 @@ class local_atst_tree_context
 // Context, relating to a single task (= request-to-be-resolved),
 // or a non-request argument of such a request;
 // on the local machine.
-class local_atst_context : public virtual cached_introspective_context_intf,
-                           public virtual local_async_context_intf
+class local_atst_context final : public cached_introspective_context_intf,
+                                 public local_async_context_intf
 {
  public:
     local_atst_context(
@@ -141,6 +151,12 @@ class local_atst_context : public virtual cached_introspective_context_intf,
     remotely() const override
     {
         return false;
+    }
+
+    bool
+    is_async() const override
+    {
+        return true;
     }
 
     // cached_context_intf
@@ -279,6 +295,8 @@ class local_atst_context : public virtual cached_introspective_context_intf,
     std::atomic<int> num_subs_not_running_;
 };
 
+static_assert(ValidContext<local_atst_context>);
+
 class local_atst_context_tree_builder : public req_visitor_intf
 {
  public:
@@ -343,7 +361,7 @@ class proxy_atst_tree_context
 };
 
 // Proxy for a local_atst_context object on an RPC server
-class proxy_atst_context : public remote_async_context_intf
+class proxy_atst_context final : public remote_async_context_intf
 {
  public:
     proxy_atst_context(
@@ -356,6 +374,12 @@ class proxy_atst_context : public remote_async_context_intf
     // context_intf
     bool
     remotely() const override
+    {
+        return true;
+    }
+
+    bool
+    is_async() const override
     {
         return true;
     }
@@ -441,6 +465,8 @@ class proxy_atst_context : public remote_async_context_intf
     remote_proxy&
     get_proxy();
 };
+
+static_assert(ValidContext<proxy_atst_context>);
 
 // Creates a proxy_atst_context object for the root node in a context tree.
 // Subobjects to be added later.

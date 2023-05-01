@@ -17,16 +17,27 @@ init_test_inner_service(inner_resources& resources);
 void
 reset_disk_cache(inner_resources& resources);
 
-struct uncached_request_resolution_context : public context_intf
+struct uncached_request_resolution_context final : public local_context_intf,
+                                                   public sync_context_intf
 {
     bool
     remotely() const override
     {
         return false;
     }
+
+    bool
+    is_async() const override
+    {
+        return false;
+    }
 };
 
-struct cached_request_resolution_context : public cached_context_intf
+static_assert(ValidContext<uncached_request_resolution_context>);
+
+struct cached_request_resolution_context final : public local_context_intf,
+                                                 public sync_context_intf,
+                                                 public cached_context_intf
 {
     inner_resources resources;
 
@@ -50,9 +61,17 @@ struct cached_request_resolution_context : public cached_context_intf
         return false;
     }
 
+    bool
+    is_async() const override
+    {
+        return false;
+    }
+
     void
     reset_memory_cache();
 };
+
+static_assert(ValidContext<cached_request_resolution_context>);
 
 template<caching_level_type level>
 struct request_resolution_context_struct

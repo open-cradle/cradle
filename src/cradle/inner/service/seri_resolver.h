@@ -44,6 +44,7 @@ class seri_resolver_intf
  * Responses currently are always serialized via MessagePack.
  */
 // TODO Req must have visit() if LocalAsyncContext<Ctx>
+// TODO Context -> LocalContext
 template<Context Ctx, Request Req>
 class seri_resolver_impl : public seri_resolver_intf
 {
@@ -56,6 +57,7 @@ class seri_resolver_impl : public seri_resolver_intf
         assert(actual_ctx != nullptr);
 
         auto req{deserialize_request<Req>(std::move(seri_req))};
+        // TODO compile-time only distinction sync/async context?
         if constexpr (LocalAsyncContext<Ctx>)
         {
             // Populate the context tree under ctx
@@ -63,7 +65,7 @@ class seri_resolver_impl : public seri_resolver_intf
             auto builder = actx->make_ctx_tree_builder();
             req.visit(*builder);
         }
-        auto value = co_await resolve_request(*actual_ctx, req);
+        auto value = co_await resolve_request_local(*actual_ctx, req);
         co_return serialized_result{serialize_response(value)};
     }
 };

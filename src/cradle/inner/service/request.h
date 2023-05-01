@@ -4,7 +4,6 @@
 #include <stdexcept>
 #include <type_traits>
 
-#include <cppcoro/fmap.hpp>
 #include <cppcoro/shared_task.hpp>
 #include <cppcoro/task.hpp>
 
@@ -18,13 +17,36 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/service/secondary_cached_blob.h>
 
+/*
+ * Service resolving a request to a value
+ *
+ * The public interface is resolve_request().
+ * There also is resolve_request_local() intended to be called by the
+ * framework.
+ *
+ * (Almost) all functions have a Context template argument. It is assumed that
+ * a caller knows the actual context class, and so that type is also passed
+ * around by the functions in this file.
+ *
+ * Context implementation classes should be declared "final" whenever possible
+ * to profit from the "if constexpr" constructs: these prevent compilation
+ * errors on paths not taken, and diminish object code size.
+ */
+
 namespace cradle {
+
+template<Context Ctx, Request Req>
+cppcoro::shared_task<typename Req::value_type>
+resolve_request_uncached(Ctx& ctx, Req const& req)
+{
+    // TODO maybe let req.resolve() return shared_task
+    co_return co_await req.resolve(ctx);
+}
 
 // Resolves a memory-cached request using some sort of secondary cache.
 // A memory-cached request needs no secondary cache, so it can be resolved
 // right away (by calling the request's function).
-template<typename Ctx, MemoryCachedRequest Req>
-    requires ContextMatchingRequest<Ctx, Req>
+template<Context Ctx, MemoryCachedRequest Req>
 cppcoro::task<typename Req::value_type>
 resolve_secondary_cached(Ctx& ctx, Req const& req)
 {
@@ -33,8 +55,7 @@ resolve_secondary_cached(Ctx& ctx, Req const& req)
 
 // Resolves a fully-cached request using some sort of secondary cache, and some
 // sort of serialization.
-template<typename Ctx, FullyCachedRequest Req>
-    requires ContextMatchingRequest<Ctx, Req>
+template<Context Ctx, FullyCachedRequest Req>
 cppcoro::task<typename Req::value_type>
 resolve_secondary_cached(Ctx& ctx, Req const& req)
 {
@@ -50,8 +71,7 @@ resolve_secondary_cached(Ctx& ctx, Req const& req)
 
 // This function, being a coroutine, takes key by value.
 // The caller should ensure that cache, ctx and req outlive the coroutine.
-template<typename Ctx, CachedRequest Req>
-    requires ContextMatchingRequest<Ctx, Req>
+template<Context Ctx, CachedRequest Req>
 cppcoro::shared_task<typename Req::value_type>
 resolve_request_on_memory_cache_miss(
     detail::immutable_cache_impl& cache,
@@ -73,8 +93,7 @@ resolve_request_on_memory_cache_miss(
     }
 }
 
-template<typename Ctx, CachedIntrospectiveRequest Req>
-    requires ContextMatchingRequest<Ctx, Req>
+template<Context Ctx, CachedIntrospectiveRequest Req>
 cppcoro::shared_task<typename Req::value_type>
 resolve_request_introspective(
     Ctx& ctx,
@@ -91,17 +110,11 @@ resolve_request_introspective(
 
 // Returns a reference to the shared_task stored in the memory cache.
 // Not copying shared_task's looks like a worthwhile optimization.
-template<typename Ctx, CachedNonIntrospectiveRequest Req>
-    requires ContextMatchingRequest<Ctx, Req>
+template<Context Ctx, CachedNonIntrospectiveRequest Req>
 cppcoro::shared_task<typename Req::value_type> const&
-resolve_request_cached(Ctx& ctx, Req const& req)
+resolve_request_cached_sync(Ctx& ctx, Req const& req)
 {
-    if (ctx.remotely())
-    {
-        // This optimization rules out the combination of a run-time remote
-        // context and a build-time non-introspective request.
-        throw std::logic_error("TODO cannot remote here");
-    }
+    // Must not be called for runtime-remote contexts
     immutable_cache_ptr<typename Req::value_type> ptr{
         ctx.get_cache(),
         req.get_captured_id(),
@@ -113,23 +126,11 @@ resolve_request_cached(Ctx& ctx, Req const& req)
     return ptr.task();
 }
 
-template<Request Req>
-cppcoro::shared_task<typename Req::value_type>
-resolve_remote_to_value_coro(remote_context_intf& ctx, Req const& req)
-{
-    co_return resolve_remote_to_value(ctx, req);
-}
-
 // Returns the shared_task by value.
-template<typename Ctx, CachedIntrospectiveRequest Req>
-    requires ContextMatchingRequest<Ctx, Req>
+template<Context Ctx, CachedIntrospectiveRequest Req>
 cppcoro::shared_task<typename Req::value_type>
-resolve_request_cached(Ctx& ctx, Req const& req)
+resolve_request_cached_sync(Ctx& ctx, Req const& req)
 {
-    if (remote_context_intf* rem_ctx = to_remote_context_intf(ctx))
-    {
-        return resolve_remote_to_value_coro(*rem_ctx, req);
-    }
     immutable_cache_ptr<typename Req::value_type> ptr{
         ctx.get_cache(),
         req.get_captured_id(),
@@ -147,55 +148,11 @@ resolve_request_cached(Ctx& ctx, Req const& req)
     return shared_task;
 }
 
-// Public interface starts here
-// All resolve_request() variants are blocking. Progress of an asynchronous
-// request can be monitored via its context tree.
-// All throw async_cancelled when an asynchronous request is cancelled.
-
-// If second arg is a request, one of the following templates will subsume.
-// (Maybe that arg should be Val&& but then the mechanism doesn't work.)
-// The "requires" here is strictly not needed but otherwise the compiler
-// emits unclear error messages when the intended subsuming template
-// is not selected for some reason.
-template<typename Ctx, typename Val>
-    requires(!Request<Val>)
-cppcoro::task<Val> resolve_request(Ctx& ctx, Val const& val)
-{
-    // async status, if appropriate, should already be FINISHED
-    co_return val;
-}
-
-template<typename Ctx, UncachedRequest Req>
-    requires ContextMatchingRequest<Ctx, Req>
-auto
-resolve_request(Ctx& ctx, Req const& req)
-{
-    // req should update async status, if appropriate
-    return req.resolve(ctx);
-}
-
-template<typename Ctx, CachedNonIntrospectiveRequest Req>
-    requires(ContextMatchingRequest<Ctx, Req> && !AsyncContext<Ctx>)
-cppcoro::shared_task<typename Req::value_type> const& resolve_request(
-    Ctx& ctx, Req const& req)
-{
-    return resolve_request_cached(ctx, req);
-}
-
-template<typename Ctx, CachedIntrospectiveRequest Req>
-    requires(ContextMatchingRequest<Ctx, Req> && !AsyncContext<Ctx>)
-cppcoro::shared_task<typename Req::value_type> resolve_request(
-    Ctx& ctx, Req const& req)
-{
-    return resolve_request_cached(ctx, req);
-}
-
-template<typename Ctx, CachedRequest Req>
-    requires ContextMatchingRequest<Ctx, Req> && LocalAsyncContext<Ctx>
+template<Context Ctx, Request Req>
 cppcoro::shared_task<typename Req::value_type>
-resolve_request(Ctx& ctx, Req const& req)
+resolve_request_cached_async(Ctx& ctx, Req const& req)
 {
-    auto task = resolve_request_cached(ctx, req);
+    auto task = resolve_request_cached_sync(ctx, req);
     auto result = co_await task;
     auto* actx = to_local_async_context_intf(ctx);
     // If function ran, status already will be FINISHED
@@ -204,18 +161,120 @@ resolve_request(Ctx& ctx, Req const& req)
     co_return result;
 }
 
-// Note: Req's props will be based on a LocalAsyncContext so
-// ContextMatchingRequest<Ctx, Req> will not hold.
-// TODO adapt ContextMatchingRequest for Local/Remote mix
-template<typename Ctx, Request Req>
-// requires ContextMatchingRequest<Ctx, Req>&& RemoteAsyncContext<Ctx>
-    requires RemoteAsyncContext<Ctx>
-cppcoro::task<typename Req::value_type>
+template<Context Ctx, CachedRequest Req>
+cppcoro::shared_task<typename Req::value_type>
+resolve_request_cached(Ctx& ctx, Req const& req)
+{
+    if constexpr (DefinitelyAsyncContext<Ctx>)
+    {
+        return resolve_request_cached_async(ctx, req);
+    }
+    else if constexpr (DefinitelySyncContext<Ctx>)
+    {
+        return resolve_request_cached_sync(ctx, req);
+    }
+    else
+    {
+        if (ctx.is_async())
+        {
+            return resolve_request_cached_async(ctx, req);
+        }
+        else
+        {
+            return resolve_request_cached_sync(ctx, req);
+        }
+    }
+}
+
+template<Request Req>
+cppcoro::shared_task<typename Req::value_type>
+resolve_request_remote(remote_context_intf& ctx, Req const& req)
+{
+    co_return resolve_remote_to_value(ctx, req);
+}
+
+// Framework-internal interface: resolve_request_local()
+// Anything above should be called only from within this file.
+
+template<Context Ctx, typename Val>
+    requires(!Request<Val>)
+cppcoro::task<Val> resolve_request_local(Ctx& ctx, Val const& val)
+{
+    // async status, if appropriate, should already be FINISHED
+    co_return val;
+}
+
+template<Context Ctx, Request Req>
+cppcoro::shared_task<typename Req::value_type>
+resolve_request_local(Ctx& ctx, Req const& req)
+{
+    static_assert(UncachedRequest<Req> || CachingContext<Ctx>);
+    if constexpr (UncachedRequest<Req>)
+    {
+        return resolve_request_uncached(ctx, req);
+    }
+    else
+    {
+        return resolve_request_cached(ctx, req);
+    }
+}
+
+// Public interface: resolve_request()
+
+// The "requires" here is strictly not needed: if it is omitted, and the second
+// arg is a request, then the following template would subsume.
+// However, when that template is not selected for some
+// reason, the compiler will emit unclear error messages.
+template<Context Ctx, typename Val>
+    requires(!Request<Val>)
+cppcoro::task<Val> resolve_request(Ctx& ctx, Val const& val)
+{
+    // async status, if appropriate, should already be FINISHED
+    co_return val;
+}
+
+/*
+ * Resolve a request, remotely or locally, depending on context
+ *
+ * This function is blocking. Progress of an asynchronous
+ * request can be monitored via its context tree.
+ * This function throws async_cancelled when an asynchronous request is
+ * cancelled.
+ *
+ * - shared_task because that's what resolve_request_cached_sync() returns
+ * - It seems likely that for multiple calls for the same Request,
+ *   Context will be the same in each case (so just one template
+ *   instantiation)
+ */
+template<Context Ctx, Request Req>
+cppcoro::shared_task<typename Req::value_type>
 resolve_request(Ctx& ctx, Req const& req)
 {
-    // Even if Req is a CachedRequest, its result will not be cached locally.
-    // Caching and introspection are for the server.
-    co_return resolve_remote_to_value(ctx, req);
+    // Assume that the actual context class is known when calling this function
+    static_assert(!std::is_abstract_v<Ctx>);
+    // Context implementation classes should be declared "final"
+    static_assert(std::is_final_v<Ctx>);
+    static_assert(ValidContext<Ctx>);
+    if constexpr (DefinitelyRemoteContext<Ctx>)
+    {
+        // cppcoro::task return value also possible
+        return resolve_request_remote(ctx, req);
+    }
+    else if constexpr (DefinitelyLocalContext<Ctx>)
+    {
+        return resolve_request_local(ctx, req);
+    }
+    else
+    {
+        if (auto* rctx = to_remote_context_intf(ctx))
+        {
+            return resolve_request_remote(*rctx, req);
+        }
+        else
+        {
+            return resolve_request_local(ctx, req);
+        }
+    }
 }
 
 } // namespace cradle

@@ -70,6 +70,7 @@ class seri_catalog
  *
  * Context at resolution time should equal Ctx.
  */
+// TODO Context should be Local (at least)
 template<Context Ctx, Request Req>
 void
 register_seri_resolver(Req const& req)
