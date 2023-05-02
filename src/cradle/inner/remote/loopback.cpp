@@ -40,11 +40,10 @@ serialized_result
 loopback_service::resolve_sync(
     remote_context_intf& ctx, std::string domain_name, std::string seri_req)
 {
-    // TODO compare ctx arg against make_local_context() from rpclib server
     logger_->debug("resolve_sync({}): request {}", domain_name, seri_req);
     auto local_ctx{ctx.local_clone()};
     auto result = cppcoro::sync_wait(
-        resolve_serialized_request(*local_ctx, std::move(seri_req)));
+        resolve_serialized_local(*local_ctx, std::move(seri_req)));
     logger_->debug("response {}", result.value());
     return result;
 }
@@ -61,7 +60,7 @@ resolve_async(
     try
     {
         blob res = cppcoro::sync_wait(
-                       resolve_serialized_request(*actx, std::move(seri_req)))
+                       resolve_serialized_local(*actx, std::move(seri_req)))
                        .value();
         logger.info("resolve_async done: {}", res);
         if (actx->get_status() != async_status::FINISHED)
@@ -83,19 +82,18 @@ resolve_async(
     }
 }
 
-// TODO ctx should support remote and local; and it should support async
-// TODO split local_async_clone into general clone() and add "remote" modifier?
 async_id
 loopback_service::submit_async(
     remote_context_intf& ctx, std::string domain_name, std::string seri_req)
 {
     logger_->info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
-    auto actx{to_remote_async_context_intf(ctx)->local_async_clone()};
+    auto actx{to_remote_async_ref(ctx).local_async_clone()};
     get_async_db().add(actx);
+    // TODO populate actx subs?
     // TODO update status to SUBMITTED
-    // This function should return asap.
-    // Need to dispatch a thread calling the blocking cppcoro::sync_wait().
+    // This function should return asap, but cppcoro::sync_wait() is blocking,
+    // so need to dispatch to another thread.
     async_pool_.push_task(resolve_async, this, actx, seri_req);
     async_id aid = actx->get_id();
     logger_->info("async_id {}", aid);
@@ -112,7 +110,7 @@ loopback_service::get_sub_contexts(async_id aid)
     remote_context_spec_list result;
     for (decltype(nsubs) ix = 0; ix < nsubs; ++ix)
     {
-        auto& sub_actx = actx->get_sub(ix);
+        auto& sub_actx = actx->get_local_sub(ix);
         logger_->debug(
             "  sub {}: id {} ({}) {}",
             ix,

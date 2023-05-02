@@ -8,6 +8,7 @@
 #include <fmt/format.h>
 
 #include "../../support/inner_service.h"
+#include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/service/request.h>
@@ -142,7 +143,7 @@ test_resolve_async_across_rpc(
         rq_cancellable_coro<level>(loops, delay1))};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
-    auto ctx{make_remote_async_ctx(tree_ctx)};
+    auto ctx{make_root_proxy_atst_context(tree_ctx)};
 
     test_resolve_async(ctx, req, true, loops, delay0, delay1);
 }
@@ -224,7 +225,7 @@ test_error_async_across_rpc(
         rq_cancellable_coro<level>(loops, delay1))};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
-    auto ctx{make_remote_async_ctx(tree_ctx)};
+    auto ctx{make_root_proxy_atst_context(tree_ctx)};
 
     test_error_async(ctx, req);
 }
@@ -340,7 +341,7 @@ test_cancel_async_across_rpc(
         rq_cancellable_coro<level>(loops, delay1))};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
-    auto ctx{make_remote_async_ctx(tree_ctx)};
+    auto ctx{make_root_proxy_atst_context(tree_ctx)};
 
     test_cancel_async(ctx, req);
 }

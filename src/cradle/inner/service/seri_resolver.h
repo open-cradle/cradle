@@ -30,7 +30,7 @@ class seri_resolver_intf
     virtual ~seri_resolver_intf() = default;
 
     virtual cppcoro::task<serialized_result>
-    resolve(context_intf& ctx, std::string seri_req) = 0;
+    resolve(local_context_intf& ctx, std::string seri_req) = 0;
 };
 
 /**
@@ -50,22 +50,20 @@ class seri_resolver_impl : public seri_resolver_intf
 {
  public:
     cppcoro::task<serialized_result>
-    resolve(context_intf& ctx, std::string seri_req) override
+    resolve(local_context_intf& ctx, std::string seri_req) override
     {
         assert(!ctx.remotely());
-        Ctx* actual_ctx = dynamic_cast<Ctx*>(&ctx);
-        assert(actual_ctx != nullptr);
+        Ctx& actual_ctx = dynamic_cast<Ctx&>(ctx);
 
         auto req{deserialize_request<Req>(std::move(seri_req))};
         // TODO compile-time only distinction sync/async context?
         if constexpr (LocalAsyncContext<Ctx>)
         {
             // Populate the context tree under ctx
-            auto actx = to_local_async_context_intf(ctx);
-            auto builder = actx->make_ctx_tree_builder();
+            auto builder = actual_ctx.make_ctx_tree_builder();
             req.visit(*builder);
         }
-        auto value = co_await resolve_request_local(*actual_ctx, req);
+        auto value = co_await resolve_request_local(actual_ctx, req);
         co_return serialized_result{serialize_response(value)};
     }
 };

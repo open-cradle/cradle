@@ -16,7 +16,7 @@ class testing_domain : public domain
     std::string
     name() const override;
 
-    std::shared_ptr<context_intf>
+    std::shared_ptr<local_context_intf>
     make_local_context(inner_resources& service) override;
 };
 
@@ -31,7 +31,7 @@ class atst_domain : public domain
     std::string
     name() const override;
 
-    std::shared_ptr<context_intf>
+    std::shared_ptr<local_context_intf>
     make_local_context(inner_resources& service) override;
 };
 

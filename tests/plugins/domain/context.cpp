@@ -15,15 +15,7 @@ TEST_CASE("get_resources()", "[testing][context]")
     testing_request_context ctx{resources, nullptr};
 
     REQUIRE(&ctx.get_resources() == &resources);
-}
-
-TEST_CASE("get_cache()", "[testing][context]")
-{
-    inner_resources resources;
-    init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
-
-    REQUIRE(&ctx.get_cache() == &resources.memory_cache());
+    REQUIRE(&ctx.get_resources().memory_cache() == &resources.memory_cache());
 }
 
 TEST_CASE("remotely(), default", "[testing][context]")
@@ -124,20 +116,12 @@ TEST_CASE("local_clone()", "[testing][context]")
     auto& ctx1{static_cast<testing_request_context&>(*ctx1_intf)};
     // Same as the original
     REQUIRE(&ctx1.get_resources() == &ctx.get_resources());
-    REQUIRE(&ctx1.get_cache() == &ctx.get_cache());
+    REQUIRE(
+        &ctx1.get_resources().memory_cache()
+        == &ctx.get_resources().memory_cache());
     REQUIRE(ctx1.domain_name() == ctx.domain_name());
     // Differences with the original
     REQUIRE(ctx1.get_tasklet() == nullptr);
     REQUIRE_THROWS(ctx1.proxy_name());
     REQUIRE(!ctx1.remotely());
-}
-
-TEST_CASE("make_blob_file_writer()", "[testing][context]")
-{
-    inner_resources resources;
-    init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
-
-    auto writer{ctx.make_blob_file_writer(10)};
-    REQUIRE(writer);
 }

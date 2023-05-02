@@ -49,7 +49,7 @@ class seri_catalog
      * Throws uuid_error if the uuid does not appear in the catalog.
      */
     cppcoro::task<serialized_result>
-    resolve(context_intf& ctx, std::string seri_req);
+    resolve(local_context_intf& ctx, std::string seri_req);
 
  private:
     std::unordered_map<std::string, std::shared_ptr<seri_resolver_intf>> map_;

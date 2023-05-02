@@ -24,7 +24,7 @@ class domain
     name() const
         = 0;
 
-    virtual std::shared_ptr<context_intf>
+    virtual std::shared_ptr<local_context_intf>
     make_local_context(inner_resources& resources) = 0;
 };
 

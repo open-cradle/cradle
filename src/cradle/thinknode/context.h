@@ -32,9 +32,6 @@ struct thinknode_request_context final
     inner_resources&
     get_resources() override;
 
-    immutable_cache&
-    get_cache() override;
-
     tasklet_tracker*
     get_tasklet() override;
 
@@ -68,7 +65,7 @@ struct thinknode_request_context final
         return domain_name_;
     }
 
-    std::shared_ptr<remote_context_intf>
+    std::shared_ptr<local_context_intf>
     local_clone() const override;
 
     std::string const&

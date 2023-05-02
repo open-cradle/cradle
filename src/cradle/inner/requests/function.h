@@ -17,7 +17,6 @@
 
 #include <cereal/types/memory.hpp>
 #include <cereal/types/tuple.hpp>
-#include <cppcoro/schedule_on.hpp>
 #include <cppcoro/task.hpp>
 #include <cppcoro/when_all.hpp>
 #include <fmt/format.h>
@@ -133,7 +132,7 @@ auto
 make_async_sub_tasks(Ctx& ctx, Args const& args, std::index_sequence<Ix...>)
 {
     return std::make_tuple(
-        resolve_request_local(ctx.get_sub(Ix), std::get<Ix>(args))...);
+        resolve_request_local(ctx.get_local_sub(Ix), std::get<Ix>(args))...);
 }
 
 template<typename Tuple, std::size_t... Ix>
@@ -345,10 +344,7 @@ class function_request_impl : public Intf
                 ctx.update_status(async_status::SELF_RUNNING);
                 // Rescheduling allows tasks to run in parallel, but is not
                 // always opportune
-                if (ctx.decide_reschedule())
-                {
-                    co_await ctx.get_thread_pool().schedule();
-                }
+                co_await ctx.reschedule_if_opportune();
                 auto result = co_await std::apply(
                     *function_,
                     std::tuple_cat(std::tie(ctx), std::move(sub_results)));

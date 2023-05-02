@@ -29,33 +29,83 @@ tasklet_context::~tasklet_context()
 }
 
 remote_context_intf*
-to_remote_context_intf(context_intf& ctx)
+to_remote_ptr(context_intf& ctx)
 {
     if (!ctx.remotely())
     {
         return nullptr;
     }
-    remote_context_intf* rem_ctx = dynamic_cast<remote_context_intf*>(&ctx);
-    assert(rem_ctx != nullptr);
-    return rem_ctx;
-}
-
-local_async_context_intf*
-to_local_async_context_intf(context_intf& ctx)
-{
-    return dynamic_cast<local_async_context_intf*>(&ctx);
-}
-
-std::shared_ptr<local_async_context_intf>
-to_local_async_context_intf(std::shared_ptr<context_intf> const& ctx)
-{
-    return std::dynamic_pointer_cast<local_async_context_intf>(ctx);
+    return dynamic_cast<remote_context_intf*>(&ctx);
 }
 
 remote_async_context_intf*
-to_remote_async_context_intf(context_intf& ctx)
+to_remote_async_ptr(context_intf& ctx)
 {
+    if (!ctx.remotely())
+    {
+        return nullptr;
+    }
+    if (!ctx.is_async())
+    {
+        return nullptr;
+    }
     return dynamic_cast<remote_async_context_intf*>(&ctx);
+}
+
+remote_async_context_intf&
+to_remote_async_ref(context_intf& ctx)
+{
+    if (!ctx.remotely())
+    {
+        throw std::logic_error(
+            "to_remote_async_ref(): remotely() returns false");
+    }
+    if (!ctx.is_async())
+    {
+        throw std::logic_error(
+            "to_remote_async_ref(): is_async() returns false");
+    }
+    return dynamic_cast<remote_async_context_intf&>(ctx);
+}
+
+local_context_intf&
+to_local_ref(context_intf& ctx)
+{
+    if (ctx.remotely())
+    {
+        throw std::logic_error("to_local_ref(): remotely() returns true");
+    }
+    return dynamic_cast<local_context_intf&>(ctx);
+}
+
+local_async_context_intf&
+to_local_async_ref(context_intf& ctx)
+{
+    if (ctx.remotely())
+    {
+        throw std::logic_error(
+            "to_local_async_ref(): remotely() returns true");
+    }
+    if (!ctx.is_async())
+    {
+        throw std::logic_error(
+            "to_local_async_ref(): is_async() returns false");
+    }
+    return dynamic_cast<local_async_context_intf&>(ctx);
+}
+
+std::shared_ptr<local_async_context_intf>
+to_local_async(std::shared_ptr<context_intf> const& ctx)
+{
+    if (ctx->remotely())
+    {
+        throw std::logic_error("to_local_async(): remotely() returns true");
+    }
+    if (!ctx->is_async())
+    {
+        throw std::logic_error("to_local_async(): is_async() returns false");
+    }
+    return std::dynamic_pointer_cast<local_async_context_intf>(ctx);
 }
 
 std::string

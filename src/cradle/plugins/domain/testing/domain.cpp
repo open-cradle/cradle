@@ -16,7 +16,7 @@ testing_domain::name() const
     return "testing";
 }
 
-std::shared_ptr<context_intf>
+std::shared_ptr<local_context_intf>
 testing_domain::make_local_context(inner_resources& service)
 {
     // TODO need initial tasklet?
@@ -35,7 +35,7 @@ atst_domain::name() const
     return "atst";
 }
 
-std::shared_ptr<context_intf>
+std::shared_ptr<local_context_intf>
 atst_domain::make_local_context(inner_resources& service)
 {
     auto tree_ctx{std::make_shared<local_atst_tree_context>(service)};

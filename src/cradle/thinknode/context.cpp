@@ -29,12 +29,6 @@ thinknode_request_context::get_resources()
     return service;
 }
 
-immutable_cache&
-thinknode_request_context::get_cache()
-{
-    return service.memory_cache();
-}
-
 tasklet_tracker*
 thinknode_request_context::get_tasklet()
 {
@@ -74,7 +68,7 @@ thinknode_request_context::proxy_name() const
     return proxy_name_;
 }
 
-std::shared_ptr<remote_context_intf>
+std::shared_ptr<local_context_intf>
 thinknode_request_context::local_clone() const
 {
     return std::make_shared<thinknode_request_context>(

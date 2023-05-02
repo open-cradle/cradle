@@ -49,12 +49,6 @@ struct cached_request_resolution_context final : public local_context_intf,
         return resources;
     }
 
-    immutable_cache&
-    get_cache() override
-    {
-        return resources.memory_cache();
-    }
-
     bool
     remotely() const override
     {

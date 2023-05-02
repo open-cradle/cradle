@@ -26,7 +26,7 @@ thinknode_domain::name() const
     return "thinknode";
 }
 
-std::shared_ptr<context_intf>
+std::shared_ptr<local_context_intf>
 thinknode_domain::make_local_context(inner_resources& service)
 {
     ensure_session();

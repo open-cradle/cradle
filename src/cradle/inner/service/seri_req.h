@@ -29,6 +29,18 @@ namespace cradle {
 cppcoro::task<serialized_result>
 resolve_serialized_request(context_intf& ctx, std::string seri_req);
 
+/**
+ * Resolves a serialized request to a serialized response, remotely
+ */
+cppcoro::task<serialized_result>
+resolve_serialized_remote(remote_context_intf& ctx, std::string seri_req);
+
+/**
+ * Resolves a serialized request to a serialized response, locally
+ */
+cppcoro::task<serialized_result>
+resolve_serialized_local(local_context_intf& ctx, std::string seri_req);
+
 } // namespace cradle
 
 #endif

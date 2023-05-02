@@ -1,5 +1,6 @@
 #include <chrono>
 #include <deque>
+#include <thread>
 
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/proxy.h>
@@ -18,16 +19,19 @@ class async_status_matcher
     virtual bool operator()(async_status) const = 0;
 };
 
+// Polls the status of the remote context for remote_id until it passes the
+// matcher's condition. Throws if the remote operation was cancelled or ran
+// into an error.
 void
 wait_until_async_done(
     remote_proxy& proxy,
     async_id remote_id,
-    std::unique_ptr<async_status_matcher> matcher)
+    async_status_matcher const& matcher)
 {
     for (;;)
     {
         auto status = proxy.get_async_status(remote_id);
-        if ((*matcher)(status))
+        if (matcher(status))
         {
             break;
         }
@@ -62,6 +66,7 @@ report_matcher_status(
     }
 }
 
+// Matches if the sub contexts of the active one have been created.
 class subs_available_matcher : public async_status_matcher
 {
  public:
@@ -92,10 +97,10 @@ void
 wait_until_subs_available(remote_proxy& proxy, async_id remote_id)
 {
     auto& logger = proxy.get_logger();
-    wait_until_async_done(
-        proxy, remote_id, std::make_unique<subs_available_matcher>(logger));
+    wait_until_async_done(proxy, remote_id, subs_available_matcher(logger));
 }
 
+// Matches if the remote operation has finished successfully
 class async_finished_matcher : public async_status_matcher
 {
  public:
@@ -124,10 +129,13 @@ void
 wait_until_async_finished(remote_proxy& proxy, async_id remote_id)
 {
     auto& logger = proxy.get_logger();
-    wait_until_async_done(
-        proxy, remote_id, std::make_unique<async_finished_matcher>(logger));
+    wait_until_async_done(proxy, remote_id, async_finished_matcher(logger));
 }
 
+// Populates the context tree under root_ctx, so that it mirrors the tree on
+// the remote server. For each node in the local tree, a query is made to the
+// remote server asking for the subnodes of the corresponding remote context
+// node.
 void
 populate_remote_ctx_tree(
     remote_proxy& proxy, remote_async_context_intf& root_ctx)
@@ -138,11 +146,16 @@ populate_remote_ctx_tree(
     {
         auto* todo_ctx = todo_list.front();
         todo_list.pop_front();
-        auto child_specs = proxy.get_sub_contexts(todo_ctx->get_remote_id());
+        auto todo_remote_id{todo_ctx->get_remote_id()};
+        // The remote_id for a root context is set in resolve_async();
+        // for sub contexts, it is set a few lines down.
+        assert(todo_remote_id != NO_ASYNC_ID);
+        auto child_specs = proxy.get_sub_contexts(todo_remote_id);
         for (auto& spec : child_specs)
         {
             auto [sub_aid, is_req] = spec;
-            auto& sub_ctx = todo_ctx->add_sub(sub_aid, is_req);
+            auto& sub_ctx = todo_ctx->add_sub(is_req);
+            sub_ctx.set_remote_id(sub_aid);
             todo_list.push_back(&sub_ctx);
         }
     }
@@ -191,7 +204,7 @@ resolve_remote(remote_context_intf& ctx, std::string seri_req)
     auto& logger = proxy.get_logger();
     std::string domain_name{ctx.domain_name()};
     logger.debug("request on {}: {} ...", domain_name, seri_req.substr(0, 10));
-    if (auto* async_ctx = to_remote_async_context_intf(ctx))
+    if (auto* async_ctx = to_remote_async_ptr(ctx))
     {
         return resolve_async(
             proxy, *async_ctx, std::move(domain_name), std::move(seri_req));

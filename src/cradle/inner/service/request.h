@@ -116,7 +116,7 @@ resolve_request_cached_sync(Ctx& ctx, Req const& req)
 {
     // Must not be called for runtime-remote contexts
     immutable_cache_ptr<typename Req::value_type> ptr{
-        ctx.get_cache(),
+        ctx.get_resources().memory_cache(),
         req.get_captured_id(),
         [&](detail::immutable_cache_impl& internal_cache,
             captured_id const& key) {
@@ -132,7 +132,7 @@ cppcoro::shared_task<typename Req::value_type>
 resolve_request_cached_sync(Ctx& ctx, Req const& req)
 {
     immutable_cache_ptr<typename Req::value_type> ptr{
-        ctx.get_cache(),
+        ctx.get_resources().memory_cache(),
         req.get_captured_id(),
         [&](detail::immutable_cache_impl& internal_cache,
             captured_id const& key) {
@@ -154,10 +154,10 @@ resolve_request_cached_async(Ctx& ctx, Req const& req)
 {
     auto task = resolve_request_cached_sync(ctx, req);
     auto result = co_await task;
-    auto* actx = to_local_async_context_intf(ctx);
+    auto& actx = to_local_async_ref(ctx);
     // If function ran, status already will be FINISHED
     // If result came from cache, it will not yet be
-    actx->update_status(async_status::FINISHED);
+    actx.update_status(async_status::FINISHED);
     co_return result;
 }
 
@@ -266,9 +266,9 @@ resolve_request(Ctx& ctx, Req const& req)
     }
     else
     {
-        if (auto* rctx = to_remote_context_intf(ctx))
+        if (auto* rem_ctx = to_remote_ptr(ctx))
         {
-            return resolve_request_remote(*rctx, req);
+            return resolve_request_remote(*rem_ctx, req);
         }
         else
         {

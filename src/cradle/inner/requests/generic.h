@@ -6,7 +6,6 @@
 #include <stdexcept>
 #include <string>
 
-#include <cppcoro/static_thread_pool.hpp>
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/core/id.h>
@@ -130,20 +129,22 @@ class req_visitor_intf
  *   introspective_context_intf.
  */
 
-// Generic context interface
+/*
+ * Generic context interface
+ */
 class context_intf
 {
  public:
     virtual ~context_intf() = default;
 
-    // Indicates if non-trivial requests will be resolved remotely.
+    // Indicates if requests will be resolved remotely.
     // - Will return true if the context does not support local resolution
     // - Will return false if the context does not support remote resolution
     virtual bool
     remotely() const
         = 0;
 
-    // Indicates if non-trivial requests will be resolved asynchronously.
+    // Indicates if requests will be resolved asynchronously.
     // - Will return true if the context does not support synchronous
     //   resolution
     // - Will return false if the context does not support asynchronous
@@ -153,38 +154,55 @@ class context_intf
         = 0;
 };
 
-// A context class implementing this interface declares that it supports
-// locally resolving requests.
+/*
+ * A context class implementing this interface declares that it supports
+ * locally resolving requests.
+ * Requests will still be resolved remotely if the class also implements
+ * remote_context_intf, and remotely() returns true.
+ */
 class local_context_intf : public virtual context_intf
 {
  public:
     virtual ~local_context_intf() = default;
 };
 
-// A context class implementing this interface declares that it supports
-// remotely resolving requests.
-// Requests will still be resolved locally if the class also implements
-// local_context_intf, and remotely() returns false.
+/*
+ * A context class implementing this interface declares that it supports
+ * remotely resolving requests.
+ * Requests will still be resolved locally if the class also implements
+ * local_context_intf, and remotely() returns false.
+ *
+ * Remotely resolving a request means that the request is serialized, then
+ * sent to the server; the response arrives from the server in some
+ * serialization format, so needs to be deserialized.
+ * Serialization and deserialization functions are template functions,
+ * provided by a plugin. #include'ing the corresponding header file
+ * activates the plugin; there is no runtime dispatching.
+ */
 class remote_context_intf : public virtual context_intf
 {
  public:
     virtual ~remote_context_intf() = default;
 
+    // The proxy name identifies the proxy that will forward requests to a
+    // remote executioner.
     virtual std::string const&
     proxy_name() const
         = 0;
 
+    // The domain name identifies a context implementation class.
     virtual std::string const&
     domain_name() const
         = 0;
 
-    // Creates a clone of *this that differs only in its remotely() returning
-    // false
-    virtual std::shared_ptr<remote_context_intf>
+    // Creates a variant of *this that can be used to locally resolve the same
+    // set of requests. In particular, the new object's remotely() will return
+    // false.
+    // Will be called only when *this is the root of a context tree.
+    // TODO formalize "context object is root"
+    // Useful for a loopback service.
+    virtual std::shared_ptr<local_context_intf>
     local_clone() const = 0;
-
-    // TODO return request serialization method
-    // TODO return response serialization method
 };
 
 // A context class implementing this interface declares that it supports
@@ -196,7 +214,9 @@ class sync_context_intf : public virtual context_intf
 };
 
 // Status of an asynchronous operation: a (cppcoro) task, associated
-// with a coroutine
+// with a coroutine.
+// CANCELLED, FINISHED and ERROR are final statuses: once a task ends up in
+// one of these, its status won't change anymore.
 enum class async_status
 {
     CREATED, // Task was created
@@ -229,9 +249,10 @@ class async_error : public std::runtime_error
     using runtime_error::runtime_error;
 };
 
-// Context for an asynchronously operating coroutine.
-// Fine-grained: one object will be created for each task (coro);
+// Context for an asynchronously operating task (coroutine).
+// One context object will be created for each task (coroutine);
 // these objects form a tree with the same topology as the request tree.
+// Thus, a context object tracks progress for a single (sub)request.
 class async_context_intf : public virtual context_intf
 {
  public:
@@ -252,11 +273,22 @@ class async_context_intf : public virtual context_intf
     get_num_subs() const
         = 0;
 
-    // Gets the status of this task
+    // Gets the context for the subtask corresponding to the ix'th
+    // subrequest (ix=0 representing the first subrequest).
+    virtual async_context_intf&
+    get_sub(std::size_t ix)
+        = 0;
+
+    // Gets the status of this task.
+    // This is a coroutine version of local_async_context_intf::get_status(),
+    // and is also available on remote-only contexts.
     virtual cppcoro::task<async_status>
     get_status_coro() = 0;
 
-    // Requests cancellation of all tasks in the same context tree
+    // Requests cancellation of all tasks in the same context tree.
+    // This is a coroutine version of
+    // local_async_context_intf::request_cancellation(),
+    // and is also available on remote-only contexts.
     virtual cppcoro::task<void>
     request_cancellation_coro() = 0;
 };
@@ -268,41 +300,42 @@ class local_async_context_intf : public local_context_intf,
  public:
     virtual ~local_async_context_intf() = default;
 
-    // Get the context for the subtask corresponding to the ix'th
-    // subrequest (ix=0 representing the first subrequest)
+    // Gets the context for the subtask corresponding to the ix'th
+    // subrequest (ix=0 representing the first subrequest).
+    // Differs from get_sub() in its return value.
     virtual local_async_context_intf&
-    get_sub(std::size_t ix)
+    get_local_sub(std::size_t ix)
         = 0;
 
-    // Should be called only for a root context.
     // Returns a visitor that will traverse a request tree and build a
     // corresponding tree of subcontexts, under the current context object.
+    // Should be called only for a root context (a context that forms the
+    // root of its context tree).
     virtual std::unique_ptr<req_visitor_intf>
     make_ctx_tree_builder() = 0;
 
-    // Returns a hint indicating whether rescheduling execution for this
-    // context on another thread might improve performance due to increased
-    // parallelism.
+    // Reschedule execution for this context on another thread if this is
+    // likely to improve performance due to increased parallelism.
     // Should be called only for real requests (is_req() returning true).
-    // Should be called only once per context (i.e., may have side effects).
-    virtual bool
-    decide_reschedule()
-        = 0;
+    // Should be called at most once per context.
+    virtual cppcoro::task<void>
+    reschedule_if_opportune() = 0;
 
-    // Gets the status of this task
+    // Gets the status of this task.
+    // This is a non-coroutine version of async_context_intf::get_status().
     virtual async_status
     get_status()
         = 0;
 
-    // Gets the error message for this task
-    // Should be called only when get_status() returns ERROR
+    // Gets the error message for this task.
+    // Should be called only when get_status() returns ERROR.
     virtual std::string
     get_error_message()
         = 0;
 
-    // Updates the status of this task
+    // Updates the status of this task.
     // If status == FINISHED, also recursively updates subtasks
-    // (needed if this task's result came from a cache)
+    // (needed if this task's result came from a cache).
     // TODO need to the the same if status == ERROR?
     // TODO keep history of an async request e.g.
     // TODO vector<tuple<async_status, timestamp>>
@@ -312,39 +345,40 @@ class local_async_context_intf : public local_context_intf,
     update_status(async_status status)
         = 0;
 
-    // Updates the status of this task to "ERROR", and store an associated
-    // error message
+    // Updates the status of this task to "ERROR", and stores an associated
+    // error message.
     virtual void
     update_status_error(std::string const& errmsg)
         = 0;
 
-    // Returns a thread pool that can be used by a caller
-    virtual cppcoro::static_thread_pool&
-    get_thread_pool()
-        = 0;
-
-    // Sets the result of a finished task
+    // Sets the result of a finished task.
+    // Should be called only when get_status() returns FINISHED.
     virtual void
     set_result(blob result)
         = 0;
 
-    // Returns the value of a finished task
+    // Returns the value of a finished task.
+    // Should be called only when get_status() returns FINISHED.
     virtual blob
     get_result()
         = 0;
 
     // Requests cancellation of all tasks in the same context tree
+    // This is a non-coroutine version of
+    // async_context_intf::request_cancellation().
     virtual void
     request_cancellation()
         = 0;
 
     // Returns true if cancellation has been requested on this context or
-    // another one in the same context tree
+    // another one in the same context tree.
     virtual bool
     is_cancellation_requested() const noexcept
         = 0;
 
-    // Throws async_cancelled if cancellation was requested
+    // Throws async_cancelled if cancellation was requested.
+    // The intention is that an asynchronous task will all this function on
+    // polling basis.
     virtual void
     throw_if_cancellation_requested() const
         = 0;
@@ -353,40 +387,47 @@ class local_async_context_intf : public local_context_intf,
 // Context for an asynchronous task running on a (remote) server.
 // This object will act as a proxy for a local_async_context_intf object on
 // the server.
-class remote_async_context_intf : public async_context_intf,
-                                  public remote_context_intf
+class remote_async_context_intf : public remote_context_intf,
+                                  public async_context_intf
 {
  public:
     virtual ~remote_async_context_intf() = default;
 
-    // Creates a "local" counterpart of this object
+    // Creates a variant of *this that can be used to locally resolve the same
+    // set of requests. In particular, the new object's remotely() will return
+    // false.
+    // Will be called only when *this is the root of a context tree.
+    // Useful for a loopback service.
     virtual std::shared_ptr<local_async_context_intf>
     local_async_clone() const = 0;
 
+    // Adds a subcontext (corresponding to a subrequest) to this one.
     virtual remote_async_context_intf&
-    add_sub(async_id sub_remote_id, bool is_req)
+    add_sub(bool is_req)
         = 0;
 
-    // Get the context for the subtask corresponding to the ix'th
-    // subrequest (ix=0 representing the first subrequest)
+    // Gets the context for the subtask corresponding to the ix'th
+    // subrequest (ix=0 representing the first subrequest).
+    // Differs from get_sub() in its return value.
     virtual remote_async_context_intf&
-    get_sub(std::size_t ix)
+    get_remote_sub(std::size_t ix)
         = 0;
 
+    // Sets the id identifying this context on the remote server
+    // (after this id has been retrieved from the server).
     virtual void
     set_remote_id(async_id remote_id)
         = 0;
 
-    // Returns the remote id.
-    // Should be called only if the remote id has been set (by the caller,
-    // presumably).
+    // Returns the remote id, or NO_ASYNC_ID if it was not set.
     virtual async_id
     get_remote_id()
         = 0;
 
-    // Returns true if cancellation was requested before the remote_id became
-    // available.
-    // The caller should forward the request to the server.
+    // Returns true if cancellation was requested before the root remote_id
+    // became available.
+    // The caller is responsible to call this function once it has obtained
+    // the root remote_id, and if it returns true, call request_cancellation().
     virtual bool
     cancellation_pending()
         = 0;
@@ -398,12 +439,9 @@ class cached_context_intf : public virtual context_intf
  public:
     virtual ~cached_context_intf() = default;
 
+    // Returns resources implementing the cache(s).
     virtual inner_resources&
     get_resources()
-        = 0;
-
-    virtual immutable_cache&
-    get_cache()
         = 0;
 };
 
@@ -587,25 +625,31 @@ class tasklet_context
     introspective_context_intf* ctx_{nullptr};
 };
 
-// If ctx is remote, convert to remote_context_intf
-// otherwise, return nullptr
+// Casts ctx, or returns nullptr if it won't remotely resolve requests
 remote_context_intf*
-to_remote_context_intf(context_intf& ctx);
+to_remote_ptr(context_intf& ctx);
 
-// Convert ctx to local_async_context_intf*, or return nullptr if the
-// runtime type doesn't match.
-local_async_context_intf*
-to_local_async_context_intf(context_intf& ctx);
-
-// Converts ctx if it is a local_async_context_intf*, or returns an empty
-// shared_ptr if the runtime type doesn't match.
-std::shared_ptr<local_async_context_intf>
-to_local_async_context_intf(std::shared_ptr<context_intf> const& ctx);
-
-// Convert ctx to remote_async_context_intf*, or return nullptr if the
-// runtime type doesn't match.
+// Casts ctx, or returns nullptr if it won't remotely and asynchronously
+// resolve requests
 remote_async_context_intf*
-to_remote_async_context_intf(context_intf& ctx);
+to_remote_async_ptr(context_intf& ctx);
+
+// Casts ctx, or throws if it won't remotely and asynchronously resolve
+// requests
+remote_async_context_intf&
+to_remote_async_ref(context_intf& ctx);
+
+// Casts ctx, or throws if it won't locally resolve requests
+local_context_intf&
+to_local_ref(context_intf& ctx);
+
+// Casts ctx, or throws if it won't locally and asynchronously resolve requests
+local_async_context_intf&
+to_local_async_ref(context_intf& ctx);
+
+// Casts ctx, or throws if it won't locally and asynchronously resolve requests
+std::shared_ptr<local_async_context_intf>
+to_local_async(std::shared_ptr<context_intf> const& ctx);
 
 } // namespace cradle
 

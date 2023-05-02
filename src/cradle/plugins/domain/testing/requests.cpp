@@ -19,7 +19,7 @@ make_some_blob(testing_request_context ctx, std::size_t size, bool shared)
     uint8_t* data{nullptr};
     if (shared)
     {
-        auto writer = ctx.make_blob_file_writer(size);
+        auto writer = ctx.get_resources().make_blob_file_writer(size);
         owner = writer;
         data = writer->data();
     }

@@ -348,19 +348,20 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     auto res0 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
     sync_wait_write_disk_cache(ctx.get_resources());
 
+    auto& mem_cache{ctx.get_resources().memory_cache()};
     REQUIRE(res0.size() == num_requests);
     for (int i = 0; i < num_requests; ++i)
     {
         REQUIRE(res0[i] == i * 3);
     }
     REQUIRE(num_add_calls == num_requests);
-    auto ic0 = get_summary_info(ctx.get_cache());
+    auto ic0 = get_summary_info(mem_cache);
     REQUIRE(ic0.entry_count == num_requests);
     auto dc0 = ll_cache.get_summary_info();
     REQUIRE(dc0.entry_count == num_requests);
 
     ctx.reset_memory_cache();
-    REQUIRE(get_summary_info(ctx.get_cache()).entry_count == 0);
+    REQUIRE(get_summary_info(mem_cache).entry_count == 0);
     auto res1 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
 
     REQUIRE(res1.size() == num_requests);
@@ -369,7 +370,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
         REQUIRE(res1[i] == i * 3);
     }
     REQUIRE(num_add_calls == num_requests);
-    auto ic1 = get_summary_info(ctx.get_cache());
+    auto ic1 = get_summary_info(mem_cache);
     REQUIRE(ic1.entry_count == num_requests);
     auto dc1 = ll_cache.get_summary_info();
     REQUIRE(dc1.entry_count == num_requests);

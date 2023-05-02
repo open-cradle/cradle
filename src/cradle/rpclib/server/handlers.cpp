@@ -49,7 +49,7 @@ resolve_sync(
     auto dom = find_domain(domain_name);
     auto ctx{dom->make_local_context(service)};
     auto seri_result = cppcoro::sync_wait(
-        resolve_serialized_request(*ctx, std::move(seri_req)));
+        resolve_serialized_local(*ctx, std::move(seri_req)));
     // TODO try to get rid of .value()
     blob result = seri_result.value();
     logger.info("result {}", result);
@@ -154,8 +154,7 @@ try
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
     auto dom = find_domain(domain_name);
     auto ctx{dom->make_local_context(service)};
-    auto actx = to_local_async_context_intf(ctx);
-    // TODO what if actx == nullptr?
+    auto actx = to_local_async(ctx);
     hctx.get_async_db().add(actx);
     // TODO update status to SUBMITTED
     // This function should return asap.
@@ -185,7 +184,7 @@ try
     remote_context_spec_list result;
     for (decltype(nsubs) ix = 0; ix < nsubs; ++ix)
     {
-        auto& sub_actx = actx->get_sub(ix);
+        auto& sub_actx = actx->get_local_sub(ix);
         logger.debug(
             "  sub {}: id {} ({}) {}",
             ix,

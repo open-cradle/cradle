@@ -57,7 +57,7 @@ async_db::remove_subtree(local_async_context_intf& node_ctx)
     auto nsubs = node_ctx.get_num_subs();
     for (decltype(nsubs) i = 0; i < nsubs; ++i)
     {
-        remove_subtree(node_ctx.get_sub(i));
+        remove_subtree(node_ctx.get_local_sub(i));
     }
     entries_.erase(node_ctx.get_id());
 }
