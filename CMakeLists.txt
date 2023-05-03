@@ -12,7 +12,14 @@ if(NOT DEFINED CRADLE_IS_MAIN_PROJECT)
 endif()
 
 # Define dependency-management options.
-option(CRADLE_USE_CONAN "Use Conan for loading dependencies" OFF)
+option(
+    CRADLE_USE_CONAN
+    "Use Conan for loading dependencies"
+    ${CRADLE_IS_MAIN_PROJECT})
+option(
+    CRADLE_SUPPORT_VCPKG
+    "Support vcpkg for dependencies"
+    OFF)
 
 # Define the options for using the preprocessor.
 set(PREPROCESSOR_USAGE_OPTIONS Native External)
@@ -162,7 +169,11 @@ find_package(Boost REQUIRED COMPONENTS
     filesystem program_options)
 find_package(Catch2 REQUIRED)
 find_package(nlohmann_json REQUIRED)
-find_package(msgpack REQUIRED)
+if(CRADLE_SUPPORT_VCPKG)
+    find_package(msgpack-cxx REQUIRED)
+else()
+    find_package(msgpack REQUIRED)
+endif()
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(SQLite3 REQUIRED)
