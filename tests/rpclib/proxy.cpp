@@ -46,8 +46,7 @@ test_make_some_blob(bool shared)
     ensure_rpclib_service();
     inner_resources service;
     init_test_inner_service(service);
-    testing_request_context ctx{service, nullptr, remotely};
-    ctx.proxy_name(proxy_name);
+    testing_request_context ctx{service, nullptr, remotely, proxy_name};
 
     auto req{rq_make_some_blob<caching_level>(10000, shared)};
     auto response = cppcoro::sync_wait(resolve_request(ctx, req));
@@ -73,8 +72,7 @@ TEST_CASE("sending bad request", "[rpclib]")
     std::string proxy_name{"rpclib"};
     inner_resources service;
     init_test_inner_service(service);
-    testing_request_context ctx{service, nullptr, remotely};
-    ctx.proxy_name(proxy_name);
+    testing_request_context ctx{service, nullptr, remotely, proxy_name};
     auto client = ensure_rpclib_service();
 
     REQUIRE_THROWS_AS(

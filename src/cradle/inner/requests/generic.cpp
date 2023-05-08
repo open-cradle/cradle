@@ -38,6 +38,16 @@ to_remote_ptr(context_intf& ctx)
     return dynamic_cast<remote_context_intf*>(&ctx);
 }
 
+remote_context_intf&
+to_remote_ref(context_intf& ctx)
+{
+    if (!ctx.remotely())
+    {
+        throw std::logic_error("to_remote_ref(): remotely() returns false");
+    }
+    return dynamic_cast<remote_context_intf&>(ctx);
+}
+
 remote_async_context_intf*
 to_remote_async_ptr(context_intf& ctx)
 {

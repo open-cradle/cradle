@@ -25,7 +25,8 @@ struct thinknode_request_context final
         service_core& service,
         thinknode_session session,
         tasklet_tracker* tasklet,
-        bool remotely = false);
+        bool remotely,
+        std::string proxy_name);
 
     ~thinknode_request_context();
 
@@ -53,11 +54,11 @@ struct thinknode_request_context final
         return false;
     }
 
-    void
-    proxy_name(std::string const& name);
-
     std::string const&
-    proxy_name() const override;
+    proxy_name() const override
+    {
+        return proxy_name_;
+    }
 
     std::string const&
     domain_name() const override

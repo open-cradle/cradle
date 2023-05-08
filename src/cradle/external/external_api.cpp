@@ -23,7 +23,9 @@ make_thinknode_request_context(api_session& session, char const* title)
     return thinknode_request_context{
         session.impl().get_service_core(),
         session.impl().get_thinknode_session(),
-        tasklet};
+        tasklet,
+        false,
+        ""};
 }
 
 api_service::api_service(std::string json_text)

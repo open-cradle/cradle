@@ -269,6 +269,8 @@ class async_context_intf : public virtual context_intf
         = 0;
 
     // Returns the number of subtasks
+    // TODO consider making this a coroutine, so that lazily populating the
+    // context subtree becomes possible.
     virtual std::size_t
     get_num_subs() const
         = 0;
@@ -628,6 +630,10 @@ class tasklet_context
 // Casts ctx, or returns nullptr if it won't remotely resolve requests
 remote_context_intf*
 to_remote_ptr(context_intf& ctx);
+
+// Casts ctx, or throws if it won't remotely resolve requests
+remote_context_intf&
+to_remote_ref(context_intf& ctx);
 
 // Casts ctx, or returns nullptr if it won't remotely and asynchronously
 // resolve requests

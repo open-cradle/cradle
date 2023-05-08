@@ -1,3 +1,4 @@
+#include <cradle/inner/core/exception.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/domain.h>
 #include <cradle/plugins/domain/testing/seri_catalog.h>
@@ -16,43 +17,39 @@ testing_domain::name() const
     return "testing";
 }
 
-std::shared_ptr<local_context_intf>
-testing_domain::make_local_context(inner_resources& service)
+std::shared_ptr<sync_context_intf>
+testing_domain::make_sync_context(
+    inner_resources& resources, bool remotely, std::string proxy_name)
 {
-    // TODO need initial tasklet?
-    return std::make_shared<testing_request_context>(service, nullptr);
+    return std::make_shared<testing_request_context>(
+        resources, nullptr, remotely, std::move(proxy_name));
 }
 
-void
-atst_domain::initialize()
+std::shared_ptr<async_context_intf>
+testing_domain::make_async_context(
+    inner_resources& resources, bool remotely, std::string proxy_name)
 {
-    register_atst_seri_resolvers();
-}
-
-std::string
-atst_domain::name() const
-{
-    return "atst";
-}
-
-std::shared_ptr<local_context_intf>
-atst_domain::make_local_context(inner_resources& service)
-{
-    auto tree_ctx{std::make_shared<local_atst_tree_context>(service)};
-    bool const is_req{true};
-    return std::make_shared<local_atst_context>(tree_ctx, nullptr, is_req);
-}
-
-void
-register_and_initialize_testing_domains()
-{
-    std::vector<std::shared_ptr<domain>> domains{
-        std::make_shared<testing_domain>(), std::make_shared<atst_domain>()};
-    for (auto& domain : domains)
+    std::shared_ptr<async_context_intf> ctx;
+    if (!remotely)
     {
-        register_domain(domain);
-        domain->initialize();
+        auto tree_ctx{std::make_shared<local_atst_tree_context>(resources)};
+        ctx = std::make_shared<local_atst_context>(tree_ctx, nullptr, true);
     }
+    else
+    {
+        auto tree_ctx{std::make_shared<proxy_atst_tree_context>(
+            resources, std::move(proxy_name))};
+        ctx = std::make_shared<proxy_atst_context>(tree_ctx, true, true);
+    }
+    return ctx;
+}
+
+void
+register_and_initialize_testing_domain()
+{
+    auto the_domain{std::make_shared<testing_domain>()};
+    register_domain(the_domain);
+    the_domain->initialize();
 }
 
 } // namespace cradle

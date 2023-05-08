@@ -36,7 +36,7 @@ setup_loopback_test(inner_resources& inner)
     init_test_inner_service(inner);
     inner.ensure_async_db();
     ensure_loopback_service(inner);
-    register_and_initialize_testing_domains();
+    register_and_initialize_testing_domain();
 }
 
 void
@@ -323,7 +323,9 @@ test_cancel_async(Ctx& ctx, Req const& req)
 {
     // Run the checker coroutine on a separate thread, independent from the
     // ones under test
-    std::thread checker_thread(checker_func, std::ref(ctx));
+    // Note: std::thread::~thread() calls terminate() if the thread wasn't
+    // joined; e.g. if the test code threw.
+    std::jthread checker_thread(checker_func, std::ref(ctx));
     cppcoro::sync_wait(test_cancel_async_coro(ctx, req));
     checker_thread.join();
 }

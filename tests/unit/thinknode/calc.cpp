@@ -94,7 +94,7 @@ TEST_CASE("calc status query", "[thinknode][tn_calc]")
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
     session.access_token = "xyz";
 
-    thinknode_request_context trc{service, session, nullptr};
+    thinknode_request_context trc{service, session, nullptr, false, ""};
     auto status
         = cppcoro::sync_wait(query_calculation_status(trc, "123", "abc"));
     REQUIRE(status == make_calculation_status_with_completed(nil));
@@ -120,7 +120,7 @@ TEST_CASE("calc request retrieval", "[thinknode][tn_calc]")
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
     session.access_token = "xyz";
 
-    thinknode_request_context trc{service, session, nullptr};
+    thinknode_request_context trc{service, session, nullptr, false, ""};
     auto request
         = cppcoro::sync_wait(retrieve_calculation_request(trc, "123", "abc"));
 
@@ -173,7 +173,7 @@ TEST_CASE("calc status long polling", "[thinknode][tn_calc]")
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
     session.access_token = "xyz";
 
-    thinknode_request_context trc{service, session, nullptr};
+    thinknode_request_context trc{service, session, nullptr, false, ""};
     cppcoro::sync_wait([&]() -> cppcoro::task<> {
         auto statuses = long_poll_calculation_status(trc, "123", "abc");
         size_t status_counter = 0;

@@ -24,8 +24,15 @@ class domain
     name() const
         = 0;
 
-    virtual std::shared_ptr<local_context_intf>
-    make_local_context(inner_resources& resources) = 0;
+    virtual std::shared_ptr<sync_context_intf>
+    make_sync_context(
+        inner_resources& resources, bool remotely, std::string proxy_name)
+        = 0;
+
+    virtual std::shared_ptr<async_context_intf>
+    make_async_context(
+        inner_resources& resources, bool remotely, std::string proxy_name)
+        = 0;
 };
 
 void

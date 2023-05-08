@@ -47,9 +47,10 @@ resolve_sync(
     auto& logger{hctx.logger()};
     logger.info("resolve_sync {}: {}", domain_name, seri_req);
     auto dom = find_domain(domain_name);
-    auto ctx{dom->make_local_context(service)};
+    auto ctx{dom->make_sync_context(service, false, "")};
+    auto& loc_ctx{to_local_ref(*ctx)};
     auto seri_result = cppcoro::sync_wait(
-        resolve_serialized_local(*ctx, std::move(seri_req)));
+        resolve_serialized_local(loc_ctx, std::move(seri_req)));
     // TODO try to get rid of .value()
     blob result = seri_result.value();
     logger.info("result {}", result);
@@ -153,7 +154,7 @@ try
     logger.info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
     auto dom = find_domain(domain_name);
-    auto ctx{dom->make_local_context(service)};
+    auto ctx{dom->make_async_context(service, false, "")};
     auto actx = to_local_async(ctx);
     hctx.get_async_db().add(actx);
     // TODO update status to SUBMITTED

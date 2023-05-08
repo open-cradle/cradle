@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <stdexcept>
 
+#include <cradle/inner/core/exception.h>
 #include <cradle/thinknode/context.h>
 #include <cradle/thinknode/domain.h>
 #include <cradle/thinknode/seri_catalog.h>
@@ -26,15 +27,23 @@ thinknode_domain::name() const
     return "thinknode";
 }
 
-std::shared_ptr<local_context_intf>
-thinknode_domain::make_local_context(inner_resources& service)
+std::shared_ptr<sync_context_intf>
+thinknode_domain::make_sync_context(
+    inner_resources& resources, bool remotely, std::string proxy_name)
 {
     ensure_session();
-    assert(dynamic_cast<service_core*>(&service) != nullptr);
-    auto& tn_service = static_cast<service_core&>(service);
+    assert(dynamic_cast<service_core*>(&resources) != nullptr);
+    auto& tn_resources = static_cast<service_core&>(resources);
     // TODO need initial tasklet?
     return std::make_shared<thinknode_request_context>(
-        tn_service, session_, nullptr);
+        tn_resources, session_, nullptr, remotely, std::move(proxy_name));
+}
+
+std::shared_ptr<async_context_intf>
+thinknode_domain::make_async_context(
+    inner_resources& resources, bool remotely, std::string proxy_name)
+{
+    throw not_implemented_error("thinknode_domain::make_async_context()");
 }
 
 void

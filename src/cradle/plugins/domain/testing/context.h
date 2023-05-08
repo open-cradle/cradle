@@ -30,7 +30,8 @@ class testing_request_context final : public local_context_intf,
     testing_request_context(
         inner_resources& resources,
         tasklet_tracker* tasklet,
-        bool remotely = false);
+        bool remotely,
+        std::string proxy_name);
 
     // context_intf
     bool
@@ -47,7 +48,10 @@ class testing_request_context final : public local_context_intf,
 
     // remote_context_intf
     std::string const&
-    proxy_name() const override;
+    proxy_name() const override
+    {
+        return proxy_name_;
+    }
 
     std::string const&
     domain_name() const override
@@ -143,7 +147,7 @@ class local_atst_tree_context
 };
 
 /*
- * Context that can be used to asynchronously resolve requests in the "atst"
+ * Context that can be used to asynchronously resolve requests in the "testing"
  * domain, on the local machine.
  * Relates to a single request, or a non-request argument of such a request,
  * which will be resolved on the local machine.
@@ -369,7 +373,7 @@ class proxy_atst_tree_context
 {
  public:
     proxy_atst_tree_context(
-        inner_resources& resources, std::string const& proxy_name);
+        inner_resources& resources, std::string proxy_name);
 
     inner_resources&
     get_resources() const
@@ -403,7 +407,7 @@ class proxy_atst_tree_context
 };
 
 /*
- * Context that can be used to asynchronously resolve requests in the "atst"
+ * Context that can be used to asynchronously resolve requests in the "testing"
  * domain, on a remote machine.
  * It acts as a proxy for a local_atst_context object on a remote server.
  */
@@ -525,7 +529,7 @@ class proxy_atst_context final : public remote_async_context_intf
     }
 
  private:
-    std::string domain_name_{"atst"};
+    std::string domain_name_{"testing"};
     std::shared_ptr<proxy_atst_tree_context> tree_ctx_;
     bool is_root_;
     bool is_req_;

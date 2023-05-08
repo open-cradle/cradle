@@ -12,8 +12,13 @@
 namespace cradle {
 
 testing_request_context::testing_request_context(
-    inner_resources& resources, tasklet_tracker* tasklet, bool remotely)
-    : resources_{resources}, remotely_{remotely}
+    inner_resources& resources,
+    tasklet_tracker* tasklet,
+    bool remotely,
+    std::string proxy_name)
+    : resources_{resources},
+      remotely_{remotely},
+      proxy_name_{std::move(proxy_name)}
 {
     if (tasklet)
     {
@@ -21,28 +26,12 @@ testing_request_context::testing_request_context(
     }
 }
 
-void
-testing_request_context::proxy_name(std::string const& name)
-{
-    proxy_name_ = name;
-}
-
-std::string const&
-testing_request_context::proxy_name() const
-{
-    if (proxy_name_.empty())
-    {
-        throw std::logic_error(
-            "testing_request_context::proxy_name(): name not set");
-    }
-    return proxy_name_;
-}
-
 std::shared_ptr<local_context_intf>
 testing_request_context::local_clone() const
 {
     // TODO tasklets should continue in the clone
-    return std::make_shared<testing_request_context>(resources_, nullptr);
+    return std::make_shared<testing_request_context>(
+        resources_, nullptr, false, "");
 }
 
 tasklet_tracker*
@@ -324,9 +313,9 @@ local_atst_context_tree_builder::visit_req_arg(std::size_t ix)
 }
 
 proxy_atst_tree_context::proxy_atst_tree_context(
-    inner_resources& resources, std::string const& proxy_name)
+    inner_resources& resources, std::string proxy_name)
     : resources_(resources),
-      proxy_name_{proxy_name},
+      proxy_name_{std::move(proxy_name)},
       proxy_{find_proxy(proxy_name_)},
       logger_{spdlog::get("cradle")}
 {

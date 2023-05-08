@@ -193,8 +193,8 @@ test_post_iss_requests_parallel(
     {
         tasklet = create_tasklet_tracker("my_pool", "my_title");
     }
-    thinknode_request_context ctx{service, session, tasklet, remotely};
-    ctx.proxy_name("loopback");
+    thinknode_request_context ctx{
+        service, session, tasklet, remotely, "loopback"};
 
     auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
 
@@ -377,7 +377,7 @@ test_retrieve_immutable_object_parallel(
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
     session.access_token = "xyz";
     tasklet_tracker* tasklet = nullptr;
-    thinknode_request_context ctx{service, session, tasklet};
+    thinknode_request_context ctx{service, session, tasklet, false, ""};
 
     auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
 

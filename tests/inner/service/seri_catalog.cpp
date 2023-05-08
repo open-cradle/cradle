@@ -53,7 +53,7 @@ TEST_CASE("register seri resolver and call it", tag)
 
     inner_resources resources;
     init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
+    testing_request_context ctx{resources, nullptr, false, ""};
     std::string seri_req{serialize_request(req)};
     auto seri_resp{
         cppcoro::sync_wait(seri_catalog::instance().resolve(ctx, seri_req))};
@@ -69,7 +69,7 @@ TEST_CASE("call unregistered resolver", tag)
     auto req{rq_local(make_string<arg>{}, arg)};
     inner_resources resources;
     init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
+    testing_request_context ctx{resources, nullptr, false, ""};
     std::string seri_req{serialize_request(req)};
 
     REQUIRE_THROWS_WITH(
@@ -84,7 +84,7 @@ TEST_CASE("serialized request lacking polymorphic_name", tag)
     register_seri_resolver<testing_request_context>(req);
     inner_resources resources;
     init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
+    testing_request_context ctx{resources, nullptr, false, ""};
     std::string correct{serialize_request(req)};
 
     std::regex re("polymorphic_name");
@@ -102,7 +102,7 @@ TEST_CASE("malformed serialized request", tag)
     register_seri_resolver<testing_request_context>(req);
     inner_resources resources;
     init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
+    testing_request_context ctx{resources, nullptr, false, ""};
     std::string seri_req{serialize_request(req)};
 
     seri_req.pop_back();
@@ -143,7 +143,7 @@ TEST_CASE("resolve two C++ functions with the same signature", tag)
 
     inner_resources resources;
     init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
+    testing_request_context ctx{resources, nullptr, false, ""};
 
     auto seri_resp_e{
         cppcoro::sync_wait(seri_catalog::instance().resolve(ctx, seri_req_e))};

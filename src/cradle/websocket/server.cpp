@@ -1444,8 +1444,8 @@ make_thinknode_request_context(
         server.core,
         get_client(server.clients, request.client).session,
         request.tasklet,
-        remotely};
-    ctx.proxy_name("rpclib");
+        remotely,
+        "rpclib"};
     return ctx;
 }
 

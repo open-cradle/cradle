@@ -19,12 +19,11 @@ test_resolve(bool remotely)
     register_testing_seri_resolvers();
     inner_resources resources;
     init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr, remotely};
     if (remotely)
     {
         ensure_loopback_service(resources);
-        ctx.proxy_name("loopback");
     }
+    testing_request_context ctx{resources, nullptr, remotely, "loopback"};
 
     constexpr auto caching_level{caching_level_type::full};
     auto req{rq_make_some_blob<caching_level>(256, false)};

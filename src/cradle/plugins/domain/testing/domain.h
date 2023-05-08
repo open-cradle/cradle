@@ -16,30 +16,26 @@ class testing_domain : public domain
     std::string
     name() const override;
 
-    std::shared_ptr<local_context_intf>
-    make_local_context(inner_resources& service) override;
-};
+    // proxy_name identifies the proxy to use if remotely is true
+    std::shared_ptr<sync_context_intf>
+    make_sync_context(
+        inner_resources& resources,
+        bool remotely,
+        std::string proxy_name) override;
 
-class atst_domain : public domain
-{
- public:
-    ~atst_domain() = default;
-
-    void
-    initialize() override;
-
-    std::string
-    name() const override;
-
-    std::shared_ptr<local_context_intf>
-    make_local_context(inner_resources& service) override;
+    // proxy_name identifies the proxy to use if remotely is true
+    std::shared_ptr<async_context_intf>
+    make_async_context(
+        inner_resources& resources,
+        bool remotely,
+        std::string proxy_name) override;
 };
 
 /*
- * Registers and initializes the testing domains.
+ * Registers and initializes the testing domain.
  */
 void
-register_and_initialize_testing_domains();
+register_and_initialize_testing_domain();
 
 } // namespace cradle
 

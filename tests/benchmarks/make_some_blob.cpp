@@ -61,12 +61,11 @@ BM_try_resolve_testing_request(
     inner_resources resources;
     init_test_inner_service(resources);
     bool remotely = proxy_name.size() > 0;
-    testing_request_context ctx{resources, nullptr, remotely};
     if (remotely)
     {
         register_remote_services(resources, proxy_name);
-        ctx.proxy_name(proxy_name);
     }
+    testing_request_context ctx{resources, nullptr, remotely, proxy_name};
 
     // Fill the appropriate cache if any
     auto init = [&]() -> cppcoro::task<void> {

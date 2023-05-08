@@ -250,6 +250,9 @@ template<Context Ctx, Request Req>
 cppcoro::shared_task<typename Req::value_type>
 resolve_request(Ctx& ctx, Req const& req)
 {
+    // TODO the caller may not know the exact implementation class (e.g. got
+    // it from a domain::make_sync_context() call). It _may_ e.g. know that the
+    // request should be resolved synchronously and locally.
     // Assume that the actual context class is known when calling this function
     static_assert(!std::is_abstract_v<Ctx>);
     // Context implementation classes should be declared "final"

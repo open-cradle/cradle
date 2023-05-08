@@ -12,8 +12,7 @@ register_and_initialize_all_domains()
 {
     std::vector<std::shared_ptr<domain>> domains{
         std::make_shared<thinknode_domain>(),
-        std::make_shared<testing_domain>(),
-        std::make_shared<atst_domain>()};
+        std::make_shared<testing_domain>()};
     for (auto& domain : domains)
     {
         register_domain(domain);
