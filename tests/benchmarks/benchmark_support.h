@@ -31,12 +31,12 @@ void
 call_resolve_by_ref_loop(Req const& req)
 {
     constexpr int num_loops = 1000;
-    uncached_request_resolution_context ctx{};
+    non_caching_request_resolution_context ctx{};
     auto loop = [&]() -> cppcoro::task<int> {
         int total{};
         for (auto i = 0; i < num_loops; ++i)
         {
-            total += co_await req.resolve(ctx);
+            total += co_await req.resolve_sync(ctx);
         }
         co_return total;
     };
@@ -49,8 +49,8 @@ call_resolve_by_ref_loop(Req const& req)
 // not measured
 // - Each equals() will immediately return true, so is also not really measured
 template<typename Ctx, Request Req>
-    requires(ContextMatchingRequest<Ctx, typename Req::element_type>)
-void resolve_request_loop(
+void
+resolve_request_loop(
     benchmark::State& state, Ctx& ctx, Req const& req, int num_loops = 1000)
 {
     constexpr auto caching_level = Req::element_type::caching_level;
@@ -79,8 +79,8 @@ void resolve_request_loop(
 }
 
 template<typename Ctx, Request Req>
-    requires(ContextMatchingRequest<Ctx, typename Req::element_type>)
-void BM_resolve_request(benchmark::State& state, Ctx& ctx, Req const& req)
+void
+BM_resolve_request(benchmark::State& state, Ctx& ctx, Req const& req)
 {
     for (auto _ : state)
     {

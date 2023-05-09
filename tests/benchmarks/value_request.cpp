@@ -30,7 +30,7 @@ BENCHMARK(BM_call_value_request_resolve)->Apply(thousand_loops);
 static void
 BM_resolve_value_request(benchmark::State& state)
 {
-    uncached_request_resolution_context ctx;
+    non_caching_request_resolution_context ctx;
     for (auto _ : state)
     {
         resolve_request_loop(state, ctx, rq_value(42));

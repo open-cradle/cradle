@@ -20,13 +20,13 @@ resolve_serialized_local(local_context_intf& ctx, std::string seri_req)
 cppcoro::task<serialized_result>
 resolve_serialized_request(context_intf& ctx, std::string seri_req)
 {
-    if (remote_context_intf* rem_ctx = to_remote_ptr(ctx))
+    if (auto* rem_ctx = cast_ctx_to_ptr<remote_context_intf>(ctx))
     {
         return resolve_serialized_remote(*rem_ctx, std::move(seri_req));
     }
     else
     {
-        local_context_intf& loc_ctx = to_local_ref(ctx);
+        auto& loc_ctx = cast_ctx_to_ref<local_context_intf>(ctx);
         return resolve_serialized_local(loc_ctx, std::move(seri_req));
     }
 }

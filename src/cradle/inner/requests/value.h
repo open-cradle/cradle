@@ -22,6 +22,7 @@ class value_request
  public:
     using element_type = value_request;
     using value_type = Value;
+    using required_ctx_types = ctx_type_list<local_context_intf>;
 
     static constexpr caching_level_type caching_level{
         caching_level_type::none};
@@ -42,11 +43,12 @@ class value_request
         return request_uuid();
     }
 
-    // How useful is this?
+    // A value request is "trivial": it presents itself as having no
+    // subrequests, and no arguments.
+    // Thus, accept() becomes a no-op.
     void
-    visit(req_visitor_intf& visitor) const
+    accept(req_visitor_intf& visitor) const
     {
-        visitor.visit_val_arg(0);
     }
 
     Value
@@ -61,9 +63,14 @@ class value_request
         update_unique_hash(hasher, value_);
     }
 
-    template<Context Ctx>
     cppcoro::task<Value>
-    resolve(Ctx& ctx) const
+    resolve_sync(local_context_intf& ctx) const
+    {
+        co_return value_;
+    }
+
+    cppcoro::task<Value>
+    resolve_async(local_async_context_intf& ctx) const
     {
         co_return value_;
     }

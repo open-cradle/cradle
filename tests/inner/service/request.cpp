@@ -59,7 +59,7 @@ test_resolve_uncached(
     int& num_calls1,
     int* num_calls2 = nullptr)
 {
-    uncached_request_resolution_context ctx;
+    non_caching_request_resolution_context ctx;
 
     auto res0 = cppcoro::sync_wait(resolve_request(ctx, req));
 
@@ -88,7 +88,7 @@ test_resolve_cached(
     int& num_calls1,
     int* num_calls2 = nullptr)
 {
-    cached_request_resolution_context ctx;
+    caching_request_resolution_context ctx;
 
     auto res0 = cppcoro::sync_wait(resolve_request(ctx, req));
 
@@ -138,7 +138,7 @@ TEST_CASE("evaluate dual function request V+V - memory cached", tag)
     auto req0{rq_function_erased(props0, add, 6, 1)};
     auto req1{rq_function_erased(props1, add, 5, 3)};
 
-    cached_request_resolution_context ctx;
+    caching_request_resolution_context ctx;
 
     // Resolve the two requests, storing the results in the memory cache
     auto res00 = cppcoro::sync_wait(resolve_request(ctx, req0));
@@ -193,7 +193,7 @@ TEST_CASE("evaluate function request V+V - fully cached", tag)
     auto req_mem{rq_function_erased(props_mem, add, 6, 1)};
     auto req_full{rq_function_erased(props_full, add, 6, 1)};
 
-    cached_request_resolution_context ctx;
+    caching_request_resolution_context ctx;
     num_add_calls = 0;
 
     // Resolving a fully-cached request stores the result in both
@@ -245,7 +245,7 @@ TEST_CASE("evaluate function requests in parallel - uncached function", tag)
     using Req = function_request_erased<Value, Props>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    uncached_request_resolution_context ctx{};
+    non_caching_request_resolution_context ctx{};
     std::vector<Req> requests;
     for (int i = 0; i < num_requests; ++i)
     {
@@ -271,7 +271,7 @@ TEST_CASE("evaluate function requests in parallel - uncached coroutine", tag)
     using Req = function_request_erased<Value, Props>;
     int num_add_calls{};
     auto add{create_adder_coro(num_add_calls)};
-    uncached_request_resolution_context ctx{};
+    non_caching_request_resolution_context ctx{};
     std::vector<Req> requests;
     for (int i = 0; i < num_requests; ++i)
     {
@@ -297,7 +297,7 @@ TEST_CASE("evaluate function requests in parallel - memory cached", tag)
     using Req = function_request_erased<Value, Props>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    cached_request_resolution_context ctx{};
+    caching_request_resolution_context ctx{};
     std::vector<Req> requests;
     for (int i = 0; i < num_requests; ++i)
     {
@@ -332,7 +332,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     using Req = function_request_erased<Value, Props>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    cached_request_resolution_context ctx{};
+    caching_request_resolution_context ctx{};
     auto& ll_cache
         = static_cast<local_disk_cache&>(ctx.get_resources().secondary_cache())
               .get_ll_disk_cache();
@@ -386,7 +386,7 @@ TEST_CASE("resolve function_request_erased with subrequest", tag)
     auto req0{rq_function_erased(props0, add2, 1, 2)};
     auto req1{rq_function_erased(props1, add2, req0, 3)};
     auto req2{rq_function_erased(props2, add2, req1, 4)};
-    cached_request_resolution_context ctx;
+    caching_request_resolution_context ctx;
 
     REQUIRE(cppcoro::sync_wait(resolve_request(ctx, req0)) == 3);
     REQUIRE(cppcoro::sync_wait(resolve_request(ctx, req1)) == 6);

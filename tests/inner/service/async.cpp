@@ -46,17 +46,18 @@ setup_rpclib_test(inner_resources& inner)
     ensure_rpclib_service();
 }
 
-template<typename Ctx, typename Req>
+template<typename Ctx, typename Req, typename Constraints>
 cppcoro::task<void>
 test_resolve_async_coro(
     Ctx& ctx,
     Req const& req,
+    Constraints constraints,
     bool requests_are_normalized,
     int loops,
     int delay0,
     int delay1)
 {
-    auto res = co_await resolve_request(ctx, req);
+    auto res = co_await resolve_request(ctx, req, constraints);
 
     REQUIRE(res == (loops + delay0) + (loops + delay1));
     REQUIRE(ctx.is_req());
@@ -116,18 +117,25 @@ test_resolve_async_coro(
     }
 }
 
-template<typename Ctx, typename Req>
+template<typename Ctx, typename Req, typename Constraints>
 void
 test_resolve_async(
     Ctx& ctx,
     Req const& req,
+    Constraints constraints,
     bool requests_are_normalized,
     int loops,
     int delay0,
     int delay1)
 {
     cppcoro::sync_wait(test_resolve_async_coro(
-        ctx, req, requests_are_normalized, loops, delay0, delay1));
+        ctx,
+        req,
+        constraints,
+        requests_are_normalized,
+        loops,
+        delay0,
+        delay1));
 }
 
 void
@@ -145,7 +153,8 @@ test_resolve_async_across_rpc(
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
     auto ctx{make_root_proxy_atst_context(tree_ctx)};
 
-    test_resolve_async(ctx, req, true, loops, delay0, delay1);
+    ResolutionConstraintsRemoteAsync constraints;
+    test_resolve_async(ctx, req, constraints, true, loops, delay0, delay1);
 }
 
 } // namespace
@@ -153,11 +162,12 @@ test_resolve_async_across_rpc(
 TEST_CASE("resolve async locally", tag)
 {
     constexpr int loops = 3;
+    using required_ctx_types = ctx_type_list<local_async_context_intf>;
     using Props = request_props<
         caching_level_type::none,
         true,
         false,
-        local_async_context_intf>;
+        required_ctx_types>;
     Props props0{make_test_uuid(100)};
     Props props1{make_test_uuid(101)};
     Props props2{make_test_uuid(102)};
@@ -173,7 +183,9 @@ TEST_CASE("resolve async locally", tag)
     auto tree_ctx = std::make_shared<local_atst_tree_context>(inner);
     auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};
 
-    test_resolve_async(*root_ctx, req, false, loops, delay0, delay1);
+    ResolutionConstraintsLocalAsync constraints;
+    test_resolve_async(
+        *root_ctx, req, constraints, false, loops, delay0, delay1);
 }
 
 TEST_CASE("resolve async on loopback", tag)
@@ -234,11 +246,12 @@ test_error_async_across_rpc(
 
 TEST_CASE("error async request locally", tag)
 {
+    using required_ctx_types = ctx_type_list<local_async_context_intf>;
     using Props = request_props<
         caching_level_type::none,
         true,
         false,
-        local_async_context_intf>;
+        required_ctx_types>;
     Props props0{make_test_uuid(300)};
     Props props1{make_test_uuid(301)};
     Props props2{make_test_uuid(302)};
@@ -352,11 +365,12 @@ test_cancel_async_across_rpc(
 
 TEST_CASE("cancel async request locally", tag)
 {
+    using required_ctx_types = ctx_type_list<local_async_context_intf>;
     using Props = request_props<
         caching_level_type::none,
         true,
         false,
-        local_async_context_intf>;
+        required_ctx_types>;
     Props props0{make_test_uuid(200)};
     Props props1{make_test_uuid(201)};
     auto req{rq_function_erased(

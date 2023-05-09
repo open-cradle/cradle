@@ -17,8 +17,9 @@ init_test_inner_service(inner_resources& resources);
 void
 reset_disk_cache(inner_resources& resources);
 
-struct uncached_request_resolution_context final : public local_context_intf,
-                                                   public sync_context_intf
+struct non_caching_request_resolution_context final
+    : public local_context_intf,
+      public sync_context_intf
 {
     bool
     remotely() const override
@@ -33,15 +34,15 @@ struct uncached_request_resolution_context final : public local_context_intf,
     }
 };
 
-static_assert(ValidContext<uncached_request_resolution_context>);
+static_assert(ValidContext<non_caching_request_resolution_context>);
 
-struct cached_request_resolution_context final : public local_context_intf,
-                                                 public sync_context_intf,
-                                                 public cached_context_intf
+struct caching_request_resolution_context final : public local_context_intf,
+                                                  public sync_context_intf,
+                                                  public caching_context_intf
 {
     inner_resources resources;
 
-    cached_request_resolution_context();
+    caching_request_resolution_context();
 
     inner_resources&
     get_resources() override
@@ -65,18 +66,18 @@ struct cached_request_resolution_context final : public local_context_intf,
     reset_memory_cache();
 };
 
-static_assert(ValidContext<cached_request_resolution_context>);
+static_assert(ValidContext<caching_request_resolution_context>);
 
 template<caching_level_type level>
 struct request_resolution_context_struct
 {
-    using type = cached_request_resolution_context;
+    using type = caching_request_resolution_context;
 };
 
 template<>
 struct request_resolution_context_struct<caching_level_type::none>
 {
-    using type = uncached_request_resolution_context;
+    using type = non_caching_request_resolution_context;
 };
 
 template<caching_level_type level>

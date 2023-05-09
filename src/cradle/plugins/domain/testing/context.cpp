@@ -280,6 +280,7 @@ make_root_local_atst_context(std::shared_ptr<local_atst_tree_context> tree_ctx)
     return root_ctx;
 }
 
+// TODO can this be generalized for other context types?
 local_atst_context_tree_builder::local_atst_context_tree_builder(
     local_atst_context& ctx)
     : ctx_{ctx}
@@ -289,27 +290,28 @@ local_atst_context_tree_builder::local_atst_context_tree_builder(
 void
 local_atst_context_tree_builder::visit_val_arg(std::size_t ix)
 {
-    auto tree_ctx{ctx_.get_tree_context()};
-    auto sub_ctx
-        = std::make_shared<local_atst_context>(tree_ctx, &ctx_, false);
-    ctx_.add_sub(ix, sub_ctx);
-    if (auto* db = get_async_db(*tree_ctx))
-    {
-        db->add(sub_ctx);
-    }
+    make_sub_ctx(ix, false);
 }
 
 std::unique_ptr<req_visitor_intf>
 local_atst_context_tree_builder::visit_req_arg(std::size_t ix)
 {
+    auto sub_ctx{make_sub_ctx(ix, true)};
+    return std::make_unique<local_atst_context_tree_builder>(*sub_ctx);
+}
+
+std::shared_ptr<local_atst_context>
+local_atst_context_tree_builder::make_sub_ctx(std::size_t ix, bool is_req)
+{
     auto tree_ctx{ctx_.get_tree_context()};
-    auto sub_ctx = std::make_shared<local_atst_context>(tree_ctx, &ctx_, true);
+    auto sub_ctx
+        = std::make_shared<local_atst_context>(tree_ctx, &ctx_, is_req);
     ctx_.add_sub(ix, sub_ctx);
     if (auto* db = get_async_db(*tree_ctx))
     {
         db->add(sub_ctx);
     }
-    return std::make_unique<local_atst_context_tree_builder>(*sub_ctx);
+    return sub_ctx;
 }
 
 proxy_atst_tree_context::proxy_atst_tree_context(

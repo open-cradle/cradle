@@ -34,19 +34,19 @@ static auto functor_a = []() { return func_a(); };
 static auto functor_b = []() { return func_b(); };
 
 cppcoro::task<std::string>
-coro_a(cached_context_intf& ctx)
+coro_a(context_intf& ctx)
 {
     co_return "a";
 }
 
 cppcoro::task<std::string>
-coro_b(cached_context_intf& ctx)
+coro_b(context_intf& ctx)
 {
     co_return "b";
 }
 
 cppcoro::task<std::string>
-make_string(cached_context_intf& ctx, std::string val)
+make_string(context_intf& ctx, std::string val)
 {
     co_return val;
 }
@@ -240,11 +240,8 @@ TEST_CASE("function_request_impl: load unregistered function", tag)
     request_props<caching_level_type::memory> props{good_uuid};
     using value_type = std::string;
     using props_type = decltype(props);
-    using ctx_type = typename props_type::ctx_type;
-    using intf_type = function_request_intf<ctx_type, value_type>;
     using impl_type = function_request_impl<
         value_type,
-        intf_type,
         props_type::func_is_coro,
         decltype(&func_a)>;
 

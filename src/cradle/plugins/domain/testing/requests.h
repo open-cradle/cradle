@@ -14,37 +14,38 @@
 
 namespace cradle {
 
-template<caching_level_type Level>
-using testing_request_props
-    = request_props<Level, true, true, testing_request_context>;
-
 cppcoro::task<blob>
-make_some_blob(testing_request_context ctx, std::size_t size, bool shared);
+make_some_blob(context_intf& ctx, std::size_t size, bool shared);
 
 template<caching_level_type Level>
 auto
 rq_make_some_blob(std::size_t size, bool shared)
 {
+    using contexts = ctx_type_list<
+        caching_context_intf,
+        introspective_context_intf,
+        local_async_context_intf>;
+    using props_type = request_props<Level, true, true, contexts>;
     return rq_function_erased(
-        testing_request_props<Level>(
+        props_type(
             request_uuid{"make_some_blob"}, std::string{"make_some_blob"}),
         make_some_blob,
         size,
         shared);
 }
 
-template<caching_level_type Level>
-using atst_request_props
-    = request_props<Level, true, true, local_atst_context>;
-
 cppcoro::task<int>
-cancellable_coro(local_async_context_intf& ctx, int loops, int delay);
+cancellable_coro(context_intf& ctx, int loops, int delay);
 
 template<caching_level_type Level, typename Loops, typename Delay>
 auto
 rq_cancellable_coro(Loops loops, Delay delay)
 {
-    using props_type = atst_request_props<Level>;
+    using contexts = ctx_type_list<
+        local_async_context_intf,
+        introspective_context_intf,
+        caching_context_intf>;
+    using props_type = request_props<Level, true, true, contexts>;
     // TODO uuid should depend on Level
     request_uuid uuid{"cancellable_coro"};
     std::string title{"cancellable_coro"};

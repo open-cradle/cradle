@@ -19,8 +19,11 @@ namespace cradle {
 // - Always introspective
 // TODO consider fixing Level to "full"
 template<caching_level_type Level>
-using thinknode_request_props
-    = request_props<Level, true, true, thinknode_request_context>;
+using thinknode_request_props = request_props<
+    Level,
+    true,
+    true,
+    ctx_type_list<thinknode_request_context>>;
 
 // Assumes that properties other than Level are as in thinknode_request_props
 template<caching_level_type Level>
@@ -58,7 +61,7 @@ rq_post_iss_object(
     std::string url_type_template{get_url_type_template(schema)};
     return rq_function_erased(
         props_type{std::move(uuid), std::move(title)},
-        post_iss_object_uncached_template_url,
+        post_iss_object_generic_template_url,
         std::move(context_id),
         std::move(url_type_template),
         normalize_arg<blob, props_type>(std::move(object_data)));
@@ -79,7 +82,7 @@ rq_retrieve_immutable_object(std::string context_id, ImmutableId immutable_id)
     std::string title{"retrieve_immutable_object"};
     return rq_function_erased(
         props_type{std::move(uuid), std::move(title)},
-        retrieve_immutable_blob_uncached,
+        retrieve_immutable_blob_generic,
         std::move(context_id),
         normalize_arg<std::string, props_type>(std::move(immutable_id)));
 }
@@ -97,7 +100,7 @@ rq_get_iss_object_metadata(std::string context_id, ObjectId object_id)
     std::string title{"get_iss_object_metadata"};
     return rq_function_erased(
         props_type(std::move(uuid), std::move(title)),
-        get_iss_object_metadata_uncached,
+        get_iss_object_metadata_generic,
         std::move(context_id),
         normalize_arg<std::string, props_type>(std::move(object_id)));
 }
@@ -117,7 +120,7 @@ rq_resolve_iss_object_to_immutable(
     std::string title{"resolve_iss_object_to_immutable"};
     return rq_function_erased(
         props_type(std::move(uuid), std::move(title)),
-        resolve_iss_object_to_immutable_uncached,
+        resolve_iss_object_to_immutable_generic,
         std::move(context_id),
         normalize_arg<std::string, props_type>(std::move(object_id)),
         ignore_upgrades);

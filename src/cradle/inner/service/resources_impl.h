@@ -2,6 +2,7 @@
 #define CRADLE_INNER_SERVICE_RESOURCES_IMPL_H
 
 #include <memory>
+#include <mutex>
 
 #include <cppcoro/static_thread_pool.hpp>
 
@@ -68,6 +69,7 @@ class inner_resources_impl
     get_async_db();
 
  private:
+    std::mutex mutex_;
     std::unique_ptr<cradle::immutable_cache> memory_cache_;
     std::unique_ptr<secondary_cache_intf> secondary_cache_;
     std::unique_ptr<blob_file_directory> blob_dir_;

@@ -24,7 +24,8 @@ namespace cradle {
 class testing_request_context final : public local_context_intf,
                                       public remote_context_intf,
                                       public sync_context_intf,
-                                      public cached_introspective_context_intf
+                                      public caching_context_intf,
+                                      public introspective_context_intf
 {
  public:
     testing_request_context(
@@ -62,7 +63,7 @@ class testing_request_context final : public local_context_intf,
     std::shared_ptr<local_context_intf>
     local_clone() const override;
 
-    // cached_context_intf
+    // caching_context_intf
     inner_resources&
     get_resources() override
     {
@@ -153,7 +154,8 @@ class local_atst_tree_context
  * which will be resolved on the local machine.
  */
 class local_atst_context final : public local_async_context_intf,
-                                 public cached_introspective_context_intf
+                                 public caching_context_intf,
+                                 public introspective_context_intf
 {
  public:
     local_atst_context(
@@ -261,7 +263,7 @@ class local_atst_context final : public local_async_context_intf,
     void
     throw_if_cancellation_requested() const override;
 
-    // cached_context_intf
+    // caching_context_intf
     inner_resources&
     get_resources() override
     {
@@ -320,20 +322,29 @@ class local_atst_context final : public local_async_context_intf,
 static_assert(ValidContext<local_atst_context>);
 
 /*
- * Creates a local_atst_context object for the root node in a context tree.
- * Child objects will be added by class local_atst_context_tree_builder.
+ * Creates a root local_atst_context object for the root request in a request
+ * tree.
+ *
+ * The remainder of the local_atst_context tree will be populated by
+ * local_atst_context_tree_builder, by recursively crawling the request tree.
  */
 std::shared_ptr<local_atst_context>
 make_root_local_atst_context(
     std::shared_ptr<local_atst_tree_context> tree_ctx);
 
 /*
- * Recursively creates subtrees for a local_atst_context tree node, with the
+ * Recursively creates subtrees of local_atst_context objects, with the
  * same topology as the corresponding request subtree.
+ *
+ * A local_atst_context object will be created for each request in the tree,
+ * but also for each value: the resolve_request() variant resolving a value
+ * requires a context argument, even though it doesn't access it.
  */
 class local_atst_context_tree_builder : public req_visitor_intf
 {
  public:
+    // ctx is the context object corresponding to the request whose arguments
+    // will be visited
     local_atst_context_tree_builder(local_atst_context& ctx);
 
     void
@@ -344,21 +355,23 @@ class local_atst_context_tree_builder : public req_visitor_intf
 
  private:
     local_atst_context& ctx_;
+
+    std::shared_ptr<local_atst_context>
+    make_sub_ctx(std::size_t ix, bool is_req);
 };
 
 /*
  * Creates a tree of local_atst_context objects, reflecting the structure of
  * the request tree of which `root_req' is the root request.
  */
-// TODO Req must have visit()
-template<typename Req>
+template<VisitableRequest Req>
 std::shared_ptr<local_atst_context>
 make_local_async_ctx_tree(
     std::shared_ptr<local_atst_tree_context> tree_ctx, Req const& root_req)
 {
     auto root_ctx{make_root_local_atst_context(std::move(tree_ctx))};
     local_atst_context_tree_builder builder{*root_ctx};
-    root_req.visit(builder);
+    root_req.accept(builder);
     return root_ctx;
 }
 

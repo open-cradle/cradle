@@ -95,6 +95,8 @@ class inner_resources
     std::shared_ptr<blob_file_writer>
     make_blob_file_writer(std::size_t size);
 
+    // Ensures that the async_db instance is available.
+    // Thread-safe.
     void
     ensure_async_db();
 

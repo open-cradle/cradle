@@ -117,8 +117,9 @@ BM_try_resolve_thinknode_request(
     {
         register_remote_services(service, proxy_name, response);
     }
+    std::string proxy_name_string{proxy_name ? proxy_name : ""};
     thinknode_request_context ctx{
-        service, session, nullptr, remotely, proxy_name};
+        service, session, nullptr, remotely, proxy_name_string};
 
     // Fill the appropriate cache if any
     auto init = [&]() -> cppcoro::task<void> {

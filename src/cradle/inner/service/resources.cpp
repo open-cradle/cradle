@@ -215,6 +215,7 @@ inner_resources_impl::enable_http_mocking(bool http_is_synchronous)
 void
 inner_resources_impl::ensure_async_db()
 {
+    std::scoped_lock lock{mutex_};
     if (!async_db_instance_)
     {
         async_db_instance_ = std::make_unique<async_db>();

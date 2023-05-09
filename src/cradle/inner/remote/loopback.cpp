@@ -88,7 +88,9 @@ loopback_service::submit_async(
 {
     logger_->info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
-    auto actx{to_remote_async_ref(ctx).local_async_clone()};
+    auto actx{
+        cast_ctx_to_ref<remote_async_context_intf>(ctx).local_async_clone()};
+    resources_.ensure_async_db();
     get_async_db().add(actx);
     // TODO populate actx subs?
     // TODO update status to SUBMITTED

@@ -19,15 +19,16 @@ namespace {
 
 static char const tag[] = "[inner][service][seri_catalog]";
 
+using required_ctx_types = ctx_type_list<testing_request_context>;
 template<caching_level_type Level>
-using local_props = request_props<Level, true, true, testing_request_context>;
+using local_props = request_props<Level, true, true, required_ctx_types>;
 
 template<char const* arg>
 class make_string
 {
  public:
     cppcoro::task<std::string>
-    operator()(testing_request_context& ctx) const
+    operator()(context_intf& ctx) const
     {
         co_return arg;
     }
@@ -49,7 +50,7 @@ TEST_CASE("register seri resolver and call it", tag)
     static char const arg[] = "a";
     auto req{rq_local(make_string<arg>{}, arg)};
 
-    REQUIRE_NOTHROW(register_seri_resolver<testing_request_context>(req));
+    REQUIRE_NOTHROW(register_seri_resolver(req));
 
     inner_resources resources;
     init_test_inner_service(resources);
@@ -81,7 +82,7 @@ TEST_CASE("serialized request lacking polymorphic_name", tag)
 {
     static char const arg[] = "c";
     auto req{rq_local(make_string<arg>{}, arg)};
-    register_seri_resolver<testing_request_context>(req);
+    register_seri_resolver(req);
     inner_resources resources;
     init_test_inner_service(resources);
     testing_request_context ctx{resources, nullptr, false, ""};
@@ -99,7 +100,7 @@ TEST_CASE("malformed serialized request", tag)
 {
     static char const arg[] = "d";
     auto req{rq_local(make_string<arg>{}, arg)};
-    register_seri_resolver<testing_request_context>(req);
+    register_seri_resolver(req);
     inner_resources resources;
     init_test_inner_service(resources);
     testing_request_context ctx{resources, nullptr, false, ""};
@@ -114,14 +115,16 @@ TEST_CASE("malformed serialized request", tag)
 
 namespace {
 
+// TODO replace local_context_intf with context_intf and solve the failing test
+// (leads to same function_request_impl type as the "0050" test).
 cppcoro::task<std::string>
-make_e_string(testing_request_context& ctx)
+make_e_string(local_context_intf& ctx)
 {
     co_return "e";
 }
 
 cppcoro::task<std::string>
-make_f_string(testing_request_context& ctx)
+make_f_string(local_context_intf& ctx)
 {
     co_return "f";
 }
@@ -133,8 +136,8 @@ TEST_CASE("resolve two C++ functions with the same signature", tag)
     auto req_e{rq_local(make_e_string, "test_seri_catalog_e")};
     auto req_f{rq_local(make_f_string, "test_seri_catalog_f")};
 
-    REQUIRE_NOTHROW(register_seri_resolver<testing_request_context>(req_e));
-    REQUIRE_NOTHROW(register_seri_resolver<testing_request_context>(req_f));
+    REQUIRE_NOTHROW(register_seri_resolver(req_e));
+    REQUIRE_NOTHROW(register_seri_resolver(req_f));
 
     std::string seri_req_e{serialize_request(req_e)};
     std::string seri_req_f{serialize_request(req_f)};

@@ -18,81 +18,27 @@ class inner_resources;
 class request_uuid;
 class tasklet_tracker;
 
+// Specifies how request resolution results should be cached
 enum class caching_level_type
 {
-    none,
-    memory,
-    full
+    none, // No caching
+    memory, // Caching in local memory only
+    full // Caching in local memory, plus some secondary storage
 };
 
-template<typename T>
-concept Request
-    = requires {
-          std::same_as<typename T::element_type, T>;
-          typename T::value_type;
-          std::same_as<decltype(T::caching_level), caching_level_type>;
-          std::same_as<decltype(T::introspective), bool>;
-      } && requires(T const& req) {
-               {
-                   req.get_uuid()
-                   } -> std::convertible_to<request_uuid>;
-           };
-
-template<typename T>
-concept UncachedRequest = Request<T> && T::caching_level ==
-caching_level_type::none;
-
-template<typename Req>
-concept CachedRequest = Request<Req> && Req::caching_level !=
-caching_level_type::none&& requires(Req const& req) {
-                               {
-                                   req.get_captured_id()
-                                   }
-                                   -> std::convertible_to<captured_id const&>;
-                           };
-
-template<typename Req>
-concept MemoryCachedRequest = CachedRequest<Req> && Req::caching_level ==
-caching_level_type::memory;
-
-template<typename Req>
-concept FullyCachedRequest = CachedRequest<Req> && Req::caching_level ==
-caching_level_type::full;
-
-template<typename Req>
-concept IntrospectiveRequest
-    = Req::introspective && requires(Req const& req) {
-                                {
-                                    req.get_introspection_title()
-                                    } -> std::convertible_to<std::string>;
-                            };
-
-template<typename Req>
-concept NonIntrospectiveRequest = !
-Req::introspective;
-
-template<typename Req>
-concept CachedIntrospectiveRequest
-    = CachedRequest<Req> && IntrospectiveRequest<Req>;
-
-template<typename Req>
-concept CachedNonIntrospectiveRequest
-    = CachedRequest<Req> && NonIntrospectiveRequest<Req>;
-
-// Contains the type of an argument to an rq_function-like call.
-// Primary template, used for non-request types; should be specialized
-// for each kind of request (in other .h files).
-template<typename T>
-struct arg_type_struct
-{
-    using value_type = T;
-};
-
-// Yields the type of an argument to an rq_function-like call
-template<typename T>
-using arg_type = typename arg_type_struct<T>::value_type;
-
-// Visits a request, and its arguments (which may be subrequests themselves).
+/*
+ * Visits a request's arguments (which may be subrequests themselves).
+ *
+ * A visitor may contain state information relating to a specific request
+ * object. Thus, a new visitor object has to be created for visiting a
+ * subrequest's arguments.
+ *
+ * A request that only has non-request arguments cannot be distinguished from
+ * a request that has no arguments at all. Thus, such a request's accept()
+ * implementation could be a no-op.
+ * TODO try to optimize accept() for "trivial" requests
+ * (e.g. those resulting from normalize_arg)
+ */
 class req_visitor_intf
 {
  public:
@@ -118,16 +64,51 @@ class req_visitor_intf
  * - Sync or async. A context implementation may support one or both.
  *   - It supports synchronous resolving if it implements sync_context_intf.
  *   - It supports asynchronous resolving if it implements async_context_intf.
- * - Cached or uncached. A cached request can be resolved only with a context
- *   supporting cached resolution, and such a context can also handle uncached
- *   requests.
- *   A context supports cached resolving if it implements cached_context_intf.
+ * - Caching or non-caching. A cached request can be resolved only with a
+ *   context supporting caching resolution, and such a context can also handle
+ *   uncached requests.
+ *   A context supports caching resolving if it implements
+ *   caching_context_intf.
  * - Introspective or not. An introspective request can be resolved only with a
  *   context offering that support, and such a context can also handle
  *   non-introspective requests.
  *   A context supports introspective resolving if it implements
  *   introspective_context_intf.
  */
+
+// A (usually non-empty) list of context types
+template<typename... Ctx>
+struct ctx_type_list
+{
+};
+
+template<typename CtxTypeList>
+struct first_ctx_type_struct;
+
+template<typename FirstCtx, typename... MoreCtx>
+struct first_ctx_type_struct<ctx_type_list<FirstCtx, MoreCtx...>>
+{
+    using ctx_type = FirstCtx;
+};
+
+// Yields the first context type in a list (which must not be empty)
+template<typename CtxTypeList>
+using first_ctx_type = typename first_ctx_type_struct<CtxTypeList>::ctx_type;
+
+template<typename Ctx, typename CtxTypeList>
+struct ctx_in_type_list_struct;
+
+template<typename Ctx, typename... CtxType>
+struct ctx_in_type_list_struct<Ctx, ctx_type_list<CtxType...>>
+{
+    static constexpr bool value = (... || std::convertible_to<CtxType&, Ctx&>);
+};
+
+// Yields a value indicating whether the context type list contains Ctx,
+// or a context type implementing Ctx
+template<typename Ctx, typename CtxTypeList>
+inline constexpr bool ctx_in_type_list
+    = ctx_in_type_list_struct<Ctx, CtxTypeList>::value;
 
 /*
  * Generic context interface
@@ -435,11 +416,13 @@ class remote_async_context_intf : public remote_context_intf,
         = 0;
 };
 
-// Context interface needed for resolving a cached request
-class cached_context_intf : public virtual context_intf
+// Context interface needed for resolving a cached request.
+// Implicitly local-only although not derived from local_context_intf,
+// but an implementation class should do that.
+class caching_context_intf : public virtual context_intf
 {
  public:
-    virtual ~cached_context_intf() = default;
+    virtual ~caching_context_intf() = default;
 
     // Returns resources implementing the cache(s).
     virtual inner_resources&
@@ -447,7 +430,9 @@ class cached_context_intf : public virtual context_intf
         = 0;
 };
 
-// Context interface needed for resolving an introspective request
+// Context interface needed for resolving an introspective request.
+// Implicitly local-only although not derived from local_context_intf,
+// but an implementation class should do that.
 class introspective_context_intf : public virtual context_intf
 {
  public:
@@ -466,50 +451,52 @@ class introspective_context_intf : public virtual context_intf
         = 0;
 };
 
-// Context interface needed for resolving a request that is both cached and
-// introspective
-// A context class that is both caching and introspective should implement this
-// interface, rather than the two individual ones. The reason is that
-// ctx_type_for_props needs a single type.
-class cached_introspective_context_intf : public cached_context_intf,
-                                          public introspective_context_intf
-{
- public:
-    virtual ~cached_introspective_context_intf() = default;
-};
-
 // The most generic/minimal context
 template<typename Ctx>
 concept Context = std::convertible_to<Ctx&, context_intf&>;
 
+// Context that supports remote resolution
+template<typename Ctx>
+concept RemoteContext = std::convertible_to<Ctx&, remote_context_intf&>;
+
+// Context that supports local resolution
+template<typename Ctx>
+concept LocalContext
+    = std::convertible_to<Ctx&, local_context_intf&>
+      || std::convertible_to<Ctx&, local_async_context_intf&>
+      || std::convertible_to<Ctx&, caching_context_intf&>
+      || std::convertible_to<Ctx&, introspective_context_intf&>;
+
 // Context that supports remote resolution only, and does not support local
 template<typename Ctx>
 concept DefinitelyRemoteContext
-    = std::is_final_v<Ctx> && std::convertible_to<Ctx&, remote_context_intf&>
-      && !
-std::convertible_to<Ctx&, local_context_intf&>;
+    = std::is_final_v<Ctx> && RemoteContext<Ctx> && !
+LocalContext<Ctx>;
 
 // Context that supports local resolution only, and does not support remote
 template<typename Ctx>
-concept DefinitelyLocalContext
-    = std::is_final_v<Ctx> && std::convertible_to<Ctx&, local_context_intf&>
-      && !
-std::convertible_to<Ctx&, remote_context_intf&>;
+concept DefinitelyLocalContext = std::is_final_v<Ctx> && LocalContext<Ctx> && !
+RemoteContext<Ctx>;
 
+// Context that supports synchronous resolution
+template<typename Ctx>
+concept SyncContext = std::convertible_to<Ctx&, sync_context_intf&>;
+
+// Context that supports asynchronous resolution
 template<typename Ctx>
 concept AsyncContext = std::convertible_to<Ctx&, async_context_intf&>;
 
+// Context that supports synchronous resolution only, and does not support
+// asynchronous
 template<typename Ctx>
-concept DefinitelyAsyncContext
-    = std::is_final_v<Ctx> && std::convertible_to<Ctx&, async_context_intf&>
-      && !
-std::convertible_to<Ctx&, sync_context_intf&>;
+concept DefinitelySyncContext = std::is_final_v<Ctx> && SyncContext<Ctx> && !
+AsyncContext<Ctx>;
 
+// Context that supports asynchronous resolution only, and does not support
+// synchronous
 template<typename Ctx>
-concept DefinitelySyncContext
-    = std::is_final_v<Ctx> && std::convertible_to<Ctx&, sync_context_intf&>
-      && !
-std::convertible_to<Ctx&, async_context_intf&>;
+concept DefinitelyAsyncContext = std::is_final_v<Ctx> && AsyncContext<Ctx> && !
+SyncContext<Ctx>;
 
 template<typename Ctx>
 concept LocalAsyncContext
@@ -522,7 +509,7 @@ concept RemoteAsyncContext
 // A context that supports caching, which will happen when the request demands
 // it
 template<typename Ctx>
-concept CachingContext = std::convertible_to<Ctx&, cached_context_intf&>;
+concept CachingContext = std::convertible_to<Ctx&, caching_context_intf&>;
 
 // A context that supports introspection, which will happen when the request
 // demands it
@@ -531,86 +518,150 @@ concept IntrospectiveContext
     = std::convertible_to<Ctx&, introspective_context_intf&>;
 
 // Any context implementation class should be valid
+// TODO ValidContext obsolete? What about other Context concepts?
 template<typename Ctx>
 concept ValidContext
     = Context<Ctx>
-      && (!std::is_final_v<Ctx>
-          || std::convertible_to<Ctx&, remote_context_intf&>
-          || std::convertible_to<Ctx&, local_context_intf&>)
-      && (!std::is_final_v<Ctx>
-          || std::convertible_to<Ctx&, sync_context_intf&>
-          || std::convertible_to<Ctx&, async_context_intf&>)
-      && (!std::is_final_v<Ctx> || !CachingContext<Ctx>
-          || !IntrospectiveContext<Ctx>
-          || std::convertible_to<Ctx&, cached_introspective_context_intf&>);
+      && (!std::is_final_v<Ctx> || RemoteContext<Ctx> || LocalContext<Ctx>)
+      && (!std::is_final_v<Ctx> || SyncContext<Ctx> || AsyncContext<Ctx>);
 
-// Defines the context_intf derived class needed for resolving a request
-// characterized by Intrsp and Level.
-// Primary template first, followed by the four partial specializations for
-// all (is request introspective?, is request cached?) combinations.
-template<bool Intrsp, caching_level_type Level>
-struct ctx_type_helper;
+template<bool caching, bool introspective>
+struct default_ctx_type_list_struct;
 
-template<caching_level_type Level>
-struct ctx_type_helper<false, Level>
+template<>
+struct default_ctx_type_list_struct<false, false>
 {
-    // Resolving a cached function request requires a cached context.
-    using type = cached_context_intf;
-};
-
-template<caching_level_type Level>
-struct ctx_type_helper<true, Level>
-{
-    // Resolving a cached+introspective function request requires a
-    // cached+introspective context.
-    using type = cached_introspective_context_intf;
+    using types = ctx_type_list<context_intf>;
 };
 
 template<>
-struct ctx_type_helper<false, caching_level_type::none>
+struct default_ctx_type_list_struct<true, false>
 {
-    // An uncached function request can be resolved using any kind of context.
-    using type = local_context_intf;
+    using types = ctx_type_list<caching_context_intf>;
 };
 
 template<>
-struct ctx_type_helper<true, caching_level_type::none>
+struct default_ctx_type_list_struct<false, true>
 {
-    // Resolving an introspective function request requires an introspective
-    // context.
-    using type = introspective_context_intf;
+    using types = ctx_type_list<introspective_context_intf>;
 };
 
-// The minimal context type needed for resolving a request characterized by
-// Intrsp and Level
-template<bool Intrsp, caching_level_type Level>
-using ctx_type_for_props = typename ctx_type_helper<Intrsp, Level>::type;
+template<>
+struct default_ctx_type_list_struct<true, true>
+{
+    using types
+        = ctx_type_list<caching_context_intf, introspective_context_intf>;
+};
 
-// The minimal context type needed for resolving request Req
-template<Request Req>
-using ctx_type_for_req =
-    typename ctx_type_helper<Req::introspective, Req::caching_level>::type;
+template<bool caching, bool introspective>
+using default_ctx_type_list =
+    typename default_ctx_type_list_struct<caching, introspective>::types;
 
-// Context Ctx can be used for locally resolving a request characterized by
-// Intrsp and Level
-template<typename Ctx, bool Intrsp, caching_level_type Level>
-concept ContextMatchingProps
-    = Context<Ctx>
-      && (Level == caching_level_type::none || CachingContext<Ctx>)
-      && (!Intrsp || IntrospectiveContext<Ctx>);
+/*
+ * A request is something that can be resolved, resulting in a result
+ *
+ * Attributes:
+ * - value_type: result type
+ * - ctx_type: the (local) context type needed for resolving the request
+ * - caching_level
+ * - introspective
+ * - An id uniquely identifying the request (class). Can be a placeholder
+ *   if such identification is not needed (TODO define when).
+ */
+template<typename T>
+concept Request
+    = requires {
+          std::same_as<typename T::element_type, T>;
+          typename T::value_type;
+          typename T::required_ctx_types;
+          std::same_as<decltype(T::caching_level), caching_level_type>;
+          std::same_as<decltype(T::introspective), bool>;
+      } && requires(T const& req) {
+               {
+                   req.get_uuid()
+                   } -> std::convertible_to<request_uuid>;
+           };
+// TODO T::required_ctx_types must be a non-empty list of context types
+// Context<typename T::ctx_type>;
+// TODO say something about resolve_sync()/_async() as we used to do
 
-// Context Ctx can be used for locally resolving request Req
-template<typename Ctx, typename Req>
-concept ContextMatchingRequest
-    = Context<Ctx> && Request<Req>
-      && (Req::caching_level == caching_level_type::none
-          || CachingContext<Ctx>)
-      && (!Req::introspective || IntrospectiveContext<Ctx>)
-      && requires(Req const& req, Ctx& ctx) {
-             {
-                 req.resolve(ctx)
-                 } -> std::same_as<cppcoro::task<typename Req::value_type>>;
-         };
+// TODO catch as much as possible in request_props construction
+template<typename Req>
+concept ValidRequest = Request<Req>
+                       && (Req::caching_level == caching_level_type::none
+                           || ctx_in_type_list<
+                               caching_context_intf,
+                               typename Req::required_ctx_types>)
+                       && (!Req::introspective
+                           || ctx_in_type_list<
+                               introspective_context_intf,
+                               typename Req::required_ctx_types>);
+
+template<typename T>
+concept UncachedRequest = Request<T> && T::caching_level ==
+caching_level_type::none;
+
+template<typename Req>
+concept CachedRequest = Request<Req> && Req::caching_level !=
+caching_level_type::none&& requires(Req const& req) {
+                               {
+                                   req.get_captured_id()
+                                   }
+                                   -> std::convertible_to<captured_id const&>;
+                           };
+
+template<typename Req>
+concept MemoryCachedRequest = CachedRequest<Req> && Req::caching_level ==
+caching_level_type::memory;
+
+template<typename Req>
+concept FullyCachedRequest = CachedRequest<Req> && Req::caching_level ==
+caching_level_type::full;
+
+template<typename Req>
+concept IntrospectiveRequest
+    = Req::introspective && requires(Req const& req) {
+                                {
+                                    req.get_introspection_title()
+                                    } -> std::convertible_to<std::string>;
+                            };
+
+template<typename Req>
+concept NonIntrospectiveRequest = !
+Req::introspective;
+
+template<typename Req>
+concept CachedIntrospectiveRequest
+    = CachedRequest<Req> && IntrospectiveRequest<Req>;
+
+template<typename Req>
+concept CachedNonIntrospectiveRequest
+    = CachedRequest<Req> && NonIntrospectiveRequest<Req>;
+
+// A request that accepts visitors. A visitor will recursively visit all
+// subrequests, so all of these should be visitable as well.
+// This functionality is being used for constructing a context tree when a
+// request is resolved locally and asynchronously.
+template<typename Req>
+concept VisitableRequest
+    = Request<Req> && requires(Req const& req) {
+                          {
+                              req.accept(*(req_visitor_intf*) nullptr)
+                          };
+                      };
+
+// Contains the type of an argument to an rq_function-like call.
+// Primary template, used for non-request types; should be specialized
+// for each kind of request (in other .h files).
+template<typename T>
+struct arg_type_struct
+{
+    using value_type = T;
+};
+
+// Yields the type of an argument to an rq_function-like call
+template<typename T>
+using arg_type = typename arg_type_struct<T>::value_type;
 
 // tasklet_tracker context, ending when the destructor is called
 class tasklet_context
@@ -627,35 +678,174 @@ class tasklet_context
     introspective_context_intf* ctx_{nullptr};
 };
 
-// Casts ctx, or returns nullptr if it won't remotely resolve requests
-remote_context_intf*
-to_remote_ptr(context_intf& ctx);
+// Casts a context_intf reference to DestCtx*.
+// Returns nullptr if the runtime type doesn't match.
+// Retains the original type if no cast is needed.
+template<Context DestCtx, Context SrcCtx>
+    requires(std::convertible_to<SrcCtx&, DestCtx&>)
+SrcCtx* cast_ctx_to_ptr_base(SrcCtx& ctx)
+{
+    return &ctx;
+}
 
-// Casts ctx, or throws if it won't remotely resolve requests
-remote_context_intf&
-to_remote_ref(context_intf& ctx);
+template<Context DestCtx, Context SrcCtx>
+    requires(!std::convertible_to<SrcCtx&, DestCtx&>)
+DestCtx* cast_ctx_to_ptr_base(SrcCtx& ctx)
+{
+    return dynamic_cast<DestCtx*>(&ctx);
+}
 
-// Casts ctx, or returns nullptr if it won't remotely and asynchronously
-// resolve requests
-remote_async_context_intf*
-to_remote_async_ptr(context_intf& ctx);
+// Casts a context_intf reference to DestCtx*.
+// Returns nullptr if the runtime type doesn't match.
+// Returns nullptr if the remotely() and/or is_async() return values don't
+// match; see comments on throw_on_ctx_mismatch() for details;
+// these function are not called when compile-time information suffices.
+// Retains the original type if no cast is needed.
+template<Context DestCtx, Context SrcCtx>
+DestCtx*
+cast_ctx_to_ptr(SrcCtx& ctx)
+{
+    if constexpr (
+        RemoteContext<DestCtx> && !LocalContext<DestCtx>
+        && !DefinitelyRemoteContext<SrcCtx>)
+    {
+        if (!ctx.remotely())
+        {
+            return nullptr;
+        }
+    }
+    if constexpr (
+        LocalContext<DestCtx> && !RemoteContext<DestCtx>
+        && !DefinitelyLocalContext<SrcCtx>)
+    {
+        if (ctx.remotely())
+        {
+            return nullptr;
+        }
+    }
+    if constexpr (
+        AsyncContext<DestCtx> && !SyncContext<DestCtx>
+        && !DefinitelyAsyncContext<SrcCtx>)
+    {
+        if (!ctx.is_async())
+        {
+            return nullptr;
+        }
+    }
+    if constexpr (
+        SyncContext<DestCtx> && !AsyncContext<DestCtx>
+        && !DefinitelySyncContext<SrcCtx>)
+    {
+        if (ctx.is_async())
+        {
+            return nullptr;
+        }
+    }
+    return cast_ctx_to_ptr_base<DestCtx>(ctx);
+}
 
-// Casts ctx, or throws if it won't remotely and asynchronously resolve
-// requests
-remote_async_context_intf&
-to_remote_async_ref(context_intf& ctx);
+// Casts a context_intf reference to DestCtx&.
+// Retains the original type if no cast is needed.
+template<Context DestCtx, Context SrcCtx>
+    requires(std::convertible_to<SrcCtx&, DestCtx&>)
+SrcCtx& cast_ctx_to_ref_base(SrcCtx& ctx)
+{
+    return ctx;
+}
 
-// Casts ctx, or throws if it won't locally resolve requests
-local_context_intf&
-to_local_ref(context_intf& ctx);
+template<Context DestCtx, Context SrcCtx>
+    requires(!std::convertible_to<SrcCtx&, DestCtx&>)
+DestCtx& cast_ctx_to_ref_base(SrcCtx& ctx)
+{
+    return dynamic_cast<DestCtx&>(ctx);
+}
 
-// Casts ctx, or throws if it won't locally and asynchronously resolve requests
-local_async_context_intf&
-to_local_async_ref(context_intf& ctx);
+/*
+ * Throws when ctx.remotely() or ctx.is_async() return values conflicting with
+ * a specified context cast.
+ *
+ * E.g., when we have a cast like
+ *   auto& lctx = cast_ctx_to_ref<local_context_intf>(ctx);
+ * we want resolution to happen locally only, so remotely() should return
+ * false.
+ *
+ * The remotely() return value need not be checked in two situations:
+ * - When casting to a context type covering both local and remote
+ *   execution, then either return value is OK.
+ * - When the source context is definitely remote-only, we already know that
+ *   ctx.remotely() should be returning true, so the check is not needed.
+ */
+template<Context DestCtx, Context SrcCtx>
+void
+throw_on_ctx_mismatch(SrcCtx& ctx)
+{
+    if constexpr (
+        RemoteContext<DestCtx> && !LocalContext<DestCtx>
+        && !DefinitelyRemoteContext<SrcCtx>)
+    {
+        if (!ctx.remotely())
+        {
+            throw std::logic_error("remotely() returning false");
+        }
+    }
+    if constexpr (
+        LocalContext<DestCtx> && !RemoteContext<DestCtx>
+        && !DefinitelyLocalContext<SrcCtx>)
+    {
+        if (ctx.remotely())
+        {
+            throw std::logic_error("remotely() returning true");
+        }
+    }
+    if constexpr (
+        AsyncContext<DestCtx> && !SyncContext<DestCtx>
+        && !DefinitelyAsyncContext<SrcCtx>)
+    {
+        if (!ctx.is_async())
+        {
+            throw std::logic_error("is_async() returning false");
+        }
+    }
+    if constexpr (
+        SyncContext<DestCtx> && !AsyncContext<DestCtx>
+        && !DefinitelySyncContext<SrcCtx>)
+    {
+        if (ctx.is_async())
+        {
+            throw std::logic_error("is_async() returning true");
+        }
+    }
+}
 
-// Casts ctx, or throws if it won't locally and asynchronously resolve requests
-std::shared_ptr<local_async_context_intf>
-to_local_async(std::shared_ptr<context_intf> const& ctx);
+// Casts a context_intf reference to DestCtx&.
+// Throws if the runtime type doesn't match.
+// Throws if the remotely() and/or is_async() return values don't match;
+// these function are not called when compile-time information suffices.
+// Retains the original type if no cast is needed.
+template<Context DestCtx, Context SrcCtx>
+DestCtx&
+cast_ctx_to_ref(SrcCtx& ctx)
+{
+    // The MSVC2019 compiler reports warning C4702 in a release build,
+    // claiming that the return would be unreachable.
+    // As it does not and will not output anything more usable, this
+    // warning is disabled in CMakeLists.txt.
+    throw_on_ctx_mismatch<DestCtx>(ctx);
+    return cast_ctx_to_ref_base<DestCtx>(ctx);
+}
+
+// Casts a shared_ptr<context_intf> to shared_ptr<DestCtx>.
+// Throws if the source shared_ptr is empty.
+// Throws if the runtime type doesn't match.
+// Throws if the remotely() and/or is_async() return values don't match;
+// these function are not called when compile-time information suffices.
+template<Context DestCtx, Context SrcCtx>
+std::shared_ptr<DestCtx>
+cast_ctx_to_shared_ptr(std::shared_ptr<SrcCtx> const& ctx)
+{
+    throw_on_ctx_mismatch<DestCtx>(*ctx);
+    return std::dynamic_pointer_cast<DestCtx>(ctx);
+}
 
 } // namespace cradle
 

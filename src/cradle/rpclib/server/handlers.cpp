@@ -48,7 +48,7 @@ resolve_sync(
     logger.info("resolve_sync {}: {}", domain_name, seri_req);
     auto dom = find_domain(domain_name);
     auto ctx{dom->make_sync_context(service, false, "")};
-    auto& loc_ctx{to_local_ref(*ctx)};
+    auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(*ctx)};
     auto seri_result = cppcoro::sync_wait(
         resolve_serialized_local(loc_ctx, std::move(seri_req)));
     // TODO try to get rid of .value()
@@ -155,7 +155,7 @@ try
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
     auto dom = find_domain(domain_name);
     auto ctx{dom->make_async_context(service, false, "")};
-    auto actx = to_local_async(ctx);
+    auto actx = cast_ctx_to_shared_ptr<local_async_context_intf>(ctx);
     hctx.get_async_db().add(actx);
     // TODO update status to SUBMITTED
     // This function should return asap.

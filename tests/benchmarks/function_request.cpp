@@ -231,7 +231,7 @@ void
 BM_resolve_triangular_tree_erased_full(benchmark::State& state)
 {
     spdlog::set_level(spdlog::level::warn);
-    cached_request_resolution_context ctx{};
+    caching_request_resolution_context ctx{};
     BM_resolve_request(
         state,
         ctx,

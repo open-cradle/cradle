@@ -11,15 +11,16 @@ namespace cradle {
 
 // TODO shared should be used on an RPC server only; how to enforce?
 cppcoro::task<blob>
-make_some_blob(testing_request_context ctx, std::size_t size, bool shared)
+make_some_blob(context_intf& ctx, std::size_t size, bool shared)
 {
+    auto& cctx{cast_ctx_to_ref<caching_context_intf>(ctx)};
     spdlog::get("cradle")->info("make_some_blob({}, {})", size, shared);
 
     std::shared_ptr<data_owner> owner;
     uint8_t* data{nullptr};
     if (shared)
     {
-        auto writer = ctx.get_resources().make_blob_file_writer(size);
+        auto writer = cctx.get_resources().make_blob_file_writer(size);
         owner = writer;
         data = writer->data();
     }
@@ -40,9 +41,10 @@ make_some_blob(testing_request_context ctx, std::size_t size, bool shared)
 }
 
 cppcoro::task<int>
-cancellable_coro(local_async_context_intf& ctx, int loops, int delay)
+cancellable_coro(context_intf& ctx, int loops, int delay)
 {
-    async_id ctx_id{ctx.get_id()};
+    auto& cctx{cast_ctx_to_ref<local_async_context_intf>(ctx)};
+    async_id ctx_id{cctx.get_id()};
     auto logger = spdlog::get("cradle");
     logger->info(
         "cancellable_coro(ctx {}, loops={}, delay={})", ctx_id, loops, delay);
@@ -50,12 +52,12 @@ cancellable_coro(local_async_context_intf& ctx, int loops, int delay)
     for (; i < std::abs(loops); ++i)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(delay));
-        if (ctx.is_cancellation_requested())
+        if (cctx.is_cancellation_requested())
         {
             logger->info(
                 "cancellable_coro(ctx {}): throwing cancelled", ctx_id);
         }
-        ctx.throw_if_cancellation_requested();
+        cctx.throw_if_cancellation_requested();
     }
     if (loops < 0)
     {

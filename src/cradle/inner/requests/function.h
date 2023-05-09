@@ -74,14 +74,15 @@ visit_arg(req_visitor_intf& visitor, std::size_t ix, Val const& val)
     visitor.visit_val_arg(ix);
 }
 
-// Visits a subrequest, and recursively visits its arguments.
-// TODO seems useful only if req's function is a coro. Not for value_request
-template<Request Req>
+// Visits a request's subrequest argument, and recursively visits that
+// subrequest's arguments.
+template<Request SubReq>
 void
-visit_arg(req_visitor_intf& visitor, std::size_t ix, Req const& req)
+visit_arg(req_visitor_intf& visitor, std::size_t ix, SubReq const& sub_req)
 {
+    static_assert(VisitableRequest<SubReq>);
     auto sub_visitor = visitor.visit_req_arg(ix);
-    req.visit(*sub_visitor);
+    sub_req.accept(*sub_visitor);
 }
 
 // Recursively visits all arguments of a request, and its subrequests.
@@ -97,15 +98,13 @@ visit_args(
  * The interface type exposing the functionality that function_request_erased
  * requires outside its constructor.
  *
- * Ctx is the "minimum" context needed to resolve this request.
- * E.g. a "cached" context can be used to resolve a non-cached request.
+ * The references taken by resolve_sync() and resolve_async() are the "minimal"
+ * ones needed.
  */
-template<Context Ctx, typename Value>
+template<typename Value>
 class function_request_intf : public id_interface
 {
  public:
-    using context_type = Ctx;
-
     virtual ~function_request_intf() = default;
 
     virtual request_uuid
@@ -113,26 +112,32 @@ class function_request_intf : public id_interface
         = 0;
 
     virtual void
-    visit(req_visitor_intf& visitor) const
+    accept(req_visitor_intf& visitor) const
         = 0;
 
     virtual cppcoro::task<Value>
-    resolve(Ctx& ctx) const = 0;
+    resolve_sync(local_context_intf& ctx) const = 0;
+
+    virtual cppcoro::task<Value>
+    resolve_async(local_async_context_intf& ctx) const = 0;
 };
 
 template<typename Ctx, typename Args, std::size_t... Ix>
 auto
 make_sync_sub_tasks(Ctx& ctx, Args const& args, std::index_sequence<Ix...>)
 {
-    return std::make_tuple(resolve_request_local(ctx, std::get<Ix>(args))...);
+    ResolutionConstraintsLocalSync constraints;
+    return std::make_tuple(
+        resolve_request(ctx, std::get<Ix>(args), constraints)...);
 }
 
 template<typename Ctx, typename Args, std::size_t... Ix>
 auto
 make_async_sub_tasks(Ctx& ctx, Args const& args, std::index_sequence<Ix...>)
 {
-    return std::make_tuple(
-        resolve_request_local(ctx.get_local_sub(Ix), std::get<Ix>(args))...);
+    ResolutionConstraintsLocalAsync constraints;
+    return std::make_tuple(resolve_request(
+        ctx.get_local_sub(Ix), std::get<Ix>(args), constraints)...);
 }
 
 template<typename Tuple, std::size_t... Ix>
@@ -150,10 +155,8 @@ when_all_wrapper(Tuple&& tasks, std::index_sequence<Ix...>)
  * Function must be MoveAssignable but may not be CopyAssignable (e.g. if it's
  * a lambda).
  *
- * Only a small part of this class depends on the context type, so there will
- * be object code duplication if multiple instantiations exist differing in
- * the context (i.e., introspective + caching level) only. Maybe this could be
- * optimized if it becomes an issue.
+ * No part of this class depends on the actual context type used to resolve the
+ * request.
  *
  * If Function is a class, then the type of a function_request_impl
  * instantiation will uniquely identify it.
@@ -167,23 +170,16 @@ when_all_wrapper(Tuple&& tasks, std::index_sequence<Ix...>)
  * function_request_impl object is created of the specified class, then that
  * object's function member is set to the correct (pointer) value.
  */
-template<
-    typename Value,
-    typename Intf,
-    bool AsCoro,
-    typename Function,
-    typename... Args>
-class function_request_impl : public Intf
+template<typename Value, bool AsCoro, typename Function, typename... Args>
+class function_request_impl : public function_request_intf<Value>
 {
  public:
     using this_type = function_request_impl;
-    using base_type = Intf;
-    using context_type = typename Intf::context_type;
+    using base_type = function_request_intf<Value>;
 
     static constexpr bool func_is_coro = AsCoro;
     static constexpr bool func_is_plain
         = std::is_function_v<std::remove_pointer_t<Function>>;
-    static constexpr bool is_async = LocalAsyncContext<context_type>;
 
     function_request_impl(request_uuid uuid, Function function, Args... args)
         : uuid_{std::move(uuid)}, args_{std::move(args)...}
@@ -290,14 +286,14 @@ class function_request_impl : public Intf
     }
 
     void
-    visit(req_visitor_intf& visitor) const override
+    accept(req_visitor_intf& visitor) const override
     {
         using Indices = std::index_sequence_for<Args...>;
         visit_args(visitor, args_, Indices{});
     }
 
     cppcoro::task<Value>
-    resolve(context_type& ctx) const override
+    resolve_sync(local_context_intf& ctx) const override
     {
         // If there is no coroutine function and no caching in the request
         // tree, there is nothing to co_await on (but how useful would such
@@ -309,14 +305,17 @@ class function_request_impl : public Intf
         {
             // gcc tends to have trouble with this piece of code (leading to
             // compiler crashes or runtime errors).
+            ResolutionConstraintsLocalSync constraints;
             co_return co_await std::apply(
                 [&](auto&&... args) -> cppcoro::task<Value> {
-                    co_return (*function_)((co_await resolve_request_local(
-                        ctx, std::forward<decltype(args)>(args)))...);
+                    co_return (*function_)((co_await resolve_request(
+                        ctx,
+                        std::forward<decltype(args)>(args),
+                        constraints))...);
                 },
                 args_);
         }
-        else if constexpr (!is_async)
+        else
         {
             using Indices = std::index_sequence_for<Args...>;
             auto sub_tasks = make_sync_sub_tasks(ctx, args_, Indices{});
@@ -326,6 +325,24 @@ class function_request_impl : public Intf
                     std::tie(ctx),
                     co_await when_all_wrapper(
                         std::move(sub_tasks), Indices{})));
+        }
+    }
+
+    cppcoro::task<Value>
+    resolve_async(local_async_context_intf& ctx) const override
+    {
+        if constexpr (!func_is_coro)
+        {
+            // TODO resolve_async for non-coro function
+            ResolutionConstraintsLocalSync constraints;
+            co_return co_await std::apply(
+                [&](auto&&... args) -> cppcoro::task<Value> {
+                    co_return (*function_)((co_await resolve_request(
+                        ctx,
+                        std::forward<decltype(args)>(args),
+                        constraints))...);
+                },
+                args_);
         }
         else
         {
@@ -501,19 +518,26 @@ class function_request_impl : public Intf
     }
 };
 
-// Request properties that would be identical between similar requests
+// Request (resolution) properties that would be identical between similar
+// requests
+// - Request attributes (AsCoro)
+// - How it should be resolved (Level, Introspective)
+// - What it needs for its resolution (CtxTypes)
 template<
     caching_level_type Level,
     bool AsCoro = false,
     bool Introspective = false,
-    typename Ctx = ctx_type_for_props<Introspective, Level>>
+    typename CtxTypes
+    = default_ctx_type_list<Level != caching_level_type::none, Introspective>>
 // TODO apply "local_" prefixes wherever applicable
 struct request_props
 {
+    // TODO (level != none) == (caching_context_intf in CtxTypes)
     static constexpr caching_level_type level = Level;
     static constexpr bool func_is_coro = AsCoro;
+    // TODO Introspective == (introspective_context_intf in CtxTypes)
     static constexpr bool introspective = Introspective;
-    using ctx_type = Ctx;
+    using required_ctx_types = CtxTypes;
 
     request_uuid uuid_;
     std::string title_; // Used only if introspective
@@ -556,9 +580,9 @@ class function_request_erased
  public:
     using element_type = function_request_erased;
     using value_type = Value;
-    using ctx_type = typename Props::ctx_type;
-    using intf_type = function_request_intf<ctx_type, Value>;
+    using intf_type = function_request_intf<Value>;
     using props_type = Props;
+    using required_ctx_types = typename Props::required_ctx_types;
 
     static constexpr caching_level_type caching_level = Props::level;
     static constexpr bool introspective = Props::introspective;
@@ -575,7 +599,6 @@ class function_request_erased
         }
         using impl_type = function_request_impl<
             Value,
-            intf_type,
             Props::func_is_coro,
             Function,
             Args...>;
@@ -624,17 +647,21 @@ class function_request_erased
     }
 
     void
-    visit(req_visitor_intf& visitor) const
+    accept(req_visitor_intf& visitor) const
     {
-        impl_->visit(visitor);
+        impl_->accept(visitor);
     }
 
-    template<typename Ctx>
-        requires ContextMatchingProps<Ctx, introspective, caching_level>
     cppcoro::task<Value>
-    resolve(Ctx& ctx) const
+    resolve_sync(local_context_intf& ctx) const
     {
-        return impl_->resolve(ctx);
+        return impl_->resolve_sync(ctx);
+    }
+
+    cppcoro::task<Value>
+    resolve_async(local_async_context_intf& ctx) const
+    {
+        return impl_->resolve_async(ctx);
     }
 
     std::string
@@ -750,11 +777,14 @@ template<typename Props, typename Function, typename... Args>
     requires(Props::func_is_coro)
 auto rq_function_erased(Props props, Function function, Args... args)
 {
-    using CtxRef = std::add_lvalue_reference_t<typename Props::ctx_type>;
     // Rely on the coroutine returning cppcoro::task<Value>,
-    // which is a class that has a value_type member
+    // which is a class that has a value_type member.
+    // Function's first argument is a reference to some context type.
+    // Exactly which type is not known here, but Function should be callable
+    // with any context interface that the request requires.
+    using ctx_type = first_ctx_type<typename Props::required_ctx_types>;
     using Value = typename std::
-        invoke_result_t<Function, CtxRef, arg_type<Args>...>::value_type;
+        invoke_result_t<Function, ctx_type&, arg_type<Args>...>::value_type;
     return function_request_erased<Value, Props>{
         std::move(props), std::move(function), std::move(args)...};
 }

@@ -204,7 +204,7 @@ resolve_remote(remote_context_intf& ctx, std::string seri_req)
     auto& logger = proxy.get_logger();
     std::string domain_name{ctx.domain_name()};
     logger.debug("request on {}: {} ...", domain_name, seri_req.substr(0, 10));
-    if (auto* async_ctx = to_remote_async_ptr(ctx))
+    if (auto* async_ctx = cast_ctx_to_ptr<remote_async_context_intf>(ctx))
     {
         return resolve_async(
             proxy, *async_ctx, std::move(domain_name), std::move(seri_req));

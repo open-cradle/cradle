@@ -34,11 +34,12 @@ class seri_catalog
     /**
      * Registers a resolver for a uuid
      */
-    template<Context Ctx, Request Req>
+    template<Request Req>
     void
-    register_resolver(std::string const& uuid_str)
+    register_resolver(Req const& req)
     {
-        map_[uuid_str] = std::make_shared<seri_resolver_impl<Ctx, Req>>();
+        auto uuid_str{req.get_uuid().str()};
+        map_[uuid_str] = std::make_shared<seri_resolver_impl<Req>>();
     }
 
     /**
@@ -68,14 +69,13 @@ class seri_catalog
  * to the template one; different arguments are allowed, but otherwise the
  * request should be identical to the template.
  *
- * Context at resolution time should equal Ctx.
+ * Context at resolution time should be convertible to Req::ctx_type.
  */
-// TODO Context should be Local (at least)
-template<Context Ctx, Request Req>
+template<Request Req>
 void
 register_seri_resolver(Req const& req)
 {
-    seri_catalog::instance().register_resolver<Ctx, Req>(req.get_uuid().str());
+    seri_catalog::instance().register_resolver(req);
 }
 
 } // namespace cradle

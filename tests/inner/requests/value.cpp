@@ -27,7 +27,7 @@ TEST_CASE("create value request", "[requests]")
 
 TEST_CASE("evaluate value request", "[requests]")
 {
-    uncached_request_resolution_context ctx{};
+    non_caching_request_resolution_context ctx{};
 
     auto req{rq_value(87)};
 
@@ -39,7 +39,7 @@ TEST_CASE("evaluate value request", "[requests]")
 TEST_CASE("evaluate value requests in parallel", "[requests]")
 {
     static constexpr int num_requests = 7;
-    uncached_request_resolution_context ctx{};
+    non_caching_request_resolution_context ctx{};
     std::vector<value_request<int>> requests;
     for (int i = 0; i < num_requests; ++i)
     {

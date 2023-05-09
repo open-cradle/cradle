@@ -19,6 +19,13 @@ resolve_iss_object_to_immutable_uncached(
     string object_id,
     bool ignore_upgrades);
 
+cppcoro::task<string>
+resolve_iss_object_to_immutable_generic(
+    context_intf& ctx,
+    string context_id,
+    string object_id,
+    bool ignore_upgrades);
+
 // Resolve an ISS object to an immutable ID.
 cppcoro::shared_task<string>
 resolve_iss_object_to_immutable(
@@ -30,6 +37,10 @@ resolve_iss_object_to_immutable(
 cppcoro::task<std::map<string, string>>
 get_iss_object_metadata_uncached(
     thinknode_request_context ctx, string context_id, string object_id);
+
+cppcoro::task<std::map<string, string>>
+get_iss_object_metadata_generic(
+    context_intf& ctx, string context_id, string object_id);
 
 // Get the metadata for an ISS object.
 cppcoro::shared_task<std::map<string, string>>
@@ -44,6 +55,10 @@ retrieve_immutable(
 cppcoro::task<blob>
 retrieve_immutable_blob_uncached(
     thinknode_request_context ctx, string context_id, string immutable_id);
+
+cppcoro::task<blob>
+retrieve_immutable_blob_generic(
+    context_intf& ctx, string context_id, string immutable_id);
 
 // Retrieve an immutable object as a raw blob of data (e.g. in MessagePack
 // format).
@@ -90,6 +105,13 @@ post_iss_object_uncached(
 cppcoro::task<string>
 post_iss_object_uncached_template_url(
     thinknode_request_context ctx,
+    string context_id,
+    string url_type_template_string,
+    blob object_data);
+
+cppcoro::task<string>
+post_iss_object_generic_template_url(
+    context_intf& ctx,
     string context_id,
     string url_type_template_string,
     blob object_data);

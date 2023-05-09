@@ -24,6 +24,9 @@ class domain
     name() const
         = 0;
 
+    // TODO pass in the request's required context types, so that the returned
+    // contructed context object can be guaranteed to implement them all
+    // (the factory function should throw if it cannot create such an object).
     virtual std::shared_ptr<sync_context_intf>
     make_sync_context(
         inner_resources& resources, bool remotely, std::string proxy_name)

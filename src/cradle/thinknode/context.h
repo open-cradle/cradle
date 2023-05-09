@@ -12,11 +12,11 @@ struct immutable_cache;
 class service_core;
 class tasklet_tracker;
 
-struct thinknode_request_context final
-    : public remote_context_intf,
-      public local_context_intf,
-      public sync_context_intf,
-      public cached_introspective_context_intf
+struct thinknode_request_context final : public remote_context_intf,
+                                         public local_context_intf,
+                                         public sync_context_intf,
+                                         public caching_context_intf,
+                                         public introspective_context_intf
 {
     service_core& service;
     thinknode_session session;
