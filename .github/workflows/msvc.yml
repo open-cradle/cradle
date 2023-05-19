@@ -46,9 +46,10 @@ jobs:
         path: build/generated
 
     - name: Deploy preprocessed headers to preprocessor-output repo
-      uses: JamesIves/github-pages-deploy-action@4.1.0
+      uses: JamesIves/github-pages-deploy-action@4.4.1
       with:
         repository-name: alialib/alia-html
+        branch: output
         tag: ${GITHUB_SHA}
         token: ${{ secrets.ALIA_GHPAGES_DEPLOYMENT_TOKEN }}
         folder: html/build/deploy
