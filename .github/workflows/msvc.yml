@@ -51,7 +51,7 @@ jobs:
         repository-name: open-cradle/preprocessor-output
         branch: output
         target-folder: generated
-        tag: ${GITHUB_SHA}
+        tag: output-${{ github.sha }}
         token: ${{ secrets.CRADLE_PREPROCESSOR_OUTPUT_TOKEN }}
         folder: build/generated
         single-commit: true
