@@ -585,25 +585,25 @@ endif()
 
 # Describe our installation.
 
-install(
-    TARGETS
-        cradle_inner cradle_typing cradle_plugins_typing cradle_thinknode
-        cradle_plugins_thinknode cradle_websocket cradle_external
-        websocket_server rpclib_server
-    EXPORT CradleTargets
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin)
+# install(
+#     TARGETS
+#         cradle_inner cradle_typing cradle_plugins_typing cradle_thinknode
+#         cradle_plugins_thinknode cradle_websocket cradle_external
+#         websocket_server rpclib_server
+#     EXPORT CradleTargets
+#     LIBRARY DESTINATION lib
+#     ARCHIVE DESTINATION lib
+#     RUNTIME DESTINATION bin)
 
-# TODO: Decide how to get the version info.
-# include(CMakePackageConfigHelpers)
-# write_basic_package_version_file(
-#     CradleConfigVersion.cmake
-#     VERSION ${CRADLE_VERSION}
-#     COMPATIBILITY AnyNewerVersion)
+# # TODO: Decide how to get the version info.
+# # include(CMakePackageConfigHelpers)
+# # write_basic_package_version_file(
+# #     CradleConfigVersion.cmake
+# #     VERSION ${CRADLE_VERSION}
+# #     COMPATIBILITY AnyNewerVersion)
 
-install(
-    EXPORT CradleTargets
-    FILE CradleTargets.cmake
-    NAMESPACE cradle::
-    DESTINATION lib/cmake/cradle)
+# install(
+#     EXPORT CradleTargets
+#     FILE CradleTargets.cmake
+#     NAMESPACE cradle::
+#     DESTINATION lib/cmake/cradle)
