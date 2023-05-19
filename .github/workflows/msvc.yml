@@ -50,9 +50,10 @@ jobs:
       with:
         repository-name: alialib/alia-html
         branch: output
+        target-folder: generated
         tag: ${GITHUB_SHA}
         token: ${{ secrets.ALIA_GHPAGES_DEPLOYMENT_TOKEN }}
-        folder: html/build/deploy
+        folder: build/generated
         single-commit: true
 
   VS2019:
