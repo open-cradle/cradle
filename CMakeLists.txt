@@ -29,6 +29,8 @@ set_property(CACHE CRADLE_PREPROCESSOR_USAGE PROPERTY
     STRINGS ${CRADLE_PREPROCESSOR_USAGE_OPTIONS})
 set(CRADLE_EXTERNALLY_PREPROCESSED_DIRECTORY "" CACHE STRING
     "If CRADLE_PREPROCESSOR_USAGE is External, this is the directory that contains the externally preprocessed files.")
+set(CRADLE_COMMIT_HASH "" CACHE STRING
+    "If CRADLE_PREPROCESSOR_USAGE is GitCache, this is the commit hash to look up. If not given, this is queried from Git.")
 
 # Define test generation options.
 option(
@@ -298,11 +300,15 @@ elseif("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "GitCache" OR
     if("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "GitCache")
         message(STATUS "Retrieving preprocessed file from Git cache")
         find_package(Git)
-            # Get the current commit hash for the CRADLE repository.
-            execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
-                OUTPUT_VARIABLE cradle_commit_hash)
-            # Strip trailing newline.
-            string(REPLACE "\n" "" cradle_commit_hash "${cradle_commit_hash}")
+            if("${CRADLE_COMMIT_HASH}" STREQUAL "")
+                # Get the current commit hash for the CRADLE repository.
+                execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+                    OUTPUT_VARIABLE commit_hash)
+                # Strip trailing newline.
+                string(REPLACE "\n" "" commit_hash "${commit_hash}")
+            else()
+                set(commit_hash ${CRADLE_COMMIT_HASH})
+            endif()
             # This fails if CMake is reinvoked, but given that it is only meant
             # to be used in automated builds of CRADLE as a dependency, it
             # seems fine to leave it as is until another use case emerges.
@@ -310,7 +316,7 @@ elseif("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "GitCache" OR
                 COMMAND ${GIT_EXECUTABLE} clone https://github.com/open-cradle/preprocessor-output
                 WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
         execute_process(
-            COMMAND ${GIT_EXECUTABLE} checkout "output-${cradle_commit_hash}"
+            COMMAND ${GIT_EXECUTABLE} checkout "output-${commit_hash}"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/preprocessor-output")
         set(CRADLE_EXTERNALLY_PREPROCESSED_DIRECTORY
             "${CMAKE_CURRENT_BINARY_DIR}/preprocessor-output/generated/")
