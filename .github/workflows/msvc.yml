@@ -48,7 +48,7 @@ jobs:
     - name: Deploy preprocessed headers to preprocessor-output repo
       uses: JamesIves/github-pages-deploy-action@v4.4.1
       with:
-        repository-name: alialib/alia-html
+        repository-name: open-cradle/preprocessor-output
         branch: output
         target-folder: generated
         tag: ${GITHUB_SHA}
