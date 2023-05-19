@@ -298,7 +298,7 @@ if("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "Native")
 elseif("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "GitCache" OR
        "${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "External")
     if("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "GitCache")
-        message(STATUS "Retrieving preprocessed file from Git cache")
+        message(STATUS "Retrieving preprocessed files from Git cache")
         find_package(Git)
             if("${CRADLE_COMMIT_HASH}" STREQUAL "")
                 # Get the current commit hash for the CRADLE repository.
