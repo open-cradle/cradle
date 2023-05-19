@@ -52,7 +52,7 @@ jobs:
         branch: output
         target-folder: generated
         tag: ${GITHUB_SHA}
-        token: ${{ secrets.ALIA_GHPAGES_DEPLOYMENT_TOKEN }}
+        token: ${{ secrets.CRADLE_PREPROCESSOR_OUTPUT_TOKEN }}
         folder: build/generated
         single-commit: true
 
