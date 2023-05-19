@@ -39,11 +39,20 @@ jobs:
         cmake -Bbuild -DCMAKE_BUILD_TYPE=Debug -DCRADLE_USE_CONAN=ON .
         cmake --build build --target preprocessing -j4
 
-    - name: Upload preprocessed headers
+    - name: Upload preprocessed headers as build artifact
       uses: actions/upload-artifact@v3
       with:
         name: preprocessed
         path: build/generated
+
+    - name: Deploy preprocessed headers to preprocessor-output repo
+      uses: JamesIves/github-pages-deploy-action@4.1.0
+      with:
+        repository-name: alialib/alia-html
+        tag: ${GITHUB_SHA}
+        token: ${{ secrets.ALIA_GHPAGES_DEPLOYMENT_TOKEN }}
+        folder: html/build/deploy
+        single-commit: true
 
   VS2019:
     runs-on: windows-2019

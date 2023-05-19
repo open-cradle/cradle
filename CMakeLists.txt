@@ -22,7 +22,7 @@ option(
     OFF)
 
 # Define the options for using the preprocessor.
-set(PREPROCESSOR_USAGE_OPTIONS Native External)
+set(PREPROCESSOR_USAGE_OPTIONS Native GitCache External)
 set(PREPROCESSOR_USAGE Native CACHE STRING
     "How the preprocessor should be invoked")
 set_property(CACHE PREPROCESSOR_USAGE PROPERTY
@@ -293,7 +293,28 @@ if("${PREPROCESSOR_USAGE}" STREQUAL "Native")
         DEPENDS ${generated_srcs} ${generated_headers})
     set(generated_src_dirs
         ${CMAKE_CURRENT_BINARY_DIR}/generated/src)
-elseif("${PREPROCESSOR_USAGE}" STREQUAL "External")
+elseif("${PREPROCESSOR_USAGE}" STREQUAL "GitCache" OR
+       "${PREPROCESSOR_USAGE}" STREQUAL "External")
+    if("${PREPROCESSOR_USAGE}" STREQUAL "GitCache")
+        message(STATUS "Retrieving preprocessed file from Git cache")
+        find_package(Git)
+            # Get the current commit hash for the CRADLE repository.
+            execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+                OUTPUT_VARIABLE cradle_commit_hash)
+            # Strip trailing newline.
+            string(REPLACE "\n" "" cradle_commit_hash "${cradle_commit_hash}")
+            # This fails if CMake is reinvoked, but given that it is only meant
+            # to be used in automated builds of CRADLE as a dependency, it
+            # seems fine to leave it as is until another use case emerges.
+            execute_process(
+                COMMAND ${GIT_EXECUTABLE} clone https://github.com/open-cradle/preprocessor-output
+                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} checkout "output-${cradle_commit_hash}"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/preprocessor-output")
+        set(EXTERNALLY_PREPROCESSED_DIRECTORY
+            "${CMAKE_CURRENT_BINARY_DIR}/preprocessor-output/generated/")
+    endif()
     message(STATUS "Using externally preprocessed files in:")
     message(STATUS "  ${EXTERNALLY_PREPROCESSED_DIRECTORY}")
     get_filename_component(
