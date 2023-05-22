@@ -179,10 +179,8 @@ resolve_request_introspective(
     co_return res;
 }
 
-// Returns a reference to the shared_task stored in the memory cache.
-// Not copying shared_task's looks like a worthwhile optimization.
 template<Context Ctx, CachedNonIntrospectiveRequest Req, BoolConst Async>
-cppcoro::shared_task<typename Req::value_type> const&
+cppcoro::shared_task<typename Req::value_type>
 resolve_request_cached(Ctx& ctx, Req const& req, Async async)
 {
     auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
@@ -194,10 +192,11 @@ resolve_request_cached(Ctx& ctx, Req const& req, Async async)
             return resolve_request_on_memory_cache_miss(
                 ctx, req, async, internal_cache, key);
         }};
+    // ptr owns a reference to the cache record, and thus to the shared_task,
+    // but its lifetime ends here, so the shared_task must be copied.
     return ptr.task();
 }
 
-// Returns the shared_task by value.
 template<Context Ctx, CachedIntrospectiveRequest Req, BoolConst Async>
 cppcoro::shared_task<typename Req::value_type>
 resolve_request_cached(Ctx& ctx, Req const& req, Async async)
