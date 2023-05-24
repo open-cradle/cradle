@@ -169,17 +169,14 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}")
 
 find_package(Boost REQUIRED COMPONENTS
     filesystem program_options)
-message(STATUS "finding Catch2")
 find_package(Catch2 REQUIRED)
-message(STATUS "finding nlohmann_json")
 find_package(nlohmann_json REQUIRED)
 if(CRADLE_SUPPORT_VCPKG)
-    message(STATUS "finding msgpack-cxx")
-    find_package(msgpack-cxx CONFIG REQUIRED)
+    set(msgpack_package_name "msgpack-cxx")
 else()
-    message(STATUS "finding msgpack")
-    find_package(msgpack REQUIRED)
+    set(msgpack_package_name "msgpack")
 endif()
+find_package(${msgpack_package_name} REQUIRED)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(SQLite3 REQUIRED)
@@ -407,7 +404,7 @@ target_link_libraries(cradle_inner PUBLIC
     CURL::libcurl
     fmt::fmt
     lz4::lz4
-    msgpack::msgpack
+    ${msgpack_package_name}::${msgpack_package_name}
     OpenSSL::OpenSSL
     simdjson::simdjson
     spdlog::spdlog
