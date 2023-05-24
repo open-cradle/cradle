@@ -167,15 +167,18 @@ FetchContent_MakeAvailable(fetched_cppcoro)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}")
 
+if(CRADLE_SUPPORT_VCPKG)
+    set(msgpack_package_name "msgpack-cxx")
+    set(msgpack_target_name "msgpack-cxx")
+else()
+    set(msgpack_package_name "msgpack")
+    set(msgpack_target_name "msgpack::msgpack")
+endif()
+
 find_package(Boost REQUIRED COMPONENTS
     filesystem program_options)
 find_package(Catch2 REQUIRED)
 find_package(nlohmann_json REQUIRED)
-if(CRADLE_SUPPORT_VCPKG)
-    set(msgpack_package_name "msgpack-cxx")
-else()
-    set(msgpack_package_name "msgpack")
-endif()
 find_package(${msgpack_package_name} REQUIRED)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
@@ -404,7 +407,7 @@ target_link_libraries(cradle_inner PUBLIC
     CURL::libcurl
     fmt::fmt
     lz4::lz4
-    ${msgpack_package_name}::${msgpack_package_name}
+    ${msgpack_target_name}
     OpenSSL::OpenSSL
     simdjson::simdjson
     spdlog::spdlog
