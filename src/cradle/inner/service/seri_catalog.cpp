@@ -1,6 +1,8 @@
 #include <regex>
 #include <sstream>
 
+#include <fmt/format.h>
+
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/service/seri_catalog.h>
 #include <cradle/inner/service/seri_resolver.h>
@@ -25,14 +27,14 @@ seri_catalog::resolve(local_context_intf& ctx, std::string seri_req)
 std::string
 seri_catalog::find_uuid_str(std::string const& seri_req)
 {
-    // The uuid appears multiple times in the JSON, the first time like
-    //   "polymorphic_name": "rq_retrieve_immutable_object_func+gb6df901-dirty"
+    // The uuid appears in the JSON like
+    //   "uuid": "rq_retrieve_immutable_object_func+gb6df901-dirty"
     // Retrieving the uuid from the JSON text is easier than parsing the JSON.
-    std::regex re("\"polymorphic_name\": \"(.+?)\"");
+    std::regex re("\"uuid\": \"(.+?)\"");
     std::smatch match;
     if (!std::regex_search(seri_req, match, re))
     {
-        throw uuid_error("no polymorphic_name found in JSON");
+        throw uuid_error{fmt::format("no uuid found in JSON: {}", seri_req)};
     }
     return match[1].str();
 }
@@ -54,7 +56,7 @@ seri_catalog::find_resolver(std::string const& uuid_str)
         {
             oss << " " << kv.first;
         }
-        throw uuid_error(oss.str());
+        throw uuid_error{oss.str()};
     }
     return resolver;
 }

@@ -27,7 +27,6 @@
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/encodings/cereal.h>
-#include <cradle/inner/requests/cereal.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/service/request.h>
@@ -48,6 +47,12 @@ namespace cradle {
  * function_request_erased's constructor only.
  */
 
+class conflicting_types_uuid_error : public uuid_error
+{
+ public:
+    using uuid_error::uuid_error;
+};
+
 class conflicting_functions_uuid_error : public uuid_error
 {
  public:
@@ -61,6 +66,12 @@ class no_function_for_uuid_error : public uuid_error
 };
 
 class missing_uuid_error : public uuid_error
+{
+ public:
+    using uuid_error::uuid_error;
+};
+
+class unregistered_uuid_error : public uuid_error
 {
  public:
     using uuid_error::uuid_error;
@@ -147,6 +158,123 @@ when_all_wrapper(Tuple&& tasks, std::index_sequence<Ix...>)
     return cppcoro::when_all(std::get<Ix>(std::forward<Tuple>(tasks))...);
 }
 
+/**
+ * A registry of functions to serialize or deserialize a function_request_impl
+ * object. The functions are identified by a request_uuid value.
+ *
+ * A uuid identifies three functions:
+ * - create() creates a shared_ptr<function_request_impl> object.
+ * - save() serializes a function_request_impl object to JSON.
+ * - load() deserializes a function_request_impl object from JSON.
+ *
+ * This registry forms the basis for an ad-hoc alternative to the cereal
+ * polymorphic types implementation, which is not usable here:
+ * 1. A polymorphic type needs to be registered with CEREAL_REGISTER_TYPE or
+ *    CEREAL_REGISTER_TYPE_WITH_NAME. These put constructs in namespaces, so
+ *    cannot be used within a class or function.
+ *    However, with templated classes like function_request_impl, we cannot use
+ *    these constructs outside a class either, as the type of an instance is
+ *    known only _within_ the class.
+ * 2. Cereal needs to translate the type of a derived class to the name under
+ *    which that polymorphic type will be serialized.
+ *    - We cannot use type_index::name() because that is not portable, and
+ *      because creating a serialized request (e.g. from a WebSocket client)
+ *      would be practically impossible.
+ *    - We cannot use the uuid because that is unique for a
+ *      function_request_impl+function combination, not for just
+ *      function_request_impl.
+ * Instead, we need a mechanism where the uuid in the serialization identifies
+ * both the function_request_impl _class_ (template instantiation), and the
+ * function _value_ in that class.
+ */
+class cereal_functions_registry_impl
+{
+ public:
+    using create_t = std::shared_ptr<void>(request_uuid const& uuid);
+    using save_t = void(cereal::JSONOutputArchive& archive, void const* impl);
+    using load_t = void(cereal::JSONInputArchive& archive, void* impl);
+
+    struct entry_t
+    {
+        create_t* create;
+        save_t* save;
+        load_t* load;
+    };
+
+    static cereal_functions_registry_impl&
+    instance();
+
+    void
+    add_entry(
+        std::string const& uuid_str,
+        create_t* create,
+        save_t* save,
+        load_t* load);
+
+    entry_t&
+    find_entry(request_uuid const& uuid);
+
+ private:
+    std::unordered_map<std::string, entry_t> entries_;
+};
+
+template<typename Intf>
+class cereal_functions_registry
+{
+    using impl_t = cereal_functions_registry_impl;
+    using entry_t = typename impl_t::entry_t;
+    using create_t = typename impl_t::create_t;
+    using save_t = typename impl_t::save_t;
+    using load_t = typename impl_t::load_t;
+
+ public:
+    static cereal_functions_registry&
+    instance()
+    {
+        static cereal_functions_registry instance_;
+        return instance_;
+    }
+
+    cereal_functions_registry() : impl_{impl_t::instance()}
+    {
+    }
+
+    void
+    add_entry(
+        std::string const& uuid_str,
+        create_t* create,
+        save_t* save,
+        load_t* load)
+    {
+        impl_.add_entry(uuid_str, create, save, load);
+    }
+
+    std::shared_ptr<Intf>
+    create(request_uuid const& uuid)
+    {
+        entry_t& entry{impl_.find_entry(uuid)};
+        return std::static_pointer_cast<Intf>(entry.create(uuid));
+    }
+
+    void
+    save(cereal::JSONOutputArchive& archive, Intf const& intf)
+    {
+        entry_t& entry{impl_.find_entry(intf.get_uuid())};
+        entry.save(archive, &intf);
+    }
+
+    // The uuid should be set before deserializing the (rest of) the object.
+    void
+    load(cereal::JSONInputArchive& archive, Intf& intf)
+    {
+        entry_t& entry{impl_.find_entry(intf.get_uuid())};
+        entry.load(archive, &intf);
+    }
+
+ private:
+    impl_t& impl_;
+};
+
 /*
  * The actual type created by function_request_erased, but visible only in its
  * constructor (and erased elsewhere).
@@ -158,17 +286,19 @@ when_all_wrapper(Tuple&& tasks, std::index_sequence<Ix...>)
  * No part of this class depends on the actual context type used to resolve the
  * request.
  *
- * If Function is a class, then the type of a function_request_impl
- * instantiation will uniquely identify it.
- * If Function is a C++ function, then the type of a function_request_impl
- * instantiation will correspond to all C++ functions having the same
- * signature, so it must be combined with the function's address to achieve
- * that uniqueness.
- * This uniqeness is relevant when deserializing a type-erased request. Its
- * uuid will identify both the function_request_impl class, and (if
- * relevant) the C++ function. This implies a two-step process: first a
- * function_request_impl object is created of the specified class, then that
- * object's function member is set to the correct (pointer) value.
+ * A function_request_impl object has an associated uuid that should identify
+ * both the function_request_impl instantiation (type), and function value.
+ * It is primarily the caller's responsibility to provide a unique uuid.
+ * The implementation will catch attempts to associate different instantiations
+ * with a single uuid, but in general cannot catch attempts to associate
+ * different function values with a single uuid. This will still happen in case
+ * the function is a plain C++ function, but is impossible if it is a capturing
+ * lambda.
+ *
+ * The uuid identifying both function_request_impl class and function value
+ * leads to a two-step deserialization process: first a function_request_impl
+ * object is created of the specified class, then that object's function member
+ * is set to the correct value.
  */
 template<typename Value, bool AsCoro, typename Function, typename... Args>
 class function_request_impl : public function_request_intf<Value>
@@ -188,27 +318,31 @@ class function_request_impl : public function_request_intf<Value>
         assert(uuid_.is_real());
 
         // The uuid uniquely identifies the function.
-        // Have a single shared_ptr per function
-        // (though not really necessary).
+        // Store it so that is available during deserialization.
         auto uuid_str{uuid_.str()};
         std::scoped_lock lock{static_mutex_};
+        cereal_functions_registry<base_type>::instance().add_entry(
+            uuid_str, create, save_json, load_json);
+
         auto it = matching_functions_.find(uuid_str);
         if (it == matching_functions_.end())
         {
-            register_polymorphic_type<this_type, base_type>(uuid_);
             function_ = std::make_shared<Function>(std::move(function));
             matching_functions_[uuid_str] = function_;
         }
         else
         {
             function_ = matching_functions_[uuid_str];
-            // Attempts to associate more than one Function (type) with
-            // a single uuid will be caught in uuid_registry.
-            // The following check catches attempts to associate more than
-            // one C++ function with a single uuid.
+            // Try to catch attempts to associate different functions with the
+            // same uuid.
+            // - This is possible for plain C++ functions.
+            // - It is not possible to distinguish two lambdas capturing
+            //   different arguments (and thus probably having different
+            //   behaviour).
+            // - Captureless lambdas with the same type are identical.
             if constexpr (func_is_plain)
             {
-                if (**function_ != *function)
+                if (*function_ != function)
                 {
                     throw conflicting_functions_uuid_error(fmt::format(
                         "Multiple C++ functions for uuid {}", uuid_str));
@@ -249,22 +383,13 @@ class function_request_impl : public function_request_intf<Value>
     {
         if (!hash_)
         {
-            auto function_type_hash = invoke_hash(get_function_type_index());
+            auto uuid_hash = invoke_hash(uuid_);
             auto args_hash = std::apply(
                 [](auto&&... args) {
                     return combine_hashes(invoke_hash(args)...);
                 },
                 args_);
-            if constexpr (func_is_plain)
-            {
-                auto function_hash = invoke_hash(*function_);
-                hash_ = combine_hashes(
-                    function_type_hash, function_hash, args_hash);
-            }
-            else
-            {
-                hash_ = combine_hashes(function_type_hash, args_hash);
-            }
+            hash_ = combine_hashes(uuid_hash, args_hash);
         }
         return *hash_;
     }
@@ -381,28 +506,45 @@ class function_request_impl : public function_request_intf<Value>
         }
     }
 
- private:
+ public:
     // cereal-related
 
-    friend class cereal::access;
-    function_request_impl()
+    // Construct an object to be deserialized.
+    // The uuid is serialized in function_request_erased, not here.
+    function_request_impl(request_uuid const& uuid) : uuid_{uuid}
     {
     }
 
- public:
+    static std::shared_ptr<void>
+    create(request_uuid const& uuid)
+    {
+        return std::make_shared<this_type>(uuid);
+    }
+
+    static void
+    save_json(cereal::JSONOutputArchive& archive, void const* impl)
+    {
+        static_cast<this_type const*>(impl)->save(archive);
+    }
+
+    static void
+    load_json(cereal::JSONInputArchive& archive, void* impl)
+    {
+        static_cast<this_type*>(impl)->load(archive);
+    }
+
     template<typename Archive>
     void
     save(Archive& archive) const
     {
-        // Trust archive to be save-only
-        const_cast<function_request_impl*>(this)->load_save(archive);
+        archive(cereal::make_nvp("args", args_));
     }
 
     template<typename Archive>
     void
     load(Archive& archive)
     {
-        load_save(archive);
+        archive(cereal::make_nvp("args", args_));
         std::scoped_lock lock{static_mutex_};
         auto it = matching_functions_.find(uuid_.str());
         if (it == matching_functions_.end())
@@ -415,18 +557,8 @@ class function_request_impl : public function_request_intf<Value>
     }
 
  private:
-    // Adding the make_nvp's allows changing the order of uuid and args
-    // in the JSON.
-    template<typename Archive>
-    void
-    load_save(Archive& archive)
-    {
-        archive(
-            cereal::make_nvp("uuid", uuid_), cereal::make_nvp("args", args_));
-    }
-
- private:
     // Protector of matching_functions_
+    // TODO check this mutex; it should be global, not one per instantiation
     static inline std::mutex static_mutex_;
 
     // The functions matching this request's type, indexed by uuid string.
@@ -455,16 +587,9 @@ class function_request_impl : public function_request_intf<Value>
     mutable unique_hasher::result_t unique_hash_;
     mutable bool have_unique_hash_{false};
 
-    std::type_index
-    get_function_type_index() const
-    {
-        // The typeid() is evaluated at compile time
-        return std::type_index(typeid(Function));
-    }
-
     // *this and other are the same type, so their function types (i.e.,
     // typeid(Function)) are identical. The functions themselves might still
-    // differ if they are plain C++ functions.
+    // differ, in which case the uuid's should be different.
     // Likewise, argument types will be identical, but their values might
     // differ.
     bool
@@ -474,12 +599,9 @@ class function_request_impl : public function_request_intf<Value>
         {
             return true;
         }
-        if constexpr (func_is_plain)
+        if (uuid_ != other.uuid_)
         {
-            if (**function_ != **other.function_)
-            {
-                return false;
-            }
+            return false;
         }
         return args_ == other.args_;
     }
@@ -492,13 +614,9 @@ class function_request_impl : public function_request_intf<Value>
         {
             return false;
         }
-        if constexpr (func_is_plain)
+        if (uuid_ != other.uuid_)
         {
-            if (**function_ != **other.function_)
-            {
-                // Clang refuses to compare using <
-                return std::less<Function>{}(*function_, *other.function_);
-            }
+            return uuid_ < other.uuid_;
         }
         return args_ < other.args_;
     }
@@ -549,6 +667,26 @@ struct request_props
         assert(!(introspective && title_.empty()));
     }
 };
+
+// Serialize a function_request_impl object, given a type-erased
+// function_request_intf reference.
+template<typename Archive, typename Value>
+void
+save(Archive& archive, function_request_intf<Value> const& intf)
+{
+    using intf_type = function_request_intf<Value>;
+    cereal_functions_registry<intf_type>::instance().save(archive, intf);
+}
+
+// Deserialize a function_request_impl object, given a type-erased
+// function_request_intf reference.
+template<typename Archive, typename Value>
+void
+load(Archive& archive, function_request_intf<Value>& intf)
+{
+    using intf_type = function_request_intf<Value>;
+    cereal_functions_registry<intf_type>::instance().load(archive, intf);
+}
 
 /*
  * A function request that erases function and arguments types
@@ -692,16 +830,25 @@ class function_request_erased
     void
     save(Archive& archive) const
     {
-        archive(
-            cereal::make_nvp("impl", impl_),
-            cereal::make_nvp("title", title_));
+        // At least for JSON, there is no difference between multiple archive()
+        // calls, or putting everything in one call.
+        save_with_name(archive, impl_->get_uuid(), "uuid");
+        archive(cereal::make_nvp("title", title_));
+        archive(cereal::make_nvp("impl", *impl_));
     }
 
     template<typename Archive>
     void
     load(Archive& archive)
     {
-        archive(impl_, title_);
+        request_uuid uuid;
+        load_with_name(archive, uuid, "uuid");
+        archive(cereal::make_nvp("title", title_));
+        // Create a mostly empty function_request_impl object.
+        impl_ = cereal_functions_registry<intf_type>::instance().create(
+            std::move(uuid));
+        // Deserialize the remainder of the function_request_impl object.
+        archive(cereal::make_nvp("impl", *impl_));
         init_captured_id();
     }
 

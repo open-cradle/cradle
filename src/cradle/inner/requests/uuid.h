@@ -5,6 +5,8 @@
 #include <stdexcept>
 #include <string>
 
+#include <cereal/cereal.hpp>
+
 #include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/requests/generic.h>
@@ -107,16 +109,16 @@ class request_uuid
     static std::string const&
     get_git_version();
 
- public:
-    // cereal interface
-    template<typename Archive>
-    void
-    serialize(Archive& archive)
-    {
-        archive(str_);
-    }
-
  private:
+    template<typename Archive>
+    friend void
+    save_with_name(
+        Archive& archive, request_uuid const& uuid, std::string const& name);
+    template<typename Archive>
+    friend void
+    load_with_name(
+        Archive& archive, request_uuid& uuid, std::string const& name);
+
     inline static std::string git_version_;
     std::string str_;
 
@@ -126,6 +128,28 @@ class request_uuid
     std::string
     combine(std::string const& base, std::string const& version);
 };
+
+// Serialize a request_uuid object using cereal.
+// This results in JSON
+//    "uuid": "...uuid text...",
+// A more usual implementation (e.g. putting serialize() in the class) would
+// give
+//    "uuid": { "value0": "...uuid text..." },
+template<typename Archive>
+void
+save_with_name(
+    Archive& archive, request_uuid const& uuid, std::string const& name)
+{
+    archive(cereal::make_nvp(name, uuid.str_));
+}
+
+// Deserialize a request_uuid object using cereal.
+template<typename Archive>
+void
+load_with_name(Archive& archive, request_uuid& uuid, std::string const& name)
+{
+    archive(cereal::make_nvp(name, uuid.str_));
+}
 
 // For memory cache, unordered map
 inline size_t

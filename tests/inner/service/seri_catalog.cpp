@@ -78,7 +78,7 @@ TEST_CASE("call unregistered resolver", tag)
         Catch::StartsWith("no request registered with uuid"));
 }
 
-TEST_CASE("serialized request lacking polymorphic_name", tag)
+TEST_CASE("serialized request lacking uuid", tag)
 {
     static char const arg[] = "c";
     auto req{rq_local(make_string<arg>{}, arg)};
@@ -88,12 +88,12 @@ TEST_CASE("serialized request lacking polymorphic_name", tag)
     testing_request_context ctx{resources, nullptr, false, ""};
     std::string correct{serialize_request(req)};
 
-    std::regex re("polymorphic_name");
+    std::regex re("uuid");
     std::string wrong{std::regex_replace(correct, re, "wrong")};
 
     REQUIRE_THROWS_WITH(
         cppcoro::sync_wait(seri_catalog::instance().resolve(ctx, wrong)),
-        Catch::StartsWith("no polymorphic_name found in JSON"));
+        Catch::StartsWith("no uuid found in JSON"));
 }
 
 TEST_CASE("malformed serialized request", tag)
@@ -115,16 +115,14 @@ TEST_CASE("malformed serialized request", tag)
 
 namespace {
 
-// TODO replace local_context_intf with context_intf and solve the failing test
-// (leads to same function_request_impl type as the "0050" test).
 cppcoro::task<std::string>
-make_e_string(local_context_intf& ctx)
+make_e_string(context_intf& ctx)
 {
     co_return "e";
 }
 
 cppcoro::task<std::string>
-make_f_string(local_context_intf& ctx)
+make_f_string(context_intf& ctx)
 {
     co_return "f";
 }

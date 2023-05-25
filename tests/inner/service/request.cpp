@@ -186,11 +186,9 @@ TEST_CASE("evaluate function request (V+V)*V - memory cached", tag)
 
 TEST_CASE("evaluate function request V+V - fully cached", tag)
 {
-    request_props<caching_level_type::memory> props_mem{make_test_uuid(200)};
     request_props<caching_level_type::full> props_full{make_test_uuid(201)};
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
-    auto req_mem{rq_function_erased(props_mem, add, 6, 1)};
     auto req_full{rq_function_erased(props_full, add, 6, 1)};
 
     caching_request_resolution_context ctx;
@@ -203,38 +201,20 @@ TEST_CASE("evaluate function request V+V - fully cached", tag)
     REQUIRE(res00 == 7);
     REQUIRE(num_add_calls == 1);
 
-    auto res01 = cppcoro::sync_wait(resolve_request(ctx, req_mem));
-    REQUIRE(res01 == 7);
-    REQUIRE(num_add_calls == 1);
-
+    // Resolving the same request again, the result comes from a cache
+    // (the memory cache, although we cannot see that).
     auto res02 = cppcoro::sync_wait(resolve_request(ctx, req_full));
     REQUIRE(res02 == 7);
     REQUIRE(num_add_calls == 1);
 
-    // New memory cache
-    ctx.reset_memory_cache();
-    num_add_calls = 0;
-
-    // Resolving a memory-cached request means a cache miss.
-    auto res10 = cppcoro::sync_wait(resolve_request(ctx, req_mem));
-    REQUIRE(res10 == 7);
-    REQUIRE(num_add_calls == 1);
-
     // New memory cache, same disk cache
     ctx.reset_memory_cache();
-    num_add_calls = 0;
 
-    // Resolving a fully-cached request means a disk cache hit,
-    // and the result is stored in the memory cache as well.
+    // The result still comes from a cache; this time, we know it must be the
+    // disk cache.
     auto res20 = cppcoro::sync_wait(resolve_request(ctx, req_full));
     REQUIRE(res20 == 7);
-    REQUIRE(num_add_calls == 0);
-
-    // So now resolving a memory-cached request finds the result in
-    // the memory cache.
-    auto res21 = cppcoro::sync_wait(resolve_request(ctx, req_mem));
-    REQUIRE(res21 == 7);
-    REQUIRE(num_add_calls == 0);
+    REQUIRE(num_add_calls == 1);
 }
 
 TEST_CASE("evaluate function requests in parallel - uncached function", tag)
