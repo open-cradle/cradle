@@ -834,7 +834,7 @@ class function_request_erased
         // calls, or putting everything in one call.
         save_with_name(archive, impl_->get_uuid(), "uuid");
         archive(cereal::make_nvp("title", title_));
-        archive(cereal::make_nvp("impl", *impl_));
+        ::cradle::save(archive, *impl_);
     }
 
     template<typename Archive>
@@ -848,7 +848,7 @@ class function_request_erased
         impl_ = cereal_functions_registry<intf_type>::instance().create(
             std::move(uuid));
         // Deserialize the remainder of the function_request_impl object.
-        archive(cereal::make_nvp("impl", *impl_));
+        ::cradle::load(archive, *impl_);
         init_captured_id();
     }
 

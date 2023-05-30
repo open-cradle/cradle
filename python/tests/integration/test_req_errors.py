@@ -9,7 +9,7 @@ def test_req_no_uuid_in_json(session, remote):
     req_data = \
         {'missing_uuid': 'sample uuid',
          'title': 'sample title',
-         'impl': {'args': []}}
+         'args': {}}
 
     with pytest.raises(cradle.exceptions.ErrorResponseError) as excinfo:
         session.resolve_request(req_data, remote)
@@ -22,7 +22,7 @@ def test_req_unknown_uuid_in_json(session, remote):
     req_data = \
         {'uuid': 'unknown_uuid',
          'title': 'sample title',
-         'impl': {'args': []}}
+         'args': {}}
 
     with pytest.raises(cradle.exceptions.ErrorResponseError) as excinfo:
         session.resolve_request(req_data, remote)

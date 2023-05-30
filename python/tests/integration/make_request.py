@@ -6,9 +6,9 @@ import msgpack  # type: ignore
 from cradle.session import Session
 
 
-# Creates a Python data structure which, when converted to JSON, is the JSON serialization of
-# a C++ function_request_impl object
-def make_impl(session: Session, uuid_base: str, title: str, args: List) -> Any:
+# Creates a Python data structure which, when converted to JSON,
+# becomes the JSON serialization of a C++ function_request_erased object
+def make_req(session: Session, uuid_base: str, title: str, args: List) -> Any:
     # Request metadata
     uuid = f'{uuid_base}+{session.git_version}'
 
@@ -18,26 +18,28 @@ def make_impl(session: Session, uuid_base: str, title: str, args: List) -> Any:
     return \
         {'uuid': uuid,
          'title': title,
-         'impl': {'args': args_data}}
+         'args': args_data}
 
 
-# Creates the representation of a function_request_impl object for a root request.
-def make_root_impl(session: Session, uuid_base: str, title: str, args: List) -> Any:
-    return make_impl(session, uuid_base, title, [session.context_id] + args)
+# Creates the representation of a function_request_erased object for a root request.
+def make_root_req(session: Session, uuid_base: str, title: str, args: List) -> Any:
+    return make_req(session, uuid_base, title, [session.context_id] + args)
 
 
-# Converts an argument to the representation of a function_request_impl object returning that value;
+# Converts an argument to the representation of a function_request_erased object returning that value;
 # similar to its same-named C++ counterpart.
-# If the argument already represents a function_request_impl object, it is returned as-is.
+# If the argument already represents a function_request_erased object, it is returned as-is.
 # type_id: 'string' or 'blob'
 def normalized_arg(session: Session, type_id: str, arg: Any) -> Any:
     try:
-        # An encoded request is a Dict having an 'impl' entry.
-        arg['impl']
+        # An encoded request is a Dict having 'uuid', 'title' and 'args' entries.
+        arg['uuid']
+        arg['title']
+        arg['args']
         return arg
     except (KeyError, TypeError):
         pass
-    return make_impl(session, f'normalization_uuid<{type_id}>', 'arg', [arg])
+    return make_req(session, f'normalization_uuid<{type_id}>', 'arg', [arg])
 
 
 def make_post_iss_object_request(session: Session, value: str) -> Any:
@@ -52,7 +54,7 @@ def make_post_iss_object_request(session: Session, value: str) -> Any:
          'blob': ascii_encoded}
     args = ['array/string', normalized_arg(session, 'blob', inner_args)]
 
-    return make_root_impl(session, uuid_base, title, args)
+    return make_root_req(session, uuid_base, title, args)
 
 
 def make_get_iss_object_metadata_request(session: Session, object_id: Any) -> Any:
@@ -60,7 +62,7 @@ def make_get_iss_object_metadata_request(session: Session, object_id: Any) -> An
     title = 'get_iss_object_metadata'
     args = [normalized_arg(session, 'string', object_id)]
 
-    return make_root_impl(session, uuid_base, title, args)
+    return make_root_req(session, uuid_base, title, args)
 
 
 def make_retrieve_immutable_object_request(session: Session, immutable_id: Any) -> Any:
@@ -68,7 +70,7 @@ def make_retrieve_immutable_object_request(session: Session, immutable_id: Any) 
     title = 'retrieve_immutable_object'
     args = [normalized_arg(session, 'string', immutable_id)]
 
-    return make_root_impl(session, uuid_base, title, args)
+    return make_root_req(session, uuid_base, title, args)
 
 
 def make_resolve_iss_object_to_immutable_request(session: Session, object_id: Any) -> Any:
@@ -77,4 +79,4 @@ def make_resolve_iss_object_to_immutable_request(session: Session, object_id: An
     ignore_upgrades = False
     args = [normalized_arg(session, 'string', object_id), ignore_upgrades]
 
-    return make_root_impl(session, uuid_base, title, args)
+    return make_root_req(session, uuid_base, title, args)
