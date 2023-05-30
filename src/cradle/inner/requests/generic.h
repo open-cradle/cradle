@@ -709,7 +709,11 @@ cast_ctx_to_ptr(SrcCtx& ctx)
         RemoteContext<DestCtx> && !LocalContext<DestCtx>
         && !DefinitelyRemoteContext<SrcCtx>)
     {
-        if (!ctx.remotely())
+        if constexpr (DefinitelyLocalContext<SrcCtx>)
+        {
+            return nullptr;
+        }
+        else if (!ctx.remotely())
         {
             return nullptr;
         }
@@ -718,7 +722,11 @@ cast_ctx_to_ptr(SrcCtx& ctx)
         LocalContext<DestCtx> && !RemoteContext<DestCtx>
         && !DefinitelyLocalContext<SrcCtx>)
     {
-        if (ctx.remotely())
+        if constexpr (DefinitelyRemoteContext<SrcCtx>)
+        {
+            return nullptr;
+        }
+        else if (ctx.remotely())
         {
             return nullptr;
         }
@@ -727,7 +735,11 @@ cast_ctx_to_ptr(SrcCtx& ctx)
         AsyncContext<DestCtx> && !SyncContext<DestCtx>
         && !DefinitelyAsyncContext<SrcCtx>)
     {
-        if (!ctx.is_async())
+        if constexpr (DefinitelySyncContext<SrcCtx>)
+        {
+            return nullptr;
+        }
+        else if (!ctx.is_async())
         {
             return nullptr;
         }
@@ -736,7 +748,11 @@ cast_ctx_to_ptr(SrcCtx& ctx)
         SyncContext<DestCtx> && !AsyncContext<DestCtx>
         && !DefinitelySyncContext<SrcCtx>)
     {
-        if (ctx.is_async())
+        if constexpr (DefinitelyAsyncContext<SrcCtx>)
+        {
+            return nullptr;
+        }
+        else if (ctx.is_async())
         {
             return nullptr;
         }
@@ -761,19 +777,24 @@ DestCtx& cast_ctx_to_ref_base(SrcCtx& ctx)
 }
 
 /*
- * Throws when ctx.remotely() or ctx.is_async() return values conflicting with
+ * Throws when ctx.remotely() or ctx.is_async() return values conflict with
  * a specified context cast.
  *
  * E.g., when we have a cast like
  *   auto& lctx = cast_ctx_to_ref<local_context_intf>(ctx);
- * we want resolution to happen locally only, so remotely() should return
- * false.
+ * we want resolution to happen locally only, so ctx.remotely() should be
+ * returning false.
  *
- * The remotely() return value need not be checked in two situations:
+ * The remotely() return value need not be checked in three situations:
  * - When casting to a context type covering both local and remote
- *   execution, then either return value is OK.
+ *   execution, then either return value is OK, and the cast will succeed.
  * - When the source context is definitely remote-only, we already know that
- *   ctx.remotely() should be returning true, so the check is not needed.
+ *   ctx.remotely() should be returning true, so the the cast will succeed.
+ * - When the source context is definitely local-only, we already know that
+ *   ctx.remotely() should be returning false, so the cast is not possible.
+ *
+ * The type of the thrown exceptions is std::logic_error. std::bad_cast looks
+ * more appropriate but has no constructor taking a string.
  */
 template<Context DestCtx, Context SrcCtx>
 void
@@ -783,7 +804,15 @@ throw_on_ctx_mismatch(SrcCtx& ctx)
         RemoteContext<DestCtx> && !LocalContext<DestCtx>
         && !DefinitelyRemoteContext<SrcCtx>)
     {
-        if (!ctx.remotely())
+        // The first throw depends on constexpr values only.
+        //   static_assert(!DefinitelyLocalContext<SrcCtx>);
+        // would also be possible but cannot be unit tested
+        // (as the test code won't compile).
+        if constexpr (DefinitelyLocalContext<SrcCtx>)
+        {
+            throw std::logic_error("DefinitelyLocalContext");
+        }
+        else if (!ctx.remotely())
         {
             throw std::logic_error("remotely() returning false");
         }
@@ -792,7 +821,11 @@ throw_on_ctx_mismatch(SrcCtx& ctx)
         LocalContext<DestCtx> && !RemoteContext<DestCtx>
         && !DefinitelyLocalContext<SrcCtx>)
     {
-        if (ctx.remotely())
+        if constexpr (DefinitelyRemoteContext<SrcCtx>)
+        {
+            throw std::logic_error("DefinitelyRemoteContext");
+        }
+        else if (ctx.remotely())
         {
             throw std::logic_error("remotely() returning true");
         }
@@ -801,7 +834,11 @@ throw_on_ctx_mismatch(SrcCtx& ctx)
         AsyncContext<DestCtx> && !SyncContext<DestCtx>
         && !DefinitelyAsyncContext<SrcCtx>)
     {
-        if (!ctx.is_async())
+        if constexpr (DefinitelySyncContext<SrcCtx>)
+        {
+            throw std::logic_error("DefinitelySyncContext");
+        }
+        else if (!ctx.is_async())
         {
             throw std::logic_error("is_async() returning false");
         }
@@ -810,7 +847,11 @@ throw_on_ctx_mismatch(SrcCtx& ctx)
         SyncContext<DestCtx> && !AsyncContext<DestCtx>
         && !DefinitelySyncContext<SrcCtx>)
     {
-        if (ctx.is_async())
+        if constexpr (DefinitelyAsyncContext<SrcCtx>)
+        {
+            throw std::logic_error("DefinitelyAsyncContext");
+        }
+        else if (ctx.is_async())
         {
             throw std::logic_error("is_async() returning true");
         }
@@ -819,17 +860,15 @@ throw_on_ctx_mismatch(SrcCtx& ctx)
 
 // Casts a context_intf reference to DestCtx&.
 // Throws if the runtime type doesn't match.
-// Throws if the remotely() and/or is_async() return values don't match;
-// these function are not called when compile-time information suffices.
+// Throws if the remotely() and/or is_async() return values don't match.
+// These function are not called when compile-time information suffices,
+// leading to a throw depending on constexpr values only, and a C4702
+// warning in a VS2019 release build.
 // Retains the original type if no cast is needed.
 template<Context DestCtx, Context SrcCtx>
 DestCtx&
 cast_ctx_to_ref(SrcCtx& ctx)
 {
-    // The MSVC2019 compiler reports warning C4702 in a release build,
-    // claiming that the return would be unreachable.
-    // As it does not and will not output anything more usable, this
-    // warning is disabled in CMakeLists.txt.
     throw_on_ctx_mismatch<DestCtx>(ctx);
     return cast_ctx_to_ref_base<DestCtx>(ctx);
 }

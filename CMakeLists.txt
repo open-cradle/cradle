@@ -196,8 +196,6 @@ elseif(IS_MSVC)
     # "operator '|': deprecated between enumerations of different types"
     # in cereal\external\rapidjson\document.h
     add_compile_options(/wd5054)
-    # "unreachable code" in generic.h
-    add_compile_options(/wd4702)
 endif()
 
 # Use absolute paths for error messages.
