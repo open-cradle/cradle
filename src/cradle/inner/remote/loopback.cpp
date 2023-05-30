@@ -7,7 +7,7 @@
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/remote/loopback_impl.h>
 #include <cradle/inner/requests/domain.h>
-#include <cradle/inner/service/seri_req.h>
+#include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/utilities/logging.h>
 
 namespace cradle {

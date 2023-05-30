@@ -1,5 +1,5 @@
-#ifndef CRADLE_INNER_SERVICE_SERI_REQ_H
-#define CRADLE_INNER_SERVICE_SERI_REQ_H
+#ifndef CRADLE_INNER_RESOLVE_SERI_REQ_H
+#define CRADLE_INNER_RESOLVE_SERI_REQ_H
 
 // Service to resolve a serialized request to a serialized response,
 // either locally or remotely
@@ -9,7 +9,7 @@
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/seri_result.h>
+#include <cradle/inner/resolve/seri_result.h>
 
 namespace cradle {
 

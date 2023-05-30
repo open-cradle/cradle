@@ -1,6 +1,6 @@
 #include <cereal/types/map.hpp>
 
-#include <cradle/inner/service/seri_catalog.h>
+#include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
 

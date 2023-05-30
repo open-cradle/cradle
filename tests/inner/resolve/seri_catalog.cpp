@@ -6,9 +6,9 @@
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/requests/function.h>
+#include <cradle/inner/resolve/seri_catalog.h>
+#include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/inner/service/seri_catalog.h>
-#include <cradle/inner/service/seri_req.h>
 #include <cradle/plugins/domain/testing/context.h>
 
 #include "../../support/inner_service.h"

@@ -11,7 +11,7 @@
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/function.h>
-#include <cradle/inner/service/request.h>
+#include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/domain.h>

@@ -10,7 +10,7 @@
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/value.h>
-#include <cradle/inner/service/request.h>
+#include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/rpclib/client/proxy.h>

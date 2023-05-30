@@ -1,6 +1,6 @@
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/seri_catalog.h>
-#include <cradle/inner/service/seri_req.h>
+#include <cradle/inner/resolve/seri_catalog.h>
+#include <cradle/inner/resolve/seri_req.h>
 
 namespace cradle {
 
@@ -16,7 +16,7 @@ resolve_serialized_local(local_context_intf& ctx, std::string seri_req)
     return seri_catalog::instance().resolve(ctx, std::move(seri_req));
 }
 
-// TODO need to refactor like resolve_request()?
+// Currently only called from websocket/server.cpp
 cppcoro::task<serialized_result>
 resolve_serialized_request(context_intf& ctx, std::string seri_req)
 {

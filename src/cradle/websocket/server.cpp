@@ -41,8 +41,8 @@
 #include <cradle/inner/io/http_requests.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/requests/function.h>
-#include <cradle/inner/service/request.h>
-#include <cradle/inner/service/seri_req.h>
+#include <cradle/inner/resolve/resolve_request.h>
+#include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
 #include <cradle/inner/utilities/logging.h>

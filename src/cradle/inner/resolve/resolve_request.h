@@ -1,5 +1,5 @@
-#ifndef CRADLE_INNER_SERVICE_REQUEST_H
-#define CRADLE_INNER_SERVICE_REQUEST_H
+#ifndef CRADLE_INNER_RESOLVE_RESOLVE_REQUEST_H
+#define CRADLE_INNER_RESOLVE_RESOLVE_REQUEST_H
 
 #include <stdexcept>
 #include <type_traits>
@@ -13,7 +13,7 @@
 #include <cradle/inner/caching/secondary_cache_serialization.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/remote.h>
+#include <cradle/inner/resolve/remote.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/service/secondary_cached_blob.h>
 

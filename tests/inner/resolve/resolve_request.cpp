@@ -8,7 +8,7 @@
 #include "../../support/concurrency_testing.h"
 #include "../../support/inner_service.h"
 #include "../../support/request.h"
-#include <cradle/inner/service/request.h>
+#include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 

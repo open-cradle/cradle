@@ -7,7 +7,7 @@
 
 #include "../support/concurrency_testing.h"
 #include "../support/inner_service.h"
-#include <cradle/inner/service/request.h>
+#include <cradle/inner/resolve/resolve_request.h>
 
 namespace cradle {
 

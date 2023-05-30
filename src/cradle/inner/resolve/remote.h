@@ -1,5 +1,5 @@
-#ifndef CRADLE_INNER_SERVICE_REMOTE_H
-#define CRADLE_INNER_SERVICE_REMOTE_H
+#ifndef CRADLE_INNER_RESOLVE_REMOTE_H
+#define CRADLE_INNER_RESOLVE_REMOTE_H
 
 // Service to remotely resolve requests
 // No coroutines needed here
@@ -7,7 +7,7 @@
 #include <string>
 
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/seri_result.h>
+#include <cradle/inner/resolve/seri_result.h>
 #include <cradle/plugins/serialization/request/cereal_json.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 

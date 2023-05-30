@@ -1,5 +1,5 @@
-#ifndef CRADLE_INNER_SERVICE_SERI_CATALOG_H
-#define CRADLE_INNER_SERVICE_SERI_CATALOG_H
+#ifndef CRADLE_INNER_RESOLVE_SERI_CATALOG_H
+#define CRADLE_INNER_RESOLVE_SERI_CATALOG_H
 
 #include <memory>
 #include <string>
@@ -8,8 +8,8 @@
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/seri_resolver.h>
-#include <cradle/inner/service/seri_result.h>
+#include <cradle/inner/resolve/seri_resolver.h>
+#include <cradle/inner/resolve/seri_result.h>
 
 namespace cradle {
 

@@ -29,7 +29,7 @@
 #include <cradle/inner/encodings/cereal.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/uuid.h>
-#include <cradle/inner/service/request.h>
+#include <cradle/inner/resolve/resolve_request.h>
 
 namespace cradle {
 

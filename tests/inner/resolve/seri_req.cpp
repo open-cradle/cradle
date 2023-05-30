@@ -2,8 +2,8 @@
 #include <cppcoro/sync_wait.hpp>
 
 #include <cradle/inner/remote/loopback.h>
+#include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/inner/service/seri_req.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/plugins/domain/testing/seri_catalog.h>
 #include <cradle/plugins/serialization/request/cereal_json.h>

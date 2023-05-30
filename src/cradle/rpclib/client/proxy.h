@@ -7,8 +7,8 @@
 #include <fmt/format.h>
 
 #include <cradle/inner/remote/proxy.h>
+#include <cradle/inner/resolve/seri_result.h>
 #include <cradle/inner/service/config.h>
-#include <cradle/inner/service/seri_result.h>
 
 namespace cradle {
 

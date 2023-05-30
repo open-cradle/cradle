@@ -4,8 +4,8 @@
 #include <fmt/format.h>
 
 #include <cradle/inner/requests/uuid.h>
-#include <cradle/inner/service/seri_catalog.h>
-#include <cradle/inner/service/seri_resolver.h>
+#include <cradle/inner/resolve/seri_catalog.h>
+#include <cradle/inner/resolve/seri_resolver.h>
 
 namespace cradle {
 

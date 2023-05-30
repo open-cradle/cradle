@@ -9,7 +9,7 @@
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/requests/domain.h>
-#include <cradle/inner/service/seri_req.h>
+#include <cradle/inner/resolve/seri_req.h>
 #include <cradle/rpclib/server/handlers.h>
 #include <cradle/typing/service/core.h>
 
@@ -119,7 +119,7 @@ resolve_async(
     try
     {
         blob res = cppcoro::sync_wait(
-                       resolve_serialized_request(*actx, std::move(seri_req)))
+                       resolve_serialized_local(*actx, std::move(seri_req)))
                        .value();
         logger.info("resolve_async done: {}", res);
         if (actx->get_status() != async_status::FINISHED)

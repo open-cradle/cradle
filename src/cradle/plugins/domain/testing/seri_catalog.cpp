@@ -1,4 +1,4 @@
-#include <cradle/inner/service/seri_catalog.h>
+#include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/plugins/domain/testing/seri_catalog.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>

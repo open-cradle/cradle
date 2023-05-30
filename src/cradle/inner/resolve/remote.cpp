@@ -5,7 +5,7 @@
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/remote.h>
+#include <cradle/inner/resolve/remote.h>
 
 namespace cradle {
 

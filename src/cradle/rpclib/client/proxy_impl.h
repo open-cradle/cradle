@@ -12,8 +12,8 @@
 
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/resolve/seri_result.h>
 #include <cradle/inner/service/config.h>
-#include <cradle/inner/service/seri_result.h>
 #include <cradle/rpclib/common/common.h>
 
 namespace cradle {

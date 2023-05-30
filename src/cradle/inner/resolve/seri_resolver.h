@@ -1,5 +1,5 @@
-#ifndef CRADLE_INNER_SERVICE_SERI_RESOLVER_H
-#define CRADLE_INNER_SERVICE_SERI_RESOLVER_H
+#ifndef CRADLE_INNER_RESOLVE_SERI_RESOLVER_H
+#define CRADLE_INNER_RESOLVE_SERI_RESOLVER_H
 
 // Objects that locally resolve a serialized request to a serialized response
 
@@ -12,8 +12,8 @@
 
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/request.h>
-#include <cradle/inner/service/seri_result.h>
+#include <cradle/inner/resolve/resolve_request.h>
+#include <cradle/inner/resolve/seri_result.h>
 #include <cradle/plugins/serialization/request/cereal_json.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 
