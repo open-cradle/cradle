@@ -30,6 +30,7 @@ def make_root_req(session: Session, uuid_base: str, title: str, args: List) -> A
 # similar to its same-named C++ counterpart.
 # If the argument already represents a function_request_erased object, it is returned as-is.
 # type_id: 'string' or 'blob'
+# The function is assumed to be a coroutine.
 def normalized_arg(session: Session, type_id: str, arg: Any) -> Any:
     try:
         # An encoded request is a Dict having 'uuid', 'title' and 'args' entries.
@@ -39,7 +40,7 @@ def normalized_arg(session: Session, type_id: str, arg: Any) -> Any:
         return arg
     except (KeyError, TypeError):
         pass
-    return make_req(session, f'normalization_uuid<{type_id}>', 'arg', [arg])
+    return make_req(session, f'normalization<{type_id},coro>', 'arg', [arg])
 
 
 def make_post_iss_object_request(session: Session, value: str) -> Any:
