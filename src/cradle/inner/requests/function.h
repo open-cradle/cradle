@@ -641,19 +641,27 @@ class function_request_impl : public function_request_intf<Value>
 // - Request attributes (AsCoro)
 // - How it should be resolved (Level, Introspective)
 // - What it needs for its resolution (CtxTypes)
+// All requests in a tree (main request, subrequests) must have the same
+// request_props, so that the main request's uuid defines the complete
+// request type.
 template<
     caching_level_type Level,
     bool AsCoro = false,
     bool Introspective = false,
     typename CtxTypes
     = default_ctx_type_list<Level != caching_level_type::none, Introspective>>
-// TODO apply "local_" prefixes wherever applicable
 struct request_props
 {
-    // TODO (level != none) == (caching_context_intf in CtxTypes)
+    // Cf. concept ValidRequest
+    static_assert(
+        Level == caching_level_type::none
+        || ctx_in_type_list<caching_context_intf, CtxTypes>);
+    static_assert(
+        !Introspective
+        || ctx_in_type_list<introspective_context_intf, CtxTypes>);
+
     static constexpr caching_level_type level = Level;
     static constexpr bool func_is_coro = AsCoro;
-    // TODO Introspective == (introspective_context_intf in CtxTypes)
     static constexpr bool introspective = Introspective;
     using required_ctx_types = CtxTypes;
 
@@ -844,7 +852,10 @@ class function_request_erased
         request_uuid uuid;
         load_with_name(archive, uuid, "uuid");
         archive(cereal::make_nvp("title", title_));
-        // Create a mostly empty function_request_impl object.
+        // Create a mostly empty function_request_impl object. uuid defines its
+        // exact type (function_request_impl class instantiation), which could
+        // be different from the one with which this function_request_erased
+        // instantiation was registered.
         impl_ = cereal_functions_registry<intf_type>::instance().create(
             std::move(uuid));
         // Deserialize the remainder of the function_request_impl object.
@@ -991,42 +1002,47 @@ identity_coro(context_intf& ctx, Value value)
     co_return value;
 }
 
-// Contains the uuid string for a normalize_arg request. The uuid (only)
-// depends on the value type that the request resolves to.
+// Contains the uuid strings for a normalize_arg request. The uuid (only)
+// depends on:
+// - The value type that the request resolves to
+// - Whether the function is "normal" or a coroutine
 // Note: don't put the request_uuid itself in the struct as it depends
 // on the static Git version which is also evaluated at C++ initialization
 // time.
 // TODO put specializations in separate .h?
-// TODO is it possible to raise a compile-time error when instantiating
-// the generic template?
 template<typename Value>
-struct normalization_uuid
+struct normalization_uuid_str
 {
 };
 
 template<>
-struct normalization_uuid<int>
+struct normalization_uuid_str<int>
 {
-    static const inline std::string uuid_str{"normalization_uuid<int>"};
+    static const inline std::string func{"normalization<int,func>"};
+    static const inline std::string coro{"normalization<int,coro>"};
 };
 
 template<>
-struct normalization_uuid<std::string>
+struct normalization_uuid_str<std::string>
 {
-    static const inline std::string uuid_str{"normalization_uuid<string>"};
+    static const inline std::string func{"normalization<string,func>"};
+    static const inline std::string coro{"normalization<string,coro>"};
 };
 
 template<>
-struct normalization_uuid<blob>
+struct normalization_uuid_str<blob>
 {
-    static const inline std::string uuid_str{"normalization_uuid<blob>"};
+    static const inline std::string func{"normalization<blob,func>"};
+    static const inline std::string coro{"normalization<blob,coro>"};
 };
 
-template<typename Value>
+template<typename Value, bool func_is_coro>
 auto
 make_normalization_uuid()
 {
-    return request_uuid{normalization_uuid<Value>::uuid_str};
+    return request_uuid{
+        func_is_coro ? normalization_uuid_str<Value>::coro
+                     : normalization_uuid_str<Value>::func};
 }
 
 /*
@@ -1040,10 +1056,16 @@ make_normalization_uuid()
  *   normalize_arg(Arg const& arg);
  *
  * Value and Props must be specified, Arg will be deduced.
- * Props is a request_props instantiation, and must equal the one for the main
+ * Props is a request_props instantiation, and must be the one for the main
  * request.
  *
- * TODO uuid must differ between different Props types.
+ * The uuid for the main request defines the Props for the main request's
+ * function_request_erased class, and for all arguments that are subrequests.
+ * The uuid for a subrequest need only define the function_request_impl
+ * instantiation. In normalization requests, the function is fixed
+ * (identity_func or identity_coro), meaning the uuid depends only on:
+ * - The Value type
+ * - Whether the function is a "normal" one or a coroutine
  */
 
 // Normalizes a value argument in a non-coroutine context.
@@ -1051,7 +1073,7 @@ template<typename Value, typename Props>
     requires(!Request<Value> && !Props::func_is_coro)
 auto normalize_arg(Value const& arg)
 {
-    Props props{make_normalization_uuid<Value>(), "arg"};
+    Props props{make_normalization_uuid<Value, false>(), "arg"};
     return rq_function_erased(std::move(props), identity_func<Value>, arg);
 }
 
@@ -1060,7 +1082,7 @@ template<typename Value, typename Props>
     requires(!Request<Value> && Props::func_is_coro)
 auto normalize_arg(Value const& arg)
 {
-    Props props{make_normalization_uuid<Value>(), "arg"};
+    Props props{make_normalization_uuid<Value, true>(), "arg"};
     return rq_function_erased(std::move(props), identity_coro<Value>, arg);
 }
 
@@ -1069,7 +1091,7 @@ template<typename Value, typename Props>
     requires(std::same_as<Value, std::string> && !Props::func_is_coro)
 auto normalize_arg(char const* arg)
 {
-    Props props{make_normalization_uuid<Value>(), "arg"};
+    Props props{make_normalization_uuid<Value, false>(), "arg"};
     return rq_function_erased(
         std::move(props), identity_func<std::string>, std::string{arg});
 }
@@ -1079,7 +1101,7 @@ template<typename Value, typename Props>
     requires(std::same_as<Value, std::string> && Props::func_is_coro)
 auto normalize_arg(char const* arg)
 {
-    Props props{make_normalization_uuid<Value>(), "arg"};
+    Props props{make_normalization_uuid<Value, true>(), "arg"};
     return rq_function_erased(
         std::move(props), identity_coro<std::string>, std::string{arg});
 }

@@ -37,13 +37,7 @@ class seri_resolver_intf
  * Locally resolves a serialized request to a serialized response
  *
  * Objects of this class will be created at registration time
- * (seri_catalog.cpp), where Ctx=Req::ctx_type will be the context type needed
- * to resolve a request.
- * The actual type of the resolution-time context object (passed to
- * seri_resolver_intf::resolve()) should be such that a dynamic_cast to Ctx
- * succeeds; otherwise, resolve() will throw a bad_cast exception.
- * Resolution-time context objects will typically be created via the "domain"
- * class interface.
+ * (seri_catalog.cpp).
  *
  * A response value must be serializable via the chosen method.
  * Requests currently are always serialized via cereal-JSON.

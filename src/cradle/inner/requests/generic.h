@@ -585,7 +585,6 @@ concept Request
 // Context<typename T::ctx_type>;
 // TODO say something about resolve_sync()/_async() as we used to do
 
-// TODO catch as much as possible in request_props construction
 template<typename Req>
 concept ValidRequest = Request<Req>
                        && (Req::caching_level == caching_level_type::none
