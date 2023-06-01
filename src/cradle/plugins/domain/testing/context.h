@@ -199,10 +199,10 @@ class local_atst_context final : public local_async_context_intf,
         return is_req_;
     }
 
-    std::size_t
+    cppcoro::task<std::size_t>
     get_num_subs() const override
     {
-        return subs_.size();
+        co_return subs_.size();
     }
 
     async_context_intf&
@@ -218,6 +218,12 @@ class local_atst_context final : public local_async_context_intf,
     request_cancellation_coro() override;
 
     // local_async_context_intf
+    std::size_t
+    get_local_num_subs() const override
+    {
+        return subs_.size();
+    }
+
     local_atst_context&
     get_local_sub(std::size_t ix) override
     {
@@ -489,17 +495,11 @@ class proxy_atst_context final : public remote_async_context_intf
         return is_req_;
     }
 
-    std::size_t
-    get_num_subs() const override
-    {
-        return subs_.size();
-    }
+    cppcoro::task<std::size_t>
+    get_num_subs() const override;
 
     async_context_intf&
-    get_sub(std::size_t ix) override
-    {
-        return *subs_[ix];
-    }
+    get_sub(std::size_t ix) override;
 
     cppcoro::task<async_status>
     get_status_coro() override;
@@ -514,14 +514,8 @@ class proxy_atst_context final : public remote_async_context_intf
         return make_local_clone();
     }
 
-    remote_async_context_intf&
-    add_sub(bool is_req) override;
-
     proxy_atst_context&
-    get_remote_sub(std::size_t ix) override
-    {
-        return *subs_[ix];
-    }
+    get_remote_sub(std::size_t ix) override;
 
     void
     set_remote_id(async_id remote_id) override
@@ -549,18 +543,22 @@ class proxy_atst_context final : public remote_async_context_intf
     async_id id_;
     async_id remote_id_{NO_ASYNC_ID};
     bool cancellation_pending_{false};
-    // Using unique_ptr ensures that proxy_atst_context objects are not
-    // relocated during tree build-up / visit.
-    std::vector<std::unique_ptr<proxy_atst_context>> subs_;
+    mutable bool have_subs_{false};
+    // Using unique_ptr because class proxy_atst_context has no default
+    // constructor and no copy constructor.
+    mutable std::vector<std::unique_ptr<proxy_atst_context>> subs_;
 
     remote_proxy&
-    get_proxy()
+    get_proxy() const
     {
         return tree_ctx_->get_proxy();
     }
 
     std::shared_ptr<local_atst_context>
     make_local_clone() const;
+
+    void
+    ensure_subs() const;
 };
 
 static_assert(ValidContext<proxy_atst_context>);

@@ -62,39 +62,41 @@ test_resolve_async_coro(
     REQUIRE(res == (loops + delay0) + (loops + delay1));
     REQUIRE(ctx.is_req());
     REQUIRE(co_await ctx.get_status_coro() == async_status::FINISHED);
-    REQUIRE(ctx.get_num_subs() == 2);
+    REQUIRE(co_await ctx.get_num_subs() == 2);
     auto& ctx0 = ctx.get_sub(0);
     REQUIRE(ctx.is_req());
-    REQUIRE(ctx0.get_num_subs() == 2);
+    REQUIRE(co_await ctx0.get_num_subs() == 2);
     REQUIRE(co_await ctx0.get_status_coro() == async_status::FINISHED);
     auto& ctx1 = ctx.get_sub(1);
     REQUIRE(ctx.is_req());
-    REQUIRE(ctx1.get_num_subs() == 2);
+    REQUIRE(co_await ctx1.get_num_subs() == 2);
     REQUIRE(co_await ctx1.get_status_coro() == async_status::FINISHED);
     if (requests_are_normalized)
     {
         auto& ctx00 = ctx0.get_sub(0);
         REQUIRE(ctx00.is_req());
-        REQUIRE(ctx00.get_num_subs() == 1);
+        REQUIRE(co_await ctx00.get_num_subs() == 1);
         REQUIRE(co_await ctx00.get_status_coro() == async_status::FINISHED);
         auto& ctx000 = ctx00.get_sub(0);
         REQUIRE(!ctx000.is_req());
         REQUIRE(co_await ctx000.get_status_coro() == async_status::FINISHED);
         auto& ctx01 = ctx0.get_sub(1);
         REQUIRE(ctx01.is_req());
+        REQUIRE(co_await ctx01.get_num_subs() == 1);
         REQUIRE(co_await ctx01.get_status_coro() == async_status::FINISHED);
         auto& ctx010 = ctx01.get_sub(0);
         REQUIRE(!ctx010.is_req());
         REQUIRE(co_await ctx010.get_status_coro() == async_status::FINISHED);
         auto& ctx10 = ctx1.get_sub(0);
         REQUIRE(ctx10.is_req());
-        REQUIRE(ctx10.get_num_subs() == 1);
+        REQUIRE(co_await ctx10.get_num_subs() == 1);
         REQUIRE(co_await ctx10.get_status_coro() == async_status::FINISHED);
         auto& ctx100 = ctx10.get_sub(0);
         REQUIRE(!ctx100.is_req());
         REQUIRE(co_await ctx100.get_status_coro() == async_status::FINISHED);
         auto& ctx11 = ctx1.get_sub(1);
         REQUIRE(ctx11.is_req());
+        REQUIRE(co_await ctx11.get_num_subs() == 1);
         REQUIRE(co_await ctx11.get_status_coro() == async_status::FINISHED);
         auto& ctx110 = ctx11.get_sub(0);
         REQUIRE(!ctx110.is_req());
@@ -151,10 +153,16 @@ test_resolve_async_across_rpc(
         rq_cancellable_coro<level>(loops, delay1))};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
-    auto ctx{make_root_proxy_atst_context(tree_ctx)};
-
     ResolutionConstraintsRemoteAsync constraints;
-    test_resolve_async(ctx, req, constraints, true, loops, delay0, delay1);
+
+    // TODO clear the memory cache on the remote and check the duration
+    auto ctx0{make_root_proxy_atst_context(tree_ctx)};
+    test_resolve_async(ctx0, req, constraints, true, loops, delay0, delay1);
+
+    // TODO check the duration which should be fast because the result now
+    // comes from the memory cache on the remote
+    auto ctx1{make_root_proxy_atst_context(tree_ctx)};
+    test_resolve_async(ctx1, req, constraints, true, loops, delay0, delay1);
 }
 
 } // namespace

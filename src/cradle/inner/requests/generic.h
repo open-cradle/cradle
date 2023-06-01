@@ -249,12 +249,11 @@ class async_context_intf : public virtual context_intf
     is_req() const
         = 0;
 
-    // Returns the number of subtasks
-    // TODO consider making this a coroutine, so that lazily populating the
-    // context subtree becomes possible.
-    virtual std::size_t
-    get_num_subs() const
-        = 0;
+    // Returns the number of subtasks.
+    // This is a coroutine, so that lazily populating the context subtree
+    // is possible in case of a remote context.
+    virtual cppcoro::task<std::size_t>
+    get_num_subs() const = 0;
 
     // Gets the context for the subtask corresponding to the ix'th
     // subrequest (ix=0 representing the first subrequest).
@@ -282,6 +281,12 @@ class local_async_context_intf : public local_context_intf,
 {
  public:
     virtual ~local_async_context_intf() = default;
+
+    // Returns the number of subtasks
+    // Differs from get_sub() by not being a coroutine.
+    virtual std::size_t
+    get_local_num_subs() const
+        = 0;
 
     // Gets the context for the subtask corresponding to the ix'th
     // subrequest (ix=0 representing the first subrequest).
@@ -383,11 +388,6 @@ class remote_async_context_intf : public remote_context_intf,
     // Useful for a loopback service.
     virtual std::shared_ptr<local_async_context_intf>
     local_async_clone() const = 0;
-
-    // Adds a subcontext (corresponding to a subrequest) to this one.
-    virtual remote_async_context_intf&
-    add_sub(bool is_req)
-        = 0;
 
     // Gets the context for the subtask corresponding to the ix'th
     // subrequest (ix=0 representing the first subrequest).

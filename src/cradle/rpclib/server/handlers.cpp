@@ -180,7 +180,7 @@ try
     auto& logger{hctx.logger()};
     logger.info("handle_get_sub_contexts {}", aid);
     auto actx{db.find(aid)};
-    auto nsubs = actx->get_num_subs();
+    auto nsubs = actx->get_local_num_subs();
     logger.debug("  {} subs", nsubs);
     remote_context_spec_list result;
     for (decltype(nsubs) ix = 0; ix < nsubs; ++ix)

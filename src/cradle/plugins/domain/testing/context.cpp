@@ -359,6 +359,20 @@ proxy_atst_context::~proxy_atst_context()
     }
 }
 
+cppcoro::task<std::size_t>
+proxy_atst_context::get_num_subs() const
+{
+    ensure_subs();
+    co_return subs_.size();
+}
+
+async_context_intf&
+proxy_atst_context::get_sub(std::size_t ix)
+{
+    assert(have_subs_);
+    return *subs_[ix];
+}
+
 cppcoro::task<async_status>
 proxy_atst_context::get_status_coro()
 {
@@ -384,13 +398,10 @@ proxy_atst_context::request_cancellation_coro()
     co_return;
 }
 
-remote_async_context_intf&
-proxy_atst_context::add_sub(bool is_req)
+proxy_atst_context&
+proxy_atst_context::get_remote_sub(std::size_t ix)
 {
-    auto sub = std::make_unique<proxy_atst_context>(tree_ctx_, false, is_req);
-    auto& result{*sub};
-    subs_.push_back(std::move(sub));
-    return result;
+    return *subs_[ix];
 }
 
 std::shared_ptr<local_atst_context>
@@ -400,6 +411,34 @@ proxy_atst_context::make_local_clone() const
         std::make_shared<local_atst_tree_context>(tree_ctx_->get_resources()),
         nullptr,
         is_req_);
+}
+
+void
+proxy_atst_context::ensure_subs() const
+{
+    if (have_subs_)
+    {
+        return;
+    }
+    // TODO wait on async_manual_reset_event until remote_id is set
+    if (remote_id_ == NO_ASYNC_ID)
+    {
+        throw std::logic_error(
+            "proxy_atst_context::ensure_subs(): remote_id not set");
+    }
+    // TODO wait until get_sub_contexts() precondition holds:
+    // status for remote_id is SUBS_RUNNING, SELF_RUNNING or FINISHED
+    auto& proxy{get_proxy()};
+    auto specs = proxy.get_sub_contexts(remote_id_);
+    for (auto& spec : specs)
+    {
+        auto [sub_aid, is_req] = spec;
+        auto sub_ctx
+            = std::make_unique<proxy_atst_context>(tree_ctx_, false, is_req);
+        sub_ctx->set_remote_id(sub_aid);
+        subs_.push_back(std::move(sub_ctx));
+    }
+    have_subs_ = true;
 }
 
 } // namespace cradle
