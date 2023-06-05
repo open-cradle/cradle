@@ -402,17 +402,15 @@ class remote_async_context_intf : public remote_context_intf,
     set_remote_id(async_id remote_id)
         = 0;
 
+    // Indicates that the remote id could not be retrieved.
+    // Called from exception handler.
+    virtual void
+    fail_remote_id() noexcept
+        = 0;
+
     // Returns the remote id, or NO_ASYNC_ID if it was not set.
     virtual async_id
     get_remote_id()
-        = 0;
-
-    // Returns true if cancellation was requested before the root remote_id
-    // became available.
-    // The caller is responsible to call this function once it has obtained
-    // the root remote_id, and if it returns true, call request_cancellation().
-    virtual bool
-    cancellation_pending()
         = 0;
 };
 
@@ -682,14 +680,14 @@ class tasklet_context
 // Retains the original type if no cast is needed.
 template<Context DestCtx, Context SrcCtx>
     requires(std::convertible_to<SrcCtx&, DestCtx&>)
-SrcCtx* cast_ctx_to_ptr_base(SrcCtx& ctx)
+SrcCtx* cast_ctx_to_ptr_base(SrcCtx& ctx) noexcept
 {
     return &ctx;
 }
 
 template<Context DestCtx, Context SrcCtx>
     requires(!std::convertible_to<SrcCtx&, DestCtx&>)
-DestCtx* cast_ctx_to_ptr_base(SrcCtx& ctx)
+DestCtx* cast_ctx_to_ptr_base(SrcCtx& ctx) noexcept
 {
     return dynamic_cast<DestCtx*>(&ctx);
 }
@@ -702,7 +700,7 @@ DestCtx* cast_ctx_to_ptr_base(SrcCtx& ctx)
 // Retains the original type if no cast is needed.
 template<Context DestCtx, Context SrcCtx>
 DestCtx*
-cast_ctx_to_ptr(SrcCtx& ctx)
+cast_ctx_to_ptr(SrcCtx& ctx) noexcept
 {
     if constexpr (
         RemoteContext<DestCtx> && !LocalContext<DestCtx>

@@ -324,45 +324,15 @@ proxy_atst_tree_context::proxy_atst_tree_context(
 }
 
 proxy_atst_context::proxy_atst_context(
-    std::shared_ptr<proxy_atst_tree_context> tree_ctx,
-    bool is_root,
-    bool is_req)
-    : tree_ctx_{std::move(tree_ctx)},
-      is_root_{is_root},
-      is_req_{is_req},
-      id_{allocate_async_id()}
+    std::shared_ptr<proxy_atst_tree_context> tree_ctx, bool is_req)
+    : tree_ctx_{std::move(tree_ctx)}, is_req_{is_req}, id_{allocate_async_id()}
 {
-}
-
-proxy_atst_context::~proxy_atst_context()
-{
-    // Clean up the context tree on the server once per proxy context tree
-    if (is_root_ && remote_id_ != NO_ASYNC_ID)
-    {
-        // Destructor must not throw
-        try
-        {
-            auto& proxy{get_proxy()};
-            proxy.finish_async(remote_id_);
-        }
-        catch (std::exception& e)
-        {
-            auto& logger{tree_ctx_->get_logger()};
-            try
-            {
-                logger.error("~proxy_atst_context() caught {}", e.what());
-            }
-            catch (...)
-            {
-            }
-        }
-    }
 }
 
 cppcoro::task<std::size_t>
 proxy_atst_context::get_num_subs() const
 {
-    ensure_subs();
+    co_await ensure_subs();
     co_return subs_.size();
 }
 
@@ -376,11 +346,7 @@ proxy_atst_context::get_sub(std::size_t ix)
 cppcoro::task<async_status>
 proxy_atst_context::get_status_coro()
 {
-    if (remote_id_ == NO_ASYNC_ID)
-    {
-        // Assume remote_id will soon be received
-        co_return async_status::CREATED;
-    }
+    wait_on_remote_id();
     auto& proxy{get_proxy()};
     co_return proxy.get_async_status(remote_id_);
 }
@@ -388,11 +354,7 @@ proxy_atst_context::get_status_coro()
 cppcoro::task<void>
 proxy_atst_context::request_cancellation_coro()
 {
-    if (remote_id_ == NO_ASYNC_ID)
-    {
-        cancellation_pending_ = true;
-        co_return;
-    }
+    wait_on_remote_id();
     auto& proxy{get_proxy()};
     proxy.request_cancellation(remote_id_);
     co_return;
@@ -413,19 +375,20 @@ proxy_atst_context::make_local_clone() const
         is_req_);
 }
 
-void
+cppcoro::task<>
 proxy_atst_context::ensure_subs() const
+{
+    return const_cast<proxy_atst_context*>(this)->ensure_subs_no_const();
+}
+
+cppcoro::task<>
+proxy_atst_context::ensure_subs_no_const()
 {
     if (have_subs_)
     {
-        return;
+        co_return;
     }
-    // TODO wait on async_manual_reset_event until remote_id is set
-    if (remote_id_ == NO_ASYNC_ID)
-    {
-        throw std::logic_error(
-            "proxy_atst_context::ensure_subs(): remote_id not set");
-    }
+    wait_on_remote_id();
     // TODO wait until get_sub_contexts() precondition holds:
     // status for remote_id is SUBS_RUNNING, SELF_RUNNING or FINISHED
     auto& proxy{get_proxy()};
@@ -434,11 +397,112 @@ proxy_atst_context::ensure_subs() const
     {
         auto [sub_aid, is_req] = spec;
         auto sub_ctx
-            = std::make_unique<proxy_atst_context>(tree_ctx_, false, is_req);
+            = std::make_unique<non_root_proxy_atst_context>(tree_ctx_, is_req);
         sub_ctx->set_remote_id(sub_aid);
         subs_.push_back(std::move(sub_ctx));
     }
     have_subs_ = true;
+}
+
+root_proxy_atst_context::root_proxy_atst_context(
+    std::shared_ptr<proxy_atst_tree_context> tree_ctx, bool is_req)
+    : proxy_atst_context{tree_ctx, is_req},
+      remote_id_future_{remote_id_promise_.get_future()}
+{
+}
+
+root_proxy_atst_context::~root_proxy_atst_context()
+{
+    // Clean up the context tree on the server once per proxy context tree.
+    // There must have been a set_remote_id() or fail_remote_id() call for this
+    // root context.
+    if (remote_id_ != NO_ASYNC_ID)
+    {
+        // Destructor must not throw
+        try
+        {
+            auto& proxy{get_proxy()};
+            proxy.finish_async(remote_id_);
+        }
+        catch (std::exception& e)
+        {
+            auto& logger{tree_ctx_->get_logger()};
+            try
+            {
+                logger.error("~root_proxy_atst_context() caught {}", e.what());
+            }
+            catch (...)
+            {
+            }
+        }
+    }
+}
+
+void
+root_proxy_atst_context::set_remote_id(async_id remote_id)
+{
+    // This could throw std::future_error, but that should be possible only
+    // when the caller is misbehaving.
+    remote_id_promise_.set_value(remote_id);
+}
+
+void
+root_proxy_atst_context::fail_remote_id() noexcept
+{
+    try
+    {
+        remote_id_promise_.set_exception(std::current_exception());
+    }
+    catch (std::future_error const& e)
+    {
+        try
+        {
+            // Everything must be noexcept here
+            auto& logger(tree_ctx_->get_logger());
+            logger.warn(
+                "root_proxy_atst_context::fail_remote_id caught {}", e.what());
+        }
+        catch (...)
+        {
+        }
+    }
+}
+
+// This may cause the current thread to block.
+// Cannot use cppcoro::async_manual_reset_event because it could be set from
+// an exception handler or destructor which must not throw, and the unblocked
+// call will continue on that thread.
+void
+root_proxy_atst_context::wait_on_remote_id()
+{
+    if (remote_id_ == NO_ASYNC_ID)
+    {
+        remote_id_ = remote_id_future_.get();
+    }
+}
+
+non_root_proxy_atst_context::non_root_proxy_atst_context(
+    std::shared_ptr<proxy_atst_tree_context> tree_ctx, bool is_req)
+    : proxy_atst_context{tree_ctx, is_req}
+{
+}
+
+void
+non_root_proxy_atst_context::set_remote_id(async_id remote_id)
+{
+    remote_id_ = remote_id;
+}
+
+void
+non_root_proxy_atst_context::fail_remote_id() noexcept
+{
+    assert(false);
+}
+
+void
+non_root_proxy_atst_context::wait_on_remote_id()
+{
+    // For non-root contexts, remote_id_ is set on object creation
 }
 
 } // namespace cradle

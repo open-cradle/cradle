@@ -156,12 +156,12 @@ test_resolve_async_across_rpc(
     ResolutionConstraintsRemoteAsync constraints;
 
     // TODO clear the memory cache on the remote and check the duration
-    auto ctx0{make_root_proxy_atst_context(tree_ctx)};
+    auto ctx0{root_proxy_atst_context{tree_ctx, true}};
     test_resolve_async(ctx0, req, constraints, true, loops, delay0, delay1);
 
     // TODO check the duration which should be fast because the result now
     // comes from the memory cache on the remote
-    auto ctx1{make_root_proxy_atst_context(tree_ctx)};
+    auto ctx1{root_proxy_atst_context{tree_ctx, true}};
     test_resolve_async(ctx1, req, constraints, true, loops, delay0, delay1);
 }
 
@@ -245,7 +245,7 @@ test_error_async_across_rpc(
         rq_cancellable_coro<level>(loops, delay1))};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
-    auto ctx{make_root_proxy_atst_context(tree_ctx)};
+    auto ctx{root_proxy_atst_context{tree_ctx, true}};
 
     test_error_async(ctx, req);
 }
@@ -364,7 +364,7 @@ test_cancel_async_across_rpc(
         rq_cancellable_coro<level>(loops, delay1))};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
-    auto ctx{make_root_proxy_atst_context(tree_ctx)};
+    auto ctx{root_proxy_atst_context{tree_ctx, true}};
 
     test_cancel_async(ctx, req);
 }
@@ -409,3 +409,81 @@ TEST_CASE("cancel async request on rpclib", tag)
 
     test_cancel_async_across_rpc(inner, "rpclib");
 }
+
+#if 0
+
+// TODO enable these test cases, throw in rpclib_client::submit_async()
+namespace {
+
+// Requests cancellation of all coroutines sharing the context resources
+// for ctx
+cppcoro::task<void>
+get_subs_control_coro(async_context_intf& ctx)
+{
+    auto logger = ensure_logger("checker");
+    logger->info("get_subs_control_coro(ctx {})", ctx.get_id());
+    auto num_subs = co_await ctx.get_num_subs();
+    logger->info("num_subs {}", num_subs);
+    co_return;
+}
+
+void
+get_subs_control_func(async_context_intf& ctx)
+{
+    REQUIRE_THROWS(cppcoro::sync_wait(get_subs_control_coro(ctx)));
+}
+
+template<AsyncContext Ctx, typename Req>
+cppcoro::task<void>
+test_get_subs_async_coro(Ctx& ctx, Req const& req)
+{
+    REQUIRE_THROWS(co_await resolve_request(ctx, req));
+}
+
+template<AsyncContext Ctx, typename Req>
+void
+test_get_subs_async(Ctx& ctx, Req const& req)
+{
+    // Run the checker coroutine on a separate thread, independent from the
+    // ones under test
+    // Note: std::thread::~thread() calls terminate() if the thread wasn't
+    // joined; e.g. if the test code threw.
+    std::jthread get_subs_control_thread(get_subs_control_func, std::ref(ctx));
+    cppcoro::sync_wait(test_get_subs_async_coro(ctx, req));
+    get_subs_control_thread.join();
+}
+
+void
+test_get_subs_async_across_rpc(
+    inner_resources& inner, std::string const& proxy_name)
+{
+    constexpr int loops = 10;
+    constexpr auto level = caching_level_type::memory;
+    int delay = 5;
+    // Don't need to set props e.g. uuid?!
+    auto req{rq_cancellable_coro<level>(loops, delay)};
+    auto tree_ctx{
+        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+    auto ctx{root_proxy_atst_context{tree_ctx, true}};
+
+    test_get_subs_async(ctx, req);
+}
+
+} // namespace
+
+TEST_CASE("get subs for request on loopback", tag)
+{
+    inner_resources inner;
+    setup_loopback_test(inner);
+
+    test_get_subs_async_across_rpc(inner, "loopback");
+}
+
+TEST_CASE("get subs for request on rpclib", "[B]")
+{
+    inner_resources inner;
+    setup_rpclib_test(inner);
+
+    test_get_subs_async_across_rpc(inner, "rpclib");
+}
+#endif

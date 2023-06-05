@@ -102,33 +102,39 @@ wait_until_async_finished(remote_proxy& proxy, async_id remote_id)
 }
 
 serialized_result
-resolve_async(
-    remote_proxy& proxy,
-    remote_async_context_intf& root_ctx,
-    std::string domain_name,
-    std::string seri_req)
+resolve_async(remote_async_context_intf& ctx, std::string seri_req)
 {
-    auto& logger = proxy.get_logger();
-    logger.debug("resolve_async");
-    auto remote_id = proxy.submit_async(
-        root_ctx, std::move(domain_name), std::move(seri_req));
-    root_ctx.set_remote_id(remote_id);
-    if (root_ctx.cancellation_pending())
+    remote_proxy* proxy{};
+    async_id remote_id{};
+    try
     {
-        proxy.request_cancellation(remote_id);
-        throw remote_error{"cancelled"};
+        proxy = &find_proxy(ctx.proxy_name());
+        auto& logger = proxy->get_logger();
+        std::string domain_name{ctx.domain_name()};
+        logger.debug(
+            "resolve_async on {}: {} ...",
+            domain_name,
+            seri_req.substr(0, 10));
+        remote_id = proxy->submit_async(
+            ctx, std::move(domain_name), std::move(seri_req));
+        ctx.set_remote_id(remote_id);
     }
-    wait_until_async_finished(proxy, remote_id);
-    return proxy.get_async_response(remote_id);
+    catch (...)
+    {
+        ctx.fail_remote_id();
+        throw;
+    }
+    wait_until_async_finished(*proxy, remote_id);
+    return proxy->get_async_response(remote_id);
 }
 
 serialized_result
-resolve_sync(
-    remote_context_intf& ctx,
-    remote_proxy& proxy,
-    std::string domain_name,
-    std::string seri_req)
+resolve_sync(remote_context_intf& ctx, std::string seri_req)
 {
+    auto& proxy = find_proxy(ctx.proxy_name());
+    auto& logger = proxy.get_logger();
+    std::string domain_name{ctx.domain_name()};
+    logger.debug("request on {}: {} ...", domain_name, seri_req.substr(0, 10));
     return proxy.resolve_sync(
         ctx, std::move(domain_name), std::move(seri_req));
 }
@@ -138,19 +144,13 @@ resolve_sync(
 serialized_result
 resolve_remote(remote_context_intf& ctx, std::string seri_req)
 {
-    auto& proxy = find_proxy(ctx.proxy_name());
-    auto& logger = proxy.get_logger();
-    std::string domain_name{ctx.domain_name()};
-    logger.debug("request on {}: {} ...", domain_name, seri_req.substr(0, 10));
     if (auto* async_ctx = cast_ctx_to_ptr<remote_async_context_intf>(ctx))
     {
-        return resolve_async(
-            proxy, *async_ctx, std::move(domain_name), std::move(seri_req));
+        return resolve_async(*async_ctx, std::move(seri_req));
     }
     else
     {
-        return resolve_sync(
-            ctx, proxy, std::move(domain_name), std::move(seri_req));
+        return resolve_sync(ctx, std::move(seri_req));
     }
 }
 

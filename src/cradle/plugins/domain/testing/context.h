@@ -2,6 +2,7 @@
 #define CRADLE_PLUGINS_DOMAIN_TESTING_CONTEXT_H
 
 #include <atomic>
+#include <future>
 #include <memory>
 #include <vector>
 
@@ -20,6 +21,9 @@ namespace cradle {
  * "testing" domain.
  * It offers all context features other than the asynchronous functionality
  * (i.e., implements all context interfaces other than async_context_intf).
+ *
+ * TODO pass the domain name to the ctor, then this class should be usable as
+ * base class for e.g. thinknode_request_context.
  */
 class testing_request_context final : public local_context_intf,
                                       public remote_context_intf,
@@ -430,15 +434,11 @@ class proxy_atst_tree_context
  * domain, on a remote machine.
  * It acts as a proxy for a local_atst_context object on a remote server.
  */
-class proxy_atst_context final : public remote_async_context_intf
+class proxy_atst_context : public remote_async_context_intf
 {
  public:
     proxy_atst_context(
-        std::shared_ptr<proxy_atst_tree_context> tree_ctx,
-        bool is_root,
-        bool is_req);
-
-    ~proxy_atst_context();
+        std::shared_ptr<proxy_atst_tree_context> tree_ctx, bool is_req);
 
     // Once created, these objects should not be moved.
     proxy_atst_context(proxy_atst_context const&) = delete;
@@ -517,36 +517,22 @@ class proxy_atst_context final : public remote_async_context_intf
     proxy_atst_context&
     get_remote_sub(std::size_t ix) override;
 
-    void
-    set_remote_id(async_id remote_id) override
-    {
-        remote_id_ = remote_id;
-    }
-
     async_id
     get_remote_id() override
     {
         return remote_id_;
     }
 
-    bool
-    cancellation_pending() override
-    {
-        return cancellation_pending_;
-    }
-
- private:
+ protected:
     std::string domain_name_{"testing"};
     std::shared_ptr<proxy_atst_tree_context> tree_ctx_;
-    bool is_root_;
     bool is_req_;
     async_id id_;
-    async_id remote_id_{NO_ASYNC_ID};
-    bool cancellation_pending_{false};
-    mutable bool have_subs_{false};
+    std::atomic<async_id> remote_id_{NO_ASYNC_ID};
+    bool have_subs_{false};
     // Using unique_ptr because class proxy_atst_context has no default
     // constructor and no copy constructor.
-    mutable std::vector<std::unique_ptr<proxy_atst_context>> subs_;
+    std::vector<std::unique_ptr<proxy_atst_context>> subs_;
 
     remote_proxy&
     get_proxy() const
@@ -557,21 +543,58 @@ class proxy_atst_context final : public remote_async_context_intf
     std::shared_ptr<local_atst_context>
     make_local_clone() const;
 
-    void
+    cppcoro::task<>
     ensure_subs() const;
+
+    cppcoro::task<>
+    ensure_subs_no_const();
+
+    virtual void
+    wait_on_remote_id()
+        = 0;
 };
 
-static_assert(ValidContext<proxy_atst_context>);
-
-/*
- * Creates a proxy_atst_context object for the root node in a context tree.
- * Subobjects are to be added later.
- */
-inline proxy_atst_context
-make_root_proxy_atst_context(std::shared_ptr<proxy_atst_tree_context> tree_ctx)
+class root_proxy_atst_context final : public proxy_atst_context
 {
-    return proxy_atst_context{std::move(tree_ctx), true, true};
-}
+ public:
+    root_proxy_atst_context(
+        std::shared_ptr<proxy_atst_tree_context> tree_ctx, bool is_req);
+
+    ~root_proxy_atst_context();
+
+    void
+    set_remote_id(async_id remote_id) override;
+
+    void
+    fail_remote_id() noexcept override;
+
+ private:
+    std::promise<async_id> remote_id_promise_;
+    // Using shared_future to allow get() from multiple threads
+    std::shared_future<async_id> remote_id_future_;
+
+    void
+    wait_on_remote_id() override;
+};
+static_assert(ValidContext<root_proxy_atst_context>);
+
+class non_root_proxy_atst_context final : public proxy_atst_context
+{
+ public:
+    non_root_proxy_atst_context(
+        std::shared_ptr<proxy_atst_tree_context> tree_ctx, bool is_req);
+
+    void
+    set_remote_id(async_id remote_id) override;
+
+    void
+    fail_remote_id() noexcept override;
+
+ private:
+    void
+    wait_on_remote_id() override;
+};
+static_assert(ValidContext<non_root_proxy_atst_context>);
 
 } // namespace cradle
 
