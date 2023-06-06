@@ -1,18 +1,13 @@
 #ifndef CRADLE_PLUGINS_DOMAIN_TESTING_CONTEXT_H
 #define CRADLE_PLUGINS_DOMAIN_TESTING_CONTEXT_H
 
-#include <atomic>
-#include <future>
-#include <memory>
-#include <vector>
+#include <cradle/inner/requests/context_base.h>
 
-#include <cppcoro/cancellation_source.hpp>
-#include <cppcoro/cancellation_token.hpp>
-#include <spdlog/spdlog.h>
-
-#include <cradle/inner/remote/proxy.h>
-#include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/resources.h>
+/*
+ * This file defines a collection of concrete context classes for the "testing"
+ * domain. These classes fill in gaps in the context bases classes, mostly by
+ * defining a number of factory functions (specific to the concrete classes).
+ */
 
 namespace cradle {
 
@@ -21,15 +16,8 @@ namespace cradle {
  * "testing" domain.
  * It offers all context features other than the asynchronous functionality
  * (i.e., implements all context interfaces other than async_context_intf).
- *
- * TODO pass the domain name to the ctor, then this class should be usable as
- * base class for e.g. thinknode_request_context.
  */
-class testing_request_context final : public local_context_intf,
-                                      public remote_context_intf,
-                                      public sync_context_intf,
-                                      public caching_context_intf,
-                                      public introspective_context_intf
+class testing_request_context final : public sync_context_base
 {
  public:
     testing_request_context(
@@ -38,26 +26,7 @@ class testing_request_context final : public local_context_intf,
         bool remotely,
         std::string proxy_name);
 
-    // context_intf
-    bool
-    remotely() const override
-    {
-        return remotely_;
-    }
-
-    bool
-    is_async() const override
-    {
-        return false;
-    }
-
     // remote_context_intf
-    std::string const&
-    proxy_name() const override
-    {
-        return proxy_name_;
-    }
-
     std::string const&
     domain_name() const override
     {
@@ -67,99 +36,32 @@ class testing_request_context final : public local_context_intf,
     std::shared_ptr<local_context_intf>
     local_clone() const override;
 
-    // caching_context_intf
-    inner_resources&
-    get_resources() override
-    {
-        return resources_;
-    }
-
-    // introspective_context_intf
-    tasklet_tracker*
-    get_tasklet() override;
-
-    void
-    push_tasklet(tasklet_tracker* tasklet) override;
-
-    void
-    pop_tasklet() override;
-
-    // Other
-    void
-    proxy_name(std::string const& name);
-
  private:
-    inner_resources& resources_;
-    bool remotely_;
-    std::string proxy_name_;
     std::string domain_name_{"testing"};
-    std::vector<tasklet_tracker*> tasklets_;
 };
-
 static_assert(ValidContext<testing_request_context>);
 
 /*
  * Tree-level context, shared by all local_atst_context objects in the same
  * context tree (relating to the same root request).
  *
- * In particular, it owns a cppcoro::cancellation_source object, which is
- * shared by all contexts in the tree.
+ * Note that an object of this class must not be re-used across multiple
+ * context trees.
  */
-class local_atst_tree_context
+class local_atst_tree_context : public local_tree_context_base
 {
  public:
     local_atst_tree_context(inner_resources& resources);
-
-    // Once created, these objects should not be moved.
-    local_atst_tree_context(local_atst_tree_context const&) = delete;
-    void
-    operator=(local_atst_tree_context const&)
-        = delete;
-    local_atst_tree_context(local_atst_tree_context&&) = delete;
-    void
-    operator=(local_atst_tree_context&&)
-        = delete;
-
-    inner_resources&
-    get_resources()
-    {
-        return resources_;
-    }
-
-    void
-    request_cancellation()
-    {
-        csource_.request_cancellation();
-    }
-
-    cppcoro::cancellation_token
-    get_cancellation_token()
-    {
-        return ctoken_;
-    }
-
-    spdlog::logger&
-    get_logger() noexcept
-    {
-        return *logger_;
-    }
-
- private:
-    inner_resources& resources_;
-    cppcoro::cancellation_source csource_;
-    cppcoro::cancellation_token ctoken_;
-    std::shared_ptr<spdlog::logger> logger_;
 };
 
 /*
  * Context that can be used to asynchronously resolve requests in the "testing"
  * domain, on the local machine.
+ *
  * Relates to a single request, or a non-request argument of such a request,
  * which will be resolved on the local machine.
  */
-class local_atst_context final : public local_async_context_intf,
-                                 public caching_context_intf,
-                                 public introspective_context_intf
+class local_atst_context final : public local_async_context_base
 {
  public:
     local_atst_context(
@@ -167,180 +69,11 @@ class local_atst_context final : public local_async_context_intf,
         local_atst_context* parent,
         bool is_req);
 
-    // Once created, these objects should not be moved.
-    local_atst_context(local_atst_context const&) = delete;
-    void
-    operator=(local_atst_context const&)
-        = delete;
-    local_atst_context(local_atst_context&&) = delete;
-    void
-    operator=(local_atst_context&&)
-        = delete;
-
-    // context_intf
-    bool
-    remotely() const override
-    {
-        return false;
-    }
-
-    bool
-    is_async() const override
-    {
-        return true;
-    }
-
-    // async_context_intf
-    async_id
-    get_id() const override
-    {
-        return id_;
-    }
-
-    bool
-    is_req() const override
-    {
-        return is_req_;
-    }
-
-    cppcoro::task<std::size_t>
-    get_num_subs() const override
-    {
-        co_return subs_.size();
-    }
-
-    async_context_intf&
-    get_sub(std::size_t ix) override
-    {
-        return *subs_[ix];
-    }
-
-    cppcoro::task<async_status>
-    get_status_coro() override;
-
-    cppcoro::task<void>
-    request_cancellation_coro() override;
-
     // local_async_context_intf
-    std::size_t
-    get_local_num_subs() const override
-    {
-        return subs_.size();
-    }
-
-    local_atst_context&
-    get_local_sub(std::size_t ix) override
-    {
-        return *subs_[ix];
-    }
-
     std::unique_ptr<req_visitor_intf>
     make_ctx_tree_builder() override;
-
-    cppcoro::task<void>
-    reschedule_if_opportune() override;
-
-    async_status
-    get_status() override;
-
-    std::string
-    get_error_message() override
-    {
-        return errmsg_;
-    }
-
-    void
-    update_status(async_status status) override;
-
-    void
-    update_status_error(std::string const& errmsg) override;
-
-    void
-    set_result(blob result) override;
-
-    blob
-    get_result() override;
-
-    void
-    request_cancellation() override
-    {
-        tree_ctx_->request_cancellation();
-    }
-
-    bool
-    is_cancellation_requested() const noexcept override;
-
-    void
-    throw_if_cancellation_requested() const override;
-
-    // caching_context_intf
-    inner_resources&
-    get_resources() override
-    {
-        return tree_ctx_->get_resources();
-    }
-
-    // introspective_context_intf
-    // TODO add support for introspection
-    tasklet_tracker*
-    get_tasklet() override
-    {
-        return nullptr;
-    }
-
-    void
-    push_tasklet(tasklet_tracker* tasklet) override
-    {
-        throw not_implemented_error();
-    }
-
-    void
-    pop_tasklet() override
-    {
-        throw not_implemented_error();
-    }
-
-    // Other
-    void
-    add_sub(std::size_t ix, std::shared_ptr<local_atst_context> sub);
-
-    std::shared_ptr<local_atst_tree_context>
-    get_tree_context()
-    {
-        return tree_ctx_;
-    }
-
- private:
-    std::shared_ptr<local_atst_tree_context> tree_ctx_;
-    local_atst_context* parent_;
-    bool is_req_;
-    async_id id_;
-    async_status status_;
-    std::string errmsg_;
-    blob result_;
-    // Using shared_ptr ensures that local_atst_context objects are not
-    // relocated during tree build-up / visit.
-    // It cannot be unique_ptr because there can be two owners: the parent
-    // context, and the async_db.
-    std::vector<std::shared_ptr<local_atst_context>> subs_;
-    std::atomic<int> num_subs_not_running_;
-
-    bool
-    decide_reschedule_sub();
 };
-
 static_assert(ValidContext<local_atst_context>);
-
-/*
- * Creates a root local_atst_context object for the root request in a request
- * tree.
- *
- * The remainder of the local_atst_context tree will be populated by
- * local_atst_context_tree_builder, by recursively crawling the request tree.
- */
-std::shared_ptr<local_atst_context>
-make_root_local_atst_context(
-    std::shared_ptr<local_atst_tree_context> tree_ctx);
 
 /*
  * Recursively creates subtrees of local_atst_context objects, with the
@@ -350,24 +83,25 @@ make_root_local_atst_context(
  * but also for each value: the resolve_request() variant resolving a value
  * requires a context argument, even though it doesn't access it.
  */
-class local_atst_context_tree_builder : public req_visitor_intf
+class local_atst_context_tree_builder : public local_context_tree_builder_base
 {
  public:
     // ctx is the context object corresponding to the request whose arguments
     // will be visited
     local_atst_context_tree_builder(local_atst_context& ctx);
 
-    void
-    visit_val_arg(std::size_t ix) override;
-
-    std::unique_ptr<req_visitor_intf>
-    visit_req_arg(std::size_t ix) override;
+    ~local_atst_context_tree_builder();
 
  private:
-    local_atst_context& ctx_;
+    // local_context_tree_builder_base
+    std::unique_ptr<local_context_tree_builder_base>
+    make_sub_builder(local_async_context_base& sub_ctx) override;
 
-    std::shared_ptr<local_atst_context>
-    make_sub_ctx(std::size_t ix, bool is_req);
+    std::shared_ptr<local_async_context_base>
+    make_sub_ctx(
+        std::shared_ptr<local_tree_context_base> tree_ctx,
+        std::size_t ix,
+        bool is_req) override;
 };
 
 /*
@@ -379,7 +113,9 @@ std::shared_ptr<local_atst_context>
 make_local_async_ctx_tree(
     std::shared_ptr<local_atst_tree_context> tree_ctx, Req const& root_req)
 {
-    auto root_ctx{make_root_local_atst_context(std::move(tree_ctx))};
+    auto root_ctx{
+        std::make_shared<local_atst_context>(tree_ctx, nullptr, true)};
+    register_local_async_ctx(root_ctx);
     local_atst_context_tree_builder builder{*root_ctx};
     root_req.accept(builder);
     return root_ctx;
@@ -389,86 +125,58 @@ make_local_async_ctx_tree(
  * Tree-level context, shared by all proxy_atst_context objects in the same
  * context tree (relating to the same root request).
  *
- * In particular, it owns a remote_proxy reference shared by all context
- * objects in the tree.
+ * Note that an object of this class should not be re-used across multiple
+ * context trees.
  */
-class proxy_atst_tree_context
+class proxy_atst_tree_context : public proxy_async_tree_context_base
 {
  public:
     proxy_atst_tree_context(
         inner_resources& resources, std::string proxy_name);
-
-    inner_resources&
-    get_resources() const
-    {
-        return resources_;
-    }
-
-    std::string const&
-    get_proxy_name() const
-    {
-        return proxy_name_;
-    }
-
-    remote_proxy&
-    get_proxy() const
-    {
-        return proxy_;
-    }
-
-    spdlog::logger&
-    get_logger() const noexcept
-    {
-        return *logger_;
-    }
-
- private:
-    inner_resources& resources_;
-    std::string proxy_name_;
-    remote_proxy& proxy_;
-    std::shared_ptr<spdlog::logger> logger_;
 };
 
 /*
- * Context that can be used to asynchronously resolve requests in the "testing"
- * domain, on a remote machine.
- * It acts as a proxy for a local_atst_context object on a remote server.
+ * Context that can be used to asynchronously resolve root requests in the
+ * "testing" domain on a remote machine.
  */
-class proxy_atst_context : public remote_async_context_intf
+class root_proxy_atst_context final : public root_proxy_async_context_base
 {
  public:
-    proxy_atst_context(
-        std::shared_ptr<proxy_atst_tree_context> tree_ctx, bool is_req);
-
-    // Once created, these objects should not be moved.
-    proxy_atst_context(proxy_atst_context const&) = delete;
-    void
-    operator=(proxy_atst_context const&)
-        = delete;
-    proxy_atst_context(proxy_atst_context&&) = delete;
-    void
-    operator=(proxy_atst_context&&)
-        = delete;
-
-    // context_intf
-    bool
-    remotely() const override
-    {
-        return true;
-    }
-
-    bool
-    is_async() const override
-    {
-        return true;
-    }
+    root_proxy_atst_context(std::shared_ptr<proxy_atst_tree_context> tree_ctx);
 
     // remote_context_intf
     std::string const&
-    proxy_name() const override
+    domain_name() const override
     {
-        return tree_ctx_->get_proxy_name();
+        return domain_name_;
     }
+
+ private:
+    std::string domain_name_{"testing"};
+
+    // proxy_async_context_base
+    std::shared_ptr<local_async_context_base>
+    make_local_clone() const override;
+
+    std::unique_ptr<proxy_async_context_base>
+    make_sub_ctx(
+        std::shared_ptr<proxy_async_tree_context_base> tree_ctx,
+        bool is_req) override;
+};
+static_assert(ValidContext<root_proxy_atst_context>);
+
+/*
+ * Context that can be used to asynchronously resolve non-root requests in the
+ * "testing" domain on a remote machine.
+ */
+class non_root_proxy_atst_context final
+    : public non_root_proxy_async_context_base
+{
+ public:
+    non_root_proxy_atst_context(
+        std::shared_ptr<proxy_atst_tree_context> tree_ctx, bool is_req);
+
+    ~non_root_proxy_atst_context();
 
     std::string const&
     domain_name() const override
@@ -476,123 +184,17 @@ class proxy_atst_context : public remote_async_context_intf
         return domain_name_;
     }
 
-    std::shared_ptr<local_context_intf>
-    local_clone() const override
-    {
-        return make_local_clone();
-    }
-
-    // async_context_intf
-    async_id
-    get_id() const override
-    {
-        return id_;
-    }
-
-    bool
-    is_req() const override
-    {
-        return is_req_;
-    }
-
-    cppcoro::task<std::size_t>
-    get_num_subs() const override;
-
-    async_context_intf&
-    get_sub(std::size_t ix) override;
-
-    cppcoro::task<async_status>
-    get_status_coro() override;
-
-    cppcoro::task<void>
-    request_cancellation_coro() override;
-
-    // remote_async_context_intf
-    std::shared_ptr<local_async_context_intf>
-    local_async_clone() const override
-    {
-        return make_local_clone();
-    }
-
-    proxy_atst_context&
-    get_remote_sub(std::size_t ix) override;
-
-    async_id
-    get_remote_id() override
-    {
-        return remote_id_;
-    }
-
- protected:
+ private:
     std::string domain_name_{"testing"};
-    std::shared_ptr<proxy_atst_tree_context> tree_ctx_;
-    bool is_req_;
-    async_id id_;
-    std::atomic<async_id> remote_id_{NO_ASYNC_ID};
-    bool have_subs_{false};
-    // Using unique_ptr because class proxy_atst_context has no default
-    // constructor and no copy constructor.
-    std::vector<std::unique_ptr<proxy_atst_context>> subs_;
 
-    remote_proxy&
-    get_proxy() const
-    {
-        return tree_ctx_->get_proxy();
-    }
+    // proxy_async_context_base
+    std::shared_ptr<local_async_context_base>
+    make_local_clone() const override;
 
-    std::shared_ptr<local_atst_context>
-    make_local_clone() const;
-
-    cppcoro::task<>
-    ensure_subs() const;
-
-    cppcoro::task<>
-    ensure_subs_no_const();
-
-    virtual void
-    wait_on_remote_id()
-        = 0;
-};
-
-class root_proxy_atst_context final : public proxy_atst_context
-{
- public:
-    root_proxy_atst_context(
-        std::shared_ptr<proxy_atst_tree_context> tree_ctx, bool is_req);
-
-    ~root_proxy_atst_context();
-
-    void
-    set_remote_id(async_id remote_id) override;
-
-    void
-    fail_remote_id() noexcept override;
-
- private:
-    std::promise<async_id> remote_id_promise_;
-    // Using shared_future to allow get() from multiple threads
-    std::shared_future<async_id> remote_id_future_;
-
-    void
-    wait_on_remote_id() override;
-};
-static_assert(ValidContext<root_proxy_atst_context>);
-
-class non_root_proxy_atst_context final : public proxy_atst_context
-{
- public:
-    non_root_proxy_atst_context(
-        std::shared_ptr<proxy_atst_tree_context> tree_ctx, bool is_req);
-
-    void
-    set_remote_id(async_id remote_id) override;
-
-    void
-    fail_remote_id() noexcept override;
-
- private:
-    void
-    wait_on_remote_id() override;
+    std::unique_ptr<proxy_async_context_base>
+    make_sub_ctx(
+        std::shared_ptr<proxy_async_tree_context_base> tree_ctx,
+        bool is_req) override;
 };
 static_assert(ValidContext<non_root_proxy_atst_context>);
 

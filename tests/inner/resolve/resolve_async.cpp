@@ -151,17 +151,19 @@ test_resolve_async_across_rpc(
     auto req{rq_cancellable_coro<level>(
         rq_cancellable_coro<level>(loops, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
-    auto tree_ctx{
-        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
     ResolutionConstraintsRemoteAsync constraints;
 
     // TODO clear the memory cache on the remote and check the duration
-    auto ctx0{root_proxy_atst_context{tree_ctx, true}};
+    auto tree_ctx0{
+        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+    auto ctx0{root_proxy_atst_context{tree_ctx0}};
     test_resolve_async(ctx0, req, constraints, true, loops, delay0, delay1);
 
     // TODO check the duration which should be fast because the result now
     // comes from the memory cache on the remote
-    auto ctx1{root_proxy_atst_context{tree_ctx, true}};
+    auto tree_ctx1{
+        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+    auto ctx1{root_proxy_atst_context{tree_ctx1}};
     test_resolve_async(ctx1, req, constraints, true, loops, delay0, delay1);
 }
 
@@ -245,7 +247,7 @@ test_error_async_across_rpc(
         rq_cancellable_coro<level>(loops, delay1))};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
-    auto ctx{root_proxy_atst_context{tree_ctx, true}};
+    auto ctx{root_proxy_atst_context{tree_ctx}};
 
     test_error_async(ctx, req);
 }
@@ -364,7 +366,7 @@ test_cancel_async_across_rpc(
         rq_cancellable_coro<level>(loops, delay1))};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
-    auto ctx{root_proxy_atst_context{tree_ctx, true}};
+    auto ctx{root_proxy_atst_context{tree_ctx}};
 
     test_cancel_async(ctx, req);
 }
@@ -464,7 +466,7 @@ test_get_subs_async_across_rpc(
     auto req{rq_cancellable_coro<level>(loops, delay)};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
-    auto ctx{root_proxy_atst_context{tree_ctx, true}};
+    auto ctx{root_proxy_atst_context{tree_ctx}};
 
     test_get_subs_async(ctx, req);
 }

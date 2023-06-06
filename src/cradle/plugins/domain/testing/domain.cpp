@@ -39,7 +39,7 @@ testing_domain::make_async_context(
     {
         auto tree_ctx{std::make_shared<proxy_atst_tree_context>(
             resources, std::move(proxy_name))};
-        ctx = std::make_shared<root_proxy_atst_context>(tree_ctx, true);
+        ctx = std::make_shared<root_proxy_atst_context>(tree_ctx);
     }
     return ctx;
 }
