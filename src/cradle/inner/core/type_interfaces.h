@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+#include <fmt/ostream.h>
+
 #include <cradle/inner/core/type_definitions.h>
 
 namespace cradle {

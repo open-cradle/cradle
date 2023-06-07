@@ -4,7 +4,7 @@
 #pragma warning(disable : 5030)
 #pragma warning(disable : 4068)
 #pragma warning(disable : 4702)
-#include <fakeit.hpp>
+#include <fakeit/fakeit.hpp>
 #pragma warning(pop)
 #elif defined(__clang__)
 #pragma clang diagnostic push

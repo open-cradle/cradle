@@ -10,6 +10,7 @@
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/spdlog.h>
 
+#include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/core/monitoring.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/fs/file_io.h>

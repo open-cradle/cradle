@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.14)
 project(cradle)
 
+set(CMAKE_VERBOSE_MAKEFILE TRUE CACHE BOOL "Verbose output" FORCE)
+
 # CRADLE_IS_MAIN_PROJECT defines whether we are building CRADLE as the main
 # project or as a dependency of another project.
 if(NOT DEFINED CRADLE_IS_MAIN_PROJECT)
@@ -10,16 +12,6 @@ if(NOT DEFINED CRADLE_IS_MAIN_PROJECT)
         set(CRADLE_IS_MAIN_PROJECT OFF)
     endif()
 endif()
-
-# Define dependency-management options.
-option(
-    CRADLE_USE_CONAN
-    "Use Conan for loading dependencies"
-    ${CRADLE_IS_MAIN_PROJECT})
-option(
-    CRADLE_SUPPORT_VCPKG
-    "Support vcpkg for dependencies"
-    OFF)
 
 # Define the options for using the preprocessor.
 set(CRADLE_PREPROCESSOR_USAGE_OPTIONS Native GitCache External)
@@ -77,74 +69,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 add_custom_target(version_info
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.cmake)
 
-if (CRADLE_USE_CONAN)
-    # Download/include CMake/Conan integration.
-    if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake")
-        message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
-        file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/0.18.1/conan.cmake"
-                    "${CMAKE_CURRENT_BINARY_DIR}/conan.cmake"
-                    TLS_VERIFY ON)
-    endif()
-    include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
-
-    # Invoke Conan.
-    conan_cmake_configure(
-        REQUIRES
-            boost/1.77.0
-            catch2/2.13.4
-            nlohmann_json/3.9.1
-            msgpack/3.3.0
-            libcurl/7.75.0
-            openssl/1.1.1j
-            sqlite3/3.35.2
-            fakeit/2.0.7
-            websocketpp/0.8.2
-            zlib/1.2.12
-            bzip2/1.0.8
-            yaml-cpp/0.6.3
-            spdlog/1.10.0
-            simdjson/0.9.1
-            lz4/1.9.3
-            fmt/8.1.1
-            cereal/1.3.2
-            benchmark/1.6.1
-            rpclib/2.3.0
-            tomlplusplus/3.3.0
-        OPTIONS
-            boost:without_chrono=True
-            boost:without_container=True
-            boost:without_context=True
-            boost:without_contract=True
-            boost:without_coroutine=True
-            boost:without_fiber=True
-            boost:without_graph=True
-            boost:without_graph_parallel=True
-            boost:without_iostreams=True
-            boost:without_json=True
-            boost:without_locale=True
-            boost:without_log=True
-            boost:without_mpi=True
-            boost:without_nowide=True
-            boost:without_serialization=True
-            boost:without_stacktrace=True
-            boost:without_test=True
-            boost:without_thread=True
-            boost:without_timer=True
-            boost:without_type_erasure=True
-            boost:without_wave=True
-            fakeit:integration=catch
-            *:shared=False
-        GENERATORS cmake_find_package)
-
-    conan_cmake_autodetect(settings)
-
-    conan_cmake_install(
-        PATH_OR_REFERENCE .
-        BUILD missing
-        REMOTE conancenter
-        SETTINGS ${settings})
-endif()
-
 include(FetchContent)
 
 # The cppcoro detection logic seems broken for GCC 10.x (at least in CI), so
@@ -165,27 +89,14 @@ FetchContent_Declare(fetched_cppcoro
     GIT_TAG master)
 FetchContent_MakeAvailable(fetched_cppcoro)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}")
-
-if(CRADLE_SUPPORT_VCPKG)
-    set(msgpack_package_name "msgpack-cxx")
-    set(msgpack_target_name "msgpack-cxx")
-else()
-    set(msgpack_package_name "msgpack")
-    set(msgpack_target_name "msgpack::msgpack")
-endif()
-
 find_package(Boost REQUIRED COMPONENTS
     filesystem program_options)
 find_package(Catch2 REQUIRED)
 find_package(nlohmann_json REQUIRED)
-find_package(${msgpack_package_name} REQUIRED)
+find_package(msgpack REQUIRED)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(SQLite3 REQUIRED)
-if (CRADLE_ENABLE_TESTING)
-    find_package(fakeit REQUIRED)
-endif()
 find_package(websocketpp REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(spdlog REQUIRED)
@@ -297,7 +208,7 @@ if("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "Native")
         INPUT_FILES ${preprocessed_files})
     add_custom_target(preprocessing
         DEPENDS ${generated_srcs} ${generated_headers})
-    set(generated_src_dirs
+    set(generated_src_dir
         ${CMAKE_CURRENT_BINARY_DIR}/generated/src)
 elseif("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "GitCache" OR
        "${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "External")
@@ -337,14 +248,13 @@ elseif("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "GitCache" OR
     file(GLOB_RECURSE generated_headers
         "${resolved_preprocessed_directory}/*.hpp")
     add_custom_target(preprocessing)
-    set(generated_src_dirs
-        ${resolved_preprocessed_directory}/src
-        ${CMAKE_CURRENT_BINARY_DIR}/generated/src)
+    set(generated_src_dir
+        ${resolved_preprocessed_directory}/src)
 else()
     message(FATAL_ERROR "Invalid setting for CRADLE_PREPROCESSOR_USAGE")
 endif()
 
-# Files generated by the preprocessor are in ${generated_src_dirs};
+# Files generated by the preprocessor are in ${generated_src_dir};
 # depending on the ${CRADLE_PREPROCESSOR_USAGE} setting, generated by this cmake,
 # or provided through other means.
 # Other generated files are in ${intgen_src_dir}; always generated by this cmake.
@@ -352,8 +262,9 @@ set(intgen_src_dir
     ${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src)
 
 # Set up the deployment directory.
-set(deploy_dir "${CMAKE_CURRENT_BINARY_DIR}/deploy")
-file(MAKE_DIRECTORY ${deploy_dir})
+# TODO: Choose a better name for this?
+set(deploy_dir ${CMAKE_CURRENT_BINARY_DIR})
+# file(MAKE_DIRECTORY ${deploy_dir})
 
 # Create deploy_dir.h providing access to the deployment directory contents.
 set(deploy_dir_file "${intgen_src_dir}/cradle/deploy_dir.h")
@@ -367,27 +278,34 @@ add_custom_command(
         -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.cmake
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.h.in)
 
+# Set up a public include directory for a target in a way that's compatible
+# with installing the headers in those directories for use by clients.
+function(record_public_include_directory
+    TARGET INTERNAL_DIRECTORY INSTALLED_DIRECTORY PATTERN)
+    target_include_directories(${TARGET} PUBLIC
+        $<BUILD_INTERFACE:${INTERNAL_DIRECTORY}>
+        $<INSTALL_INTERFACE:${INSTALLED_DIRECTORY}>)
+    install(
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${INTERNAL_DIRECTORY}"
+        DESTINATION ${INSTALLED_DIRECTORY}
+        FILES_MATCHING
+        PATTERN ${PATTERN})
+endfunction()
+
 # The library for the in-tree third-party software
 file(GLOB_RECURSE srcs_third_party CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/*.cpp")
 add_library(lib_third_party STATIC ${srcs_third_party})
-if (CRADLE_USE_CONAN)
-    target_compile_definitions(
-        lib_third_party PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
-endif()
-target_include_directories(lib_third_party PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/third-party>
-    $<INSTALL_INTERFACE:include/third-party>)
+record_public_include_directory(lib_third_party
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/third-party
+    include/third-party
+    "*.[ih]*")
 
 # The library for the inner core
 file(GLOB_RECURSE srcs_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/inner/*.cpp")
 add_library(cradle_inner STATIC ${srcs_inner})
 add_dependencies(cradle_inner version_info)
-if (CRADLE_USE_CONAN)
-    target_compile_definitions(
-        cradle_inner PUBLIC ${CONAN_DEFINES} ${CONAN_COMPILE_DEFINITIONS})
-endif()
 # simdjson.h "local variable is initialized but not referenced"
 # Only when building from Visual Studio GUI, not from command line?!
 # TODO use recent simdjson
@@ -396,10 +314,18 @@ if(IS_MSVC)
         SOURCE src/cradle/inner/service/config_map_json.cpp
         APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4189")
 endif()
-target_include_directories(cradle_inner PUBLIC
+record_public_include_directory(cradle_inner
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    include
+    "*.h")
+record_public_include_directory(cradle_inner
     ${intgen_src_dir}
-    src
-    src/third-party)
+    include/internally_generated
+    "*.h*")
+record_public_include_directory(cradle_inner
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/third-party
+    include/third-party
+    "*.[ih]*")
 target_link_libraries(cradle_inner PUBLIC
     Boost::headers
     cereal::cereal
@@ -407,8 +333,8 @@ target_link_libraries(cradle_inner PUBLIC
     CURL::libcurl
     fmt::fmt
     lz4::lz4
-    ${msgpack_target_name}
-    OpenSSL::OpenSSL
+    msgpackc-cxx
+    OpenSSL::SSL
     simdjson::simdjson
     spdlog::spdlog
     tomlplusplus::tomlplusplus)
@@ -419,10 +345,14 @@ file(GLOB_RECURSE srcs_plugins_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/testing/*.cpp")
 add_library(cradle_plugins_inner STATIC ${srcs_plugins_inner})
 add_dependencies(cradle_plugins_inner preprocessing)
-target_include_directories(cradle_plugins_inner PUBLIC
+record_public_include_directory(cradle_plugins_inner
+    ${generated_src_dir}
+    include/generated
+    "*.hpp")
+record_public_include_directory(cradle_plugins_inner
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     include
-    ${generated_src_dirs}
-    src)
+    "*.h*")
 target_link_libraries(cradle_plugins_inner PUBLIC
     cradle_inner
     lib_third_party
@@ -439,16 +369,20 @@ add_library(cradle_rpclib_client STATIC)
 target_sources(cradle_rpclib_client PRIVATE
     ${srcs_rpclib_client}
     ${deploy_dir_file})
-target_include_directories(cradle_rpclib_client PRIVATE
+record_public_include_directory(cradle_rpclib_client
+    ${generated_src_dir}
+    include/generated
+    "*.hpp")
+record_public_include_directory(cradle_rpclib_client
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     include
-    ${intgen_src_dir}
-    src)
+    "*.h*")
 target_link_libraries(cradle_rpclib_client PUBLIC
     cradle_inner
     Boost::filesystem
     Boost::headers
     cppcoro
-    rpclib::rpclib
+    rpclib::rpc
     spdlog::spdlog)
 
 # The typing library (a.o.) adds a type system (e.g. dynamics)
@@ -456,10 +390,14 @@ file(GLOB_RECURSE srcs_typing CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/typing/*.cpp")
 add_library(cradle_typing STATIC ${srcs_typing} ${headers})
 target_sources(cradle_typing PRIVATE ${generated_headers} ${generated_srcs})
-target_include_directories(cradle_typing PUBLIC
+record_public_include_directory(cradle_typing
+    ${generated_src_dir}
+    include/generated
+    "*.hpp")
+record_public_include_directory(cradle_typing
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
     include
-    ${generated_src_dirs}
-    src)
+    "*.h*")
 target_link_libraries(cradle_typing PUBLIC
     cradle_inner
     Boost::headers
@@ -467,17 +405,13 @@ target_link_libraries(cradle_typing PUBLIC
     cppcoro
     nlohmann_json::nlohmann_json
     spdlog::spdlog
-    yaml-cpp::yaml-cpp)
+    yaml-cpp)
 
 # The library for the plugins depending on the typing library
 file(GLOB_RECURSE srcs_plugins_typing CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/serialization/secondary_cache/legacy/native/*.cpp")
 add_library(cradle_plugins_typing STATIC ${srcs_plugins_typing})
 add_dependencies(cradle_plugins_typing preprocessing)
-target_include_directories(cradle_plugins_typing PUBLIC
-    include
-    ${generated_src_dirs}
-    src)
 target_link_libraries(cradle_plugins_typing PUBLIC
     cradle_typing
     cppcoro)
@@ -487,11 +421,6 @@ file(GLOB_RECURSE srcs_thinknode CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/thinknode/*.cpp")
 add_library(cradle_thinknode STATIC ${srcs_thinknode} ${headers})
 target_sources(cradle_thinknode PRIVATE ${generated_headers} ${generated_srcs})
-target_include_directories(cradle_thinknode PUBLIC
-    include
-    ${generated_src_dirs}
-    src
-    src/third-party)
 target_link_libraries(cradle_thinknode PUBLIC
     cradle_plugins_typing
     cradle_typing
@@ -504,9 +433,6 @@ target_link_libraries(cradle_thinknode PUBLIC
 file(GLOB_RECURSE srcs_plugins_thinknode CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/all/*.cpp")
 add_library(cradle_plugins_thinknode STATIC ${srcs_plugins_thinknode})
-target_include_directories(cradle_plugins_thinknode PUBLIC
-    ${generated_src_dirs}
-    src)
 target_link_libraries(cradle_plugins_thinknode PUBLIC
     cradle_thinknode)
 
@@ -525,11 +451,6 @@ if(IS_MSVC)
         APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4996 /wd4127 /wd4267 /wd4244")
 endif()
 target_sources(cradle_websocket PRIVATE ${generated_headers} ${generated_srcs})
-target_include_directories(cradle_websocket PUBLIC
-    include
-    ${generated_src_dirs}
-    src
-    src/third-party)
 target_link_libraries(cradle_websocket PUBLIC
     cradle_thinknode
     cradle_rpclib_client
@@ -544,33 +465,23 @@ file(GLOB_RECURSE srcs_external CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/external/*.cpp")
 add_library(cradle_external STATIC ${srcs_external} ${headers})
 target_sources(cradle_external PRIVATE ${generated_headers} ${generated_srcs})
-target_include_directories(cradle_external PUBLIC
-    include
-    ${generated_src_dirs}
-    src)
 target_link_libraries(cradle_external PUBLIC
     cradle_websocket)
 
 # The WebSocket server
 add_executable(websocket_server src/server.cpp)
-target_include_directories(websocket_server PRIVATE
-    ${generated_src_dirs}
-    src)
 target_link_libraries(websocket_server
     cradle_websocket
     cradle_plugins_inner
     Boost::program_options)
-add_custom_command(TARGET websocket_server POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:websocket_server> ${deploy_dir})
+# add_custom_command(TARGET websocket_server POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:websocket_server> ${deploy_dir})
 
 # The rpclib server
 file(GLOB_RECURSE srcs_rpclib_server CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/server/*.cpp")
 add_executable(rpclib_server ${srcs_rpclib_server})
-target_include_directories(rpclib_server PRIVATE
-    ${generated_src_dirs}
-    src)
-target_link_libraries(rpclib_server
+target_link_libraries(rpclib_server PRIVATE
     cradle_plugins_thinknode
     cradle_thinknode
     cradle_plugins_inner
@@ -578,10 +489,10 @@ target_link_libraries(rpclib_server
     Boost::program_options
     cppcoro
     fmt::fmt
-    rpclib::rpclib
+    rpclib::rpc
     spdlog::spdlog)
-add_custom_command(TARGET rpclib_server POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:rpclib_server> ${deploy_dir})
+# add_custom_command(TARGET rpclib_server POST_BUILD
+#     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:rpclib_server> ${deploy_dir})
 
 # Convenience target denoting all servers
 add_custom_target(servers)
@@ -616,25 +527,25 @@ endif()
 
 # Describe our installation.
 
-# install(
-#     TARGETS
-#         cradle_inner cradle_typing cradle_plugins_typing cradle_thinknode
-#         cradle_plugins_thinknode cradle_websocket cradle_external
-#         websocket_server rpclib_server
-#     EXPORT CradleTargets
-#     LIBRARY DESTINATION lib
-#     ARCHIVE DESTINATION lib
-#     RUNTIME DESTINATION bin)
+install(
+    TARGETS
+        cradle_inner cradle_typing cradle_plugins_typing cradle_thinknode
+        cradle_plugins_thinknode cradle_rpclib_client cradle_websocket
+        cradle_external websocket_server rpclib_server
+    EXPORT CradleTargets
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin)
 
-# # TODO: Decide how to get the version info.
-# # include(CMakePackageConfigHelpers)
-# # write_basic_package_version_file(
-# #     CradleConfigVersion.cmake
-# #     VERSION ${CRADLE_VERSION}
-# #     COMPATIBILITY AnyNewerVersion)
+# TODO: Decide how to get the version info.
+# include(CMakePackageConfigHelpers)
+# write_basic_package_version_file(
+#     CradleConfigVersion.cmake
+#     VERSION ${CRADLE_VERSION}
+#     COMPATIBILITY AnyNewerVersion)
 
-# install(
-#     EXPORT CradleTargets
-#     FILE CradleTargets.cmake
-#     NAMESPACE cradle::
-#     DESTINATION lib/cmake/cradle)
+install(
+    EXPORT CradleTargets
+    FILE CradleTargets.cmake
+    NAMESPACE cradle::
+    DESTINATION lib/cmake/cradle)
