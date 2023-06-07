@@ -1,0 +1,54 @@
+{
+    "name": "cradle",
+    "version": "0.1.0",
+    "description": "a framework for declarative computation at interactive speeds",
+    "homepage": "https://github.com/open-cradle/cradle",
+    "builtin-baseline": "e527f179b10208896e983337aac4cfccfd45e3f9",
+    "dependencies": [
+        "benchmark",
+        "boost-algorithm",
+        "boost-core",
+        "boost-crc",
+        "boost-date-time",
+        "boost-endian",
+        "boost-exception",
+        "boost-filesystem",
+        "boost-format",
+        "boost-functional",
+        "boost-interprocess",
+        "boost-lexical-cast",
+        "boost-numeric-conversion",
+        "boost-process",
+        "boost-program-options",
+        "boost-stacktrace",
+        "boost-uuid",
+        "bzip2",
+        "catch2",
+        "cereal",
+        "curl",
+        "fmt",
+        "lz4",
+        "msgpack",
+        "nlohmann-json",
+        "openssl",
+        "rpclib",
+        "simdjson",
+        "spdlog",
+        "sqlite3",
+        "tomlplusplus",
+        "vcpkg-cmake",
+        "websocketpp",
+        "yaml-cpp",
+        "zlib"
+    ],
+    "overrides": [
+        {
+            "name": "catch2",
+            "version": "2.13.9"
+        },
+        {
+            "name": "msgpack",
+            "version": "3.3.0"
+        }
+    ]
+}
