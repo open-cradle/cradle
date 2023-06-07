@@ -17,7 +17,7 @@ using namespace cradle;
 
 namespace {
 
-static char const tag[] = "[inner][service][seri_catalog]";
+static char const tag[] = "[inner][resolve][seri_catalog]";
 
 using required_ctx_types = ctx_type_list<testing_request_context>;
 template<caching_level_type Level>

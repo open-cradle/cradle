@@ -4,6 +4,7 @@
 #include <atomic>
 #include <future>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include <cppcoro/cancellation_source.hpp>
@@ -209,10 +210,10 @@ class local_async_context_base : public local_async_context_intf,
         return is_req_;
     }
 
-    cppcoro::task<std::size_t>
+    std::size_t
     get_num_subs() const override
     {
-        co_return subs_.size();
+        return subs_.size();
     }
 
     async_context_intf&
@@ -427,6 +428,18 @@ class proxy_async_tree_context_base
  * Context that can be used to asynchronously resolve requests on a remote
  * machine. It acts as a proxy for a local_async_context_base object on a
  * remote server.
+ *
+ * This class needs thread synchronization between the main thread (the
+ * resolve_request() call) and zero or more querier threads.
+ * - The main thread calls set_remote_id() or fail_remote_id(). Queriers may
+ *   need to wait for a valid remote_id.
+ *   * set_remote_id(): queriers call remote_id_future_.get() and set
+ *     remote_id_ to the returned value. remote_id_ is atomic.
+ *   * fail_remote_id(): queriers call remote_id_future_.get().
+ *     fail_remote_id() sets an exception on the related promise, causing
+ *     that exception to propagate to each querier.
+ * - One or more queriers call get_num_subs(), which populates have_subs_ and
+ *   subs_ if that wasn't done before. Synchronization through subs_mutex_.
  */
 class proxy_async_context_base : public remote_async_context_intf
 {
@@ -481,7 +494,7 @@ class proxy_async_context_base : public remote_async_context_intf
         return id_;
     }
 
-    cppcoro::task<std::size_t>
+    std::size_t
     get_num_subs() const override;
 
     async_context_intf&
@@ -500,9 +513,6 @@ class proxy_async_context_base : public remote_async_context_intf
         return make_local_clone();
     }
 
-    proxy_async_context_base&
-    get_remote_sub(std::size_t ix) override;
-
     async_id
     get_remote_id() override
     {
@@ -513,6 +523,9 @@ class proxy_async_context_base : public remote_async_context_intf
     std::shared_ptr<proxy_async_tree_context_base> tree_ctx_;
     async_id id_;
     std::atomic<async_id> remote_id_{NO_ASYNC_ID};
+
+    // This mutex regulates write access to have_subs_ and subs_.
+    std::mutex subs_mutex_;
     bool have_subs_{false};
     // Using unique_ptr because class proxy_async_context_base has no default
     // constructor and no copy constructor.
@@ -532,10 +545,10 @@ class proxy_async_context_base : public remote_async_context_intf
         std::shared_ptr<proxy_async_tree_context_base> tree_ctx, bool is_req)
         = 0;
 
-    cppcoro::task<>
+    void
     ensure_subs() const;
 
-    cppcoro::task<>
+    void
     ensure_subs_no_const();
 
     virtual void

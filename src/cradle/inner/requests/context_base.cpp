@@ -3,10 +3,9 @@
 
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/async_db.h>
+#include <cradle/inner/remote/wait_async.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/context.h>
-
-// TODO make everything thread-safe
 
 namespace cradle {
 
@@ -60,6 +59,29 @@ async_db*
 get_async_db(local_tree_context_base& tree_ctx)
 {
     return tree_ctx.get_resources().get_async_db();
+}
+
+// Matches if the subs on the remote are available for retrieval, i.e., if the
+// get_sub_contexts() precondition holds.
+class subs_available_matcher : public async_status_matcher
+{
+ public:
+    subs_available_matcher(spdlog::logger& logger);
+
+    bool operator()(async_status) const override;
+};
+
+subs_available_matcher::subs_available_matcher(spdlog::logger& logger)
+    : async_status_matcher{"subs_available_matcher", logger}
+{
+}
+
+bool
+subs_available_matcher::operator()(async_status status) const
+{
+    bool done = status >= async_status::SUBS_RUNNING;
+    report_status(status, done);
+    return done;
 }
 
 } // namespace
@@ -306,11 +328,11 @@ proxy_async_context_base::proxy_async_context_base(
 {
 }
 
-cppcoro::task<std::size_t>
+std::size_t
 proxy_async_context_base::get_num_subs() const
 {
-    co_await ensure_subs();
-    co_return subs_.size();
+    ensure_subs();
+    return subs_.size();
 }
 
 async_context_intf&
@@ -337,29 +359,25 @@ proxy_async_context_base::request_cancellation_coro()
     co_return;
 }
 
-proxy_async_context_base&
-proxy_async_context_base::get_remote_sub(std::size_t ix)
-{
-    return *subs_[ix];
-}
-
-cppcoro::task<>
+void
 proxy_async_context_base::ensure_subs() const
 {
-    return const_cast<proxy_async_context_base*>(this)->ensure_subs_no_const();
+    const_cast<proxy_async_context_base*>(this)->ensure_subs_no_const();
 }
 
-cppcoro::task<>
+void
 proxy_async_context_base::ensure_subs_no_const()
 {
+    wait_on_remote_id();
+    std::scoped_lock<std::mutex> lock(subs_mutex_);
     if (have_subs_)
     {
-        co_return;
+        return;
     }
-    wait_on_remote_id();
-    // TODO wait until get_sub_contexts() precondition holds:
-    // status for remote_id is SUBS_RUNNING, SELF_RUNNING or FINISHED
     auto& proxy{get_proxy()};
+    // Wait until the get_sub_contexts precondition holds
+    wait_until_async_status_matches(
+        proxy, remote_id_, subs_available_matcher(tree_ctx_->get_logger()));
     auto specs = proxy.get_sub_contexts(remote_id_);
     for (auto& spec : specs)
     {

@@ -1,73 +1,13 @@
-#include <algorithm>
-#include <chrono>
 #include <deque>
-#include <thread>
 
-#include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/proxy.h>
+#include <cradle/inner/remote/wait_async.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/resolve/remote.h>
 
 namespace cradle {
 
 namespace {
-
-class async_status_matcher
-{
- public:
-    virtual ~async_status_matcher() = default;
-
-    virtual bool operator()(async_status) const = 0;
-};
-
-// Polls the status of the remote context for remote_id until it passes the
-// matcher's condition. Throws if the remote operation was cancelled or ran
-// into an error.
-void
-wait_until_async_done(
-    remote_proxy& proxy,
-    async_id remote_id,
-    async_status_matcher const& matcher)
-{
-    int sleep_time{1};
-    for (;;)
-    {
-        auto status = proxy.get_async_status(remote_id);
-        if (matcher(status))
-        {
-            break;
-        }
-        else if (status == async_status::CANCELLED)
-        {
-            throw async_cancelled(
-                fmt::format("remote async {} cancelled", remote_id));
-        }
-        else if (status == async_status::ERROR)
-        {
-            std::string errmsg = proxy.get_async_error_message(remote_id);
-            throw async_error(errmsg);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
-        sleep_time = std::min((sleep_time + 1) * 3 / 2, 100);
-    }
-}
-
-void
-report_matcher_status(
-    spdlog::logger& logger,
-    std::string const& matcher_name,
-    async_status status,
-    bool done)
-{
-    if (!done)
-    {
-        logger.debug("{}: status {}, NOT done", matcher_name, status);
-    }
-    else
-    {
-        logger.debug("{}: status {}, DONE", matcher_name, status);
-    }
-}
 
 // Matches if the remote operation has finished successfully
 class async_finished_matcher : public async_status_matcher
@@ -76,13 +16,10 @@ class async_finished_matcher : public async_status_matcher
     async_finished_matcher(spdlog::logger& logger);
 
     bool operator()(async_status) const override;
-
- private:
-    spdlog::logger& logger_;
 };
 
 async_finished_matcher::async_finished_matcher(spdlog::logger& logger)
-    : logger_{logger}
+    : async_status_matcher{"async_finished_matcher", logger}
 {
 }
 
@@ -90,7 +27,7 @@ bool
 async_finished_matcher::operator()(async_status status) const
 {
     bool done = status == async_status::FINISHED;
-    report_matcher_status(logger_, "async_finished_matcher", status, done);
+    report_status(status, done);
     return done;
 }
 
@@ -98,7 +35,8 @@ void
 wait_until_async_finished(remote_proxy& proxy, async_id remote_id)
 {
     auto& logger = proxy.get_logger();
-    wait_until_async_done(proxy, remote_id, async_finished_matcher(logger));
+    wait_until_async_status_matches(
+        proxy, remote_id, async_finished_matcher(logger));
 }
 
 serialized_result

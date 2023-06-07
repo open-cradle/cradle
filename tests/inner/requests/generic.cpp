@@ -68,7 +68,7 @@ class async_context_mixin : public async_context_intf
         throw not_implemented_error();
     }
 
-    cppcoro::task<std::size_t>
+    std::size_t
     get_num_subs() const
     {
         throw not_implemented_error();

@@ -21,7 +21,7 @@ using namespace cradle;
 
 namespace {
 
-static char const tag[] = "[inner][service][async]";
+static char const tag[] = "[inner][resolve][async]";
 
 request_uuid
 make_test_uuid(int ext)
@@ -62,41 +62,41 @@ test_resolve_async_coro(
     REQUIRE(res == (loops + delay0) + (loops + delay1));
     REQUIRE(ctx.is_req());
     REQUIRE(co_await ctx.get_status_coro() == async_status::FINISHED);
-    REQUIRE(co_await ctx.get_num_subs() == 2);
+    REQUIRE(ctx.get_num_subs() == 2);
     auto& ctx0 = ctx.get_sub(0);
     REQUIRE(ctx.is_req());
-    REQUIRE(co_await ctx0.get_num_subs() == 2);
+    REQUIRE(ctx0.get_num_subs() == 2);
     REQUIRE(co_await ctx0.get_status_coro() == async_status::FINISHED);
     auto& ctx1 = ctx.get_sub(1);
     REQUIRE(ctx.is_req());
-    REQUIRE(co_await ctx1.get_num_subs() == 2);
+    REQUIRE(ctx1.get_num_subs() == 2);
     REQUIRE(co_await ctx1.get_status_coro() == async_status::FINISHED);
     if (requests_are_normalized)
     {
         auto& ctx00 = ctx0.get_sub(0);
         REQUIRE(ctx00.is_req());
-        REQUIRE(co_await ctx00.get_num_subs() == 1);
+        REQUIRE(ctx00.get_num_subs() == 1);
         REQUIRE(co_await ctx00.get_status_coro() == async_status::FINISHED);
         auto& ctx000 = ctx00.get_sub(0);
         REQUIRE(!ctx000.is_req());
         REQUIRE(co_await ctx000.get_status_coro() == async_status::FINISHED);
         auto& ctx01 = ctx0.get_sub(1);
         REQUIRE(ctx01.is_req());
-        REQUIRE(co_await ctx01.get_num_subs() == 1);
+        REQUIRE(ctx01.get_num_subs() == 1);
         REQUIRE(co_await ctx01.get_status_coro() == async_status::FINISHED);
         auto& ctx010 = ctx01.get_sub(0);
         REQUIRE(!ctx010.is_req());
         REQUIRE(co_await ctx010.get_status_coro() == async_status::FINISHED);
         auto& ctx10 = ctx1.get_sub(0);
         REQUIRE(ctx10.is_req());
-        REQUIRE(co_await ctx10.get_num_subs() == 1);
+        REQUIRE(ctx10.get_num_subs() == 1);
         REQUIRE(co_await ctx10.get_status_coro() == async_status::FINISHED);
         auto& ctx100 = ctx10.get_sub(0);
         REQUIRE(!ctx100.is_req());
         REQUIRE(co_await ctx100.get_status_coro() == async_status::FINISHED);
         auto& ctx11 = ctx1.get_sub(1);
         REQUIRE(ctx11.is_req());
-        REQUIRE(co_await ctx11.get_num_subs() == 1);
+        REQUIRE(ctx11.get_num_subs() == 1);
         REQUIRE(co_await ctx11.get_status_coro() == async_status::FINISHED);
         auto& ctx110 = ctx11.get_sub(0);
         REQUIRE(!ctx110.is_req());
@@ -412,80 +412,111 @@ TEST_CASE("cancel async request on rpclib", tag)
     test_cancel_async_across_rpc(inner, "rpclib");
 }
 
-#if 0
-
-// TODO enable these test cases, throw in rpclib_client::submit_async()
 namespace {
 
-// Requests cancellation of all coroutines sharing the context resources
-// for ctx
-cppcoro::task<void>
-get_subs_control_coro(async_context_intf& ctx)
-{
-    auto logger = ensure_logger("checker");
-    logger->info("get_subs_control_coro(ctx {})", ctx.get_id());
-    auto num_subs = co_await ctx.get_num_subs();
-    logger->info("num_subs {}", num_subs);
-    co_return;
-}
-
+// Attempts to retrieve information from the remote related to the given
+// context. The get_num_subs() call should throw an exception because
+// submit_async was forced to fail, so no remote id will ever be available.
+// Runs on separate thread. Any exception thrown here, including the one thrown
+// from a failing REQUIRE*(), won't be caught by Catch2, and lead to a
+// terminate. So instead use CHECK_THROWS.
 void
 get_subs_control_func(async_context_intf& ctx)
 {
-    REQUIRE_THROWS(cppcoro::sync_wait(get_subs_control_coro(ctx)));
-}
-
-template<AsyncContext Ctx, typename Req>
-cppcoro::task<void>
-test_get_subs_async_coro(Ctx& ctx, Req const& req)
-{
-    REQUIRE_THROWS(co_await resolve_request(ctx, req));
-}
-
-template<AsyncContext Ctx, typename Req>
-void
-test_get_subs_async(Ctx& ctx, Req const& req)
-{
-    // Run the checker coroutine on a separate thread, independent from the
-    // ones under test
-    // Note: std::thread::~thread() calls terminate() if the thread wasn't
-    // joined; e.g. if the test code threw.
-    std::jthread get_subs_control_thread(get_subs_control_func, std::ref(ctx));
-    cppcoro::sync_wait(test_get_subs_async_coro(ctx, req));
-    get_subs_control_thread.join();
+    CHECK_THROWS(ctx.get_num_subs());
 }
 
 void
-test_get_subs_async_across_rpc(
+test_failing_get_num_subs(
     inner_resources& inner, std::string const& proxy_name)
 {
-    constexpr int loops = 10;
     constexpr auto level = caching_level_type::memory;
-    int delay = 5;
-    // Don't need to set props e.g. uuid?!
-    auto req{rq_cancellable_coro<level>(loops, delay)};
+    auto req{rq_cancellable_coro<level>(2, 3)};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+    // Set a special domain name causing submit_async to fail on the remote
+    tree_ctx->set_domain_name("fail_submit_async");
     auto ctx{root_proxy_atst_context{tree_ctx}};
 
-    test_get_subs_async(ctx, req);
+    // Run get_num_subs on a separate thread, independent from the main one
+    // which will call resolve_request().
+    std::jthread control_thread(get_subs_control_func, std::ref(ctx));
+
+    CHECK_THROWS(cppcoro::sync_wait(resolve_request(ctx, req)));
+
+    control_thread.join();
 }
 
 } // namespace
 
-TEST_CASE("get subs for request on loopback", tag)
+TEST_CASE("get_num_subs failure on loopback", tag)
 {
     inner_resources inner;
     setup_loopback_test(inner);
 
-    test_get_subs_async_across_rpc(inner, "loopback");
+    test_failing_get_num_subs(inner, "loopback");
 }
 
-TEST_CASE("get subs for request on rpclib", "[B]")
+TEST_CASE("get_num_subs failure on rpclib", tag)
 {
     inner_resources inner;
     setup_rpclib_test(inner);
 
-    test_get_subs_async_across_rpc(inner, "rpclib");
+    test_failing_get_num_subs(inner, "rpclib");
 }
-#endif
+
+namespace {
+
+void
+delayed_get_subs_control_func(async_context_intf& ctx)
+{
+    // Check that resolve_async on the remote is in the startup delay
+    CHECK(cppcoro::sync_wait(ctx.get_status_coro()) == async_status::CREATED);
+
+    // get_num_subs should block until the information is available on the
+    // remote. Status should be SUBS_RUNNING now or real soon, but "real soon"
+    // implies we cannot check it.
+    CHECK(ctx.get_num_subs() == 2);
+}
+
+void
+test_delayed_get_num_subs(
+    inner_resources& inner, std::string const& proxy_name)
+{
+    constexpr auto level = caching_level_type::memory;
+    auto req{rq_cancellable_coro<level>(2, 3)};
+    auto tree_ctx{
+        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+    // Set a special domain name causing resolve_async to have a startup delay
+    tree_ctx->set_domain_name("testing_delay_resolve_async");
+    auto ctx{root_proxy_atst_context{tree_ctx}};
+
+    // Run get_num_subs on a separate thread, independent from the main one
+    // which will call resolve_request().
+    std::jthread control_thread(delayed_get_subs_control_func, std::ref(ctx));
+
+    CHECK(cppcoro::sync_wait(resolve_request(ctx, req)) == 5);
+
+    control_thread.join();
+}
+
+} // namespace
+
+// resolve_async() is forced to have a startup delay.
+// The information that get_num_subs needs is available only after
+// resolve_async has started, so get_num_subs needs to wait.
+TEST_CASE("delayed get_num_subs on loopback", tag)
+{
+    inner_resources inner;
+    setup_loopback_test(inner);
+
+    test_delayed_get_num_subs(inner, "loopback");
+}
+
+TEST_CASE("delayed get_num_subs on rpclib", tag)
+{
+    inner_resources inner;
+    setup_rpclib_test(inner);
+
+    test_delayed_get_num_subs(inner, "rpclib");
+}

@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <thread>
 
 #include <cppcoro/sync_wait.hpp>
 
@@ -15,6 +16,8 @@ namespace cradle {
 loopback_service::loopback_service(
     service_config const& config, inner_resources& resources)
     : resources_{resources},
+      testing_{
+          config.get_bool_or_default(generic_config_keys::TESTING, false)},
       async_pool_{static_cast<BS::concurrency_t>(config.get_number_or_default(
           loopback_config_keys::ASYNC_CONCURRENCY, 16))}
 {
@@ -55,6 +58,11 @@ resolve_async(
     std::string seri_req)
 {
     auto& logger{loopback->get_logger()};
+    if (loopback->delayed_resolve_async())
+    {
+        logger.warn("resolve_async forced startup delay");
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
     logger.info("resolve_async start");
     // TODO update status to STARTED or so
     try
@@ -82,12 +90,28 @@ resolve_async(
     }
 }
 
+// On an RPC server, domain_name is used to create a context object of the
+// correct type. The loopback service gets the correct object from the client,
+// so domain_name is mostly unused.
 async_id
 loopback_service::submit_async(
     remote_context_intf& ctx, std::string domain_name, std::string seri_req)
 {
     logger_->info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
+    if (testing_)
+    {
+        if (domain_name == "fail_submit_async")
+        {
+            logger_->warn("submit_async: forced failure");
+            throw remote_error{"submit_async forced failure"};
+        }
+        if (domain_name == "testing_delay_resolve_async")
+        {
+            logger_->warn("forcing delayed resolve_async");
+            delayed_resolve_async_ = true;
+        }
+    }
     auto actx{
         cast_ctx_to_ref<remote_async_context_intf>(ctx).local_async_clone()};
     resources_.ensure_async_db();

@@ -179,8 +179,7 @@ class remote_context_intf : public virtual context_intf
     // Creates a variant of *this that can be used to locally resolve the same
     // set of requests. In particular, the new object's remotely() will return
     // false.
-    // Will be called only when *this is the root of a context tree.
-    // TODO formalize "context object is root"
+    // For an asynchronous context tree, *this must be the tree root.
     // Useful for a loopback service.
     virtual std::shared_ptr<local_context_intf>
     local_clone() const = 0;
@@ -250,10 +249,13 @@ class async_context_intf : public virtual context_intf
         = 0;
 
     // Returns the number of subtasks.
-    // This is a coroutine, so that lazily populating the context subtree
-    // is possible in case of a remote context.
-    virtual cppcoro::task<std::size_t>
-    get_num_subs() const = 0;
+    // If this context is a remote one and the requested information has not
+    // yet been retrieved from the server, this call will populate the
+    // context subtree, and block while that is happening. The current
+    // implementation uses no coroutines, so this function isn't one either.
+    virtual std::size_t
+    get_num_subs() const
+        = 0;
 
     // Gets the context for the subtask corresponding to the ix'th
     // subrequest (ix=0 representing the first subrequest).
@@ -384,17 +386,12 @@ class remote_async_context_intf : public remote_context_intf,
     // Creates a variant of *this that can be used to locally resolve the same
     // set of requests. In particular, the new object's remotely() will return
     // false.
-    // Will be called only when *this is the root of a context tree.
+    // Must be called only when *this is the root of a context tree.
     // Useful for a loopback service.
+    // A call of this function is equivalent to
+    //   static_pointer_cast<local_async_context_intf>(local_clone())
     virtual std::shared_ptr<local_async_context_intf>
     local_async_clone() const = 0;
-
-    // Gets the context for the subtask corresponding to the ix'th
-    // subrequest (ix=0 representing the first subrequest).
-    // Differs from get_sub() in its return value.
-    virtual remote_async_context_intf&
-    get_remote_sub(std::size_t ix)
-        = 0;
 
     // Sets the id identifying this context on the remote server
     // (after this id has been retrieved from the server).

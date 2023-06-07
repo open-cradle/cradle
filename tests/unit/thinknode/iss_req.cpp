@@ -31,7 +31,7 @@ using namespace cradle;
 
 namespace {
 
-static char const tag[] = "[inner][service][seri_catalog]";
+static char const tag[] = "[thinknode][iss_req]";
 
 template<typename Request>
 auto

@@ -16,7 +16,7 @@ using namespace cradle;
 
 namespace {
 
-static char const tag[] = "[inner][service][request]";
+static char const tag[] = "[inner][resolve][request]";
 
 request_uuid
 make_test_uuid(int ext)

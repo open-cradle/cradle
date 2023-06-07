@@ -19,6 +19,12 @@ testing_request_context::local_clone() const
         resources_, nullptr, false, "");
 }
 
+void
+testing_request_context::set_domain_name(std::string const& name)
+{
+    domain_name_ = name;
+}
+
 local_atst_tree_context::local_atst_tree_context(inner_resources& resources)
     : local_tree_context_base{resources}
 {
@@ -80,6 +86,13 @@ root_proxy_atst_context::root_proxy_atst_context(
 {
 }
 
+std::string const&
+root_proxy_atst_context::domain_name() const
+{
+    auto my_tree_ctx{static_pointer_cast<proxy_atst_tree_context>(tree_ctx_)};
+    return my_tree_ctx->domain_name();
+}
+
 std::shared_ptr<local_async_context_base>
 root_proxy_atst_context::make_local_clone() const
 {
@@ -107,10 +120,17 @@ non_root_proxy_atst_context::~non_root_proxy_atst_context()
 {
 }
 
+std::string const&
+non_root_proxy_atst_context::domain_name() const
+{
+    auto my_tree_ctx{static_pointer_cast<proxy_atst_tree_context>(tree_ctx_)};
+    return my_tree_ctx->domain_name();
+}
+
 std::shared_ptr<local_async_context_base>
 non_root_proxy_atst_context::make_local_clone() const
 {
-    // Will be called only for a root context
+    // Must be called only for a root context
     throw std::logic_error{
         "invalid non_root_proxy_atst_context::make_local_clone() call"};
 }

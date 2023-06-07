@@ -1,5 +1,6 @@
 #include <functional>
 #include <stdexcept>
+#include <thread>
 
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
@@ -20,6 +21,8 @@ rpclib_handler_context::rpclib_handler_context(
     service_core& service,
     spdlog::logger& logger)
     : service_{service},
+      testing_{
+          config.get_bool_or_default(generic_config_keys::TESTING, false)},
       logger_{logger},
       request_pool_{
           static_cast<BS::concurrency_t>(config.get_number_or_default(
@@ -114,6 +117,11 @@ resolve_async(
     std::string seri_req)
 {
     auto& logger{hctx.logger()};
+    if (hctx.delayed_resolve_async())
+    {
+        logger.warn("resolve_async forced startup delay");
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
     logger.info("resolve_async start");
     // TODO update status to STARTED or so
     try
@@ -148,12 +156,26 @@ handle_submit_async(
     std::string const& seri_req)
 try
 {
+    std::string actual_domain_name{domain_name};
     auto& service{hctx.service()};
     auto& logger{hctx.logger()};
-    // logger.info("submit_async {}: {}", domain_name, seri_req);
     logger.info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
-    auto dom = find_domain(domain_name);
+    if (hctx.testing())
+    {
+        if (domain_name == "fail_submit_async")
+        {
+            logger.warn("submit_async: forced failure");
+            throw remote_error{"submit_async forced failure"};
+        }
+        if (domain_name == "testing_delay_resolve_async")
+        {
+            logger.warn("forcing delayed resolve_async");
+            hctx.force_delayed_resolve_async();
+            actual_domain_name = "testing";
+        }
+    }
+    auto dom = find_domain(actual_domain_name);
     auto ctx{dom->make_async_context(service, false, "")};
     auto actx = cast_ctx_to_shared_ptr<local_async_context_intf>(ctx);
     hctx.get_async_db().add(actx);

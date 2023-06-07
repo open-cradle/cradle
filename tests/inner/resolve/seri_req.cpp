@@ -13,6 +13,8 @@
 
 using namespace cradle;
 
+static char const tag[] = "[inner][resolve][seri_req]";
+
 static void
 test_resolve(bool remotely)
 {
@@ -37,12 +39,12 @@ test_resolve(bool remotely)
     REQUIRE(response.data()[0xff] == static_cast<std::byte>(0x55));
 }
 
-TEST_CASE("resolve serialized request, locally", "[inner][service][seri_req]")
+TEST_CASE("resolve serialized request, locally", tag)
 {
     test_resolve(false);
 }
 
-TEST_CASE("resolve serialized request, remotely", "[inner][service][seri_req]")
+TEST_CASE("resolve serialized request, remotely", tag)
 {
     test_resolve(true);
 }

@@ -23,6 +23,14 @@ class loopback_service : public remote_proxy
     spdlog::logger&
     get_logger() override;
 
+    // If true, resolve_async() has an artifical delay at the start.
+    // For testing purposes only.
+    bool
+    delayed_resolve_async() const
+    {
+        return delayed_resolve_async_;
+    }
+
     serialized_result
     resolve_sync(
         remote_context_intf& ctx,
@@ -55,6 +63,8 @@ class loopback_service : public remote_proxy
 
  private:
     inner_resources& resources_;
+    bool testing_;
+    bool delayed_resolve_async_{false};
     inline static std::shared_ptr<spdlog::logger> logger_;
     BS::thread_pool async_pool_;
 

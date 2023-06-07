@@ -4,16 +4,17 @@
 #include <cradle/inner/requests/context_base.h>
 
 /*
- * This file defines a collection of concrete context classes for the "testing"
- * domain. These classes fill in gaps in the context bases classes, mostly by
+ * This file defines a collection of concrete context classes. The default
+ * domain is "testing" but can be overridden.
+ * These classes fill in gaps in the context bases classes, mostly by
  * defining a number of factory functions (specific to the concrete classes).
  */
 
 namespace cradle {
 
 /*
- * A context that can be used to synchronously resolve requests in the
- * "testing" domain.
+ * A context that can be used to synchronously resolve requests in some
+ * domain ("testing" by default).
  * It offers all context features other than the asynchronous functionality
  * (i.e., implements all context interfaces other than async_context_intf).
  */
@@ -36,6 +37,10 @@ class testing_request_context final : public sync_context_base
     std::shared_ptr<local_context_intf>
     local_clone() const override;
 
+    // other
+    void
+    set_domain_name(std::string const& name);
+
  private:
     std::string domain_name_{"testing"};
 };
@@ -55,8 +60,8 @@ class local_atst_tree_context : public local_tree_context_base
 };
 
 /*
- * Context that can be used to asynchronously resolve requests in the "testing"
- * domain, on the local machine.
+ * Context that can be used to asynchronously resolve requests on the local
+ * machine.
  *
  * Relates to a single request, or a non-request argument of such a request,
  * which will be resolved on the local machine.
@@ -123,7 +128,8 @@ make_local_async_ctx_tree(
 
 /*
  * Tree-level context, shared by all proxy_atst_context objects in the same
- * context tree (relating to the same root request).
+ * context tree (relating to the same root request). The default domain is
+ * "testing" but can be overridden.
  *
  * Note that an object of this class should not be re-used across multiple
  * context trees.
@@ -133,11 +139,26 @@ class proxy_atst_tree_context : public proxy_async_tree_context_base
  public:
     proxy_atst_tree_context(
         inner_resources& resources, std::string proxy_name);
+
+    std::string const&
+    domain_name() const
+    {
+        return domain_name_;
+    }
+
+    void
+    set_domain_name(std::string const& name)
+    {
+        domain_name_ = name;
+    }
+
+ private:
+    std::string domain_name_{"testing"};
 };
 
 /*
- * Context that can be used to asynchronously resolve root requests in the
- * "testing" domain on a remote machine.
+ * Context that can be used to asynchronously resolve root requests in some
+ * domain ("testing" by default), on a remote machine.
  */
 class root_proxy_atst_context final : public root_proxy_async_context_base
 {
@@ -146,14 +167,9 @@ class root_proxy_atst_context final : public root_proxy_async_context_base
 
     // remote_context_intf
     std::string const&
-    domain_name() const override
-    {
-        return domain_name_;
-    }
+    domain_name() const override;
 
  private:
-    std::string domain_name_{"testing"};
-
     // proxy_async_context_base
     std::shared_ptr<local_async_context_base>
     make_local_clone() const override;
@@ -166,8 +182,8 @@ class root_proxy_atst_context final : public root_proxy_async_context_base
 static_assert(ValidContext<root_proxy_atst_context>);
 
 /*
- * Context that can be used to asynchronously resolve non-root requests in the
- * "testing" domain on a remote machine.
+ * Context that can be used to asynchronously resolve non-root requests in some
+ * domain ("testing" by default), on a remote machine.
  */
 class non_root_proxy_atst_context final
     : public non_root_proxy_async_context_base
@@ -178,15 +194,11 @@ class non_root_proxy_atst_context final
 
     ~non_root_proxy_atst_context();
 
+    // remote_context_intf
     std::string const&
-    domain_name() const override
-    {
-        return domain_name_;
-    }
+    domain_name() const override;
 
  private:
-    std::string domain_name_{"testing"};
-
     // proxy_async_context_base
     std::shared_ptr<local_async_context_base>
     make_local_clone() const override;
