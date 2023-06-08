@@ -10,8 +10,8 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunknown-attributes"
 #pragma clang diagnostic ignored "-Wunknown-warning-option"
-#include <fakeit.hpp>
+#include <fakeit/fakeit.hpp>
 #pragma clang diagnostic pop
 #else
-#include <fakeit.hpp>
+#include <fakeit/fakeit.hpp>
 #endif
