@@ -81,7 +81,7 @@ you can do so yourself if you like.
 Either way, you should install the following packages:
 
 ```shell
-pip install pyyaml gcovr pytest websocket-client msgpack
+pip install gcovr pytest requests websocket-client msgpack pyyaml
 ```
 
 ## Secrets
