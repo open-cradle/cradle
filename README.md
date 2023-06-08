@@ -48,8 +48,7 @@ choco install ocpwin
 
 ### Python
 
-CRADLE uses Python (3.x) both indirectly (via Conan) and directly (for some
-testing purposes).
+CRADLE uses Python (3.x) for some testing purposes.
 
 #### Ubuntu
 
@@ -82,7 +81,7 @@ you can do so yourself if you like.
 Either way, you should install the following packages:
 
 ```shell
-pip install conan gcovr pytest websocket-client msgpack
+pip install gcovr pytest websocket-client msgpack
 ```
 
 ## Secrets

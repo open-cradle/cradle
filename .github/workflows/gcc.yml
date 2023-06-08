@@ -21,12 +21,9 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Cache
-      uses: actions/cache@v3
+    - uses: friendlyanon/setup-vcpkg@v1
       with:
-        path: |
-          ~/.conan/data
-        key: ${{runner.os}}-GCC-10-${{matrix.config}}
+        committish: 662dbb50e63af15baa2909b7eac5b1b87e86a0aa
 
     - name: Install
       run: |
@@ -41,7 +38,8 @@ jobs:
         scripts/set-up-python.sh --python=python3
         source .venv/bin/activate
         cmake -Bbuild -DCMAKE_BUILD_TYPE=${{matrix.config}} \
-           -DCRADLE_USE_CONAN=ON .
+          -D"CMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+          .
 
     - name: Build
       run: |

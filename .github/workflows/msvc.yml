@@ -17,12 +17,10 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Cache
-      uses: actions/cache@v3
+    # TODO: The preprocessing job shouldn't require vcpkg.
+    - uses: friendlyanon/setup-vcpkg@v1
       with:
-        path: |
-          ~/.conan/data
-        key: ${{runner.os}}-GCC-10-${{matrix.config}}
+        committish: 662dbb50e63af15baa2909b7eac5b1b87e86a0aa
 
     - name: Install
       run: |
@@ -36,7 +34,9 @@ jobs:
         ${CXX} --version
         scripts/set-up-python.sh --python=python3
         source .venv/bin/activate
-        cmake -Bbuild -DCMAKE_BUILD_TYPE=Debug -DCRADLE_USE_CONAN=ON .
+        cmake -Bbuild -DCMAKE_BUILD_TYPE=Debug \
+          -D"CMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+          .
         cmake --build build --target preprocessing -j4
 
     - name: Upload preprocessed headers as build artifact
@@ -69,16 +69,9 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Cache
-      uses: actions/cache@v3
+    - uses: friendlyanon/setup-vcpkg@v1
       with:
-        path: |
-          C:/.conan/data
-        key: ${{runner.os}}-MSVC-2019-${{matrix.config}}
-
-    - name: Install Conan
-      run: |
-        pip install conan==1.59.0
+        committish: 662dbb50e63af15baa2909b7eac5b1b87e86a0aa
 
     - name: Download preprocessed headers
       uses: actions/download-artifact@v3
@@ -87,12 +80,12 @@ jobs:
         path: preprocessed
 
     - name: Configure
-      run: >
-        cmake -Bbuild -DCMAKE_BUILD_TYPE=${{matrix.config}}
-        -DCRADLE_USE_CONAN=ON
-        -DCRADLE_PREPROCESSOR_USAGE=External
-        -DCRADLE_EXTERNALLY_PREPROCESSED_DIRECTORY=preprocessed
-        -DCRADLE_LOCAL_DOCKER_TESTING=OFF
+      run: |
+        cmake -Bbuild -DCMAKE_BUILD_TYPE=${{matrix.config}} \
+          -D"CMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+          -DCRADLE_PREPROCESSOR_USAGE=External \
+          -DCRADLE_EXTERNALLY_PREPROCESSED_DIRECTORY=preprocessed \
+          -DCRADLE_LOCAL_DOCKER_TESTING=OFF
 
     - name: Build
       run: |
