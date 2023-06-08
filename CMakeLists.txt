@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 project(cradle)
 
-set(CMAKE_VERBOSE_MAKEFILE TRUE CACHE BOOL "Verbose output" FORCE)
-
 # CRADLE_IS_MAIN_PROJECT defines whether we are building CRADLE as the main
 # project or as a dependency of another project.
 if(NOT DEFINED CRADLE_IS_MAIN_PROJECT)
