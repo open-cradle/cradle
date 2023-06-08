@@ -5,4 +5,4 @@ set -x -e
 virtualenv "$@" --prompt="(cradle) " .venv
 source .venv/bin/activate
 python --version
-pip install gcovr pytest websocket-client msgpack
+pip install pyyaml gcovr pytest websocket-client msgpack
