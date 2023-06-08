@@ -77,6 +77,35 @@ class local_atst_context final : public local_async_context_base
     // local_async_context_intf
     std::unique_ptr<req_visitor_intf>
     make_ctx_tree_builder() override;
+
+    void
+    set_result(blob result) override;
+
+    // Other; for extending / aggerating short delays so that corresponding
+    // race conditions become reproducible and can be checked in a unit test.
+
+    // Sets the delay (in ms) that a resolve_async operation / thread will wait
+    // after starting
+    void
+    set_resolve_async_delay(int delay)
+    {
+        resolve_async_delay_ = delay;
+    }
+
+    // Sets the delay (in ms) that a set_result() call will wait before
+    // actually setting the result
+    void
+    set_set_result_delay(int delay)
+    {
+        set_result_delay_ = delay;
+    }
+
+    void
+    apply_resolve_async_delay();
+
+ private:
+    int resolve_async_delay_{0};
+    int set_result_delay_{0};
 };
 static_assert(ValidContext<local_atst_context>);
 

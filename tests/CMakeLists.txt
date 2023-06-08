@@ -35,7 +35,8 @@ target_include_directories(unit_test_runner PUBLIC
     src)
 target_link_libraries(unit_test_runner PRIVATE
     test_lib_runner
-    test_lib_unit)
+    test_lib_unit
+    cradle_inner)
 
 # Add the unit testing target.
 add_custom_target(

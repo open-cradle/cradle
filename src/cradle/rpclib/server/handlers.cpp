@@ -11,6 +11,7 @@
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/requests/domain.h>
 #include <cradle/inner/resolve/seri_req.h>
+#include <cradle/plugins/domain/testing/context.h>
 #include <cradle/rpclib/server/handlers.h>
 #include <cradle/typing/service/core.h>
 
@@ -117,10 +118,9 @@ resolve_async(
     std::string seri_req)
 {
     auto& logger{hctx.logger()};
-    if (hctx.delayed_resolve_async())
+    if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*actx))
     {
-        logger.warn("resolve_async forced startup delay");
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        atst_ctx->apply_resolve_async_delay();
     }
     logger.info("resolve_async start");
     // TODO update status to STARTED or so
@@ -130,11 +130,6 @@ resolve_async(
                        resolve_serialized_local(*actx, std::move(seri_req)))
                        .value();
         logger.info("resolve_async done: {}", res);
-        if (actx->get_status() != async_status::FINISHED)
-        {
-            logger.error(
-                "resolve_async finished but status is {}", actx->get_status());
-        }
         actx->set_result(std::move(res));
     }
     catch (async_cancelled const&)
@@ -161,6 +156,8 @@ try
     auto& logger{hctx.logger()};
     logger.info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
+    int resolve_async_delay = 0;
+    int set_result_delay = 0;
     if (hctx.testing())
     {
         if (domain_name == "fail_submit_async")
@@ -171,13 +168,32 @@ try
         if (domain_name == "testing_delay_resolve_async")
         {
             logger.warn("forcing delayed resolve_async");
-            hctx.force_delayed_resolve_async();
+            resolve_async_delay = 500;
+            actual_domain_name = "testing";
+        }
+        if (domain_name == "testing_delay_set_result")
+        {
+            logger.warn("forcing delayed set_result");
+            set_result_delay = 200;
             actual_domain_name = "testing";
         }
     }
     auto dom = find_domain(actual_domain_name);
     auto ctx{dom->make_async_context(service, false, "")};
     auto actx = cast_ctx_to_shared_ptr<local_async_context_intf>(ctx);
+    actx->using_result();
+    if (resolve_async_delay > 0)
+    {
+        // TODO local_atst_context shouldn't be visible here
+        auto& atst_ctx = cast_ctx_to_ref<local_atst_context>(*actx);
+        atst_ctx.set_resolve_async_delay(resolve_async_delay);
+    }
+    if (set_result_delay > 0)
+    {
+        // TODO local_atst_context shouldn't be visible here
+        auto& atst_ctx = cast_ctx_to_ref<local_atst_context>(*actx);
+        atst_ctx.set_set_result_delay(set_result_delay);
+    }
     hctx.get_async_db().add(actx);
     // TODO update status to SUBMITTED
     // This function should return asap.

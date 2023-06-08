@@ -520,3 +520,65 @@ TEST_CASE("delayed get_num_subs on rpclib", tag)
 
     test_delayed_get_num_subs(inner, "rpclib");
 }
+
+namespace {
+
+void
+delayed_set_result_control_func(async_context_intf& ctx)
+{
+    // Let the calculation finish
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    // Check on the remote that the calculation has finished, but the result
+    // was not yet stored (due to the 200ms set_result forced delay)
+    CHECK(
+        cppcoro::sync_wait(ctx.get_status_coro())
+        == async_status::AWAITING_RESULT);
+
+    // Let set_result() finish
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    // Check that the calculation has now completely finished
+    CHECK(cppcoro::sync_wait(ctx.get_status_coro()) == async_status::FINISHED);
+}
+
+void
+test_delayed_set_result(inner_resources& inner, std::string const& proxy_name)
+{
+    constexpr auto level = caching_level_type::memory;
+    auto req{rq_cancellable_coro<level>(0, 0)};
+    auto tree_ctx{
+        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+    // Set a special domain name causing set_result to have a 200ms delay
+    tree_ctx->set_domain_name("testing_delay_set_result");
+    auto ctx{root_proxy_atst_context{tree_ctx}};
+
+    // Create a separate control thread, independent from the main one which
+    // will call resolve_request().
+    std::jthread control_thread(
+        delayed_set_result_control_func, std::ref(ctx));
+
+    CHECK(cppcoro::sync_wait(resolve_request(ctx, req)) == 0);
+
+    control_thread.join();
+}
+
+} // namespace
+
+// set_result() is forced to have a 200ms delay going from AWAITING_RESULT to
+// FINISHED
+TEST_CASE("delayed set_result on loopback", tag)
+{
+    inner_resources inner;
+    setup_loopback_test(inner);
+
+    test_delayed_set_result(inner, "loopback");
+}
+
+TEST_CASE("delayed set_result on rpclib", tag)
+{
+    inner_resources inner;
+    setup_rpclib_test(inner);
+
+    test_delayed_set_result(inner, "rpclib");
+}

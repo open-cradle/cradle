@@ -34,20 +34,6 @@ class rpclib_handler_context
         return testing_;
     }
 
-    // If true, resolve_async() has an artifical delay at the start.
-    // For testing purposes only.
-    bool
-    delayed_resolve_async() const
-    {
-        return delayed_resolve_async_;
-    }
-
-    void
-    force_delayed_resolve_async()
-    {
-        delayed_resolve_async_ = true;
-    }
-
     spdlog::logger&
     logger()
     {
@@ -70,7 +56,6 @@ class rpclib_handler_context
  private:
     service_core& service_;
     bool testing_;
-    bool delayed_resolve_async_{false};
     spdlog::logger& logger_;
     BS::thread_pool request_pool_;
 };

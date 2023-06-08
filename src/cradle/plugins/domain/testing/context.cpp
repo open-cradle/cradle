@@ -1,3 +1,6 @@
+#include <chrono>
+#include <thread>
+
 #include <cradle/plugins/domain/testing/context.h>
 
 namespace cradle {
@@ -42,6 +45,32 @@ std::unique_ptr<req_visitor_intf>
 local_atst_context::make_ctx_tree_builder()
 {
     return std::make_unique<local_atst_context_tree_builder>(*this);
+}
+
+void
+local_atst_context::set_result(blob result)
+{
+    if (set_result_delay_ > 0)
+    {
+        auto& logger{get_tree_context()->get_logger()};
+        logger.warn("set_result() forced delay {}ms", set_result_delay_);
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(set_result_delay_));
+    }
+    local_async_context_base::set_result(std::move(result));
+}
+
+void
+local_atst_context::apply_resolve_async_delay()
+{
+    if (resolve_async_delay_ > 0)
+    {
+        auto& logger{get_tree_context()->get_logger()};
+        logger.warn(
+            "resolve_async() forced startup delay {}ms", resolve_async_delay_);
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(resolve_async_delay_));
+    }
 }
 
 local_atst_context_tree_builder::local_atst_context_tree_builder(

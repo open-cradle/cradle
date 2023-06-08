@@ -263,6 +263,9 @@ class local_async_context_base : public local_async_context_intf,
     update_status_error(std::string const& errmsg) override;
 
     void
+    using_result() override;
+
+    void
     set_result(blob result) override;
 
     blob
@@ -324,6 +327,7 @@ class local_async_context_base : public local_async_context_intf,
     async_id id_;
     async_status status_;
     std::string errmsg_;
+    bool using_result_{false};
     blob result_;
     // Using shared_ptr ensures that local_async_context_base objects are not
     // relocated during tree build-up / visit.
@@ -331,6 +335,9 @@ class local_async_context_base : public local_async_context_intf,
     // context, and the async_db.
     std::vector<std::shared_ptr<local_async_context_base>> subs_;
     std::atomic<int> num_subs_not_running_;
+
+    void
+    check_set_get_result_precondition(bool is_get_result);
 
     bool
     decide_reschedule_sub();

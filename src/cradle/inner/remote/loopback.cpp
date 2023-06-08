@@ -1,5 +1,4 @@
 #include <stdexcept>
-#include <thread>
 
 #include <cppcoro/sync_wait.hpp>
 
@@ -10,6 +9,7 @@
 #include <cradle/inner/requests/domain.h>
 #include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/utilities/logging.h>
+#include <cradle/plugins/domain/testing/context.h>
 
 namespace cradle {
 
@@ -58,10 +58,9 @@ resolve_async(
     std::string seri_req)
 {
     auto& logger{loopback->get_logger()};
-    if (loopback->delayed_resolve_async())
+    if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*actx))
     {
-        logger.warn("resolve_async forced startup delay");
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        atst_ctx->apply_resolve_async_delay();
     }
     logger.info("resolve_async start");
     // TODO update status to STARTED or so
@@ -71,11 +70,6 @@ resolve_async(
                        resolve_serialized_local(*actx, std::move(seri_req)))
                        .value();
         logger.info("resolve_async done: {}", res);
-        if (actx->get_status() != async_status::FINISHED)
-        {
-            logger.error(
-                "resolve_async finished but status is {}", actx->get_status());
-        }
         actx->set_result(std::move(res));
     }
     catch (async_cancelled const&)
@@ -99,6 +93,8 @@ loopback_service::submit_async(
 {
     logger_->info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
+    int resolve_async_delay = 0;
+    int set_result_delay = 0;
     if (testing_)
     {
         if (domain_name == "fail_submit_async")
@@ -109,11 +105,30 @@ loopback_service::submit_async(
         if (domain_name == "testing_delay_resolve_async")
         {
             logger_->warn("forcing delayed resolve_async");
-            delayed_resolve_async_ = true;
+            resolve_async_delay = 500;
+        }
+        if (domain_name == "testing_delay_set_result")
+        {
+            logger_->warn("forcing delayed set_result");
+            set_result_delay = 200;
         }
     }
+    // TODO why not use the same mechanism as rpclib server?
     auto actx{
         cast_ctx_to_ref<remote_async_context_intf>(ctx).local_async_clone()};
+    actx->using_result();
+    if (resolve_async_delay > 0)
+    {
+        // TODO local_atst_context shouldn't be visible here
+        auto& atst_ctx = cast_ctx_to_ref<local_atst_context>(*actx);
+        atst_ctx.set_resolve_async_delay(resolve_async_delay);
+    }
+    if (set_result_delay > 0)
+    {
+        // TODO local_atst_context shouldn't be visible here
+        auto& atst_ctx = cast_ctx_to_ref<local_atst_context>(*actx);
+        atst_ctx.set_set_result_delay(set_result_delay);
+    }
     resources_.ensure_async_db();
     get_async_db().add(actx);
     // TODO populate actx subs?

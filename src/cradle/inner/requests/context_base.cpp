@@ -211,22 +211,31 @@ local_async_context_base::get_status()
 void
 local_async_context_base::update_status(async_status status)
 {
+    assert(status != async_status::AWAITING_RESULT);
     auto& logger{tree_ctx_->get_logger()};
+    auto new_status{status};
+    if (using_result_ && status == async_status::FINISHED)
+    {
+        new_status = async_status::AWAITING_RESULT;
+    }
     logger.info(
         "local_async_context_base {} update_status {} -> {}",
         id_,
         status_,
         status);
-    // Invariant: if this status is FINISHED, then all subs too
+    // Invariant: if this context's status is AWAITING_RESULT or FINISHED,
+    // then all its subcontexts' statuses are FINISHED.
     // (Subs won't be finished yet if the result came from a cache.)
-    if (status_ != async_status::FINISHED && status == async_status::FINISHED)
+    if (status_ != async_status::AWAITING_RESULT
+        && status_ != async_status::FINISHED
+        && status == async_status::FINISHED)
     {
         for (auto sub : subs_)
         {
             sub->update_status(status);
         }
     }
-    status_ = status;
+    status_ = new_status;
 }
 
 void
@@ -243,23 +252,41 @@ local_async_context_base::update_status_error(std::string const& errmsg)
 }
 
 void
+local_async_context_base::using_result()
+{
+    assert(!parent_);
+    using_result_ = true;
+}
+
+void
+local_async_context_base::check_set_get_result_precondition(bool is_get_result)
+{
+    async_status required_status{
+        is_get_result ? async_status::FINISHED
+                      : async_status::AWAITING_RESULT};
+    if (!using_result_ || status_ != required_status)
+    {
+        throw std::logic_error(fmt::format(
+            "local_async_context_base {} {}() precondition violated ({}, {})",
+            id_,
+            is_get_result ? "is_get_result" : "is_set_result",
+            using_result_,
+            status_));
+    }
+}
+
+void
 local_async_context_base::set_result(blob result)
 {
-    // TODO update status to FINISHED here?
+    check_set_get_result_precondition(false);
     result_ = std::move(result);
+    status_ = async_status::FINISHED;
 }
 
 blob
 local_async_context_base::get_result()
 {
-    if (status_ != async_status::FINISHED)
-    {
-        throw std::logic_error(fmt::format(
-            "local_async_context_base {} get_result() called for status {}",
-            id_,
-            status_));
-    }
-    // TODO maybe store shared_ptr<blob>
+    check_set_get_result_precondition(true);
     return result_;
 }
 

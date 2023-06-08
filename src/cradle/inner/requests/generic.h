@@ -204,6 +204,8 @@ enum class async_status
     SELF_RUNNING, // Subtasks finished, main task running
     CANCELLING, // Detected cancellation request
     CANCELLED, // Cancellation completed
+    AWAITING_RESULT, // Calculation completed, but the result still has to be
+                     // stored in the context (transient internal status)
     FINISHED, // Finished successfully
     ERROR // Ended due to error
 };
@@ -312,7 +314,8 @@ class local_async_context_intf : public local_context_intf,
     reschedule_if_opportune() = 0;
 
     // Gets the status of this task.
-    // This is a non-coroutine version of async_context_intf::get_status().
+    // This is a non-coroutine version of
+    // async_context_intf::get_status_coro().
     virtual async_status
     get_status()
         = 0;
@@ -326,6 +329,9 @@ class local_async_context_intf : public local_context_intf,
     // Updates the status of this task.
     // If status == FINISHED, also recursively updates subtasks
     // (needed if this task's result came from a cache).
+    // If status == FINISHED and using_result() was called, the new status
+    // will be AWAITING_RESULT.
+    // status must not be AWAITING_RESULT
     // TODO need to the the same if status == ERROR?
     // TODO keep history of an async request e.g.
     // TODO vector<tuple<async_status, timestamp>>
@@ -341,14 +347,27 @@ class local_async_context_intf : public local_context_intf,
     update_status_error(std::string const& errmsg)
         = 0;
 
+    // Calling this function indicates that the context will be used as
+    // mailbox between a result producer (calling set_result()) and a result
+    // consumer (calling get_result()). This should be done only for the root
+    // context in a tree.
+    virtual void
+    using_result()
+        = 0;
+
     // Sets the result of a finished task.
-    // Should be called only when get_status() returns FINISHED.
+    // Should be called only when:
+    // - using_result() was called before
+    // - get_status() returns AWAITING_RESULT
+    // Changes status to FINISHED.
     virtual void
     set_result(blob result)
         = 0;
 
     // Returns the value of a finished task.
-    // Should be called only when get_status() returns FINISHED.
+    // Should be called only when:
+    // - using_result() was called before
+    // - get_status() returns FINISHED
     virtual blob
     get_result()
         = 0;

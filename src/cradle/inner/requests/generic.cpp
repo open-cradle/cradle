@@ -49,6 +49,9 @@ to_string(async_status s)
         case async_status::CANCELLED:
             res = "CANCELLED";
             break;
+        case async_status::AWAITING_RESULT:
+            res = "AWAITING_RESULT";
+            break;
         case async_status::FINISHED:
             res = "FINISHED";
             break;
