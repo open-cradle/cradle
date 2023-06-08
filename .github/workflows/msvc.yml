@@ -79,6 +79,10 @@ jobs:
         name: preprocessed
         path: preprocessed
 
+    - name: Set Up Python
+      run: |
+        pip install pyyaml
+
     - name: Configure
       run: >
         cmake -Bbuild -DCMAKE_BUILD_TYPE=${{matrix.config}}
