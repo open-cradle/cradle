@@ -80,12 +80,12 @@ jobs:
         path: preprocessed
 
     - name: Configure
-      run: |
-        cmake -Bbuild -DCMAKE_BUILD_TYPE=${{matrix.config}} \
-          -D"CMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
-          -DCRADLE_PREPROCESSOR_USAGE=External \
-          -DCRADLE_EXTERNALLY_PREPROCESSED_DIRECTORY=preprocessed \
-          -DCRADLE_LOCAL_DOCKER_TESTING=OFF
+      run: >
+        cmake -Bbuild -DCMAKE_BUILD_TYPE=${{matrix.config}}
+        -D"CMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+        -DCRADLE_PREPROCESSOR_USAGE=External
+        -DCRADLE_EXTERNALLY_PREPROCESSED_DIRECTORY=preprocessed
+        -DCRADLE_LOCAL_DOCKER_TESTING=OFF
 
     - name: Build
       run: |
