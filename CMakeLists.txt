@@ -259,22 +259,8 @@ endif()
 set(intgen_src_dir
     ${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src)
 
-# Set up the deployment directory.
-# TODO: Choose a better name for this?
-set(deploy_dir ${CMAKE_CURRENT_BINARY_DIR})
-# file(MAKE_DIRECTORY ${deploy_dir})
-
-# Create deploy_dir.h providing access to the deployment directory contents.
+# Establish the location of deploy_dir.h (which will be created later on).
 set(deploy_dir_file "${intgen_src_dir}/cradle/deploy_dir.h")
-add_custom_command(
-    OUTPUT ${deploy_dir_file}
-    COMMAND ${CMAKE_COMMAND}
-        -D input_dir=${CMAKE_CURRENT_SOURCE_DIR}/cmake
-        -D output_dir=${intgen_src_dir}/cradle
-        -D deploy_dir=${deploy_dir}
-        -D compiler_id=${CMAKE_CXX_COMPILER_ID}
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.cmake
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.h.in)
 
 # Set up a public include directory for a target in a way that's compatible
 # with installing the headers in those directories for use by clients.
@@ -491,6 +477,17 @@ target_link_libraries(rpclib_server PRIVATE
     spdlog::spdlog)
 # add_custom_command(TARGET rpclib_server POST_BUILD
 #     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:rpclib_server> ${deploy_dir})
+
+# Create deploy_dir.h for providing access to the rpclib server executable.
+add_custom_command(
+    OUTPUT ${deploy_dir_file}
+    COMMAND ${CMAKE_COMMAND}
+        -D input_dir=${CMAKE_CURRENT_SOURCE_DIR}/cmake
+        -D output_dir=${intgen_src_dir}/cradle
+        -D deployed_executable="$<TARGET_FILE:rpclib_server>"
+        -D compiler_id=${CMAKE_CXX_COMPILER_ID}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.cmake
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.h.in)
 
 # Convenience target denoting all servers
 add_custom_target(servers)
