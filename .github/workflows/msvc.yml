@@ -94,6 +94,7 @@ jobs:
     - name: Build
       run: |
         cmake --build build --config ${{matrix.config}} -j4
+        Get-ChildItem -Recurse build
 
     - name: Test
       run: |
