@@ -110,16 +110,6 @@ FetchContent_Declare(fetched_cppcoro
     GIT_REPOSITORY https://github.com/mghro/cppcoro
     GIT_TAG master)
 FetchContent_MakeAvailable(fetched_cppcoro)
-FetchContent_GetProperties(
-    fetched_cppcoro
-    SOURCE_DIR FETCHED_CPPCORO_SOURCE_DIR)
-if(${CRADLE_INSTALL})
-    install(
-        DIRECTORY "${FETCHED_CPPCORO_SOURCE_DIR}/include"
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/include
-        FILES_MATCHING
-        PATTERN "*.h*")
-endif()
 
 # Find core dependencies.
 find_package(Boost REQUIRED COMPONENTS
@@ -301,14 +291,16 @@ set(deploy_dir_file "${intgen_src_dir}/cradle/deploy_dir.h")
 
 # Set up a public include directory for a target in a way that's compatible
 # with installing the headers in those directories for use by clients.
+# Note that using file sets may solve this problem more elegantly, but they are
+# only supported by more recent versions of CMake.
 function(record_public_include_directory
     TARGET INTERNAL_DIRECTORY INSTALLED_DIRECTORY PATTERN)
     target_include_directories(${TARGET} PUBLIC
         $<BUILD_INTERFACE:${INTERNAL_DIRECTORY}>
         $<INSTALL_INTERFACE:${INSTALLED_DIRECTORY}>)
-    if(${CRADLE_INSTALL})
+    if(CRADLE_INSTALL)
         install(
-            DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${INTERNAL_DIRECTORY}"
+            DIRECTORY ${INTERNAL_DIRECTORY}/
             DESTINATION ${INSTALLED_DIRECTORY}
             FILES_MATCHING
             PATTERN ${PATTERN})
@@ -560,7 +552,7 @@ if (CRADLE_ENABLE_TESTING)
 endif()
 
 # Describe our installation.
-if (CRADLE_INSTALL)
+if(CRADLE_INSTALL)
     install(
         TARGETS
             cradle_inner cradle_typing cradle_plugins_typing cradle_thinknode
