@@ -1,5 +1,6 @@
 # Run 'git describe' and capture its output.
-execute_process(COMMAND git describe --tags --dirty --long
+find_package(Git REQUIRED)
+execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags --dirty --long
                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                 OUTPUT_VARIABLE git_description
                 RESULT_VARIABLE result)
