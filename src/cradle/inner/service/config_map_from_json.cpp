@@ -3,7 +3,7 @@
 
 #include <simdjson.h>
 
-#include <cradle/inner/service/config_map_json.h>
+#include <cradle/inner/service/config_map_from_json.h>
 
 namespace cradle {
 
@@ -79,6 +79,7 @@ parse_json_doc(simdjson::dom::element const& json)
 service_config_map
 read_config_map_from_json(std::string const& json_text)
 {
+    // TODO why static variables? Move them out of this function?
     static simdjson::dom::parser the_parser;
     static std::mutex the_mutex;
 

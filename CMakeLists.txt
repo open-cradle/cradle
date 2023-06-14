@@ -326,7 +326,7 @@ target_compile_definitions(
 # TODO use recent simdjson
 if(IS_MSVC)
     set_property(
-        SOURCE src/cradle/inner/service/config_map_json.cpp
+        SOURCE src/cradle/inner/service/config_map_from_json.cpp
         APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4189")
 endif()
 target_include_directories(cradle_inner PUBLIC
@@ -342,6 +342,7 @@ target_link_libraries(cradle_inner PUBLIC
     fmt::fmt
     lz4::lz4
     msgpack::msgpack
+    nlohmann_json::nlohmann_json
     OpenSSL::OpenSSL
     simdjson::simdjson
     spdlog::spdlog
@@ -406,7 +407,6 @@ target_link_libraries(cradle_typing PUBLIC
     Boost::headers
     Catch2::Catch2
     cppcoro
-    nlohmann_json::nlohmann_json
     spdlog::spdlog
     yaml-cpp::yaml-cpp)
 

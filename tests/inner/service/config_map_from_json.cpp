@@ -1,10 +1,10 @@
 #include <catch2/catch.hpp>
 
-#include <cradle/inner/service/config_map_json.h>
+#include <cradle/inner/service/config_map_from_json.h>
 
 using namespace cradle;
 
-static char const tag[] = "[service][config_map_json]";
+static char const tag[] = "[service][config_map_from_json]";
 
 TEST_CASE("correct JSON config", tag)
 {

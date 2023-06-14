@@ -2,7 +2,7 @@
 
 #include <cradle/external/external_api_impl.h>
 #include <cradle/external_api.h>
-#include <cradle/inner/service/config_map_json.h>
+#include <cradle/inner/service/config_map_from_json.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/iam.h>
