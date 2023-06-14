@@ -80,7 +80,7 @@ if(CRADLE_VERSION)
     # If a version was set externally, use it directly.
     configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/version_info.h.in"
         "${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src/cradle/version_info.h"
-        @ONLY@)
+        @ONLY)
 else()
     # Otherwise, use version.cmake to extract the information from
     # `git describe` and generate the version_info.h from that.
