@@ -87,9 +87,9 @@ FetchContent_Declare(fetched_cppcoro
     GIT_TAG master)
 FetchContent_MakeAvailable(fetched_cppcoro)
 
+# Find core dependencies.
 find_package(Boost REQUIRED COMPONENTS
     filesystem program_options)
-find_package(Catch2 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(msgpack CONFIG REQUIRED)
 find_package(CURL CONFIG REQUIRED)
@@ -101,9 +101,12 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
 find_package(lz4 CONFIG REQUIRED)
 find_package(cereal CONFIG REQUIRED)
-find_package(benchmark CONFIG REQUIRED)
 find_package(rpclib CONFIG REQUIRED)
 find_package(tomlplusplus CONFIG REQUIRED)
+
+# TODO: Isolate these so they're only required for testing.
+find_package(Catch2 CONFIG REQUIRED)
+find_package(benchmark CONFIG REQUIRED)
 
 # Add the given linker options on anything that gets linked.
 macro(add_link_options )
