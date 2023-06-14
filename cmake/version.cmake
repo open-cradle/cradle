@@ -24,46 +24,27 @@ endif()
 # Now work backwards interpreting the parts...
 
 # Check for the dirty flag.
-set(is_dirty FALSE)
+set(CRADLE_SOURCE_IS_DIRTY FALSE)
 math(EXPR index "${fragment_count} - 1")
 list(GET fragments ${index} tail)
 if (tail STREQUAL "dirty")
-    set(is_dirty TRUE)
+    set(CRADLE_SOURCE_IS_DIRTY TRUE)
     math(EXPR index "${index} - 1")
 endif()
-string(TOLOWER ${is_dirty} is_dirty)
+string(TOLOWER ${CRADLE_SOURCE_IS_DIRTY} CRADLE_SOURCE_IS_DIRTY)
 
 # Get the commit hash.
-list(GET fragments ${index} commit_hash)
+list(GET fragments ${index} CRADLE_COMMIT_HASH)
 math(EXPR index "${index} - 1")
 
 # Get the commits since the tag.
-list(GET fragments ${index} commits_since_tag)
+list(GET fragments ${index} CRADLE_COMMITS_SINCE_RELEASE)
 
 # The rest should be the tag.
-list(SUBLIST fragments 0 ${index} tag)
-string(JOIN "-" tag "${tag}")
+list(SUBLIST fragments 0 ${index} CRADLE_VERSION)
+string(JOIN "-" CRADLE_VERSION "${CRADLE_VERSION}")
 
 # Generate the C++ code to represent all this.
-set(cpp_code "\
-// AUTOMATICALLY GENERATED!! - See version.cmake.\n\
-#include <cradle/inner/utilities/git.h>\n\
-static cradle::repository_info const version_info{\n\
-  \"${commit_hash}\", ${is_dirty}, \"${tag}\", ${commits_since_tag} };\n\
-")
-
-# Generate the header file.
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src/cradle/")
-set(header_file
-    "${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src/cradle/version_info.h")
-
-if(EXISTS "${header_file}")
-    file(READ "${header_file}" old_cpp_code)
-    if("${cpp_code}" STREQUAL "${old_cpp_code}")
-        message(VERBOSE "Keeping ${header_file}")
-        return()
-    endif()
-endif()
-
-message(VERBOSE "Generating ${header_file}")
-file(WRITE "${header_file}" "${cpp_code}")
+configure_file("${CMAKE_CURRENT_LIST_DIR}/version_info.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src/cradle/version_info.h"
+    @ONLY)

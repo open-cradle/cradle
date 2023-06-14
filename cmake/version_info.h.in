@@ -1,0 +1,8 @@
+// AUTOMATICALLY GENERATED!! - See CMake code.
+#include <cradle/inner/utilities/git.h>
+static cradle::repository_info const version_info{
+    "@CRADLE_COMMIT_HASH@",
+    @CRADLE_SOURCE_IS_DIRTY@,
+    "@CRADLE_VERSION@",
+    @CRADLE_COMMITS_SINCE_RELEASE@
+};
