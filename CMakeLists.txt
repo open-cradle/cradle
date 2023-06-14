@@ -110,6 +110,16 @@ FetchContent_Declare(fetched_cppcoro
     GIT_REPOSITORY https://github.com/mghro/cppcoro
     GIT_TAG master)
 FetchContent_MakeAvailable(fetched_cppcoro)
+FetchContent_GetProperties(
+    fetched_cppcoro
+    SOURCE_DIR FETCHED_CPPCORO_SOURCE_DIR)
+if(${CRADLE_INSTALL})
+    install(
+        DIRECTORY "${FETCHED_CPPCORO_SOURCE_DIR}/include"
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/include
+        FILES_MATCHING
+        PATTERN "*.h*")
+endif()
 
 # Find core dependencies.
 find_package(Boost REQUIRED COMPONENTS
@@ -296,11 +306,13 @@ function(record_public_include_directory
     target_include_directories(${TARGET} PUBLIC
         $<BUILD_INTERFACE:${INTERNAL_DIRECTORY}>
         $<INSTALL_INTERFACE:${INSTALLED_DIRECTORY}>)
-    install(
-        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${INTERNAL_DIRECTORY}"
-        DESTINATION ${INSTALLED_DIRECTORY}
-        FILES_MATCHING
-        PATTERN ${PATTERN})
+    if(${CRADLE_INSTALL})
+        install(
+            DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${INTERNAL_DIRECTORY}"
+            DESTINATION ${INSTALLED_DIRECTORY}
+            FILES_MATCHING
+            PATTERN ${PATTERN})
+    endif()
 endfunction()
 
 # The library for the in-tree third-party software
