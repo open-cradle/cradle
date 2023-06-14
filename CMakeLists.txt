@@ -587,6 +587,6 @@ if (CRADLE_INSTALL)
     install(
         FILES
             "${CMAKE_CURRENT_BINARY_DIR}/CradleConfig.cmake"
-            "${CMAKE_CURRENT_BINARY_DIR}/MyLibConfigVersion.cmake"
+            "${CMAKE_CURRENT_BINARY_DIR}/CradleConfigVersion.cmake"
         DESTINATION lib/cmake/Config)
 endif()
