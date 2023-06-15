@@ -63,7 +63,7 @@ class rpclib_handler_context
 rpclib_response
 handle_resolve_sync(
     rpclib_handler_context& hctx,
-    std::string domain_name,
+    std::string config_json,
     std::string seri_req);
 
 void
@@ -72,10 +72,11 @@ handle_ack_response(rpclib_handler_context& hctx, int response_id);
 void
 handle_mock_http(rpclib_handler_context& hctx, std::string const& body);
 
+// TODO why const& here and values in handle_resolve_sync()?
 async_id
 handle_submit_async(
     rpclib_handler_context& hctx,
-    std::string const& domain_name,
+    std::string const& config_json,
     std::string const& seri_req);
 
 remote_context_spec_list

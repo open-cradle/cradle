@@ -9,8 +9,10 @@
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/io/mock_http.h>
+#include <cradle/inner/remote/config.h>
 #include <cradle/inner/requests/domain.h>
 #include <cradle/inner/resolve/seri_req.h>
+#include <cradle/inner/service/config_map_from_json.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/rpclib/server/handlers.h>
 #include <cradle/typing/service/core.h>
@@ -44,14 +46,17 @@ handle_exception(rpclib_handler_context& hctx, std::exception& e)
 static rpclib_response
 resolve_sync(
     rpclib_handler_context& hctx,
-    std::string domain_name,
+    std::string config_json,
     std::string seri_req)
 {
     auto& service{hctx.service()};
     auto& logger{hctx.logger()};
+    service_config config{read_config_map_from_json(config_json)};
+    auto domain_name
+        = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
     logger.info("resolve_sync {}: {}", domain_name, seri_req);
     auto dom = find_domain(domain_name);
-    auto ctx{dom->make_sync_context(service, false, "")};
+    auto ctx{dom->make_local_sync_context(service, config)};
     auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(*ctx)};
     auto seri_result = cppcoro::sync_wait(
         resolve_serialized_local(loc_ctx, std::move(seri_req)));
@@ -68,14 +73,14 @@ resolve_sync(
 rpclib_response
 handle_resolve_sync(
     rpclib_handler_context& hctx,
-    std::string domain_name,
+    std::string config_json,
     std::string seri_req)
 try
 {
     auto fut = hctx.request_pool().submit(
         resolve_sync,
         std::ref(hctx),
-        std::move(domain_name),
+        std::move(config_json),
         std::move(seri_req));
     return fut.get();
 }
@@ -147,53 +152,25 @@ resolve_async(
 async_id
 handle_submit_async(
     rpclib_handler_context& hctx,
-    std::string const& domain_name,
+    std::string const& config_json,
     std::string const& seri_req)
 try
 {
-    std::string actual_domain_name{domain_name};
     auto& service{hctx.service()};
     auto& logger{hctx.logger()};
+    service_config config{read_config_map_from_json(config_json)};
+    auto domain_name
+        = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
     logger.info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
-    int resolve_async_delay = 0;
-    int set_result_delay = 0;
-    if (hctx.testing())
+    auto dom = find_domain(domain_name);
+    auto ctx{dom->make_local_async_context(service, config)};
+    if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*ctx))
     {
-        if (domain_name == "fail_submit_async")
-        {
-            logger.warn("submit_async: forced failure");
-            throw remote_error{"submit_async forced failure"};
-        }
-        if (domain_name == "testing_delay_resolve_async")
-        {
-            logger.warn("forcing delayed resolve_async");
-            resolve_async_delay = 500;
-            actual_domain_name = "testing";
-        }
-        if (domain_name == "testing_delay_set_result")
-        {
-            logger.warn("forcing delayed set_result");
-            set_result_delay = 200;
-            actual_domain_name = "testing";
-        }
+        atst_ctx->apply_fail_submit_async();
     }
-    auto dom = find_domain(actual_domain_name);
-    auto ctx{dom->make_async_context(service, false, "")};
     auto actx = cast_ctx_to_shared_ptr<local_async_context_intf>(ctx);
     actx->using_result();
-    if (resolve_async_delay > 0)
-    {
-        // TODO local_atst_context shouldn't be visible here
-        auto& atst_ctx = cast_ctx_to_ref<local_atst_context>(*actx);
-        atst_ctx.set_resolve_async_delay(resolve_async_delay);
-    }
-    if (set_result_delay > 0)
-    {
-        // TODO local_atst_context shouldn't be visible here
-        auto& atst_ctx = cast_ctx_to_ref<local_atst_context>(*actx);
-        atst_ctx.set_set_result_delay(set_result_delay);
-    }
     hctx.get_async_db().add(actx);
     // TODO update status to SUBMITTED
     // This function should return asap.

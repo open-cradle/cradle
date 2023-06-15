@@ -1472,10 +1472,6 @@ process_message(websocket_server_impl& server, client_request request)
                 client.name = registration.name;
                 client.session = registration.session;
             });
-            // TODO keep reference to thinknode_domain object?
-            thinknode_domain dom;
-            dom.initialize();
-            dom.set_session(registration.session);
             send_response(
                 server,
                 request,
@@ -1923,6 +1919,7 @@ initialize(websocket_server_impl& server, service_config const& config)
             on_message(server, hdl, message);
         });
 
+    register_and_initialize_thinknode_domain();
     register_rpclib_client(config);
 }
 

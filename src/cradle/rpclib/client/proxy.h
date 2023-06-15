@@ -35,16 +35,10 @@ class rpclib_client : public remote_proxy
     get_logger() override;
 
     serialized_result
-    resolve_sync(
-        remote_context_intf& ctx,
-        std::string domain_name,
-        std::string seri_req) override;
+    resolve_sync(service_config config, std::string seri_req) override;
 
     async_id
-    submit_async(
-        remote_context_intf& ctx,
-        std::string domain_name,
-        std::string seri_req) override;
+    submit_async(service_config config, std::string seri_req) override;
 
     remote_context_spec_list
     get_sub_contexts(async_id aid) override;

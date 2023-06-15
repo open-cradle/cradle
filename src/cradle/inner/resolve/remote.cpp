@@ -1,5 +1,6 @@
 #include <deque>
 
+#include <cradle/inner/remote/config.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/remote/wait_async.h>
 #include <cradle/inner/requests/generic.h>
@@ -48,13 +49,12 @@ resolve_async(remote_async_context_intf& ctx, std::string seri_req)
     {
         proxy = &find_proxy(ctx.proxy_name());
         auto& logger = proxy->get_logger();
-        std::string domain_name{ctx.domain_name()};
         logger.debug(
             "resolve_async on {}: {} ...",
-            domain_name,
+            ctx.domain_name(),
             seri_req.substr(0, 10));
-        remote_id = proxy->submit_async(
-            ctx, std::move(domain_name), std::move(seri_req));
+        remote_id
+            = proxy->submit_async(ctx.make_config(), std::move(seri_req));
         ctx.set_remote_id(remote_id);
     }
     catch (...)
@@ -71,10 +71,9 @@ resolve_sync(remote_context_intf& ctx, std::string seri_req)
 {
     auto& proxy = find_proxy(ctx.proxy_name());
     auto& logger = proxy.get_logger();
-    std::string domain_name{ctx.domain_name()};
-    logger.debug("request on {}: {} ...", domain_name, seri_req.substr(0, 10));
-    return proxy.resolve_sync(
-        ctx, std::move(domain_name), std::move(seri_req));
+    logger.debug(
+        "request on {}: {} ...", ctx.domain_name(), seri_req.substr(0, 10));
+    return proxy.resolve_sync(ctx.make_config(), std::move(seri_req));
 }
 
 } // namespace

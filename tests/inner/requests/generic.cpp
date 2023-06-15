@@ -42,8 +42,8 @@ class remote_context_mixin : public remote_context_intf
         throw not_implemented_error();
     }
 
-    std::shared_ptr<cradle::local_context_intf>
-    local_clone() const override
+    service_config
+    make_config() const override
     {
         throw not_implemented_error();
     }

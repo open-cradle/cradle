@@ -36,7 +36,8 @@ target_include_directories(unit_test_runner PUBLIC
 target_link_libraries(unit_test_runner PRIVATE
     test_lib_runner
     test_lib_unit
-    cradle_inner)
+    cradle_inner
+    cradle_plugins_thinknode)
 
 # Add the unit testing target.
 add_custom_target(
@@ -122,7 +123,8 @@ add_library(test_lib_plugins OBJECT ${test_srcs_plugins})
 target_link_libraries(test_lib_plugins PUBLIC
     cradle_external
     cradle_plugins_typing
-    cradle_plugins_inner)
+    cradle_plugins_inner
+    cradle_plugins_thinknode)
 
 # Add the plugins test runner.
 add_executable(plugins_test_runner)

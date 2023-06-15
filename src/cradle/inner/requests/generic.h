@@ -10,6 +10,7 @@
 
 #include <cradle/inner/core/id.h>
 #include <cradle/inner/core/type_definitions.h>
+#include <cradle/inner/service/config.h>
 
 namespace cradle {
 
@@ -176,13 +177,10 @@ class remote_context_intf : public virtual context_intf
     domain_name() const
         = 0;
 
-    // Creates a variant of *this that can be used to locally resolve the same
-    // set of requests. In particular, the new object's remotely() will return
-    // false.
-    // For an asynchronous context tree, *this must be the tree root.
-    // Useful for a loopback service.
-    virtual std::shared_ptr<local_context_intf>
-    local_clone() const = 0;
+    // Creates the configuration to be passed to the remote.
+    virtual service_config
+    make_config() const
+        = 0;
 };
 
 // A context class implementing this interface declares that it supports
@@ -401,16 +399,6 @@ class remote_async_context_intf : public remote_context_intf,
 {
  public:
     virtual ~remote_async_context_intf() = default;
-
-    // Creates a variant of *this that can be used to locally resolve the same
-    // set of requests. In particular, the new object's remotely() will return
-    // false.
-    // Must be called only when *this is the root of a context tree.
-    // Useful for a loopback service.
-    // A call of this function is equivalent to
-    //   static_pointer_cast<local_async_context_intf>(local_clone())
-    virtual std::shared_ptr<local_async_context_intf>
-    local_async_clone() const = 0;
 
     // Sets the id identifying this context on the remote server
     // (after this id has been retrieved from the server).

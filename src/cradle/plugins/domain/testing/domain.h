@@ -16,19 +16,15 @@ class testing_domain : public domain
     std::string
     name() const override;
 
-    // proxy_name identifies the proxy to use if remotely is true
     std::shared_ptr<sync_context_intf>
-    make_sync_context(
+    make_local_sync_context(
         inner_resources& resources,
-        bool remotely,
-        std::string proxy_name) override;
+        service_config const& config) const override;
 
-    // proxy_name identifies the proxy to use if remotely is true
     std::shared_ptr<async_context_intf>
-    make_async_context(
+    make_local_async_context(
         inner_resources& resources,
-        bool remotely,
-        std::string proxy_name) override;
+        service_config const& config) const override;
 };
 
 /*

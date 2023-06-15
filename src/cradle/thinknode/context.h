@@ -2,6 +2,7 @@
 #define CRADLE_THINKNODE_CONTEXT_H
 
 #include <cradle/inner/requests/context_base.h>
+#include <cradle/inner/service/config.h>
 #include <cradle/thinknode/types.hpp>
 #include <cradle/typing/service/core.h>
 
@@ -12,6 +13,11 @@ struct thinknode_request_context final : public sync_context_base
     service_core& service;
     thinknode_session session;
 
+    // Constructor called from thinknode_domain::make_local_sync_context()
+    thinknode_request_context(
+        service_core& service, service_config const& config);
+
+    // Other-purposes constructor
     thinknode_request_context(
         service_core& service,
         thinknode_session session,
@@ -22,22 +28,16 @@ struct thinknode_request_context final : public sync_context_base
     ~thinknode_request_context();
 
     std::string const&
-    domain_name() const override
-    {
-        return domain_name_;
-    }
+    domain_name() const override;
 
-    std::shared_ptr<local_context_intf>
-    local_clone() const override;
+    service_config
+    make_config() const override;
 
     std::string const&
     api_url() const
     {
         return session.api_url;
     }
-
- private:
-    std::string domain_name_{"thinknode"};
 };
 static_assert(ValidContext<thinknode_request_context>);
 

@@ -153,9 +153,9 @@ run_server(cli_options const& options)
     // (notification) message
     srv.bind(
         "resolve_sync",
-        [&](std::string const& domain_name, std::string const& seri_req) {
+        [&](std::string const& config_json, std::string const& seri_req) {
             // TODO create origin tasklet somewhere
-            return handle_resolve_sync(hctx, domain_name, seri_req);
+            return handle_resolve_sync(hctx, config_json, seri_req);
         });
     if (options.testing)
     {
@@ -171,8 +171,8 @@ run_server(cli_options const& options)
 
     srv.bind(
         "submit_async",
-        [&](std::string const& domain_name, std::string const& seri_req) {
-            return handle_submit_async(hctx, domain_name, seri_req);
+        [&](std::string const& config_json, std::string const& seri_req) {
+            return handle_submit_async(hctx, config_json, seri_req);
         });
     srv.bind("get_sub_contexts", [&](async_id aid) {
         return handle_get_sub_contexts(hctx, aid);

@@ -91,25 +91,3 @@ TEST_CASE("domain_name()", "[testing][context]")
 
     REQUIRE(ctx.domain_name() == "testing");
 }
-
-TEST_CASE("local_clone()", "[testing][context]")
-{
-    inner_resources resources;
-    init_test_inner_service(resources);
-    auto t0 = create_tasklet_tracker("pool", "t0");
-    testing_request_context ctx{resources, t0, true, "the name"};
-
-    auto ctx1_intf{ctx.local_clone()};
-
-    REQUIRE(dynamic_cast<testing_request_context*>(&*ctx1_intf) != nullptr);
-    auto& ctx1{static_cast<testing_request_context&>(*ctx1_intf)};
-    // Same as the original
-    REQUIRE(&ctx1.get_resources() == &ctx.get_resources());
-    REQUIRE(
-        &ctx1.get_resources().memory_cache()
-        == &ctx.get_resources().memory_cache());
-    REQUIRE(ctx1.domain_name() == ctx.domain_name());
-    // Differences with the original
-    REQUIRE(ctx1.get_tasklet() == nullptr);
-    REQUIRE(!ctx1.remotely());
-}

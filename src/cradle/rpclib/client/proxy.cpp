@@ -25,18 +25,15 @@ rpclib_client::get_logger()
 }
 
 serialized_result
-rpclib_client::resolve_sync(
-    remote_context_intf& ctx, std::string domain_name, std::string seri_req)
+rpclib_client::resolve_sync(service_config config, std::string seri_req)
 {
-    return pimpl_->resolve_sync(std::move(domain_name), std::move(seri_req));
+    return pimpl_->resolve_sync(std::move(config), std::move(seri_req));
 }
 
 async_id
-rpclib_client::submit_async(
-    remote_context_intf& ctx, std::string domain_name, std::string seri_req)
+rpclib_client::submit_async(service_config config, std::string seri_req)
 {
-    return pimpl_->submit_async(
-        ctx, std::move(domain_name), std::move(seri_req));
+    return pimpl_->submit_async(std::move(config), std::move(seri_req));
 }
 
 remote_context_spec_list

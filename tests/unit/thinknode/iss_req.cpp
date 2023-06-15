@@ -329,6 +329,7 @@ TEST_CASE("ISS POST resolution - subreq, fully cached, parallel", tag)
 
 TEST_CASE("ISS POST resolution - remote", tag)
 {
+    ensure_all_domains_registered();
     test_post_iss_request(
         make_post_iss_request_constant<caching_level_type::full>(),
         false,

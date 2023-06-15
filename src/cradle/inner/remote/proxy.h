@@ -9,6 +9,7 @@
 
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/resolve/seri_result.h>
+#include <cradle/inner/service/config.h>
 
 namespace cradle {
 
@@ -61,26 +62,17 @@ class remote_proxy
         = 0;
 
     // Resolves a request, synchronously.
-    // ctx will be the root of a context tree.
-    // TODO formalize "context object is root"
     virtual serialized_result
-    resolve_sync(
-        remote_context_intf& ctx,
-        std::string domain_name,
-        std::string seri_req)
+    resolve_sync(service_config config, std::string seri_req)
         = 0;
 
     // Submits a request for asynchronous resolution.
-    // ctx will be the root of a context tree.
     // Returns the remote id of the server's remote context associated with
     // the root request in the request tree. Other remote contexts will likely
     // be constructed only when the request is deserialized, and that could
     // take some time.
     virtual async_id
-    submit_async(
-        remote_context_intf& ctx,
-        std::string domain_name,
-        std::string seri_req)
+    submit_async(service_config config, std::string seri_req)
         = 0;
 
     // Returns the specification of the child contexts of the context subtree

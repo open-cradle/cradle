@@ -5,6 +5,7 @@
 #include <string>
 
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/service/config.h>
 #include <cradle/inner/service/resources.h>
 
 namespace cradle {
@@ -28,13 +29,13 @@ class domain
     // contructed context object can be guaranteed to implement them all
     // (the factory function should throw if it cannot create such an object).
     virtual std::shared_ptr<sync_context_intf>
-    make_sync_context(
-        inner_resources& resources, bool remotely, std::string proxy_name)
+    make_local_sync_context(
+        inner_resources& resources, service_config const& config) const
         = 0;
 
     virtual std::shared_ptr<async_context_intf>
-    make_async_context(
-        inner_resources& resources, bool remotely, std::string proxy_name)
+    make_local_async_context(
+        inner_resources& resources, service_config const& config) const
         = 0;
 };
 

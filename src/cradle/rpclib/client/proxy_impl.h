@@ -34,13 +34,10 @@ class rpclib_client_impl
     }
 
     serialized_result
-    resolve_sync(std::string domain_name, std::string seri_req);
+    resolve_sync(service_config config, std::string seri_req);
 
     async_id
-    submit_async(
-        remote_context_intf& ctx,
-        std::string domain_name,
-        std::string seri_req);
+    submit_async(service_config config, std::string seri_req);
 
     remote_context_spec_list
     get_sub_contexts(async_id aid);

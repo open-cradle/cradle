@@ -9,6 +9,7 @@
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/encodings/msgpack_adaptors_rpclib.h>
 #include <cradle/inner/requests/uuid.h>
+#include <cradle/inner/service/config_map_to_json.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/utilities/logging.h>
 
@@ -64,23 +65,25 @@ rpclib_client_impl::~rpclib_client_impl()
 }
 
 serialized_result
-rpclib_client_impl::resolve_sync(std::string domain_name, std::string seri_req)
+rpclib_client_impl::resolve_sync(service_config config, std::string seri_req)
 {
     logger_->debug("resolve_sync");
-    auto response
-        = do_rpc_call(
-              "resolve_sync", std::move(domain_name), std::move(seri_req))
-              .as<rpclib_response>();
+    auto response = do_rpc_call(
+                        "resolve_sync",
+                        write_config_map_to_json(config.get_config_map()),
+                        std::move(seri_req))
+                        .as<rpclib_response>();
     return make_serialized_result(std::move(response));
 }
 
 async_id
-rpclib_client_impl::submit_async(
-    remote_context_intf& ctx, std::string domain_name, std::string seri_req)
+rpclib_client_impl::submit_async(service_config config, std::string seri_req)
 {
     logger_->debug("submit_async");
     auto aid = do_rpc_call(
-                   "submit_async", std::move(domain_name), std::move(seri_req))
+                   "submit_async",
+                   write_config_map_to_json(config.get_config_map()),
+                   std::move(seri_req))
                    .as<async_id>();
     logger_->debug("submit_async -> {}", aid);
     return aid;

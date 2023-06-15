@@ -3,6 +3,7 @@
 #include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 
+#include <cradle/inner/remote/config.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/plugins/domain/testing/seri_catalog.h>
@@ -68,13 +69,14 @@ TEST_CASE("resolve to a blob file", "[rpclib]")
 
 TEST_CASE("sending bad request", "[rpclib]")
 {
-    constexpr auto remotely{true};
-    std::string proxy_name{"rpclib"};
     inner_resources service;
     init_test_inner_service(service);
-    testing_request_context ctx{service, nullptr, remotely, proxy_name};
     auto client = ensure_rpclib_service();
+    service_config_map config_map{
+        {remote_config_keys::DOMAIN_NAME, "bad domain"},
+    };
 
     REQUIRE_THROWS_AS(
-        client->resolve_sync(ctx, "bad domain", "bad request"), remote_error);
+        client->resolve_sync(service_config{config_map}, "bad request"),
+        remote_error);
 }

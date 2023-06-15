@@ -4,6 +4,7 @@
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/fmt_format.h>
+#include <cradle/inner/remote/config.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/remote/loopback_impl.h>
 #include <cradle/inner/requests/domain.h>
@@ -40,13 +41,16 @@ loopback_service::get_logger()
 }
 
 serialized_result
-loopback_service::resolve_sync(
-    remote_context_intf& ctx, std::string domain_name, std::string seri_req)
+loopback_service::resolve_sync(service_config config, std::string seri_req)
 {
+    auto domain_name{
+        config.get_mandatory_string(remote_config_keys::DOMAIN_NAME)};
     logger_->debug("resolve_sync({}): request {}", domain_name, seri_req);
-    auto local_ctx{ctx.local_clone()};
+    auto dom = find_domain(domain_name);
+    auto ctx{dom->make_local_sync_context(resources_, config)};
+    auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(*ctx)};
     auto result = cppcoro::sync_wait(
-        resolve_serialized_local(*local_ctx, std::move(seri_req)));
+        resolve_serialized_local(loc_ctx, std::move(seri_req)));
     logger_->debug("response {}", result.value());
     return result;
 }
@@ -84,51 +88,21 @@ resolve_async(
     }
 }
 
-// On an RPC server, domain_name is used to create a context object of the
-// correct type. The loopback service gets the correct object from the client,
-// so domain_name is mostly unused.
 async_id
-loopback_service::submit_async(
-    remote_context_intf& ctx, std::string domain_name, std::string seri_req)
+loopback_service::submit_async(service_config config, std::string seri_req)
 {
+    auto domain_name
+        = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
     logger_->info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
-    int resolve_async_delay = 0;
-    int set_result_delay = 0;
-    if (testing_)
+    auto dom = find_domain(domain_name);
+    auto ctx{dom->make_local_async_context(resources_, config)};
+    if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*ctx))
     {
-        if (domain_name == "fail_submit_async")
-        {
-            logger_->warn("submit_async: forced failure");
-            throw remote_error{"submit_async forced failure"};
-        }
-        if (domain_name == "testing_delay_resolve_async")
-        {
-            logger_->warn("forcing delayed resolve_async");
-            resolve_async_delay = 500;
-        }
-        if (domain_name == "testing_delay_set_result")
-        {
-            logger_->warn("forcing delayed set_result");
-            set_result_delay = 200;
-        }
+        atst_ctx->apply_fail_submit_async();
     }
-    // TODO why not use the same mechanism as rpclib server?
-    auto actx{
-        cast_ctx_to_ref<remote_async_context_intf>(ctx).local_async_clone()};
+    auto actx = cast_ctx_to_shared_ptr<local_async_context_intf>(ctx);
     actx->using_result();
-    if (resolve_async_delay > 0)
-    {
-        // TODO local_atst_context shouldn't be visible here
-        auto& atst_ctx = cast_ctx_to_ref<local_atst_context>(*actx);
-        atst_ctx.set_resolve_async_delay(resolve_async_delay);
-    }
-    if (set_result_delay > 0)
-    {
-        // TODO local_atst_context shouldn't be visible here
-        auto& atst_ctx = cast_ctx_to_ref<local_atst_context>(*actx);
-        atst_ctx.set_set_result_delay(set_result_delay);
-    }
     resources_.ensure_async_db();
     get_async_db().add(actx);
     // TODO populate actx subs?

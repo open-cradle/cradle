@@ -1,9 +1,13 @@
 #include <chrono>
 #include <thread>
 
+#include <cradle/inner/remote/config.h>
+#include <cradle/plugins/domain/testing/config.h>
 #include <cradle/plugins/domain/testing/context.h>
 
 namespace cradle {
+
+std::string const the_domain_name{"testing"};
 
 testing_request_context::testing_request_context(
     inner_resources& resources,
@@ -14,22 +18,36 @@ testing_request_context::testing_request_context(
 {
 }
 
-std::shared_ptr<local_context_intf>
-testing_request_context::local_clone() const
+std::string const&
+testing_request_context::domain_name() const
 {
-    // TODO tasklets should continue in the clone
-    return std::make_shared<testing_request_context>(
-        resources_, nullptr, false, "");
+    return the_domain_name;
 }
 
-void
-testing_request_context::set_domain_name(std::string const& name)
+service_config
+testing_request_context::make_config() const
 {
-    domain_name_ = name;
+    service_config_map config_map{
+        {remote_config_keys::DOMAIN_NAME, the_domain_name},
+    };
+    return service_config{config_map};
 }
 
 local_atst_tree_context::local_atst_tree_context(inner_resources& resources)
     : local_tree_context_base{resources}
+{
+}
+
+local_atst_context::local_atst_context(
+    std::shared_ptr<local_atst_tree_context> tree_ctx,
+    service_config const& config)
+    : local_async_context_base{tree_ctx, nullptr, true},
+      fail_submit_async_{config.get_bool_or_default(
+          testing_config_keys::FAIL_SUBMIT_ASYNC, false)},
+      resolve_async_delay_{static_cast<int>(config.get_number_or_default(
+          testing_config_keys::RESOLVE_ASYNC_DELAY, 0))},
+      set_result_delay_{static_cast<int>(config.get_number_or_default(
+          testing_config_keys::SET_RESULT_DELAY, 0))}
 {
 }
 
@@ -58,6 +76,17 @@ local_atst_context::set_result(blob result)
             std::chrono::milliseconds(set_result_delay_));
     }
     local_async_context_base::set_result(std::move(result));
+}
+
+void
+local_atst_context::apply_fail_submit_async()
+{
+    if (fail_submit_async_)
+    {
+        auto& logger{get_tree_context()->get_logger()};
+        logger.warn("submit_async: forced failure");
+        throw remote_error{"submit_async forced failure"};
+    }
 }
 
 void
@@ -118,17 +147,30 @@ root_proxy_atst_context::root_proxy_atst_context(
 std::string const&
 root_proxy_atst_context::domain_name() const
 {
-    auto my_tree_ctx{static_pointer_cast<proxy_atst_tree_context>(tree_ctx_)};
-    return my_tree_ctx->domain_name();
+    return the_domain_name;
 }
 
-std::shared_ptr<local_async_context_base>
-root_proxy_atst_context::make_local_clone() const
+service_config
+root_proxy_atst_context::make_config() const
 {
-    return std::make_shared<local_atst_context>(
-        std::make_shared<local_atst_tree_context>(tree_ctx_->get_resources()),
-        nullptr,
-        is_req());
+    service_config_map config_map{
+        {remote_config_keys::DOMAIN_NAME, the_domain_name},
+    };
+    if (fail_submit_async_)
+    {
+        config_map[testing_config_keys::FAIL_SUBMIT_ASYNC] = true;
+    }
+    if (resolve_async_delay_ > 0)
+    {
+        config_map[testing_config_keys::RESOLVE_ASYNC_DELAY]
+            = static_cast<std::size_t>(resolve_async_delay_);
+    }
+    if (set_result_delay_ > 0)
+    {
+        config_map[testing_config_keys::SET_RESULT_DELAY]
+            = static_cast<std::size_t>(set_result_delay_);
+    }
+    return service_config{config_map};
 }
 
 std::unique_ptr<proxy_async_context_base>
@@ -152,16 +194,15 @@ non_root_proxy_atst_context::~non_root_proxy_atst_context()
 std::string const&
 non_root_proxy_atst_context::domain_name() const
 {
-    auto my_tree_ctx{static_pointer_cast<proxy_atst_tree_context>(tree_ctx_)};
-    return my_tree_ctx->domain_name();
+    return the_domain_name;
 }
 
-std::shared_ptr<local_async_context_base>
-non_root_proxy_atst_context::make_local_clone() const
+service_config
+non_root_proxy_atst_context::make_config() const
 {
     // Must be called only for a root context
     throw std::logic_error{
-        "invalid non_root_proxy_atst_context::make_local_clone() call"};
+        "invalid non_root_proxy_atst_context::make_config() call"};
 }
 
 std::unique_ptr<proxy_async_context_base>

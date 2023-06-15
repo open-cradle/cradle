@@ -30,19 +30,13 @@ class test_proxy : public remote_proxy
     }
 
     serialized_result
-    resolve_sync(
-        remote_context_intf& ctx,
-        std::string domain_name,
-        std::string seri_req) override
+    resolve_sync(service_config config, std::string seri_req) override
     {
         throw not_implemented_error{"test_proxy::resolve_sync()"};
     }
 
     async_id
-    submit_async(
-        remote_context_intf& ctx,
-        std::string domain_name,
-        std::string seri_req) override
+    submit_async(service_config config, std::string seri_req) override
     {
         throw not_implemented_error{"test_proxy::submit_async()"};
     }

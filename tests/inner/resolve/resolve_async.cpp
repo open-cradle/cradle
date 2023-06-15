@@ -434,9 +434,9 @@ test_failing_get_num_subs(
     auto req{rq_cancellable_coro<level>(2, 3)};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
-    // Set a special domain name causing submit_async to fail on the remote
-    tree_ctx->set_domain_name("fail_submit_async");
     auto ctx{root_proxy_atst_context{tree_ctx}};
+    // Causes submit_async to fail on the remote
+    ctx.fail_submit_async();
 
     // Run get_num_subs on a separate thread, independent from the main one
     // which will call resolve_request().
@@ -487,9 +487,9 @@ test_delayed_get_num_subs(
     auto req{rq_cancellable_coro<level>(2, 3)};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
-    // Set a special domain name causing resolve_async to have a startup delay
-    tree_ctx->set_domain_name("testing_delay_resolve_async");
     auto ctx{root_proxy_atst_context{tree_ctx}};
+    // Forces resolve_async() on the remote to have a startup delay
+    ctx.set_resolve_async_delay(500);
 
     // Run get_num_subs on a separate thread, independent from the main one
     // which will call resolve_request().
@@ -549,9 +549,9 @@ test_delayed_set_result(inner_resources& inner, std::string const& proxy_name)
     auto req{rq_cancellable_coro<level>(0, 0)};
     auto tree_ctx{
         std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
-    // Set a special domain name causing set_result to have a 200ms delay
-    tree_ctx->set_domain_name("testing_delay_set_result");
     auto ctx{root_proxy_atst_context{tree_ctx}};
+    // Forces set_result() on the remote to have a delay
+    ctx.set_set_result_delay(200);
 
     // Create a separate control thread, independent from the main one which
     // will call resolve_request().

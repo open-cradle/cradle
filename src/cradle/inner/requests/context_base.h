@@ -70,8 +70,9 @@ class sync_context_base : public local_context_intf,
     domain_name() const override
         = 0;
 
-    virtual std::shared_ptr<local_context_intf>
-    local_clone() const override = 0;
+    virtual service_config
+    make_config() const override
+        = 0;
 
     // caching_context_intf
     inner_resources&
@@ -488,11 +489,9 @@ class proxy_async_context_base : public remote_async_context_intf
     domain_name() const override
         = 0;
 
-    std::shared_ptr<local_context_intf>
-    local_clone() const override
-    {
-        return make_local_clone();
-    }
+    virtual service_config
+    make_config() const override
+        = 0;
 
     // async_context_intf
     async_id
@@ -514,12 +513,6 @@ class proxy_async_context_base : public remote_async_context_intf
     request_cancellation_coro() override;
 
     // remote_async_context_intf
-    std::shared_ptr<local_async_context_intf>
-    local_async_clone() const override
-    {
-        return make_local_clone();
-    }
-
     async_id
     get_remote_id() override
     {
@@ -543,9 +536,6 @@ class proxy_async_context_base : public remote_async_context_intf
     {
         return tree_ctx_->get_proxy();
     }
-
-    virtual std::shared_ptr<local_async_context_base>
-    make_local_clone() const = 0;
 
     virtual std::unique_ptr<proxy_async_context_base>
     make_sub_ctx(
@@ -603,9 +593,6 @@ class root_proxy_async_context_base : public proxy_async_context_base
     wait_on_remote_id() override;
 
     // proxy_async_context_base
-    std::shared_ptr<local_async_context_base>
-    make_local_clone() const override = 0;
-
     std::unique_ptr<proxy_async_context_base>
     make_sub_ctx(
         std::shared_ptr<proxy_async_tree_context_base> tree_ctx,
@@ -651,9 +638,6 @@ class non_root_proxy_async_context_base : public proxy_async_context_base
     wait_on_remote_id() override;
 
     // proxy_async_context_base
-    std::shared_ptr<local_async_context_base>
-    make_local_clone() const override = 0;
-
     std::unique_ptr<proxy_async_context_base>
     make_sub_ctx(
         std::shared_ptr<proxy_async_tree_context_base> tree_ctx,

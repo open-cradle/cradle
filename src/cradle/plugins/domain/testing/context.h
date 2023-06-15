@@ -4,8 +4,8 @@
 #include <cradle/inner/requests/context_base.h>
 
 /*
- * This file defines a collection of concrete context classes. The default
- * domain is "testing" but can be overridden.
+ * This file defines a collection of concrete context classes, in the "testing"
+ * domain.
  * These classes fill in gaps in the context bases classes, mostly by
  * defining a number of factory functions (specific to the concrete classes).
  */
@@ -13,8 +13,8 @@
 namespace cradle {
 
 /*
- * A context that can be used to synchronously resolve requests in some
- * domain ("testing" by default).
+ * A context that can be used to synchronously resolve requests in the
+ * "testing" domain.
  * It offers all context features other than the asynchronous functionality
  * (i.e., implements all context interfaces other than async_context_intf).
  */
@@ -29,20 +29,10 @@ class testing_request_context final : public sync_context_base
 
     // remote_context_intf
     std::string const&
-    domain_name() const override
-    {
-        return domain_name_;
-    }
+    domain_name() const override;
 
-    std::shared_ptr<local_context_intf>
-    local_clone() const override;
-
-    // other
-    void
-    set_domain_name(std::string const& name);
-
- private:
-    std::string domain_name_{"testing"};
+    service_config
+    make_config() const override;
 };
 static_assert(ValidContext<testing_request_context>);
 
@@ -69,6 +59,12 @@ class local_atst_tree_context : public local_tree_context_base
 class local_atst_context final : public local_async_context_base
 {
  public:
+    // Constructor called from testing_domain::make_local_async_context()
+    local_atst_context(
+        std::shared_ptr<local_atst_tree_context> tree_ctx,
+        service_config const& config);
+
+    // Other-purposes constructor
     local_atst_context(
         std::shared_ptr<local_atst_tree_context> tree_ctx,
         local_atst_context* parent,
@@ -81,29 +77,15 @@ class local_atst_context final : public local_async_context_base
     void
     set_result(blob result) override;
 
-    // Other; for extending / aggerating short delays so that corresponding
-    // race conditions become reproducible and can be checked in a unit test.
-
-    // Sets the delay (in ms) that a resolve_async operation / thread will wait
-    // after starting
+    // Other
     void
-    set_resolve_async_delay(int delay)
-    {
-        resolve_async_delay_ = delay;
-    }
-
-    // Sets the delay (in ms) that a set_result() call will wait before
-    // actually setting the result
-    void
-    set_set_result_delay(int delay)
-    {
-        set_result_delay_ = delay;
-    }
+    apply_fail_submit_async();
 
     void
     apply_resolve_async_delay();
 
  private:
+    bool fail_submit_async_{false};
     int resolve_async_delay_{0};
     int set_result_delay_{0};
 };
@@ -157,8 +139,7 @@ make_local_async_ctx_tree(
 
 /*
  * Tree-level context, shared by all proxy_atst_context objects in the same
- * context tree (relating to the same root request). The default domain is
- * "testing" but can be overridden.
+ * context tree (relating to the same root request), in the "testing" domain.
  *
  * Note that an object of this class should not be re-used across multiple
  * context trees.
@@ -168,26 +149,11 @@ class proxy_atst_tree_context : public proxy_async_tree_context_base
  public:
     proxy_atst_tree_context(
         inner_resources& resources, std::string proxy_name);
-
-    std::string const&
-    domain_name() const
-    {
-        return domain_name_;
-    }
-
-    void
-    set_domain_name(std::string const& name)
-    {
-        domain_name_ = name;
-    }
-
- private:
-    std::string domain_name_{"testing"};
 };
 
 /*
- * Context that can be used to asynchronously resolve root requests in some
- * domain ("testing" by default), on a remote machine.
+ * Context that can be used to asynchronously resolve root requests in the
+ * "testing" domain, on a remote machine.
  */
 class root_proxy_atst_context final : public root_proxy_async_context_base
 {
@@ -198,11 +164,44 @@ class root_proxy_atst_context final : public root_proxy_async_context_base
     std::string const&
     domain_name() const override;
 
- private:
-    // proxy_async_context_base
-    std::shared_ptr<local_async_context_base>
-    make_local_clone() const override;
+    service_config
+    make_config() const override;
 
+    // Other
+
+    // Causes submit_async to fail on the remote
+    void
+    fail_submit_async()
+    {
+        fail_submit_async_ = true;
+    }
+
+    // Sets the delay (in ms) that a resolve_async operation / thread will wait
+    // after starting.
+    // By extending / aggerating the existing short delay, the corresponding
+    // race condition becomes reproducible and can be checked in a unit test.
+    void
+    set_resolve_async_delay(int delay)
+    {
+        resolve_async_delay_ = delay;
+    }
+
+    // Sets the delay (in ms) that a set_result() call will wait before
+    // actually setting the result.
+    // By extending / aggerating the existing short delay, the corresponding
+    // race condition becomes reproducible and can be checked in a unit test.
+    void
+    set_set_result_delay(int delay)
+    {
+        set_result_delay_ = delay;
+    }
+
+ private:
+    bool fail_submit_async_{false};
+    int resolve_async_delay_{0};
+    int set_result_delay_{0};
+
+    // proxy_async_context_base
     std::unique_ptr<proxy_async_context_base>
     make_sub_ctx(
         std::shared_ptr<proxy_async_tree_context_base> tree_ctx,
@@ -211,8 +210,8 @@ class root_proxy_atst_context final : public root_proxy_async_context_base
 static_assert(ValidContext<root_proxy_atst_context>);
 
 /*
- * Context that can be used to asynchronously resolve non-root requests in some
- * domain ("testing" by default), on a remote machine.
+ * Context that can be used to asynchronously resolve non-root requests in the
+ * "testing" domain, on a remote machine.
  */
 class non_root_proxy_atst_context final
     : public non_root_proxy_async_context_base
@@ -227,11 +226,11 @@ class non_root_proxy_atst_context final
     std::string const&
     domain_name() const override;
 
+    service_config
+    make_config() const override;
+
  private:
     // proxy_async_context_base
-    std::shared_ptr<local_async_context_base>
-    make_local_clone() const override;
-
     std::unique_ptr<proxy_async_context_base>
     make_sub_ctx(
         std::shared_ptr<proxy_async_tree_context_base> tree_ctx,
