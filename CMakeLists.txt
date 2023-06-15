@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.14)
-project(cradle)
 
 # CRADLE_IS_MAIN_PROJECT defines whether we are building CRADLE as the main
 # project or as a dependency of another project.
@@ -14,10 +13,26 @@ endif()
 # Define an option for generating installation targets.
 option(CRADLE_INSTALL "Generate install targets" OFF)
 
-# When being built as part of a release, the version can be externally
-# specified.
+# When building as part of the installation of a released version, the version
+# number must be externally specified.
 set(CRADLE_VERSION "" CACHE STRING
     "the CRADLE version number - Only for use in automated release builds.")
+if(CRADLE_INSTALL AND NOT CRADLE_VERSION)
+    message(FATAL "When installing, CRADLE_VERSION is required.")
+endif()
+
+# Again, during installation, the commit hash should be externally specified.
+set(CRADLE_COMMIT_HASH "" CACHE STRING
+    "the Git commit hash for this version of CRADLE")
+if(CRADLE_VERSION AND NOT CRADLE_COMMIT_HASH)
+    message(FATAL "When CRADLE_VERSION is specified, CRADLE_COMMIT_HASH is required.")
+endif()
+
+if(CRADLE_VERSION)
+    project(cradle VERSION ${CRADLE_VERSION})
+else()
+    project(cradle)
+endif()
 
 # Define the options for using the preprocessor.
 set(CRADLE_PREPROCESSOR_USAGE_OPTIONS Native GitCache External)
@@ -27,8 +42,8 @@ set_property(CACHE CRADLE_PREPROCESSOR_USAGE PROPERTY
     STRINGS ${CRADLE_PREPROCESSOR_USAGE_OPTIONS})
 set(CRADLE_EXTERNALLY_PREPROCESSED_DIRECTORY "" CACHE STRING
     "If CRADLE_PREPROCESSOR_USAGE is External, this is the directory that contains the externally preprocessed files.")
-set(CRADLE_COMMIT_HASH "" CACHE STRING
-    "If CRADLE_PREPROCESSOR_USAGE is GitCache, this is the commit hash to look up. If not given, this is queried from Git.")
+# Note: If CRADLE_PREPROCESSOR_USAGE is GitCache, CRADLE_COMMIT_HASH is the
+# commit hash to look up. If not explicitly given, it will be queried from Git.
 
 # Define test generation options.
 option(
@@ -72,9 +87,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 # version_info.h defines the CRADLE version.
 if(CRADLE_VERSION)
-    if(NOT CRADLE_COMMIT_HASH)
-        message(FATAL "If CRADLE_VERSION is given, CRADLE_COMMIT_HASH must also be specified.")
-    endif()
     set(CRADLE_SOURCE_IS_DIRTY "false")
     set(CRADLE_COMMITS_SINCE_RELEASE 0)
     # If a version was set externally, use it directly.
@@ -581,4 +593,14 @@ if(CRADLE_INSTALL)
             "${CMAKE_CURRENT_BINARY_DIR}/CradleConfig.cmake"
             "${CMAKE_CURRENT_BINARY_DIR}/CradleConfigVersion.cmake"
         DESTINATION lib/cmake/Config)
+
+    # Describe our packaging.
+    set(CPACK_PACKAGE_VENDOR "CRADLE")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "declarative calculation framework")
+    set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+    set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+    set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
+    set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+    include(CPack)
 endif()
