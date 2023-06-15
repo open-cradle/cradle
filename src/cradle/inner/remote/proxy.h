@@ -7,7 +7,7 @@
 
 #include <spdlog/spdlog.h>
 
-#include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/types.h>
 #include <cradle/inner/resolve/seri_result.h>
 #include <cradle/inner/service/config.h>
 
@@ -115,15 +115,6 @@ class remote_proxy
     finish_async(async_id root_aid)
         = 0;
 };
-
-// Registers a proxy.
-void
-register_proxy(std::shared_ptr<remote_proxy> proxy);
-
-// Returns the proxy with the given name.
-// Throws if the proxy was not found.
-remote_proxy&
-find_proxy(std::string const& name);
 
 } // namespace cradle
 

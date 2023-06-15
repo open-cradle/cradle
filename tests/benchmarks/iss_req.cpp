@@ -24,6 +24,7 @@
 
 #include "../support/inner_service.h"
 #include "../support/outer_service.h"
+#include "../support/thinknode.h"
 #include "benchmark_support.h"
 
 using namespace cradle;
@@ -58,33 +59,21 @@ register_remote_services(
     std::string const& proxy_name,
     http_response const& response)
 {
-    static bool registered_resolvers = false;
-    if (!registered_resolvers)
-    {
-        register_thinknode_seri_resolvers();
-        registered_resolvers = true;
-    }
+    ensure_thinknode_seri_resolvers();
+    ensure_all_domains_registered();
     if (proxy_name == "loopback")
     {
-        static bool registered_loopback;
-        if (!registered_loopback)
-        {
-            register_loopback_service(make_inner_tests_config(), resources);
-            registered_loopback = true;
-        }
+        register_loopback_service(make_inner_tests_config(), resources);
     }
     else if (proxy_name == "rpclib")
     {
-        // TODO no static here, add func to get previously registered client
-        static std::shared_ptr<rpclib_client> rpclib_client;
-        if (!rpclib_client)
-        {
-            rpclib_client = register_rpclib_client(make_outer_tests_config());
-        }
+        auto& rpclib_client
+            = register_rpclib_client(make_outer_tests_config(), resources);
+
         // TODO should body be blob or string?
         auto const& body{response.body};
         std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
-        rpclib_client->mock_http(s);
+        rpclib_client.mock_http(s);
     }
     else
     {

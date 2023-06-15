@@ -209,10 +209,12 @@ target_link_libraries(test_lib_benchmark PUBLIC
 add_executable(benchmark_test_runner)
 target_sources(benchmark_test_runner PRIVATE
     support/inner_service.cpp 
-    support/outer_service.cpp)
+    support/outer_service.cpp
+    support/thinknode.cpp)
 target_link_libraries(benchmark_test_runner PRIVATE
     test_lib_benchmark
     cradle_plugins_typing
+    cradle_plugins_thinknode
     cradle_plugins_inner)
 
 add_custom_target(

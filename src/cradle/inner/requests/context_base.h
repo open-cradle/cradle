@@ -66,6 +66,9 @@ class sync_context_base : public local_context_intf,
         return proxy_name_;
     }
 
+    remote_proxy&
+    get_proxy() const override;
+
     virtual std::string const&
     domain_name() const override
         = 0;
@@ -416,7 +419,7 @@ class proxy_async_tree_context_base
     remote_proxy&
     get_proxy() const
     {
-        return proxy_;
+        return resources_.get_proxy(proxy_name_);
     }
 
     spdlog::logger&
@@ -428,7 +431,6 @@ class proxy_async_tree_context_base
  private:
     inner_resources& resources_;
     std::string proxy_name_;
-    remote_proxy& proxy_;
     std::shared_ptr<spdlog::logger> logger_;
 };
 
@@ -485,6 +487,12 @@ class proxy_async_context_base : public remote_async_context_intf
         return tree_ctx_->get_proxy_name();
     }
 
+    remote_proxy&
+    get_proxy() const override
+    {
+        return tree_ctx_->get_proxy();
+    }
+
     virtual std::string const&
     domain_name() const override
         = 0;
@@ -530,12 +538,6 @@ class proxy_async_context_base : public remote_async_context_intf
     // Using unique_ptr because class proxy_async_context_base has no default
     // constructor and no copy constructor.
     std::vector<std::unique_ptr<proxy_async_context_base>> subs_;
-
-    remote_proxy&
-    get_proxy() const
-    {
-        return tree_ctx_->get_proxy();
-    }
 
     virtual std::unique_ptr<proxy_async_context_base>
     make_sub_ctx(

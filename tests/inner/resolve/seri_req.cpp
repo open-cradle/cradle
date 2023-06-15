@@ -23,7 +23,7 @@ test_resolve(bool remotely)
     init_test_inner_service(resources);
     if (remotely)
     {
-        ensure_loopback_service(resources);
+        register_loopback_service(make_inner_tests_config(), resources);
     }
     testing_request_context ctx{resources, nullptr, remotely, "loopback"};
 

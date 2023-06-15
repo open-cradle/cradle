@@ -100,6 +100,18 @@ inner_resources::get_async_thread_pool()
     return impl_->get_async_thread_pool();
 }
 
+void
+inner_resources::register_proxy(std::unique_ptr<remote_proxy> proxy)
+{
+    impl_->register_proxy(std::move(proxy));
+}
+
+remote_proxy&
+inner_resources::get_proxy(std::string const& name)
+{
+    return impl_->get_proxy(name);
+}
+
 http_connection_interface&
 http_connection_for_thread(inner_resources& resources)
 {
@@ -226,6 +238,29 @@ async_db*
 inner_resources_impl::get_async_db()
 {
     return async_db_instance_ ? &*async_db_instance_ : nullptr;
+}
+
+void
+inner_resources_impl::register_proxy(std::unique_ptr<remote_proxy> proxy)
+{
+    std::string const& name{proxy->name()};
+    if (proxies_.contains(name))
+    {
+        throw std::logic_error{
+            fmt::format("Proxy {} already registered", name)};
+    }
+    proxies_[name] = std::move(proxy);
+}
+
+remote_proxy&
+inner_resources_impl::get_proxy(std::string const& name)
+{
+    auto it = proxies_.find(name);
+    if (it == proxies_.end())
+    {
+        throw std::logic_error{fmt::format("Proxy {} not registered", name)};
+    }
+    return *it->second;
 }
 
 void

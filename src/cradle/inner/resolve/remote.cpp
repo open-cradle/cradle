@@ -47,7 +47,7 @@ resolve_async(remote_async_context_intf& ctx, std::string seri_req)
     async_id remote_id{};
     try
     {
-        proxy = &find_proxy(ctx.proxy_name());
+        proxy = &ctx.get_proxy();
         auto& logger = proxy->get_logger();
         logger.debug(
             "resolve_async on {}: {} ...",
@@ -69,7 +69,7 @@ resolve_async(remote_async_context_intf& ctx, std::string seri_req)
 serialized_result
 resolve_sync(remote_context_intf& ctx, std::string seri_req)
 {
-    auto& proxy = find_proxy(ctx.proxy_name());
+    auto& proxy = ctx.get_proxy();
     auto& logger = proxy.get_logger();
     logger.debug(
         "request on {}: {} ...", ctx.domain_name(), seri_req.substr(0, 10));

@@ -16,23 +16,32 @@ using namespace cradle;
 
 TEST_CASE("client name", "[rpclib]")
 {
-    auto client = ensure_rpclib_service();
+    inner_resources resources;
+    init_test_inner_service(resources);
+    auto& client
+        = register_rpclib_client(make_inner_tests_config(), resources);
 
-    REQUIRE(client->name() == "rpclib");
+    REQUIRE(client.name() == "rpclib");
 }
 
 TEST_CASE("send mock_http message", "[rpclib]")
 {
-    auto client = ensure_rpclib_service();
+    inner_resources resources;
+    init_test_inner_service(resources);
+    auto& client
+        = register_rpclib_client(make_inner_tests_config(), resources);
 
-    REQUIRE_NOTHROW(client->mock_http("mock response"));
+    REQUIRE_NOTHROW(client.mock_http("mock response"));
 }
 
 TEST_CASE("ping message", "[rpclib]")
 {
-    auto client = ensure_rpclib_service();
+    inner_resources resources;
+    init_test_inner_service(resources);
+    auto& client
+        = register_rpclib_client(make_inner_tests_config(), resources);
 
-    auto git_version = client->ping();
+    auto git_version = client.ping();
 
     REQUIRE(git_version.size() > 0);
 }
@@ -44,9 +53,9 @@ test_make_some_blob(bool shared)
     constexpr auto remotely{true};
     std::string proxy_name{"rpclib"};
     register_testing_seri_resolvers();
-    ensure_rpclib_service();
     inner_resources service;
     init_test_inner_service(service);
+    register_rpclib_client(make_inner_tests_config(), service);
     testing_request_context ctx{service, nullptr, remotely, proxy_name};
 
     auto req{rq_make_some_blob<caching_level>(10000, shared)};
@@ -71,12 +80,12 @@ TEST_CASE("sending bad request", "[rpclib]")
 {
     inner_resources service;
     init_test_inner_service(service);
-    auto client = ensure_rpclib_service();
+    auto& client = register_rpclib_client(make_inner_tests_config(), service);
     service_config_map config_map{
         {remote_config_keys::DOMAIN_NAME, "bad domain"},
     };
 
     REQUIRE_THROWS_AS(
-        client->resolve_sync(service_config{config_map}, "bad request"),
+        client.resolve_sync(service_config{config_map}, "bad request"),
         remote_error);
 }

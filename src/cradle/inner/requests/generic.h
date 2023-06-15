@@ -10,6 +10,8 @@
 
 #include <cradle/inner/core/id.h>
 #include <cradle/inner/core/type_definitions.h>
+#include <cradle/inner/remote/proxy.h>
+#include <cradle/inner/requests/types.h>
 #include <cradle/inner/service/config.h>
 
 namespace cradle {
@@ -172,6 +174,11 @@ class remote_context_intf : public virtual context_intf
     proxy_name() const
         = 0;
 
+    // The proxy itself. Will throw when it was not registered.
+    virtual remote_proxy&
+    get_proxy() const
+        = 0;
+
     // The domain name identifies a context implementation class.
     virtual std::string const&
     domain_name() const
@@ -190,32 +197,6 @@ class sync_context_intf : public virtual context_intf
  public:
     virtual ~sync_context_intf() = default;
 };
-
-// Status of an asynchronous operation: a (cppcoro) task, associated
-// with a coroutine.
-// CANCELLED, FINISHED and ERROR are final statuses: once a task ends up in
-// one of these, its status won't change anymore.
-enum class async_status
-{
-    CREATED, // Task was created
-    SUBS_RUNNING, // Subtasks running, main task waiting for them
-    SELF_RUNNING, // Subtasks finished, main task running
-    CANCELLING, // Detected cancellation request
-    CANCELLED, // Cancellation completed
-    AWAITING_RESULT, // Calculation completed, but the result still has to be
-                     // stored in the context (transient internal status)
-    FINISHED, // Finished successfully
-    ERROR // Ended due to error
-};
-
-std::string
-to_string(async_status s);
-
-// Identifies an async operation. Unique within the context of its
-// (local or remote) service.
-using async_id = uint64_t;
-
-static constexpr async_id NO_ASYNC_ID{~async_id{}};
 
 // Thrown when an asynchronous request resolution is cancelled
 class async_cancelled : public std::runtime_error

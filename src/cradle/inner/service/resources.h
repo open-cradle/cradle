@@ -16,6 +16,7 @@
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/io/http_requests.h>
 #include <cradle/inner/remote/async_db.h>
+#include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/service/config.h>
 
 namespace cradle {
@@ -107,6 +108,12 @@ class inner_resources
 
     cppcoro::static_thread_pool&
     get_async_thread_pool();
+
+    void
+    register_proxy(std::unique_ptr<remote_proxy> proxy);
+
+    remote_proxy&
+    get_proxy(std::string const& name);
 
     inner_resources_impl&
     impl()

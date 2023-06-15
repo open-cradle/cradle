@@ -30,21 +30,11 @@ register_remote_services(
     }
     if (proxy_name == "loopback")
     {
-        static bool registered_loopback;
-        if (!registered_loopback)
-        {
-            register_loopback_service(make_inner_tests_config(), resources);
-            registered_loopback = true;
-        }
+        register_loopback_service(make_inner_tests_config(), resources);
     }
     else if (proxy_name == "rpclib")
     {
-        // TODO no static here, add func to get previously registered client
-        static std::shared_ptr<rpclib_client> rpclib_client;
-        if (!rpclib_client)
-        {
-            rpclib_client = register_rpclib_client(make_inner_tests_config());
-        }
+        register_rpclib_client(make_inner_tests_config(), resources);
     }
     else
     {

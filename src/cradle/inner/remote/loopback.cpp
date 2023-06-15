@@ -196,8 +196,8 @@ void
 register_loopback_service(
     service_config const& config, inner_resources& resources)
 {
-    auto proxy{std::make_shared<loopback_service>(config, resources)};
-    register_proxy(proxy);
+    auto proxy{std::make_unique<loopback_service>(config, resources)};
+    resources.register_proxy(std::move(proxy));
 }
 
 } // namespace cradle

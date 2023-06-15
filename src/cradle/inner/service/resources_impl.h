@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 
 #include <cppcoro/static_thread_pool.hpp>
 
@@ -68,12 +69,19 @@ class inner_resources_impl
     async_db*
     get_async_db();
 
+    void
+    register_proxy(std::unique_ptr<remote_proxy> proxy);
+
+    remote_proxy&
+    get_proxy(std::string const& name);
+
  private:
     std::mutex mutex_;
     std::unique_ptr<cradle::immutable_cache> memory_cache_;
     std::unique_ptr<secondary_cache_intf> secondary_cache_;
     std::unique_ptr<blob_file_directory> blob_dir_;
     std::unique_ptr<async_db> async_db_instance_;
+    std::unordered_map<std::string, std::unique_ptr<remote_proxy>> proxies_;
 
     cppcoro::static_thread_pool http_pool_;
     cppcoro::static_thread_pool async_pool_;

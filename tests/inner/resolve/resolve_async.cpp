@@ -16,6 +16,7 @@
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/domain.h>
 #include <cradle/plugins/domain/testing/requests.h>
+#include <cradle/rpclib/client/registry.h>
 
 using namespace cradle;
 
@@ -35,7 +36,7 @@ setup_loopback_test(inner_resources& inner)
 {
     init_test_inner_service(inner);
     inner.ensure_async_db();
-    ensure_loopback_service(inner);
+    register_loopback_service(make_inner_tests_config(), inner);
     register_and_initialize_testing_domain();
 }
 
@@ -43,7 +44,7 @@ void
 setup_rpclib_test(inner_resources& inner)
 {
     init_test_inner_service(inner);
-    ensure_rpclib_service();
+    register_rpclib_client(make_inner_tests_config(), inner);
 }
 
 template<typename Ctx, typename Req, typename Constraints>

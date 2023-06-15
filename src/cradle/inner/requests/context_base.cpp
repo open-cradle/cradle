@@ -24,6 +24,12 @@ sync_context_base::sync_context_base(
     }
 }
 
+remote_proxy&
+sync_context_base::get_proxy() const
+{
+    return resources_.get_proxy(proxy_name_);
+}
+
 tasklet_tracker*
 sync_context_base::get_tasklet()
 {
@@ -344,7 +350,6 @@ proxy_async_tree_context_base::proxy_async_tree_context_base(
     inner_resources& resources, std::string proxy_name)
     : resources_(resources),
       proxy_name_{std::move(proxy_name)},
-      proxy_{find_proxy(proxy_name_)},
       logger_{spdlog::get("cradle")}
 {
 }

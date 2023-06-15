@@ -1920,7 +1920,7 @@ initialize(websocket_server_impl& server, service_config const& config)
         });
 
     register_and_initialize_thinknode_domain();
-    register_rpclib_client(config);
+    register_rpclib_client(config, server.core);
 }
 
 websocket_server::websocket_server(service_config const& config)

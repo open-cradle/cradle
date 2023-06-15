@@ -36,6 +36,12 @@ class remote_context_mixin : public remote_context_intf
         throw not_implemented_error();
     }
 
+    remote_proxy&
+    get_proxy() const override
+    {
+        throw not_implemented_error();
+    }
+
     std::string const&
     domain_name() const override
     {

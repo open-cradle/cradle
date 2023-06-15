@@ -19,6 +19,7 @@
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/io/mock_http.h>
+#include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/resolve/resolve_request.h>
@@ -165,7 +166,7 @@ test_post_iss_requests_parallel(
     if (remotely)
     {
         ensure_thinknode_seri_resolvers();
-        ensure_loopback_service(service);
+        register_loopback_service(make_inner_tests_config(), service);
     }
 
     mock_http_script script;

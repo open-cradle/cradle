@@ -84,14 +84,6 @@ template<caching_level_type level>
 using request_resolution_context =
     typename request_resolution_context_struct<level>::type;
 
-// Ensure that the "remote" loopback service is available
-void
-ensure_loopback_service(inner_resources& resources);
-
-// Ensure that an rpclib client and server are available; returns the client
-std::shared_ptr<rpclib_client>
-ensure_rpclib_service();
-
 } // namespace cradle
 
 #endif
