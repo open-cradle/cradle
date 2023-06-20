@@ -598,7 +598,7 @@ if(CRADLE_INSTALL)
         FILES
             "${CMAKE_CURRENT_BINARY_DIR}/CradleConfig.cmake"
             "${CMAKE_CURRENT_BINARY_DIR}/CradleConfigVersion.cmake"
-        DESTINATION lib/cmake/Config)
+        DESTINATION lib/cmake/cradle)
 
     # Describe our packaging.
     set(CPACK_PACKAGE_VENDOR "CRADLE")
