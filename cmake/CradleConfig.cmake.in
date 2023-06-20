@@ -20,6 +20,12 @@ find_dependency(cereal CONFIG REQUIRED)
 find_dependency(rpclib CONFIG REQUIRED)
 find_dependency(tomlplusplus CONFIG REQUIRED)
 
+# TODO: Don't bring these along as dependencies.
+find_dependency(Catch2 CONFIG REQUIRED)
+find_dependency(benchmark CONFIG REQUIRED)
+
+# This is to find cppcoro's dependencies.
+# TODO: Remove this once cppcoro is installed in a more reasonable way.
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
 find_dependency(Coroutines QUIET REQUIRED)
 
