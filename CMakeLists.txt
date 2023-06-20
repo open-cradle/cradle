@@ -569,7 +569,7 @@ if(CRADLE_INSTALL)
         TARGETS
             cradle_inner cradle_typing cradle_plugins_typing cradle_thinknode
             cradle_plugins_thinknode cradle_rpclib_client cradle_websocket
-            cradle_external cppcoro::cppcoro
+            cradle_external cppcoro
         EXPORT CradleTargets
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
