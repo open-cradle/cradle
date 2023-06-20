@@ -587,11 +587,6 @@ if(CRADLE_INSTALL)
         NAMESPACE cradle::
         DESTINATION lib/cmake/cradle)
 
-    install(
-        FILE CradleTargets.cmake
-        NAMESPACE cradle::
-        DESTINATION lib/cmake/cradle)
-
     configure_file(cmake/CradleConfig.cmake.in CradleConfig.cmake @ONLY)
     install(
         FILES
