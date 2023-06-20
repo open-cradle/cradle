@@ -587,6 +587,12 @@ if(CRADLE_INSTALL)
         NAMESPACE cradle::
         DESTINATION lib/cmake/cradle)
 
+    # Install something to the DATAROOT directory in an attempt to make vcpkg
+    # happy.
+    install(
+        FILES ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+        TYPE DOC)
+
     configure_file(cmake/CradleConfig.cmake.in CradleConfig.cmake @ONLY)
     install(
         FILES
