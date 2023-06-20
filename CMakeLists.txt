@@ -119,8 +119,8 @@ if(IS_GCC OR IS_CLANG)
 endif()
 
 FetchContent_Declare(fetched_cppcoro
-    GIT_REPOSITORY https://github.com/mghro/cppcoro
-    GIT_TAG master)
+    GIT_REPOSITORY https://github.com/andreasbuhr/cppcoro
+    GIT_TAG ba05f5c4cfeff9fde1f80c8b354c4506cb446024)
 FetchContent_MakeAvailable(fetched_cppcoro)
 
 # Find core dependencies.
@@ -569,7 +569,7 @@ if(CRADLE_INSTALL)
         TARGETS
             cradle_inner cradle_typing cradle_plugins_typing cradle_thinknode
             cradle_plugins_thinknode cradle_rpclib_client cradle_websocket
-            cradle_external cppcoro std::coroutines
+            cradle_external cppcoro
         EXPORT CradleTargets
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
@@ -587,17 +587,24 @@ if(CRADLE_INSTALL)
         NAMESPACE cradle::
         DESTINATION lib/cmake/cradle)
 
-    # Install something to the DATAROOT directory in an attempt to make vcpkg
-    # happy.
     install(
-        FILES ${CMAKE_CURRENT_SOURCE_DIR}/README.md
-        TYPE DOC)
+        FILE CradleTargets.cmake
+        NAMESPACE cradle::
+        DESTINATION lib/cmake/cradle)
 
     configure_file(cmake/CradleConfig.cmake.in CradleConfig.cmake @ONLY)
     install(
         FILES
             "${CMAKE_CURRENT_BINARY_DIR}/CradleConfig.cmake"
             "${CMAKE_CURRENT_BINARY_DIR}/CradleConfigVersion.cmake"
+        DESTINATION lib/cmake/cradle)
+
+    FetchContent_GetProperties(
+        fetched_cppcoro
+        SOURCE_DIR FETCHED_CPPCORO_SOURCE_DIR)
+    install(
+        FILES
+            "${FETCHED_CPPCORO_SOURCE_DIR}/cmake/FindCoroutines.cmake"
         DESTINATION lib/cmake/cradle)
 
     # Describe our packaging.

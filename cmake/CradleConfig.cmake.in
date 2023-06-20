@@ -20,8 +20,8 @@ find_dependency(cereal CONFIG REQUIRED)
 find_dependency(rpclib CONFIG REQUIRED)
 find_dependency(tomlplusplus CONFIG REQUIRED)
 
-# Any extra setup.
-# TODO
+include("${CMAKE_CURRENT_LIST_DIR}/FindCoroutines.cmake")
+find_dependency(Coroutines QUIET REQUIRED)
 
 # Add the targets file.
 include("${CMAKE_CURRENT_LIST_DIR}/CradleTargets.cmake")
