@@ -567,9 +567,9 @@ endif()
 if(CRADLE_INSTALL)
     install(
         TARGETS
-            cradle_inner cradle_typing cradle_plugins_typing cradle_thinknode
-            cradle_plugins_thinknode cradle_rpclib_client cradle_websocket
-            cradle_external cppcoro
+            cradle_inner cradle_typing cradle_plugins_inner
+            cradle_plugins_typing cradle_thinknode cradle_plugins_thinknode
+            cradle_rpclib_client cradle_websocket cradle_external cppcoro
         EXPORT CradleTargets
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
