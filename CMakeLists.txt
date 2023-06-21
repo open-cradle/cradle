@@ -501,8 +501,6 @@ target_link_libraries(websocket_server
     cradle_websocket
     cradle_plugins_inner
     Boost::program_options)
-# add_custom_command(TARGET websocket_server POST_BUILD
-#     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:websocket_server> ${deploy_dir})
 
 # The rpclib server
 file(GLOB_RECURSE srcs_rpclib_server CONFIGURE_DEPENDS
@@ -518,8 +516,6 @@ target_link_libraries(rpclib_server PRIVATE
     fmt::fmt
     rpclib::rpc
     spdlog::spdlog)
-# add_custom_command(TARGET rpclib_server POST_BUILD
-#     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:rpclib_server> ${deploy_dir})
 
 # Create deploy_dir.h for providing access to the rpclib server executable.
 add_custom_command(
@@ -567,7 +563,7 @@ endif()
 if(CRADLE_INSTALL)
     install(
         TARGETS
-            cradle_inner cradle_typing cradle_plugins_inner
+            cradle_inner cradle_typing lib_third_party cradle_plugins_inner
             cradle_plugins_typing cradle_thinknode cradle_plugins_thinknode
             cradle_rpclib_client cradle_websocket cradle_external cppcoro
         EXPORT CradleTargets
