@@ -11,6 +11,7 @@
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/function.h>
+#include <cradle/inner/requests/value.h>
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/domain/testing/context.h>
@@ -170,9 +171,11 @@ test_resolve_async_across_rpc(
 
 } // namespace
 
-TEST_CASE("resolve async locally", tag)
+TEST_CASE("resolve async locally - raw args", tag)
 {
     constexpr int loops = 3;
+    int delay0 = 5;
+    int delay1 = 6;
     using required_ctx_types = ctx_type_list<local_async_context_intf>;
     using Props = request_props<
         caching_level_type::none,
@@ -182,8 +185,6 @@ TEST_CASE("resolve async locally", tag)
     Props props0{make_test_uuid(100)};
     Props props1{make_test_uuid(101)};
     Props props2{make_test_uuid(102)};
-    int delay0 = 5;
-    int delay1 = 6;
     auto req{rq_function_erased(
         props0,
         cancellable_coro,
@@ -197,6 +198,25 @@ TEST_CASE("resolve async locally", tag)
     ResolutionConstraintsLocalAsync constraints;
     test_resolve_async(
         *root_ctx, req, constraints, false, loops, delay0, delay1);
+}
+
+TEST_CASE("resolve async locally - normalized args", tag)
+{
+    constexpr int loops = 3;
+    int delay0 = 5;
+    int delay1 = 6;
+    constexpr auto level{caching_level_type::none};
+    auto req{rq_cancellable_coro<level>(
+        rq_cancellable_coro<level>(loops, delay0),
+        rq_cancellable_coro<level>(loops, delay1))};
+    inner_resources inner;
+    init_test_inner_service(inner);
+    auto tree_ctx = std::make_shared<local_atst_tree_context>(inner);
+    auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};
+
+    ResolutionConstraintsLocalAsync constraints;
+    test_resolve_async(
+        *root_ctx, req, constraints, true, loops, delay0, delay1);
 }
 
 TEST_CASE("resolve async on loopback", tag)
@@ -213,6 +233,41 @@ TEST_CASE("resolve async on rpclib", tag)
     setup_rpclib_test(inner);
 
     test_resolve_async_across_rpc(inner, "rpclib");
+}
+
+TEST_CASE("resolve async with value_request locally", tag)
+{
+    constexpr int loops = 3;
+    int delay0 = 5;
+    int val1 = 6;
+    using required_ctx_types
+        = ctx_type_list<local_async_context_intf, caching_context_intf>;
+    using Props = request_props<
+        caching_level_type::full,
+        true,
+        false,
+        required_ctx_types>;
+    Props props0{make_test_uuid(110)};
+    Props props1{make_test_uuid(111)};
+    auto req{rq_function_erased(
+        props0,
+        cancellable_coro,
+        rq_function_erased(props1, cancellable_coro, loops, delay0),
+        rq_value(val1))};
+    inner_resources inner;
+    init_test_inner_service(inner);
+    auto tree_ctx = std::make_shared<local_atst_tree_context>(inner);
+    auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};
+
+    ResolutionConstraintsLocalAsync constraints;
+    auto res0
+        = cppcoro::sync_wait(resolve_request(*root_ctx, req, constraints));
+    REQUIRE(res0 == 14);
+
+    inner.reset_memory_cache();
+    auto res1
+        = cppcoro::sync_wait(resolve_request(*root_ctx, req, constraints));
+    REQUIRE(res1 == 14);
 }
 
 namespace {
@@ -582,4 +637,25 @@ TEST_CASE("delayed set_result on rpclib", tag)
     setup_rpclib_test(inner);
 
     test_delayed_set_result(inner, "rpclib");
+}
+
+TEST_CASE("create rq_cancellable_coro with different caching levels", tag)
+{
+    REQUIRE_NOTHROW(rq_cancellable_coro<caching_level_type::none>(0, 0));
+    REQUIRE_NOTHROW(rq_cancellable_coro<caching_level_type::memory>(0, 0));
+    REQUIRE_NOTHROW(rq_cancellable_coro<caching_level_type::full>(0, 0));
+}
+
+TEST_CASE("create rq_cancellable_coro with different loop/delay values", tag)
+{
+    REQUIRE_NOTHROW(rq_cancellable_coro<caching_level_type::full>(0, 1));
+    REQUIRE_NOTHROW(rq_cancellable_coro<caching_level_type::full>(1, 0));
+}
+
+TEST_CASE("create rq_cancellable_coro with different loop/delay types", tag)
+{
+    REQUIRE_NOTHROW(
+        rq_cancellable_coro<caching_level_type::full, unsigned, int>(0, 0));
+    REQUIRE_NOTHROW(
+        rq_cancellable_coro<caching_level_type::full, int, unsigned>(0, 0));
 }

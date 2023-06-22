@@ -10,7 +10,9 @@ from cradle.session import Session
 # becomes the JSON serialization of a C++ function_request_erased object
 def make_req(session: Session, uuid_base: str, title: str, args: List) -> Any:
     # Request metadata
-    uuid = f'{uuid_base}+{session.git_version}'
+    uuid = uuid_base
+    # Or, if using Git version:
+    # uuid = f'{uuid_base}+{session.git_version}'
 
     # Args
     args_data = {f'tuple_element{i}': arg for i, arg in enumerate(args)}
@@ -44,7 +46,7 @@ def normalized_arg(session: Session, type_id: str, arg: Any) -> Any:
 
 
 def make_post_iss_object_request(session: Session, value: str) -> Any:
-    uuid_base = 'rq_post_iss_object-full'
+    uuid_base = 'rq_post_iss_object+full'
     title = 'post_iss_object'
     msgpack_encoded = msgpack.packb(value, use_bin_type=True)
     base64_encoded = base64.standard_b64encode(msgpack_encoded)
@@ -59,7 +61,7 @@ def make_post_iss_object_request(session: Session, value: str) -> Any:
 
 
 def make_get_iss_object_metadata_request(session: Session, object_id: Any) -> Any:
-    uuid_base = 'rq_get_iss_object_metadata-full'
+    uuid_base = 'rq_get_iss_object_metadata+full'
     title = 'get_iss_object_metadata'
     args = [normalized_arg(session, 'string', object_id)]
 
@@ -67,7 +69,7 @@ def make_get_iss_object_metadata_request(session: Session, object_id: Any) -> An
 
 
 def make_retrieve_immutable_object_request(session: Session, immutable_id: Any) -> Any:
-    uuid_base = 'rq_retrieve_immutable_object-full'
+    uuid_base = 'rq_retrieve_immutable_object+full'
     title = 'retrieve_immutable_object'
     args = [normalized_arg(session, 'string', immutable_id)]
 
@@ -75,7 +77,7 @@ def make_retrieve_immutable_object_request(session: Session, immutable_id: Any) 
 
 
 def make_resolve_iss_object_to_immutable_request(session: Session, object_id: Any) -> Any:
-    uuid_base = 'rq_resolve_iss_object_to_immutable-full'
+    uuid_base = 'rq_resolve_iss_object_to_immutable+full'
     title = 'resolve_iss_object_to_immutable'
     ignore_upgrades = False
     args = [normalized_arg(session, 'string', object_id), ignore_upgrades]

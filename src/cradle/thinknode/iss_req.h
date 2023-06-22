@@ -7,7 +7,6 @@
 
 #include <cereal/types/string.hpp>
 #include <cppcoro/task.hpp>
-#include <fmt/format.h>
 
 #include <cradle/inner/requests/function.h>
 #include <cradle/thinknode/iss.h>
@@ -25,27 +24,6 @@ using thinknode_request_props = request_props<
     true,
     ctx_type_list<thinknode_request_context>>;
 
-// Assumes that properties other than Level are as in thinknode_request_props
-template<caching_level_type Level>
-request_uuid
-make_tn_uuid(std::string const& base)
-{
-    char const* ext{};
-    if constexpr (Level == caching_level_type::none)
-    {
-        ext = "none";
-    }
-    else if constexpr (Level == caching_level_type::memory)
-    {
-        ext = "mem";
-    }
-    else
-    {
-        ext = "full";
-    }
-    return request_uuid{fmt::format("{}-{}", base, ext)};
-}
-
 // Creates a function_request_erased object representing a
 // "post ISS object" request,
 // where object_data is either a blob, or a subrequest yielding a blob.
@@ -56,7 +34,8 @@ rq_post_iss_object(
     std::string context_id, thinknode_type_info schema, ObjectData object_data)
 {
     using props_type = thinknode_request_props<Level>;
-    auto uuid{make_tn_uuid<Level>("rq_post_iss_object")};
+    request_uuid uuid{"rq_post_iss_object"};
+    uuid.set_level(Level);
     std::string title{"post_iss_object"};
     std::string url_type_template{get_url_type_template(schema)};
     return rq_function_erased(
@@ -78,7 +57,8 @@ auto
 rq_retrieve_immutable_object(std::string context_id, ImmutableId immutable_id)
 {
     using props_type = thinknode_request_props<Level>;
-    auto uuid{make_tn_uuid<Level>("rq_retrieve_immutable_object")};
+    request_uuid uuid{"rq_retrieve_immutable_object"};
+    uuid.set_level(Level);
     std::string title{"retrieve_immutable_object"};
     return rq_function_erased(
         props_type{std::move(uuid), std::move(title)},
@@ -96,7 +76,8 @@ auto
 rq_get_iss_object_metadata(std::string context_id, ObjectId object_id)
 {
     using props_type = thinknode_request_props<Level>;
-    auto uuid{make_tn_uuid<Level>("rq_get_iss_object_metadata")};
+    request_uuid uuid{"rq_get_iss_object_metadata"};
+    uuid.set_level(Level);
     std::string title{"get_iss_object_metadata"};
     return rq_function_erased(
         props_type(std::move(uuid), std::move(title)),
@@ -116,7 +97,8 @@ rq_resolve_iss_object_to_immutable(
     std::string context_id, ObjectId object_id, bool ignore_upgrades)
 {
     using props_type = thinknode_request_props<Level>;
-    auto uuid{make_tn_uuid<Level>("rq_resolve_iss_object_to_immutable")};
+    request_uuid uuid{"rq_resolve_iss_object_to_immutable"};
+    uuid.set_level(Level);
     std::string title{"resolve_iss_object_to_immutable"};
     return rq_function_erased(
         props_type(std::move(uuid), std::move(title)),

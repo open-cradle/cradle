@@ -24,7 +24,6 @@ namespace cradle {
  * A uuid is used in:
  * - Calculating a disk-cache hash (when resolving a fully-cached request)
  * - Request serialization
- * - Cereal polymorphic map
  *
  * A uuid is not needed for resolving uncached or memory-cached requests.
  *
@@ -36,7 +35,7 @@ namespace cradle {
  *   requires(std::same_as<typename R0::value_type, common_type>)
  *   class R1 { ... };
  *
- * A value_request instantiation can have a "no meaning" uuid.
+ * A value_request instantiation need not have a uuid.
  *
  * For a function request, its uuid must cover the function *value* though;
  * so for two requests with different functions, their uuid must differ, even
@@ -57,99 +56,98 @@ struct uuid_error : public std::logic_error
 class request_uuid
 {
  public:
-    // Creates an "empty" uuid, which cannot be used for anything.
-    // Also called in request deserialization (in that case, followed up by
-    // a serialize() call).
-    request_uuid() = default;
+    // The base string should be universally unique.
+    explicit request_uuid(std::string base);
 
-    // The base string should be unique within this application.
-    // It will be combined with Git information to produce something unique
-    // across application runs on different builds.
-    explicit request_uuid(std::string const& base)
-        : str_{combine(base, get_git_version())}
-    {
-        check_base(base);
-    }
+    // Causes the base uuid to be extended with something depending on the
+    // caching level.
+    // To be called when the corresponding request is a function class having
+    // the caching level as template parameter.
+    request_uuid&
+    set_level(caching_level_type level);
 
-    // The caller promises that the base+version combination will be updated
-    // when the request's implementation changes.
-    explicit request_uuid(std::string const& base, std::string const& version)
-        : str_{combine(base, version)}
-    {
-        check_base(base);
-    }
+    // Causes the base uuid to be combined with Git information to produce
+    // something unique across application runs on different builds.
+    // It is unclear how useful this is.
+    request_uuid&
+    use_git_version();
 
-    // Returns the full uuid (base + version)
+    // Returns the full uuid (base + any extensions)
     std::string const&
     str() const
     {
+        finalize();
         return str_;
-    }
-
-    // Indicates whether this is a "real" (non-empty, non-placeholder) uuid.
-    // A request with a real uuid can be disk-cached and serialized.
-    bool
-    is_real() const
-    {
-        return !str_.empty();
     }
 
     bool
     operator==(request_uuid const& other) const
     {
-        return str_ == other.str_;
+        return str() == other.str();
     }
 
     auto
     operator<=>(request_uuid const& other) const
     {
-        return str_ <=> other.str_;
+        return str() <=> other.str();
     }
 
     static std::string const&
     get_git_version();
 
+    // Serialize using cereal.
+    // This results in JSON
+    //    "uuid": "...uuid text...",
+    // A more usual implementation (e.g. putting serialize() in the class)
+    // would give
+    //    "uuid": { "value0": "...uuid text..." },
+    template<typename Archive>
+    void
+    save_with_name(Archive& archive, std::string const& name)
+    {
+        archive(cereal::make_nvp(name, str()));
+    }
+
+    // Deserialize using cereal.
+    template<typename Archive>
+    static request_uuid
+    load_with_name(Archive& archive, std::string const& name)
+    {
+        request_uuid uuid;
+        archive(cereal::make_nvp(name, uuid.str_));
+        return uuid;
+    }
+
  private:
-    template<typename Archive>
-    friend void
-    save_with_name(
-        Archive& archive, request_uuid const& uuid, std::string const& name);
-    template<typename Archive>
-    friend void
-    load_with_name(
-        Archive& archive, request_uuid& uuid, std::string const& name);
+    // Used in load_with_name() only
+    request_uuid() = default;
 
     inline static std::string git_version_;
-    std::string str_;
+
+    // str_ is the full string if finalized_, base until then
+    mutable std::string str_;
+    mutable bool finalized_{false};
+
+    // Modifiers
+    bool include_level_{false};
+    caching_level_type level_{};
+    bool use_git_version_{false};
 
     void
-    check_base(std::string const& base);
+    check_not_finalized() const;
 
-    std::string
-    combine(std::string const& base, std::string const& version);
+    void
+    finalize() const
+    {
+        if (!finalized_)
+        {
+            do_finalize();
+        }
+    }
+
+    void
+    do_finalize() const;
 };
-
-// Serialize a request_uuid object using cereal.
-// This results in JSON
-//    "uuid": "...uuid text...",
-// A more usual implementation (e.g. putting serialize() in the class) would
-// give
-//    "uuid": { "value0": "...uuid text..." },
-template<typename Archive>
-void
-save_with_name(
-    Archive& archive, request_uuid const& uuid, std::string const& name)
-{
-    archive(cereal::make_nvp(name, uuid.str_));
-}
-
-// Deserialize a request_uuid object using cereal.
-template<typename Archive>
-void
-load_with_name(Archive& archive, request_uuid& uuid, std::string const& name)
-{
-    archive(cereal::make_nvp(name, uuid.str_));
-}
 
 // For memory cache, unordered map
 inline size_t

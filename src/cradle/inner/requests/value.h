@@ -22,7 +22,9 @@ class value_request
  public:
     using element_type = value_request;
     using value_type = Value;
-    using required_ctx_types = ctx_type_list<local_context_intf>;
+    // TODO need separate sync/async required_ctx_types?
+    using required_ctx_types
+        = ctx_type_list<local_context_intf, local_async_context_intf>;
 
     static constexpr caching_level_type caching_level{
         caching_level_type::none};
@@ -39,8 +41,8 @@ class value_request
     request_uuid
     get_uuid() const
     {
-        // Zero uuid information
-        return request_uuid();
+        // There should be no reason to call this.
+        throw not_implemented_error("value_request::get_uuid()");
     }
 
     // A value request is "trivial": it presents itself as having no

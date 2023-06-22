@@ -79,7 +79,12 @@ parse_json_doc(simdjson::dom::element const& json)
 service_config_map
 read_config_map_from_json(std::string const& json_text)
 {
-    // TODO why static variables? Move them out of this function?
+    // The simdjson documentation recommends to "make a parser once and reuse
+    // it". In a multi-threaded environment, that one parser needs to be
+    // protected by a mutex.
+    // TODO still a good idea?
+    // TODO as it is, the static objects will be created when this function is
+    // first called. There's still room for race conditions.
     static simdjson::dom::parser the_parser;
     static std::mutex the_mutex;
 

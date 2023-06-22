@@ -233,12 +233,6 @@ TEST_CASE(
     REQUIRE(result_b == "b");
 }
 
-TEST_CASE("create function_request_erased: fully cached, no uuid", tag)
-{
-    request_props<caching_level_type::full> props;
-    REQUIRE_THROWS_AS(rq_function_erased(props, func_a), missing_uuid_error);
-}
-
 TEST_CASE("compare function_request_erased with subrequest", tag)
 {
     request_props<caching_level_type::memory> props0{make_test_uuid("0030")};

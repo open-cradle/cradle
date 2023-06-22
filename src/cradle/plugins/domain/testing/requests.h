@@ -26,9 +26,11 @@ rq_make_some_blob(std::size_t size, bool shared)
         introspective_context_intf,
         local_async_context_intf>;
     using props_type = request_props<Level, true, true, contexts>;
+    request_uuid uuid{"make_some_blob"};
+    uuid.set_level(Level);
+    std::string title{"make_some_blob"};
     return rq_function_erased(
-        props_type(
-            request_uuid{"make_some_blob"}, std::string{"make_some_blob"}),
+        props_type(std::move(uuid), std::move(title)),
         make_some_blob,
         size,
         shared);
@@ -38,6 +40,7 @@ cppcoro::task<int>
 cancellable_coro(context_intf& ctx, int loops, int delay);
 
 template<caching_level_type Level, typename Loops, typename Delay>
+    requires TypedArg<Loops, int> && TypedArg<Delay, int>
 auto
 rq_cancellable_coro(Loops loops, Delay delay)
 {
@@ -46,8 +49,8 @@ rq_cancellable_coro(Loops loops, Delay delay)
         introspective_context_intf,
         caching_context_intf>;
     using props_type = request_props<Level, true, true, contexts>;
-    // TODO uuid should depend on Level
     request_uuid uuid{"cancellable_coro"};
+    uuid.set_level(Level);
     std::string title{"cancellable_coro"};
     return rq_function_erased(
         props_type(std::move(uuid), std::move(title)),

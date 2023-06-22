@@ -65,12 +65,6 @@ class no_function_for_uuid_error : public uuid_error
     using uuid_error::uuid_error;
 };
 
-class missing_uuid_error : public uuid_error
-{
- public:
-    using uuid_error::uuid_error;
-};
-
 class unregistered_uuid_error : public uuid_error
 {
  public:
@@ -314,9 +308,6 @@ class function_request_impl : public function_request_intf<Value>
     function_request_impl(request_uuid uuid, Function function, Args... args)
         : uuid_{std::move(uuid)}, args_{std::move(args)...}
     {
-        // Guaranteed by the function_request_erased ctor
-        assert(uuid_.is_real());
-
         // The uuid uniquely identifies the function.
         // Store it so that is available during deserialization.
         auto uuid_str{uuid_.str()};
@@ -636,6 +627,9 @@ class function_request_impl : public function_request_intf<Value>
     }
 };
 
+void
+check_title_is_valid(std::string const& title);
+
 // Request (resolution) properties that would be identical between similar
 // requests
 // - Request attributes (AsCoro)
@@ -668,11 +662,39 @@ struct request_props
     request_uuid uuid_;
     std::string title_; // Used only if introspective
 
-    request_props(
-        request_uuid uuid = request_uuid(), std::string title = std::string())
-        : uuid_(std::move(uuid)), title_(std::move(title))
+#if 0
+    // Constructor for a request that won't be serialized, won't be fully
+    // cached, and won't be introspected
+    // Currently no callers. The request_uuid default ctor is private.
+    // If needed after all, putting request_uuid in a unique_ptr might
+    // be better than creating a request_uuid with an empty string.
+    request_props()
     {
-        assert(!(introspective && title_.empty()));
+        static_assert(level != caching_level_type::full);
+        static_assert(!introspective);
+    }
+#endif
+
+    // Constructor for a request that
+    // - Can be serialized
+    // - Can be fully cached (but will be only if the Level template argument
+    //   is caching_level_type::full)
+    // - Cannnot be introspected
+    explicit request_props(request_uuid uuid) : uuid_{std::move(uuid)}
+    {
+        static_assert(!introspective);
+    }
+
+    // Constructor for a request that
+    // - Can be serialized
+    // - Can be fully cached (but will be only if the Level template argument
+    //   is caching_level_type::full)
+    // - Can be introspected (but will be only if the Introspective template
+    //   argument holds true)
+    request_props(request_uuid uuid, std::string title)
+        : uuid_{std::move(uuid)}, title_{std::move(title)}
+    {
+        check_title_is_valid(title_);
     }
 };
 
@@ -737,12 +759,6 @@ class function_request_erased
     function_request_erased(Props props, Function function, Args... args)
         : title_{std::move(props.title_)}
     {
-        // TODO make is_real() a compile-time thing
-        if (!props.uuid_.is_real())
-        {
-            throw missing_uuid_error{
-                "Real uuid needed for type-erased request"};
-        }
         using impl_type = function_request_impl<
             Value,
             Props::func_is_coro,
@@ -840,7 +856,7 @@ class function_request_erased
     {
         // At least for JSON, there is no difference between multiple archive()
         // calls, or putting everything in one call.
-        save_with_name(archive, impl_->get_uuid(), "uuid");
+        impl_->get_uuid().save_with_name(archive, "uuid");
         archive(cereal::make_nvp("title", title_));
         ::cradle::save(archive, *impl_);
     }
@@ -849,8 +865,7 @@ class function_request_erased
     void
     load(Archive& archive)
     {
-        request_uuid uuid;
-        load_with_name(archive, uuid, "uuid");
+        auto uuid{request_uuid::load_with_name(archive, "uuid")};
         archive(cereal::make_nvp("title", title_));
         // Create a mostly empty function_request_impl object. uuid defines its
         // exact type (function_request_impl class instantiation), which could
@@ -957,7 +972,7 @@ auto rq_function_erased(Props props, Function function, Args... args)
  * being a simple value would often be convenient.
  *
  * The major problem with allowing both is that they lead to different types
- * of the main function_request_erased template class. Each variant needs its
+ * of the main function_request_impl template class. Each variant needs its
  * own uuid, and must be registered separately. If several arguments can
  * have a template type, the number of combinations quickly becomes
  * unmanageable.
