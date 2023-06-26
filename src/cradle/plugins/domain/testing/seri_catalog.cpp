@@ -9,6 +9,10 @@ void
 register_testing_seri_resolvers()
 {
     register_seri_resolver(
+        rq_make_some_blob<caching_level_type::none>(1, false));
+    register_seri_resolver(
+        rq_make_some_blob<caching_level_type::memory>(1, false));
+    register_seri_resolver(
         rq_make_some_blob<caching_level_type::full>(1, false));
     register_seri_resolver(
         rq_cancellable_coro<caching_level_type::memory>(0, 0));

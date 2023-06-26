@@ -216,7 +216,7 @@ rpclib_client_impl::verify_git_version(std::string const& server_git_version)
 void
 rpclib_client_impl::wait_until_server_running()
 {
-    int attempts_left = 10;
+    int attempts_left = 20;
     while (!server_is_running())
     {
         attempts_left -= 1;

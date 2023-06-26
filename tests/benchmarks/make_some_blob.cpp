@@ -7,6 +7,7 @@
 
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/service/resources.h>
+#include <cradle/plugins/domain/testing/domain.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/plugins/domain/testing/seri_catalog.h>
 #include <cradle/rpclib/client/proxy.h>
@@ -25,6 +26,7 @@ register_remote_services(
     static bool registered_resolvers = false;
     if (!registered_resolvers)
     {
+        register_and_initialize_testing_domain();
         register_testing_seri_resolvers();
         registered_resolvers = true;
     }
@@ -176,14 +178,33 @@ BM_resolve_make_some_blob(benchmark::State& state)
     BM_resolve_testing_request<caching_level, storing>(state, req, proxy_name);
 }
 
-BENCHMARK(BM_resolve_make_some_blob<caching_level_type::none, false>)
-    ->Name("BM_resolve_make_some_blob_uncached")
+constexpr auto full = caching_level_type::full;
+constexpr size_t tenK = 10'240;
+constexpr size_t oneM = 1'048'576;
+
+BENCHMARK(BM_resolve_make_some_blob<caching_level_type::none, false, tenK>)
+    ->Name("BM_resolve_make_some_blob_uncached_10K")
     ->Apply(thousand_loops);
-BENCHMARK(BM_resolve_make_some_blob<caching_level_type::memory, true>)
-    ->Name("BM_resolve_make_some_blob_store_to_mem_cache")
+BENCHMARK(BM_resolve_make_some_blob<caching_level_type::none, false, oneM>)
+    ->Name("BM_resolve_make_some_blob_uncached_1M")
     ->Apply(thousand_loops);
-BENCHMARK(BM_resolve_make_some_blob<caching_level_type::memory, false>)
-    ->Name("BM_resolve_make_some_blob_load_from_mem_cache")
+BENCHMARK(BM_resolve_make_some_blob<caching_level_type::memory, true, tenK>)
+    ->Name("BM_resolve_make_some_blob_store_to_mem_cache_10K")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_make_some_blob<caching_level_type::memory, true, oneM>)
+    ->Name("BM_resolve_make_some_blob_store_to_mem_cache_1M")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_make_some_blob<caching_level_type::memory, false, tenK>)
+    ->Name("BM_resolve_make_some_blob_mem_cached_10K")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_make_some_blob<caching_level_type::memory, false, oneM>)
+    ->Name("BM_resolve_make_some_blob_mem_cached_1M")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_make_some_blob<caching_level_type::full, false, tenK>)
+    ->Name("BM_resolve_make_some_blob_disk_cached_10K")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_make_some_blob<caching_level_type::full, false, oneM>)
+    ->Name("BM_resolve_make_some_blob_disk_cached_1M")
     ->Apply(thousand_loops);
 #if 0
 /*
@@ -199,20 +220,20 @@ BENCHMARK(BM_resolve_make_some_blob<caching_level_type::full, false>)
     ->Apply(thousand_loops);
 #endif
 
-constexpr auto full = caching_level_type::full;
-constexpr size_t tenK = 10'240;
-constexpr size_t oneM = 1'048'576;
 BENCHMARK(BM_resolve_make_some_blob<full, false, tenK, remoting::loopback>)
     ->Name("BM_resolve_make_some_blob_loopback_10K")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_make_some_blob<full, false, oneM, remoting::loopback>)
+    ->Name("BM_resolve_make_some_blob_loopback_1M")
     ->Apply(thousand_loops);
 BENCHMARK(BM_resolve_make_some_blob<full, false, tenK, remoting::copy>)
     ->Name("BM_resolve_make_some_blob_rpclib_copy_10K")
     ->Apply(thousand_loops);
-BENCHMARK(BM_resolve_make_some_blob<full, false, tenK, remoting::shared>)
-    ->Name("BM_resolve_make_some_blob_rpclib_shared_10K")
-    ->Apply(thousand_loops);
 BENCHMARK(BM_resolve_make_some_blob<full, false, oneM, remoting::copy>)
     ->Name("BM_resolve_make_some_blob_rpclib_copy_1M")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_make_some_blob<full, false, tenK, remoting::shared>)
+    ->Name("BM_resolve_make_some_blob_rpclib_shared_10K")
     ->Apply(thousand_loops);
 BENCHMARK(BM_resolve_make_some_blob<full, false, oneM, remoting::shared>)
     ->Name("BM_resolve_make_some_blob_rpclib_shared_1M")
