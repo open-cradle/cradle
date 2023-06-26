@@ -7,6 +7,8 @@
 * [Messages](msg_overview.md)
 * [Lambda captures](lambda_captures.md)
 * [Capturing cache keys](capturing_cache_keys.md)
+* [Configuration file](config_template.toml)
+* [Resolving a serialized request](seri_resolver.md)
 
 
 ## Setup
@@ -41,6 +43,8 @@ The server should be configured in the extension's settings (again, in the WSL t
 
 * "Plantuml: Render" should be set to `PlantUMLServer`
 * "Plantuml: Server" should be set to `http://localhost:8080`
+
+Also "allow loading insecure content from localhost" in the popup.
 
 If all works well, a preview of a `.md` file should render both the Markdown and inlined
 PlantUML content.
