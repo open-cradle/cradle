@@ -2,10 +2,14 @@
 #
 # All possible keys should be here but the file may be outdated.
 # Unrecognized entries are silently ignored.
-# The shown values should be the defaults.
+# In most cases, the shown values should be the defaults.
 
 # true in testing (non-production) context
 testing = false
+
+# Deployment directory containing server executables; used when testing
+# Default: find executables on the search path
+deploy_dir = "/tmp/cradle/build-debug/deploy"
 
 # Whether or not the Websocket server should be open to connections from
 # other machines
@@ -54,3 +58,30 @@ request_concurrency = 16
 # How many asynchronous root requests can run in parallel,
 # on the loopback service
 async_concurrency = 16
+
+[testopts]
+# All options in this section are for testing purposes only, intended to be set by
+# a test case and not to be defined in a configuration file.
+# ---
+# Causes submit_async to fail on the remote
+fail_submit_async = false
+# Startup delay, in ms, for resolve_async
+resolve_async_delay = 0
+# Delay, in ms, for a local_atst_context::set_result() call; default: 0
+set_result_delay = 0
+
+[remote]
+# All options in this section are for internal purposes only.
+# There are no defaults: values are always set by an RPC client and passed to the RPC server.
+# ---
+# Domain name
+domain_name = ""
+
+[thinknode]
+# All options in this section are for internal purposes only.
+# There are no defaults: values are always set by an RPC client and passed to the RPC server.
+# ---
+# Access token
+access_token = ""
+# Thinknode API URL
+api_url = ""

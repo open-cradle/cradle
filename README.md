@@ -136,4 +136,4 @@ moment, and it's not really clear that the current form has any purpose in the
 project moving forward.)
 
 ## Documentation
-More [documentation](docs/README.md).
+More [documentation](docs/generated/README.md).

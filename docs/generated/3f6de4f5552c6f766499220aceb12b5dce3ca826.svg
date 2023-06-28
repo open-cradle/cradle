@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="289px" preserveAspectRatio="none" style="width:880px;height:289px;background:#FFFFFF;" version="1.1" viewBox="0 0 880 289" width="880px" zoomAndPan="magnify"><defs><filter height="300%" id="f1me5yh0p0it29" width="300%" x="-1" y="-1"><feGaussianBlur result="blurOut" stdDeviation="2.0"/><feColorMatrix in="blurOut" result="blurOut2" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .4 0"/><feOffset dx="4.0" dy="4.0" in="blurOut2" result="blurOut3"/><feBlend in="SourceGraphic" in2="blurOut3" mode="normal"/></filter></defs><g><!--MD5=[7c51fdb2328f8401d6f040f95c6e4aea]
+entity appX--><rect fill="#FEFECE" filter="url(#f1me5yh0p0it29)" height="46.2969" style="stroke:#A80036;stroke-width:1.5;" width="165" x="166.5" y="7"/><rect fill="#FEFECE" height="10" style="stroke:#A80036;stroke-width:1.5;" width="15" x="311.5" y="12"/><rect fill="#FEFECE" height="2" style="stroke:#A80036;stroke-width:1.5;" width="4" x="309.5" y="14"/><rect fill="#FEFECE" height="2" style="stroke:#A80036;stroke-width:1.5;" width="4" x="309.5" y="18"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="125" x="181.5" y="39.9951">C++ application X</text><!--MD5=[6c98dc6f799896461fecf05a8555f109]
+entity appX_mem_cache--><path d="M135,140.5 C135,130.5 196,130.5 196,130.5 C196,130.5 257,130.5 257,140.5 L257,165.7969 C257,175.7969 196,175.7969 196,175.7969 C196,175.7969 135,175.7969 135,165.7969 L135,140.5 " fill="#FEFECE" filter="url(#f1me5yh0p0it29)" style="stroke:#000000;stroke-width:1.5;"/><path d="M135,140.5 C135,150.5 196,150.5 196,150.5 C196,150.5 257,150.5 257,140.5 " fill="none" style="stroke:#000000;stroke-width:1.5;"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="102" x="145" y="167.4951">memory cache</text><!--MD5=[ef3f8262e1ee6d83ece1fa7d4bcb7c1b]
+entity appX_disk_cache--><path d="M6,140.5 C6,130.5 53,130.5 53,130.5 C53,130.5 100,130.5 100,140.5 L100,165.7969 C100,175.7969 53,175.7969 53,175.7969 C53,175.7969 6,175.7969 6,165.7969 L6,140.5 " fill="#FEFECE" filter="url(#f1me5yh0p0it29)" style="stroke:#000000;stroke-width:1.5;"/><path d="M6,140.5 C6,150.5 53,150.5 53,150.5 C53,150.5 100,150.5 100,140.5 " fill="none" style="stroke:#000000;stroke-width:1.5;"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="74" x="16" y="167.4951">disk cache</text><!--MD5=[16a8a2dc81152828d05c6f3e9188f25b]
+entity appY--><rect fill="#FEFECE" filter="url(#f1me5yh0p0it29)" height="46.2969" style="stroke:#A80036;stroke-width:1.5;" width="165" x="543.5" y="7"/><rect fill="#FEFECE" height="10" style="stroke:#A80036;stroke-width:1.5;" width="15" x="688.5" y="12"/><rect fill="#FEFECE" height="2" style="stroke:#A80036;stroke-width:1.5;" width="4" x="686.5" y="14"/><rect fill="#FEFECE" height="2" style="stroke:#A80036;stroke-width:1.5;" width="4" x="686.5" y="18"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="125" x="558.5" y="39.9951">C++ application Y</text><!--MD5=[54accd28d9c3cee3fbecaff4c5cef46c]
+entity appY_mem_cache--><path d="M622,140.5 C622,130.5 683,130.5 683,130.5 C683,130.5 744,130.5 744,140.5 L744,165.7969 C744,175.7969 683,175.7969 683,175.7969 C683,175.7969 622,175.7969 622,165.7969 L622,140.5 " fill="#FEFECE" filter="url(#f1me5yh0p0it29)" style="stroke:#000000;stroke-width:1.5;"/><path d="M622,140.5 C622,150.5 683,150.5 683,150.5 C683,150.5 744,150.5 744,140.5 " fill="none" style="stroke:#000000;stroke-width:1.5;"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="102" x="632" y="167.4951">memory cache</text><!--MD5=[7e7acf854c855a429783d4b90b245bcc]
+entity appY_disk_cache--><path d="M779,140.5 C779,130.5 826,130.5 826,130.5 C826,130.5 873,130.5 873,140.5 L873,165.7969 C873,175.7969 826,175.7969 826,175.7969 C826,175.7969 779,175.7969 779,165.7969 L779,140.5 " fill="#FEFECE" filter="url(#f1me5yh0p0it29)" style="stroke:#000000;stroke-width:1.5;"/><path d="M779,140.5 C779,150.5 826,150.5 826,150.5 C826,150.5 873,150.5 873,140.5 " fill="none" style="stroke:#000000;stroke-width:1.5;"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="74" x="789" y="167.4951">disk cache</text><!--MD5=[dd82451e1dd92fe3da01853750f49ff6]
+entity server--><rect fill="#FEFECE" filter="url(#f1me5yh0p0it29)" height="46.2969" style="stroke:#A80036;stroke-width:1.5;" width="116" x="292" y="130"/><rect fill="#FEFECE" height="10" style="stroke:#A80036;stroke-width:1.5;" width="15" x="388" y="135"/><rect fill="#FEFECE" height="2" style="stroke:#A80036;stroke-width:1.5;" width="4" x="386" y="137"/><rect fill="#FEFECE" height="2" style="stroke:#A80036;stroke-width:1.5;" width="4" x="386" y="141"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="76" x="307" y="162.9951">RPC server</text><!--MD5=[ca8fa83086af34f3e5a51745de7b7343]
+entity shared_mem_cache--><path d="M405,247 C405,237 492,237 492,237 C492,237 579,237 579,247 L579,272.2969 C579,282.2969 492,282.2969 492,282.2969 C492,282.2969 405,282.2969 405,272.2969 L405,247 " fill="#FEFECE" filter="url(#f1me5yh0p0it29)" style="stroke:#000000;stroke-width:1.5;"/><path d="M405,247 C405,257 492,257 492,257 C492,257 579,257 579,247 " fill="none" style="stroke:#000000;stroke-width:1.5;"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="154" x="415" y="273.9951">shared memory cache</text><!--MD5=[e3d17d0b43485f4dc44b6d70c4c37827]
+entity server_disk_cache--><path d="M276,247 C276,237 323,237 323,237 C323,237 370,237 370,247 L370,272.2969 C370,282.2969 323,282.2969 323,282.2969 C323,282.2969 276,282.2969 276,272.2969 L276,247 " fill="#FEFECE" filter="url(#f1me5yh0p0it29)" style="stroke:#000000;stroke-width:1.5;"/><path d="M276,247 C276,257 323,257 323,257 C323,257 370,257 370,247 " fill="none" style="stroke:#000000;stroke-width:1.5;"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="74" x="286" y="273.9951">disk cache</text><!--MD5=[0ebba5b718507c0c6c06d6d2f4cb8b69]
+link appX to appX_mem_cache--><path d="M239.28,53.19 C229.66,75.16 215.02,108.58 205.48,130.35 " fill="none" id="appX-appX_mem_cache" style="stroke:#A80036;stroke-width:1.0;"/><!--MD5=[ab17bd3e90d65a43e8d1ae13790d7587]
+link appX to appX_disk_cache--><path d="M213.05,53.19 C177.46,75.16 123.34,108.58 88.06,130.35 " fill="none" id="appX-appX_disk_cache" style="stroke:#A80036;stroke-width:1.0;"/><!--MD5=[f411c4a7ca7710d823ee243173b96941]
+link appY to appY_mem_cache--><path d="M636.45,53.19 C646.8,75.16 662.55,108.58 672.8,130.35 " fill="none" id="appY-appY_mem_cache" style="stroke:#A80036;stroke-width:1.0;"/><!--MD5=[6b365761183995780e6b637c5eca5c86]
+link appY to appY_disk_cache--><path d="M662.68,53.19 C699,75.16 754.23,108.58 790.22,130.35 " fill="none" id="appY-appY_disk_cache" style="stroke:#A80036;stroke-width:1.0;"/><!--MD5=[b74b61d4390a7cc4acc77c7ef8f68c18]
+link server to shared_mem_cache--><path d="M380.11,176.16 C404.38,194.02 438.3,218.98 462.42,236.73 " fill="none" id="server-shared_mem_cache" style="stroke:#A80036;stroke-width:1.0;"/><!--MD5=[1228172ab387cba759f4b2be8b2ac8dc]
+link server to server_disk_cache--><path d="M344.27,176.16 C339.66,194.02 333.21,218.98 328.63,236.73 " fill="none" id="server-server_disk_cache" style="stroke:#A80036;stroke-width:1.0;"/><!--MD5=[ebb6135a84a272dc45eeabff712a86c8]
+link appX to server--><path d="M270.82,57.14 C287.82,77.51 311.31,105.65 328.29,125.99 " fill="none" id="appX-server" style="stroke:#A80036;stroke-width:1.0;"/><polygon fill="#A80036" points="331.59,129.95,328.9047,120.4743,328.3905,126.1077,322.757,125.5935,331.59,129.95" style="stroke:#A80036;stroke-width:1.0;"/><polygon fill="#A80036" points="267.52,53.19,270.2227,62.6608,270.7266,57.0264,276.3609,57.5303,267.52,53.19" style="stroke:#A80036;stroke-width:1.0;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="25" x="306" y="96.0669">RPC</text><!--MD5=[e8184fa33fc815e0c3c0465e1a462405]
+link appY to server--><path d="M570.96,55.13 C522.79,76.25 453.18,106.77 405.01,127.88 " fill="none" id="appY-server" style="stroke:#A80036;stroke-width:1.0;"/><polygon fill="#A80036" points="400.42,129.89,410.2686,129.9585,405.0031,127.8912,407.0705,122.6256,400.42,129.89" style="stroke:#A80036;stroke-width:1.0;"/><polygon fill="#A80036" points="575.7,53.05,565.8513,52.9927,571.1192,55.0541,569.0579,60.322,575.7,53.05" style="stroke:#A80036;stroke-width:1.0;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="25" x="505" y="96.0669">RPC</text><!--MD5=[4c557d397f3779c184f605e4dd599812]
+link appX to shared_mem_cache--><path d="M307.29,53.15 C344.87,69.76 392.75,95.55 426,130 C456.13,161.22 475.68,208.93 485.19,236.58 " fill="none" id="appX-shared_mem_cache" style="stroke:#A80036;stroke-width:1.0;"/><!--MD5=[6c82fa431de1d0a71e1a77c6fcc9d6bb]
+link appY to shared_mem_cache--><path d="M612.91,53.23 C587.16,96.94 530.22,193.6 504.75,236.85 " fill="none" id="appY-shared_mem_cache" style="stroke:#A80036;stroke-width:1.0;"/><!--MD5=[c8a80bf77f031c5d27f3b1734843d941]
+@startuml
+component appX as "C++ application X"
+database appX_mem_cache as "memory cache"
+database appX_disk_cache as "disk cache"
+appX - - appX_mem_cache
+appX - - appX_disk_cache
+
+component appY as "C++ application Y"
+database appY_mem_cache as "memory cache"
+database appY_disk_cache as "disk cache"
+appY - - appY_mem_cache
+appY - - appY_disk_cache
+
+component server as "RPC server"
+database shared_mem_cache as "shared memory cache"
+database server_disk_cache as "disk cache"
+server - - shared_mem_cache
+server - - server_disk_cache
+
+appX <- -> server : RPC
+appY <- -> server : RPC
+appX - - shared_mem_cache
+appY - - shared_mem_cache
+@enduml
+
+PlantUML version 1.2022.0(Tue Jan 11 17:16:42 CET 2022)
+(GPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Default Encoding: UTF-8
+Language: en
+Country: null
+--></g></svg>

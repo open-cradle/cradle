@@ -28,7 +28,7 @@ content:
 The fields are:
 
 * `request_id`: identifies this request; set by the client
-* `context_id`: see [here](data.md)
+* `context_id`: see [here](thinknode_data.md)
 * `encoding`: will usually be `msgpack`
 * `object`: data for the immutable object, encoded as per `encoding`
 * `schema`: describes the structure of the object's data

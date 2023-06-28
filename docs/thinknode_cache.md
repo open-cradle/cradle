@@ -20,9 +20,9 @@ Thinknode request                               |  Entry type                   
 `GET /iam/contexts/:id`                         | `get_context_contents`            |                                                       | Available apps
 `GET /apm/apps/:account/:app/versions/:version` | `get_app_version_info`            |                                                       | App version info
 `POST /iss/{:type}`                             | `post_iss_object`                 | [`post_iss_object`](msg_post_iss_object.md)           | Reference id to an immutable object
-`GET /iss/:id/immutable`                        | `resolve_iss_object_to_immutable` | [Data](data.md)                                       | Immutable id
-`GET /iss/immutable/:id`                        | `retrieve_immutable`              | [Data](data.md)                                       | Immutable data as dynamic
-`GET /iss/immutable/:id`                        | `retrieve_immutable_blob`         | [Data](data.md)                                       | Immutable data as blob
+`GET /iss/:id/immutable`                        | `resolve_iss_object_to_immutable` | [Data](thinknode_data.md)                             | Immutable id
+`GET /iss/immutable/:id`                        | `retrieve_immutable`              | [Data](thinknode_data.md)                             | Immutable data as dynamic
+`GET /iss/immutable/:id`                        | `retrieve_immutable_blob`         | [Data](thinknode_data.md)                             | Immutable data as blob
 `HEAD /iss/:id`                                 | `get_iss_object_metadata`         | [`iss_object_metadata`](msg_iss_object_metadata.md)   | Metadata for an immutable object
 `POST /calc/:id`                                | `post_calculation`                | [`post_calculation`](msg_post_calculation.md)         | Calculation request id
 `GET /calc/:id`                                 | `retrieve_calculation_request`    | [`calculation_request`](msg_calculation_request.md)   | Calculation descriptor
@@ -35,7 +35,7 @@ Notes:
   calculated over several items, the first one always being the entry type string.
 * If the _link_ refers to a CRADLE request, the cache entry contains the data returned in the response to that request.
 * "N/A" means that the Thinknode request is issued only for CRADLE requests that are
-  candidate for removal according to [the overview](msg_overview.md) (see below).
+  candidate for removal according to [the overview](thinknode_msg_overview.md) (see below).
 
 CRADLE also caches:
 
@@ -45,7 +45,7 @@ Entry type                     | Link                                           
 `resolve_named_type_reference` |                                                   | Part of schema returned via `get_app_version_info` (is it useful to store this?)
 `coerce_encoded_object`        |                                                   | Conversion of an object passed in a `post_iss_object` request
 
-CRADLE currently also caches information on behalf of messages that are candidate for removal according to [the overview](msg_overview.md):
+CRADLE currently also caches information on behalf of messages that are candidate for removal according to [the overview](thinknode_msg_overview.md):
 
 Entry type                          | Status
 ----------                          | ------

@@ -1,36 +1,13 @@
 # Introduction
 Clients interact with CRADLE via a websocket interface, where data is encoded via MessagePack:
 
-```plantuml
-@startuml
-actor "client A" as clientA
-actor "client B" as clientB
-actor "client C" as clientC
-agent CRADLE
-
-clientA -down-> CRADLE
-clientB -down-> CRADLE
-clientC -down-> CRADLE: websocket / MessagePack
-@enduml
-```
+![](94f73619990810c81f161fb62680050543108ee9.svg)
 
 Requests are identified by an id that is set by the client.
 Requests are asynchronous; CRADLE sends responses back to the originating client, where
 the response includes the request id that was sent by the client:
 
-```plantuml
-@startuml
-participant "client A" as clientA
-participant "client B" as clientB
-
-clientA -> CRADLE: request(id=0)
-clientB -> CRADLE: request(id=0)
-clientB -> CRADLE: request(id=1)
-clientB <-- CRADLE: response(id=1)
-clientA <-- CRADLE: response(id=0)
-clientB <-- CRADLE: response(id=0)
-@enduml
-```
+![](1ea9a2c4748df6dfe0c104380824411ef7f48cb1.svg)
 
 CRADLE will calculate the response itself when it can; otherwise, it will get it from the remote
 Thinknode, and translate it into a response to the client.
@@ -42,60 +19,13 @@ Thinknode forbids messages with JSON data size exceeding 5MB; MessagePack is req
 Consequently, CRADLE uses MessagePack for storing and retrieving immutable objects (that could be too large), and
 JSON otherwise.
 
-```plantuml
-@startuml
-actor client
-agent CRADLE
-agent Thinknode
+![](ddfbc928d41611793f5b9ae6f21b8b7a49e45dfc.svg)
 
-client -down-> CRADLE: websocket / MessagePack
-CRADLE -right-> Thinknode: HTTP / JSON / MessagePack
-@enduml
-```
-
-```plantuml
-@startuml
-client -> CRADLE: request(id=0)
-CRADLE -> Thinknode: HTTP request
-CRADLE <-- Thinknode: HTTP response
-client <-- CRADLE: response(id=0)
-@enduml
-```
+![](07f18826649fa90e9764154eb758b76dd700c38d.svg)
 
 CRADLE and Thinknode have similar designs:
 
-```plantuml
-@startuml
-actor client
-
-package "CRADLE (local)" {
-    agent server as local_server
-    database cache as local_cache
-    agent "calculation supervisor" as local_supervisor
-    agent "calculation provider" as local_provider
-    note bottom of local_provider: Docker container
-
-    local_server -down-> local_cache
-    local_server -right-> local_supervisor
-    local_supervisor -down-> local_provider: IPC / MessagePack
-}
-
-package "Thinknode (remote)" {
-    agent server as remote_server
-    database storage as remote_cache
-    agent "calculation supervisor" as remote_supervisor
-    agent "calculation provider" as remote_provider
-    note bottom of remote_provider: Docker container
-
-    remote_server -down-> remote_cache
-    remote_server -right-> remote_supervisor
-    remote_supervisor -down-> remote_provider: IPC / MessagePack
-}
-
-client -down-> local_server
-local_server -> remote_server
-@enduml
-```
+![](f939607139c9ff262c2f6ad7e385d077d5079c4c.svg)
 
 The local CRADLE provides similar functionality as the remote Thinknode.
 The components are:
@@ -112,7 +42,7 @@ As the same Docker image is used for remote and local calculation, the interface
 supervisor and provider must be identical as well; it is based on IPC, using MessagePack
 for encoding structured data.
 
-CRADLE locally caches objects; more [here](cache.md).
+CRADLE locally caches objects; more [here](thinknode_cache.md).
 
 Several options exist for the request processing in CRADLE:
 
