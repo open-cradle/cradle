@@ -11,6 +11,7 @@
 #include <cppcoro/cancellation_token.hpp>
 #include <spdlog/spdlog.h>
 
+#include <cradle/inner/blob_file/blob_file.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/resources.h>
@@ -59,6 +60,13 @@ class sync_context_base : public local_context_intf,
         return false;
     }
 
+    // local_context_intf
+    std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory) override;
+
+    void
+    on_value_complete() override;
+
     // remote_context_intf
     std::string const&
     proxy_name() const override
@@ -103,6 +111,10 @@ class sync_context_base : public local_context_intf,
     bool remotely_;
     std::string proxy_name_;
     std::vector<tasklet_tracker*> tasklets_;
+    // The blob_file_writer objects allocated during the resolution of requests
+    // associated with this context. Most useful if the context is used for
+    // resolving a single request only.
+    std::vector<std::shared_ptr<blob_file_writer>> blob_file_writers_;
 };
 
 /*
@@ -200,6 +212,13 @@ class local_async_context_base : public local_async_context_intf,
     {
         return true;
     }
+
+    // local_context_intf
+    std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory) override;
+
+    void
+    on_value_complete() override;
 
     // async_context_intf
     async_id
@@ -339,6 +358,7 @@ class local_async_context_base : public local_async_context_intf,
     // context, and the async_db.
     std::vector<std::shared_ptr<local_async_context_base>> subs_;
     std::atomic<int> num_subs_not_running_;
+    std::vector<std::shared_ptr<blob_file_writer>> blob_file_writers_;
 
     void
     check_set_get_result_precondition(bool is_get_result);

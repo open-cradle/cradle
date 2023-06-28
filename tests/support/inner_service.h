@@ -21,6 +21,7 @@ struct non_caching_request_resolution_context final
     : public local_context_intf,
       public sync_context_intf
 {
+    // context_intf
     bool
     remotely() const override
     {
@@ -31,6 +32,19 @@ struct non_caching_request_resolution_context final
     is_async() const override
     {
         return false;
+    }
+
+    // local_context_intf
+    std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory) override
+    {
+        throw not_implemented_error();
+    }
+
+    void
+    on_value_complete() override
+    {
+        throw not_implemented_error();
     }
 };
 
@@ -44,12 +58,7 @@ struct caching_request_resolution_context final : public local_context_intf,
 
     caching_request_resolution_context();
 
-    inner_resources&
-    get_resources() override
-    {
-        return resources;
-    }
-
+    // context_intf
     bool
     remotely() const override
     {
@@ -62,6 +71,27 @@ struct caching_request_resolution_context final : public local_context_intf,
         return false;
     }
 
+    // local_context_intf
+    std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory) override
+    {
+        throw not_implemented_error();
+    }
+
+    void
+    on_value_complete() override
+    {
+        throw not_implemented_error();
+    }
+
+    // caching_context_intf
+    inner_resources&
+    get_resources() override
+    {
+        return resources;
+    }
+
+    // other
     void
     reset_memory_cache();
 };

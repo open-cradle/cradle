@@ -48,9 +48,9 @@ blob
 make_blob(std::string s)
 {
     auto owner{std::make_shared<string_owner>(std::move(s))};
-    auto data{owner->data()};
+    auto bytes{owner->bytes()};
     auto size{owner->size()};
-    return blob{std::move(owner), data, size};
+    return blob{std::move(owner), bytes, size};
 }
 
 blob

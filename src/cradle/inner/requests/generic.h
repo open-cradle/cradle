@@ -148,6 +148,20 @@ class local_context_intf : public virtual context_intf
 {
  public:
     virtual ~local_context_intf() = default;
+
+    // A request function _must_ call this for creating a blob using shared
+    // memory, and _should_ call it otherwise.
+    // The returned object has a non-throwing data() implementation.
+    // TODO split APIs into user vs. framework-internal parts
+    virtual std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory) = 0;
+
+    // The framework must call this once the value has been completely
+    // resolved. It will flush any shared memory regions allocated during the
+    // resolution.
+    virtual void
+    on_value_complete()
+        = 0;
 };
 
 /*

@@ -139,7 +139,7 @@ class string_owner : public data_owner
     ~string_owner() = default;
 
     std::byte const*
-    data() const
+    bytes() const
     {
         return as_bytes(value_.c_str());
     }

@@ -24,6 +24,32 @@ sync_context_base::sync_context_base(
     }
 }
 
+std::shared_ptr<data_owner>
+sync_context_base::make_data_owner(std::size_t size, bool use_shared_memory)
+{
+    std::shared_ptr<data_owner> owner;
+    if (use_shared_memory)
+    {
+        auto writer = get_resources().make_blob_file_writer(size);
+        blob_file_writers_.push_back(writer);
+        owner = writer;
+    }
+    else
+    {
+        owner = make_shared_buffer(size);
+    }
+    return owner;
+}
+
+void
+sync_context_base::on_value_complete()
+{
+    for (auto writer : blob_file_writers_)
+    {
+        writer->on_write_completed();
+    }
+}
+
 remote_proxy&
 sync_context_base::get_proxy() const
 {
@@ -118,6 +144,33 @@ local_async_context_base::local_async_context_base(
         parent_id,
         is_req ? "REQ" : "VAL",
         status_);
+}
+
+std::shared_ptr<data_owner>
+local_async_context_base::make_data_owner(
+    std::size_t size, bool use_shared_memory)
+{
+    std::shared_ptr<data_owner> owner;
+    if (use_shared_memory)
+    {
+        auto writer = get_resources().make_blob_file_writer(size);
+        blob_file_writers_.push_back(writer);
+        owner = writer;
+    }
+    else
+    {
+        owner = make_shared_buffer(size);
+    }
+    return owner;
+}
+
+void
+local_async_context_base::on_value_complete()
+{
+    for (auto writer : blob_file_writers_)
+    {
+        writer->on_write_completed();
+    }
 }
 
 void

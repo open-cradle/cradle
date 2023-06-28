@@ -48,7 +48,7 @@ class blob_file_writer : public data_owner
     on_write_completed() override;
 
     std::uint8_t*
-    data()
+    data() override
     {
         return data_;
     }
@@ -91,7 +91,7 @@ class blob_file_reader : public data_owner
     }
 
     std::uint8_t*
-    data()
+    data() override
     {
         return data_;
     }

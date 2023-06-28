@@ -25,6 +25,17 @@ static char const tag[] = "[inner][requests][generic]";
 
 class local_context_mixin : public local_context_intf
 {
+    std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory) override
+    {
+        throw not_implemented_error();
+    }
+
+    void
+    on_value_complete() override
+    {
+        throw not_implemented_error();
+    }
 };
 
 class remote_context_mixin : public remote_context_intf
