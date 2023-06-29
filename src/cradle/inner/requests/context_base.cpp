@@ -357,13 +357,10 @@ local_async_context_base::is_cancellation_requested() const noexcept
 }
 
 void
-local_async_context_base::throw_if_cancellation_requested() const
+local_async_context_base::throw_async_cancelled() const
 {
-    if (is_cancellation_requested())
-    {
-        throw async_cancelled{
-            fmt::format("local_async_context_base {} cancelled", id_)};
-    }
+    throw async_cancelled{
+        fmt::format("local_async_context_base {} cancelled", id_)};
 }
 
 local_context_tree_builder_base::local_context_tree_builder_base(

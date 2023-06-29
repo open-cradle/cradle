@@ -43,8 +43,8 @@ cancellable_coro(context_intf& ctx, int loops, int delay)
         {
             logger->info(
                 "cancellable_coro(ctx {}): throwing cancelled", ctx_id);
+            cctx.throw_async_cancelled();
         }
-        cctx.throw_if_cancellation_requested();
     }
     if (loops < 0)
     {

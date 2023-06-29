@@ -47,7 +47,7 @@ TEST_CASE("ping message", "[rpclib]")
 }
 
 static void
-test_make_some_blob(bool shared)
+test_make_some_blob(bool use_shared_memory)
 {
     constexpr auto caching_level{caching_level_type::full};
     constexpr auto remotely{true};
@@ -58,7 +58,7 @@ test_make_some_blob(bool shared)
     register_rpclib_client(make_inner_tests_config(), service);
     testing_request_context ctx{service, nullptr, remotely, proxy_name};
 
-    auto req{rq_make_some_blob<caching_level>(10000, shared)};
+    auto req{rq_make_some_blob<caching_level>(10000, use_shared_memory)};
     auto response = cppcoro::sync_wait(resolve_request(ctx, req));
 
     REQUIRE(response.size() == 10000);

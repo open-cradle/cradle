@@ -374,15 +374,16 @@ class local_async_context_intf : public local_context_intf,
 
     // Returns true if cancellation has been requested on this context or
     // another one in the same context tree.
+    // The intention is that an asynchronous task will all this function on
+    // polling basis, and call throw_async_cancelled() when it returns true.
     virtual bool
     is_cancellation_requested() const noexcept
         = 0;
 
-    // Throws async_cancelled if cancellation was requested.
-    // The intention is that an asynchronous task will all this function on
-    // polling basis.
+    // Throws async_cancelled. Should be called (only) when
+    // is_cancellation_requested() returns true.
     virtual void
-    throw_if_cancellation_requested() const
+    throw_async_cancelled() const
         = 0;
 };
 

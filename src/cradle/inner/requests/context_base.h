@@ -304,7 +304,7 @@ class local_async_context_base : public local_async_context_intf,
     is_cancellation_requested() const noexcept override;
 
     void
-    throw_if_cancellation_requested() const override;
+    throw_async_cancelled() const override;
 
     // caching_context_intf
     inner_resources&

@@ -15,11 +15,11 @@
 namespace cradle {
 
 cppcoro::task<blob>
-make_some_blob(context_intf& ctx, std::size_t size, bool shared);
+make_some_blob(context_intf& ctx, std::size_t size, bool use_shared_memory);
 
 template<caching_level_type Level>
 auto
-rq_make_some_blob(std::size_t size, bool shared)
+rq_make_some_blob(std::size_t size, bool use_shared_memory)
 {
     using contexts = ctx_type_list<
         caching_context_intf,
@@ -33,7 +33,7 @@ rq_make_some_blob(std::size_t size, bool shared)
         props_type(std::move(uuid), std::move(title)),
         make_some_blob,
         size,
-        shared);
+        use_shared_memory);
 }
 
 cppcoro::task<int>
