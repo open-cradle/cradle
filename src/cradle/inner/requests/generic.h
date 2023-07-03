@@ -79,40 +79,6 @@ class req_visitor_intf
  *   introspective_context_intf.
  */
 
-// A (usually non-empty) list of context types
-template<typename... Ctx>
-struct ctx_type_list
-{
-};
-
-template<typename CtxTypeList>
-struct first_ctx_type_struct;
-
-template<typename FirstCtx, typename... MoreCtx>
-struct first_ctx_type_struct<ctx_type_list<FirstCtx, MoreCtx...>>
-{
-    using ctx_type = FirstCtx;
-};
-
-// Yields the first context type in a list (which must not be empty)
-template<typename CtxTypeList>
-using first_ctx_type = typename first_ctx_type_struct<CtxTypeList>::ctx_type;
-
-template<typename Ctx, typename CtxTypeList>
-struct ctx_in_type_list_struct;
-
-template<typename Ctx, typename... CtxType>
-struct ctx_in_type_list_struct<Ctx, ctx_type_list<CtxType...>>
-{
-    static constexpr bool value = (... || std::convertible_to<CtxType&, Ctx&>);
-};
-
-// Yields a value indicating whether the context type list contains Ctx,
-// or a context type implementing Ctx
-template<typename Ctx, typename CtxTypeList>
-inline constexpr bool ctx_in_type_list
-    = ctx_in_type_list_struct<Ctx, CtxTypeList>::value;
-
 /*
  * Generic context interface
  */
@@ -523,44 +489,11 @@ concept ValidContext
       && (!std::is_final_v<Ctx> || RemoteContext<Ctx> || LocalContext<Ctx>)
       && (!std::is_final_v<Ctx> || SyncContext<Ctx> || AsyncContext<Ctx>);
 
-template<bool caching, bool introspective>
-struct default_ctx_type_list_struct;
-
-template<>
-struct default_ctx_type_list_struct<false, false>
-{
-    using types = ctx_type_list<context_intf>;
-};
-
-template<>
-struct default_ctx_type_list_struct<true, false>
-{
-    using types = ctx_type_list<caching_context_intf>;
-};
-
-template<>
-struct default_ctx_type_list_struct<false, true>
-{
-    using types = ctx_type_list<introspective_context_intf>;
-};
-
-template<>
-struct default_ctx_type_list_struct<true, true>
-{
-    using types
-        = ctx_type_list<caching_context_intf, introspective_context_intf>;
-};
-
-template<bool caching, bool introspective>
-using default_ctx_type_list =
-    typename default_ctx_type_list_struct<caching, introspective>::types;
-
 /*
  * A request is something that can be resolved, resulting in a result
  *
  * Attributes:
  * - value_type: result type
- * - ctx_type: the (local) context type needed for resolving the request
  * - caching_level
  * - introspective
  * - An id uniquely identifying the request (class). Can be a placeholder
@@ -571,7 +504,6 @@ concept Request
     = requires {
           std::same_as<typename T::element_type, T>;
           typename T::value_type;
-          typename T::required_ctx_types;
           std::same_as<decltype(T::caching_level), caching_level_type>;
           std::same_as<decltype(T::introspective), bool>;
       } && requires(T const& req) {
@@ -579,20 +511,7 @@ concept Request
                    req.get_uuid()
                    } -> std::convertible_to<request_uuid>;
            };
-// TODO T::required_ctx_types must be a non-empty list of context types
-// Context<typename T::ctx_type>;
 // TODO say something about resolve_sync()/_async() as we used to do
-
-template<typename Req>
-concept ValidRequest = Request<Req>
-                       && (Req::caching_level == caching_level_type::none
-                           || ctx_in_type_list<
-                               caching_context_intf,
-                               typename Req::required_ctx_types>)
-                       && (!Req::introspective
-                           || ctx_in_type_list<
-                               introspective_context_intf,
-                               typename Req::required_ctx_types>);
 
 template<typename T>
 concept UncachedRequest = Request<T> && T::caching_level ==

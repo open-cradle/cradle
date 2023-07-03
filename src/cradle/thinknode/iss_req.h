@@ -16,13 +16,10 @@ namespace cradle {
 // Properties for a Thinknode request:
 // - The function is a coroutine
 // - Always introspective
+// Context should be thinknode_request_context.
 // TODO consider fixing Level to "full"
 template<caching_level_type Level>
-using thinknode_request_props = request_props<
-    Level,
-    true,
-    true,
-    ctx_type_list<thinknode_request_context>>;
+using thinknode_request_props = request_props<Level, true, true>;
 
 // Creates a function_request_erased object representing a
 // "post ISS object" request,

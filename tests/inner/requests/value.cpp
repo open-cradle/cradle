@@ -15,7 +15,9 @@
 
 using namespace cradle;
 
-TEST_CASE("create value request", "[requests]")
+static char const tag[] = "[inner][requests][value]";
+
+TEST_CASE("create value request", tag)
 {
     std::string s0{"abc"};
     auto req0{rq_value(s0)};
@@ -25,7 +27,7 @@ TEST_CASE("create value request", "[requests]")
     REQUIRE(req1.get_value() == std::string{"def"});
 }
 
-TEST_CASE("evaluate value request", "[requests]")
+TEST_CASE("evaluate value request", tag)
 {
     non_caching_request_resolution_context ctx{};
 
@@ -36,7 +38,7 @@ TEST_CASE("evaluate value request", "[requests]")
     REQUIRE(res == 87);
 }
 
-TEST_CASE("evaluate value requests in parallel", "[requests]")
+TEST_CASE("evaluate value requests in parallel", tag)
 {
     static constexpr int num_requests = 7;
     non_caching_request_resolution_context ctx{};

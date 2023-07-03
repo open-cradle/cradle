@@ -176,12 +176,7 @@ TEST_CASE("resolve async locally - raw args", tag)
     constexpr int loops = 3;
     int delay0 = 5;
     int delay1 = 6;
-    using required_ctx_types = ctx_type_list<local_async_context_intf>;
-    using Props = request_props<
-        caching_level_type::none,
-        true,
-        false,
-        required_ctx_types>;
+    using Props = request_props<caching_level_type::none, true, false>;
     Props props0{make_test_uuid(100)};
     Props props1{make_test_uuid(101)};
     Props props2{make_test_uuid(102)};

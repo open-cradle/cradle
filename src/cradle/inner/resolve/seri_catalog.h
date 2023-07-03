@@ -68,8 +68,6 @@ class seri_catalog
  * The resolver will be able to resolve serialized requests that are similar
  * to the template one; different arguments are allowed, but otherwise the
  * request should be identical to the template.
- *
- * Context at resolution time should be convertible to Req::ctx_type.
  */
 template<Request Req>
 void

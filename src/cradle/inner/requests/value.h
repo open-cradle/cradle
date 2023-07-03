@@ -22,9 +22,6 @@ class value_request
  public:
     using element_type = value_request;
     using value_type = Value;
-    // TODO need separate sync/async required_ctx_types?
-    using required_ctx_types
-        = ctx_type_list<local_context_intf, local_async_context_intf>;
 
     static constexpr caching_level_type caching_level{
         caching_level_type::none};

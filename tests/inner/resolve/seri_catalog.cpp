@@ -19,9 +19,8 @@ namespace {
 
 static char const tag[] = "[inner][resolve][seri_catalog]";
 
-using required_ctx_types = ctx_type_list<testing_request_context>;
 template<caching_level_type Level>
-using local_props = request_props<Level, true, true, required_ctx_types>;
+using local_props = request_props<Level, true, true>;
 
 template<char const* arg>
 class make_string

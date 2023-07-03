@@ -636,30 +636,18 @@ check_title_is_valid(std::string const& title);
 // requests
 // - Request attributes (AsCoro)
 // - How it should be resolved (Level, Introspective)
-// - What it needs for its resolution (CtxTypes)
 // All requests in a tree (main request, subrequests) must have the same
 // request_props, so that the main request's uuid defines the complete
 // request type.
 template<
     caching_level_type Level,
     bool AsCoro = false,
-    bool Introspective = false,
-    typename CtxTypes
-    = default_ctx_type_list<Level != caching_level_type::none, Introspective>>
+    bool Introspective = false>
 struct request_props
 {
-    // Cf. concept ValidRequest
-    static_assert(
-        Level == caching_level_type::none
-        || ctx_in_type_list<caching_context_intf, CtxTypes>);
-    static_assert(
-        !Introspective
-        || ctx_in_type_list<introspective_context_intf, CtxTypes>);
-
     static constexpr caching_level_type level = Level;
     static constexpr bool func_is_coro = AsCoro;
     static constexpr bool introspective = Introspective;
-    using required_ctx_types = CtxTypes;
 
     request_uuid uuid_;
     std::string title_; // Used only if introspective
@@ -752,7 +740,6 @@ class function_request_erased
     using value_type = Value;
     using intf_type = function_request_intf<Value>;
     using props_type = Props;
-    using required_ctx_types = typename Props::required_ctx_types;
 
     static constexpr caching_level_type caching_level = Props::level;
     static constexpr bool introspective = Props::introspective;
@@ -955,11 +942,10 @@ auto rq_function_erased(Props props, Function function, Args... args)
     // Rely on the coroutine returning cppcoro::task<Value>,
     // which is a class that has a value_type member.
     // Function's first argument is a reference to some context type.
-    // Exactly which type is not known here, but Function should be callable
-    // with any context interface that the request requires.
-    using ctx_type = first_ctx_type<typename Props::required_ctx_types>;
-    using Value = typename std::
-        invoke_result_t<Function, ctx_type&, arg_type<Args>...>::value_type;
+    using Value = typename std::invoke_result_t<
+        Function,
+        context_intf&,
+        arg_type<Args>...>::value_type;
     return function_request_erased<Value, Props>{
         std::move(props), std::move(function), std::move(args)...};
 }

@@ -253,12 +253,9 @@ cppcoro::shared_task<typename Req::value_type>
 resolve_request_async(Ctx& ctx, Req const& req)
 {
     // Cf. the similar construct in seri_resolver_impl::resolve()
-    if constexpr (!ctx_in_type_list<
-                      local_async_context_intf,
-                      typename Req::required_ctx_types>)
+    if constexpr (!VisitableRequest<Req>)
     {
-        throw std::logic_error{
-            "local_async_context_intf not in Req::required_ctx_types"};
+        throw std::logic_error{"request is not visitable"};
     }
     // Third decision: cached or not
     else if constexpr (UncachedRequest<Req>)
@@ -344,8 +341,8 @@ cppcoro::task<Val> resolve_request(
  * depending on context and contraints.
  *
  * Notes:
- * - The caller must ensure that the actual ctx type implements all context
- *   interfaces listed in Req::required_types.
+ * - The caller must ensure that the actual ctx type implements all needed
+ *   context interfaces; if not, resolution will throw a "bad cast" exception.
  * - This function is blocking. Progress of an asynchronous request can be
  *   monitored via its context tree.
  * - This function throws async_cancelled when an asynchronous request is
@@ -364,7 +361,6 @@ resolve_request(
     Ctx& ctx, Req const& req, Constraints constraints = Constraints())
 {
     static_assert(ValidContext<Ctx>);
-    static_assert(ValidRequest<Req>);
     // TODO static_assert(ValidConstraints<Constraints>);
     // check_context_satisfies_constraints(ctx, constraints);
     // First decision (based on constraints if possible): remotely or locally

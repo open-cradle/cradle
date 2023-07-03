@@ -55,9 +55,7 @@ class seri_resolver_impl : public seri_resolver_intf
         // The intention of the "if constexpr" is to:
         // - Prevent build errors should Req not be visitable
         // - Generate less object code should Req not need async resolving
-        if constexpr (ctx_in_type_list<
-                          local_async_context_intf,
-                          typename Req::required_ctx_types>)
+        if constexpr (VisitableRequest<Req>)
         {
             if (ctx.is_async())
             {
