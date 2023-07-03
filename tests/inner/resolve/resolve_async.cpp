@@ -185,6 +185,8 @@ TEST_CASE("resolve async locally - raw args", tag)
     Props props0{make_test_uuid(100)};
     Props props1{make_test_uuid(101)};
     Props props2{make_test_uuid(102)};
+    // rq_cancellable_coro would call normalize_arg() on its arguments and
+    // we don't want that in this test.
     auto req{rq_function_erased(
         props0,
         cancellable_coro,
@@ -240,20 +242,9 @@ TEST_CASE("resolve async with value_request locally", tag)
     constexpr int loops = 3;
     int delay0 = 5;
     int val1 = 6;
-    using required_ctx_types
-        = ctx_type_list<local_async_context_intf, caching_context_intf>;
-    using Props = request_props<
-        caching_level_type::full,
-        true,
-        false,
-        required_ctx_types>;
-    Props props0{make_test_uuid(110)};
-    Props props1{make_test_uuid(111)};
-    auto req{rq_function_erased(
-        props0,
-        cancellable_coro,
-        rq_function_erased(props1, cancellable_coro, loops, delay0),
-        rq_value(val1))};
+    constexpr auto level{caching_level_type::full};
+    auto req{rq_cancellable_coro<level>(
+        rq_cancellable_coro<level>(loops, delay0), rq_value(val1))};
     inner_resources inner;
     init_test_inner_service(inner);
     auto tree_ctx = std::make_shared<local_atst_tree_context>(inner);
@@ -312,20 +303,10 @@ test_error_async_across_rpc(
 
 TEST_CASE("error async request locally", tag)
 {
-    using required_ctx_types = ctx_type_list<local_async_context_intf>;
-    using Props = request_props<
-        caching_level_type::none,
-        true,
-        false,
-        required_ctx_types>;
-    Props props0{make_test_uuid(300)};
-    Props props1{make_test_uuid(301)};
-    Props props2{make_test_uuid(302)};
-    auto req{rq_function_erased(
-        props0,
-        cancellable_coro,
-        rq_function_erased(props1, cancellable_coro, -1, 11),
-        rq_function_erased(props2, cancellable_coro, 2, 24))};
+    constexpr auto level = caching_level_type::none;
+    auto req{rq_cancellable_coro<level>(
+        rq_cancellable_coro<level>(-1, 11),
+        rq_cancellable_coro<level>(2, 24))};
     inner_resources inner;
     init_test_inner_service(inner);
     auto tree_ctx = std::make_shared<local_atst_tree_context>(inner);
@@ -431,19 +412,10 @@ test_cancel_async_across_rpc(
 
 TEST_CASE("cancel async request locally", tag)
 {
-    using required_ctx_types = ctx_type_list<local_async_context_intf>;
-    using Props = request_props<
-        caching_level_type::none,
-        true,
-        false,
-        required_ctx_types>;
-    Props props0{make_test_uuid(200)};
-    Props props1{make_test_uuid(201)};
-    auto req{rq_function_erased(
-        props0,
-        cancellable_coro,
-        rq_function_erased(props1, cancellable_coro, 100, 7),
-        rq_function_erased(props1, cancellable_coro, 100, 8))};
+    constexpr auto level{caching_level_type::none};
+    auto req{rq_cancellable_coro<level>(
+        rq_cancellable_coro<level>(100, 7),
+        rq_cancellable_coro<level>(100, 8))};
     inner_resources inner;
     init_test_inner_service(inner);
     auto tree_ctx = std::make_shared<local_atst_tree_context>(inner);

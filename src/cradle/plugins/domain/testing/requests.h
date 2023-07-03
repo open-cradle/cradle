@@ -11,6 +11,7 @@
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/plugins/domain/testing/context.h>
+#include <cradle/plugins/domain/testing/normalization_uuid.h>
 
 namespace cradle {
 

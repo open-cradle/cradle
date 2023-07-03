@@ -28,7 +28,9 @@
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/encodings/cereal.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/normalization_uuid.h>
 #include <cradle/inner/requests/uuid.h>
+#include <cradle/inner/requests/value.h>
 #include <cradle/inner/resolve/resolve_request.h>
 
 namespace cradle {
@@ -999,7 +1001,9 @@ concept TypedArg
       || (std::same_as<typename Arg::value_type, ValueType>
           && std::same_as<
               function_request_erased<ValueType, typename Arg::props_type>,
-              Arg>);
+              Arg>)
+      || (std::same_as<typename Arg::value_type, ValueType>
+          && std::same_as<value_request<ValueType>, Arg>);
 
 // Function returning the given value as-is; similar to std::identity.
 template<typename Value>
@@ -1016,40 +1020,6 @@ identity_coro(context_intf& ctx, Value value)
 {
     co_return value;
 }
-
-// Contains the uuid strings for a normalize_arg request. The uuid (only)
-// depends on:
-// - The value type that the request resolves to
-// - Whether the function is "normal" or a coroutine
-// Note: don't put the request_uuid itself in the struct as it depends
-// on the static Git version which is also evaluated at C++ initialization
-// time.
-// TODO put specializations in separate .h?
-template<typename Value>
-struct normalization_uuid_str
-{
-};
-
-template<>
-struct normalization_uuid_str<int>
-{
-    static const inline std::string func{"normalization<int,func>"};
-    static const inline std::string coro{"normalization<int,coro>"};
-};
-
-template<>
-struct normalization_uuid_str<std::string>
-{
-    static const inline std::string func{"normalization<string,func>"};
-    static const inline std::string coro{"normalization<string,coro>"};
-};
-
-template<>
-struct normalization_uuid_str<blob>
-{
-    static const inline std::string func{"normalization<blob,func>"};
-    static const inline std::string coro{"normalization<blob,coro>"};
-};
 
 template<typename Value, bool func_is_coro>
 auto
@@ -1119,6 +1089,26 @@ auto normalize_arg(char const* arg)
     Props props{make_normalization_uuid<Value, true>(), "arg"};
     return rq_function_erased(
         std::move(props), identity_coro<std::string>, std::string{arg});
+}
+
+// Normalizes a value_request argument in a non-coroutine context.
+template<typename Value, typename Props>
+    requires(!Props::func_is_coro)
+auto normalize_arg(value_request<Value> const& arg)
+{
+    Props props{make_normalization_uuid<Value, false>(), "arg"};
+    return rq_function_erased(
+        std::move(props), identity_func<Value>, arg.get_value());
+}
+
+// Normalizes a value_request argument in a coroutine context.
+template<typename Value, typename Props>
+    requires(Props::func_is_coro)
+auto normalize_arg(value_request<Value> const& arg)
+{
+    Props props{make_normalization_uuid<Value, true>(), "arg"};
+    return rq_function_erased(
+        std::move(props), identity_coro<Value>, arg.get_value());
 }
 
 // Normalizes a function_request_erased argument (returned as-is).
