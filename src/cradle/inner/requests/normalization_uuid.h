@@ -16,6 +16,8 @@ namespace cradle {
 //
 // This file only defines the standard uuid strings. Additional ones should be
 // put in a plugin.
+// All strings should start with "normalization<" (so that
+// function_request_impl can optimize these resolutions).
 template<typename Value>
 struct normalization_uuid_str
 {

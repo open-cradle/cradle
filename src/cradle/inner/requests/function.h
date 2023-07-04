@@ -271,6 +271,12 @@ class cereal_functions_registry
     impl_t& impl_;
 };
 
+template<typename Head, typename... Tail>
+struct first_element
+{
+    using type = Head;
+};
+
 /*
  * The actual type created by function_request_erased, but visible only in its
  * constructor (and erased elsewhere).
@@ -421,28 +427,26 @@ class function_request_impl : public function_request_intf<Value>
         // variants take the arg as const&.
         if constexpr (!func_is_coro)
         {
-            // gcc tends to have trouble with this piece of code (leading to
-            // compiler crashes or runtime errors).
-            ResolutionConstraintsLocalSync constraints;
-            co_return co_await std::apply(
-                [&](auto&&... args) -> cppcoro::task<Value> {
-                    co_return (*function_)((co_await resolve_request(
-                        ctx,
-                        std::forward<decltype(args)>(args),
-                        constraints))...);
-                },
-                args_);
+            return resolve_sync_non_coro(ctx);
+        }
+        else if constexpr (sizeof...(Args) == 1)
+        {
+            if constexpr (std::same_as<
+                              typename first_element<Args...>::type,
+                              Value>)
+            {
+                if (is_normalizer())
+                {
+                    return resolve_sync_normalizer(ctx);
+                }
+            }
+            // Object code for the following line will still be generated if
+            // this is a normalizer, but it won't be called in that case.
+            return resolve_sync_coro(ctx);
         }
         else
         {
-            using Indices = std::index_sequence_for<Args...>;
-            auto sub_tasks = make_sync_sub_tasks(ctx, args_, Indices{});
-            co_return co_await std::apply(
-                *function_,
-                std::tuple_cat(
-                    std::tie(ctx),
-                    co_await when_all_wrapper(
-                        std::move(sub_tasks), Indices{})));
+            return resolve_sync_coro(ctx);
         }
     }
 
@@ -451,52 +455,105 @@ class function_request_impl : public function_request_intf<Value>
     {
         if constexpr (!func_is_coro)
         {
-            // TODO resolve_async for non-coro function
-            ResolutionConstraintsLocalSync constraints;
-            co_return co_await std::apply(
-                [&](auto&&... args) -> cppcoro::task<Value> {
-                    co_return (*function_)((co_await resolve_request(
-                        ctx,
-                        std::forward<decltype(args)>(args),
-                        constraints))...);
-                },
-                args_);
+            // TODO make resolve_async() for non-coro really async
+            return resolve_sync_non_coro(ctx);
+        }
+        else if constexpr (sizeof...(Args) == 1)
+        {
+            if constexpr (std::same_as<
+                              typename first_element<Args...>::type,
+                              Value>)
+            {
+                if (is_normalizer())
+                {
+                    return resolve_async_normalizer(ctx);
+                }
+            }
+            return resolve_async_coro(ctx);
         }
         else
         {
-            // Throws on error or cancellation.
-            // If a subtask throws (because of cancellation or otherwise),
-            // the main task will wait until all other subtasks have finished
-            // (or thrown).
-            // This justifies passing contexts around by reference.
-            try
-            {
-                using Indices = std::index_sequence_for<Args...>;
-                auto sub_tasks = make_async_sub_tasks(ctx, args_, Indices{});
-                ctx.update_status(async_status::SUBS_RUNNING);
-                auto sub_results = co_await when_all_wrapper(
-                    std::move(sub_tasks), Indices{});
-                ctx.update_status(async_status::SELF_RUNNING);
-                // Rescheduling allows tasks to run in parallel, but is not
-                // always opportune
-                co_await ctx.reschedule_if_opportune();
-                auto result = co_await std::apply(
-                    *function_,
-                    std::tuple_cat(std::tie(ctx), std::move(sub_results)));
-                ctx.update_status(async_status::FINISHED);
-                co_return result;
-            }
-            catch (async_cancelled const&)
-            {
-                ctx.update_status(async_status::CANCELLED);
-                throw;
-            }
-            catch (std::exception const& e)
-            {
-                ctx.update_status_error(e.what());
-                throw;
-            }
+            return resolve_async_coro(ctx);
         }
+    }
+
+ private:
+    cppcoro::task<Value>
+    resolve_sync_non_coro(local_context_intf& ctx) const
+    {
+        // gcc tends to have trouble with this piece of code (leading to
+        // compiler crashes or runtime errors).
+        ResolutionConstraintsLocalSync constraints;
+        co_return co_await std::apply(
+            [&](auto&&... args) -> cppcoro::task<Value> {
+                co_return (*function_)((co_await resolve_request(
+                    ctx, std::forward<decltype(args)>(args), constraints))...);
+            },
+            args_);
+    }
+
+    cppcoro::task<Value>
+    resolve_sync_coro(local_context_intf& ctx) const
+    {
+        using Indices = std::index_sequence_for<Args...>;
+        auto sub_tasks = make_sync_sub_tasks(ctx, args_, Indices{});
+        co_return co_await std::apply(
+            *function_,
+            std::tuple_cat(
+                std::tie(ctx),
+                co_await when_all_wrapper(std::move(sub_tasks), Indices{})));
+    }
+
+    cppcoro::task<Value>
+    resolve_async_coro(local_async_context_intf& ctx) const
+    {
+        // Throws on error or cancellation.
+        // If a subtask throws (because of cancellation or otherwise),
+        // the main task will wait until all other subtasks have finished
+        // (or thrown).
+        // This justifies passing contexts around by reference.
+        try
+        {
+            using Indices = std::index_sequence_for<Args...>;
+            auto sub_tasks = make_async_sub_tasks(ctx, args_, Indices{});
+            ctx.update_status(async_status::SUBS_RUNNING);
+            auto sub_results
+                = co_await when_all_wrapper(std::move(sub_tasks), Indices{});
+            ctx.update_status(async_status::SELF_RUNNING);
+            // Rescheduling allows tasks to run in parallel, but is not
+            // always opportune
+            co_await ctx.reschedule_if_opportune();
+            auto result = co_await std::apply(
+                *function_,
+                std::tuple_cat(std::tie(ctx), std::move(sub_results)));
+            ctx.update_status(async_status::FINISHED);
+            co_return result;
+        }
+        catch (async_cancelled const&)
+        {
+            ctx.update_status(async_status::CANCELLED);
+            throw;
+        }
+        catch (std::exception const& e)
+        {
+            ctx.update_status_error(e.what());
+            throw;
+        }
+    }
+
+    // Shortcuts resolving a request generated by a normalize_arg() call:
+    // just return the value that was passed to normalize_arg().
+    cppcoro::task<Value>
+    resolve_sync_normalizer(local_context_intf& ctx) const
+    {
+        co_return std::get<0>(args_);
+    }
+
+    cppcoro::task<Value>
+    resolve_async_normalizer(local_async_context_intf& ctx) const
+    {
+        ctx.update_status(async_status::FINISHED);
+        co_return std::get<0>(args_);
     }
 
  public:
@@ -579,6 +636,12 @@ class function_request_impl : public function_request_intf<Value>
     mutable std::optional<size_t> hash_;
     mutable unique_hasher::result_t unique_hash_;
     mutable bool have_unique_hash_{false};
+
+    bool
+    is_normalizer() const
+    {
+        return uuid_.str().starts_with("normalization<");
+    }
 
     // *this and other are the same type, so their function types (i.e.,
     // typeid(Function)) are identical. The functions themselves might still
@@ -977,6 +1040,10 @@ auto rq_function_erased(Props props, Function function, Args... args)
  *   for this mechanism.
  * - A set of normalize_arg() functions that convert an argument to the
  *   normalized function_request_erased form.
+ *
+ * function_request_impl's resolve_sync() and resolve_async() optimize
+ * these requests so that the resolution overhead should be minimal, and
+ * there should be no need for identity_func() or identity_coro() calls.
  */
 
 // Checks that Arg is a value of type ValueType, or a request resolving to that
