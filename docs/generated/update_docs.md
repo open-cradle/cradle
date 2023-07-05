@@ -48,10 +48,11 @@ To achieve this:
 
 ```shell
 $ cd /path/to/repo/docs
-$ rm generated/*  # Optional step, to remove stale files
+# Ensure that plantuml.jar is in the current directory
+$ rm generated/*.{md,svg}  # Optional step, to remove stale files
 $ python3 replace-puml.py *.md
 ```
 
 The modified Markdown files (without PlantUML content), and the image files, end up in the
 `generated` subdirectory. These files will be under change control,
-and the entrypoint to the generated documentation will be `/path/to/repo/docs/generated/index.md`.
+and the entrypoint to the generated documentation will be `/path/to/repo/docs/generated/README.md`.

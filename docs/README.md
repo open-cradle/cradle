@@ -10,6 +10,8 @@ Read more [here](abstract.md).
 ## Contents
 User documentation
 * [Abstract](abstract.md) Read this first
+  * [Contexts](context.md)
+* [Example: make some blob](make_some_blob.md)
 * [Configuration file](config_template.toml)
 * [Remote (cloud-based) cache](remote_cache.md)
 

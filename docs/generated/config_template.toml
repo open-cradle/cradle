@@ -1,1 +1,87 @@
-../config_template.toml
+# CRADLE configuration template
+#
+# All possible keys should be here but the file may be outdated.
+# Unrecognized entries are silently ignored.
+# In most cases, the shown values should be the defaults.
+
+# true in testing (non-production) context
+testing = false
+
+# Deployment directory containing server executables; used when testing
+# Default: find executables on the search path
+deploy_dir = "/tmp/cradle/build-debug/deploy"
+
+# Whether or not the Websocket server should be open to connections from
+# other machines
+open = false
+
+# The port on which the Websocket server will listen
+port = 41071
+
+# How many concurrent threads to use for HTTP requests
+http_concurrency = 36
+
+# How many concurrent threads to use for locally resolving asynchronous
+# requests in parallel (coroutines)
+async_concurrency = 20
+
+[memory_cache]
+# The maximum amount of memory to use for caching results that are no
+# longer in use, in bytes
+unused_size_limit = 0x40000000
+
+[secondary_cache]
+# The secondary cache to use
+# Options: "local_disk_cache", "http_cache"
+factory = "local_disk_cache"
+
+[disk_cache]
+directory = "/home/user/.cache/cradle"
+size_limit = 0x40000000
+num_threads_read_pool = 2
+num_threads_write_pool = 2
+
+[http_cache]
+# HTTP port
+port = 9090
+
+[blob_cache]
+directory = "/home/user/.cache/cradle"
+
+[rpclib]
+# How many root requests can run in parallel, on the rpclib server;
+# defines the size of a thread pool shared between synchronous and
+# asynchronous requests.
+request_concurrency = 16
+
+[loopback]
+# How many asynchronous root requests can run in parallel,
+# on the loopback service
+async_concurrency = 16
+
+[testopts]
+# All options in this section are for testing purposes only, intended to be set by
+# a test case and not to be defined in a configuration file.
+# ---
+# Causes submit_async to fail on the remote
+fail_submit_async = false
+# Startup delay, in ms, for resolve_async
+resolve_async_delay = 0
+# Delay, in ms, for a local_atst_context::set_result() call; default: 0
+set_result_delay = 0
+
+[remote]
+# All options in this section are for internal purposes only.
+# There are no defaults: values are always set by an RPC client and passed to the RPC server.
+# ---
+# Domain name
+domain_name = ""
+
+[thinknode]
+# All options in this section are for internal purposes only.
+# There are no defaults: values are always set by an RPC client and passed to the RPC server.
+# ---
+# Access token
+access_token = ""
+# Thinknode API URL
+api_url = ""

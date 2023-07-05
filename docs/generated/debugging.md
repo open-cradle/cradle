@@ -17,5 +17,5 @@ $ ./rpclib_server --testing
 ```
 then run the test runner in another terminal.
 
-A test runner will abort if it finds a running RPC server that it considers incompatible.
-If so, kill the server process.
+A test runner will abort if it finds a running RPC server that it considers incompatible,
+reporting a "code version mismatch". If so, kill the server process.
