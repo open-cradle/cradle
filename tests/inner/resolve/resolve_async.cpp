@@ -442,11 +442,19 @@ namespace {
 // submit_async was forced to fail, so no remote id will ever be available.
 // Runs on separate thread. Any exception thrown here, including the one thrown
 // from a failing REQUIRE*(), won't be caught by Catch2, and lead to a
-// terminate. So instead use CHECK_THROWS.
+// terminate. Moreover, Catch2 is not thread-safe. So instead let the main
+// thread do the check.
 void
-get_subs_control_func(async_context_intf& ctx)
+get_subs_control_func(async_context_intf& ctx, bool& threw)
 {
-    CHECK_THROWS(ctx.get_num_subs());
+    try
+    {
+        ctx.get_num_subs();
+    }
+    catch (std::exception const&)
+    {
+        threw = true;
+    }
 }
 
 void
@@ -463,11 +471,15 @@ test_failing_get_num_subs(
 
     // Run get_num_subs on a separate thread, independent from the main one
     // which will call resolve_request().
-    std::jthread control_thread(get_subs_control_func, std::ref(ctx));
+    bool thread_threw{false};
+    std::jthread control_thread(
+        get_subs_control_func, std::ref(ctx), std::ref(thread_threw));
 
     CHECK_THROWS(cppcoro::sync_wait(resolve_request(ctx, req)));
 
     control_thread.join();
+
+    CHECK(thread_threw);
 }
 
 } // namespace
@@ -490,16 +502,23 @@ TEST_CASE("get_num_subs failure on rpclib", tag)
 
 namespace {
 
+// The actual CHECKs are on the main thread due to Catch2's assertion macros
+// not being thread-safe.
 void
-delayed_get_subs_control_func(async_context_intf& ctx)
+delayed_get_subs_control_func(
+    async_context_intf& ctx,
+    async_status& initial_status,
+    std::size_t& num_subs)
 {
     // Check that resolve_async on the remote is in the startup delay
-    CHECK(cppcoro::sync_wait(ctx.get_status_coro()) == async_status::CREATED);
+    initial_status = cppcoro::sync_wait(ctx.get_status_coro());
+    // CHECK(initial_status == async_status::CREATED;
 
     // get_num_subs should block until the information is available on the
     // remote. Status should be SUBS_RUNNING now or real soon, but "real soon"
     // implies we cannot check it.
-    CHECK(ctx.get_num_subs() == 2);
+    num_subs = ctx.get_num_subs();
+    // CHECK(num_subs == 2);
 }
 
 void
@@ -516,11 +535,20 @@ test_delayed_get_num_subs(
 
     // Run get_num_subs on a separate thread, independent from the main one
     // which will call resolve_request().
-    std::jthread control_thread(delayed_get_subs_control_func, std::ref(ctx));
+    async_status initial_status{};
+    std::size_t num_subs{};
+    std::jthread control_thread(
+        delayed_get_subs_control_func,
+        std::ref(ctx),
+        std::ref(initial_status),
+        std::ref(num_subs));
 
     CHECK(cppcoro::sync_wait(resolve_request(ctx, req)) == 5);
 
     control_thread.join();
+
+    CHECK(initial_status == async_status::CREATED);
+    CHECK(num_subs == 2);
 }
 
 } // namespace
@@ -546,23 +574,28 @@ TEST_CASE("delayed get_num_subs on rpclib", tag)
 
 namespace {
 
+// The actual CHECKs are on the main thread due to Catch2's assertion macros
+// not being thread-safe.
 void
-delayed_set_result_control_func(async_context_intf& ctx)
+delayed_set_result_control_func(
+    async_context_intf& ctx,
+    async_status& interim_status,
+    async_status& final_status)
 {
     // Let the calculation finish
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     // Check on the remote that the calculation has finished, but the result
     // was not yet stored (due to the 200ms set_result forced delay)
-    CHECK(
-        cppcoro::sync_wait(ctx.get_status_coro())
-        == async_status::AWAITING_RESULT);
+    interim_status = cppcoro::sync_wait(ctx.get_status_coro());
+    // CHECK(interim_status == async_status::AWAITING_RESULT);
 
     // Let set_result() finish
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     // Check that the calculation has now completely finished
-    CHECK(cppcoro::sync_wait(ctx.get_status_coro()) == async_status::FINISHED);
+    final_status = cppcoro::sync_wait(ctx.get_status_coro());
+    // CHECK(final_status == async_status::FINISHED);
 }
 
 void
@@ -578,12 +611,20 @@ test_delayed_set_result(inner_resources& inner, std::string const& proxy_name)
 
     // Create a separate control thread, independent from the main one which
     // will call resolve_request().
+    async_status interim_status{};
+    async_status final_status{};
     std::jthread control_thread(
-        delayed_set_result_control_func, std::ref(ctx));
+        delayed_set_result_control_func,
+        std::ref(ctx),
+        std::ref(interim_status),
+        std::ref(final_status));
 
     CHECK(cppcoro::sync_wait(resolve_request(ctx, req)) == 0);
 
     control_thread.join();
+
+    CHECK(interim_status == async_status::AWAITING_RESULT);
+    CHECK(final_status == async_status::FINISHED);
 }
 
 } // namespace
