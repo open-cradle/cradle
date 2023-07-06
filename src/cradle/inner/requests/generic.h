@@ -331,9 +331,12 @@ class local_async_context_intf : public local_context_intf,
     get_result()
         = 0;
 
-    // Requests cancellation of all tasks in the same context tree
+    // Requests cancellation of all tasks in the same context tree.
     // This is a non-coroutine version of
     // async_context_intf::request_cancellation().
+    //
+    // Note that after this call, tasks can still finish successfully or fail.
+    // Thus, a "cancelling" state would not be meaningful.
     virtual void
     request_cancellation()
         = 0;

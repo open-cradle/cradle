@@ -40,6 +40,7 @@ void
 cereal_functions_registry_impl::add_entry(
     std::string const& uuid_str, create_t* create, save_t* save, load_t* load)
 {
+    std::scoped_lock lock{mutex_};
     entry_t new_entry{create, save, load};
     auto it = entries_.find(uuid_str);
     if (it == entries_.end())
@@ -56,6 +57,7 @@ cereal_functions_registry_impl::add_entry(
 entry_t&
 cereal_functions_registry_impl::find_entry(request_uuid const& uuid)
 {
+    std::scoped_lock lock{mutex_};
     std::string uuid_str{uuid.str()};
     auto it = entries_.find(uuid_str);
     if (it == entries_.end())

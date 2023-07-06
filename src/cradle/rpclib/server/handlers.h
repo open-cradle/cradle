@@ -70,14 +70,13 @@ void
 handle_ack_response(rpclib_handler_context& hctx, int response_id);
 
 void
-handle_mock_http(rpclib_handler_context& hctx, std::string const& body);
+handle_mock_http(rpclib_handler_context& hctx, std::string body);
 
-// TODO why const& here and values in handle_resolve_sync()?
 async_id
 handle_submit_async(
     rpclib_handler_context& hctx,
-    std::string const& config_json,
-    std::string const& seri_req);
+    std::string config_json,
+    std::string seri_req);
 
 remote_context_spec_list
 handle_get_sub_contexts(rpclib_handler_context& hctx, async_id aid);

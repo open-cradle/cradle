@@ -271,7 +271,10 @@ class local_async_context_base : public local_async_context_intf,
     reschedule_if_opportune() override;
 
     async_status
-    get_status() override;
+    get_status() override
+    {
+        return status_;
+    }
 
     std::string
     get_error_message() override

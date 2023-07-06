@@ -105,7 +105,7 @@ catch (std::exception& e)
 }
 
 void
-handle_mock_http(rpclib_handler_context& hctx, std::string const& body)
+handle_mock_http(rpclib_handler_context& hctx, std::string body)
 try
 {
     auto& session = enable_http_mocking(hctx.service());
@@ -152,8 +152,8 @@ resolve_async(
 async_id
 handle_submit_async(
     rpclib_handler_context& hctx,
-    std::string const& config_json,
-    std::string const& seri_req)
+    std::string config_json,
+    std::string seri_req)
 try
 {
     auto& service{hctx.service()};
@@ -176,7 +176,7 @@ try
     // This function should return asap.
     // Need to dispatch a thread calling the blocking cppcoro::sync_wait().
     hctx.request_pool().push_task(
-        resolve_async, std::ref(hctx), actx, seri_req);
+        resolve_async, std::ref(hctx), actx, std::move(seri_req));
     async_id aid = actx->get_id();
     logger.info("async_id {}", aid);
     return aid;

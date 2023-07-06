@@ -14,7 +14,6 @@ enum class async_status
     CREATED, // Task was created
     SUBS_RUNNING, // Subtasks running, main task waiting for them
     SELF_RUNNING, // Subtasks finished, main task running
-    CANCELLING, // Detected cancellation request
     CANCELLED, // Cancellation completed
     AWAITING_RESULT, // Calculation completed, but the result still has to be
                      // stored in the context (transient internal status)

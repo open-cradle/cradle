@@ -6,31 +6,13 @@
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/service/config_map_file.h>
 #include <cradle/inner/service/resources.h>
+#include <cradle/inner/utilities/git.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/secondary_cache/all_plugins.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/version_info.h>
 
 using namespace cradle;
-
-static void
-show_version_info()
-{
-    if (is_tagged_version(version_info))
-    {
-        std::cout << "CRADLE " << version_info.tag << "\n";
-    }
-    else
-    {
-        std::cout << "CRADLE (unreleased version - "
-                  << version_info.commit_object_name << ", "
-                  << version_info.commits_since_tag << " commits ahead of "
-                  << version_info.tag;
-        if (version_info.dirty)
-            std::cout << ", with local modifications";
-        std::cout << ")\n";
-    }
-}
 
 int
 main(int argc, char const* const* argv)
@@ -51,14 +33,14 @@ try
 
     if (vm.count("help"))
     {
-        show_version_info();
+        show_version_info(version_info);
         std::cout << desc;
         return 0;
     }
 
     if (vm.count("version"))
     {
-        show_version_info();
+        show_version_info(version_info);
         return 0;
     }
 

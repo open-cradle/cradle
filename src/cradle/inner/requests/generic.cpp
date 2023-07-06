@@ -43,9 +43,6 @@ to_string(async_status s)
         case async_status::SELF_RUNNING:
             res = "SELF_RUNNING";
             break;
-        case async_status::CANCELLING:
-            res = "CANCELLING";
-            break;
         case async_status::CANCELLED:
             res = "CANCELLED";
             break;

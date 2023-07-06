@@ -247,26 +247,6 @@ local_async_context_base::decide_reschedule_sub()
     return num_subs_not_running_.fetch_sub(1) > 1;
 }
 
-async_status
-local_async_context_base::get_status()
-{
-    auto status = status_;
-#if 0
-    // TODO do we need this?
-    if (status < async_status::CANCELLING
-        && get_cancellation_token().is_cancellation_requested())
-    {
-        auto& logger{tree_ctx_->get_logger()};
-        logger.info(
-            "local_async_context_base {}: get_status() detected cancellation",
-            id_);
-        status = async_status::CANCELLING;
-        update_status(status);
-    }
-#endif
-    return status;
-}
-
 void
 local_async_context_base::update_status(async_status status)
 {

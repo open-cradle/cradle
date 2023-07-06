@@ -40,6 +40,9 @@ template<
     bool ForceAsync = false>
 struct ResolutionConstraints
 {
+    static_assert(!(ForceRemote && ForceLocal));
+    static_assert(!(ForceSync && ForceAsync));
+
     static constexpr bool force_remote = ForceRemote;
     static constexpr bool force_local = ForceLocal;
     static constexpr bool force_sync = ForceSync;
@@ -361,8 +364,7 @@ resolve_request(
     Ctx& ctx, Req const& req, Constraints constraints = Constraints())
 {
     static_assert(ValidContext<Ctx>);
-    // TODO static_assert(ValidConstraints<Constraints>);
-    // check_context_satisfies_constraints(ctx, constraints);
+    // TODO check_context_satisfies_constraints(ctx, constraints);
     // First decision (based on constraints if possible): remotely or locally
     if constexpr (constraints.force_remote)
     {

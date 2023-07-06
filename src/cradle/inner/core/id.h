@@ -58,11 +58,12 @@ invoke_hash(id_interface const& x)
 inline bool
 operator==(id_interface const& a, id_interface const& b)
 {
-    // TODO name() could be identical for different types
-    // Apparently it's faster to compare the name pointers for equality before
-    // resorting to actually comparing the typeid objects themselves.
-    return (typeid(a).name() == typeid(b).name() || typeid(a) == typeid(b))
-           && a.equals(b);
+    // Cannot rely on comparing type_info::name() results because "the returned
+    // string can be identical for several types" (cppreference.com). However,
+    // this is what GNU's implementation of type_info::operator==() seems to
+    // do. With C++23, type_info::operator() will be constexpr and thus faster
+    // than comparing names.
+    return typeid(a) == typeid(b) && a.equals(b);
 }
 
 inline bool

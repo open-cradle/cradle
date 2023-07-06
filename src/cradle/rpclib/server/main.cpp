@@ -17,6 +17,7 @@
 // Ensure to #include only from the msgpack inside rpclib
 #include <cradle/inner/encodings/msgpack_adaptors_rpclib.h>
 #include <cradle/inner/requests/uuid.h>
+#include <cradle/inner/utilities/git.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/domain/all/all_domains.h>
 #include <cradle/plugins/secondary_cache/all_plugins.h>
@@ -25,10 +26,10 @@
 #include <cradle/rpclib/common/common.h>
 #include <cradle/rpclib/server/handlers.h>
 #include <cradle/typing/service/core.h>
+#include <cradle/version_info.h>
 
 using namespace cradle;
 
-// TODO maybe this should be a config_map?
 struct cli_options
 {
     std::string log_level{"info"};
@@ -82,7 +83,7 @@ parse_options(int argc, char const* const* argv)
 
     if (vm.count("version"))
     {
-        std::cout << "TODO version\n";
+        show_version_info(version_info);
         std::exit(0);
     }
 
@@ -152,16 +153,16 @@ run_server(cli_options const& options)
     // TODO we need a session concept and a "start session" / "register"
     // (notification) message
     srv.bind(
-        "resolve_sync",
-        [&](std::string const& config_json, std::string const& seri_req) {
+        "resolve_sync", [&](std::string config_json, std::string seri_req) {
             // TODO create origin tasklet somewhere
-            return handle_resolve_sync(hctx, config_json, seri_req);
+            return handle_resolve_sync(
+                hctx, std::move(config_json), std::move(seri_req));
         });
     if (options.testing)
     {
         // No mocking in production server
-        srv.bind("mock_http", [&](std::string const& body) {
-            return handle_mock_http(hctx, body);
+        srv.bind("mock_http", [&](std::string body) {
+            return handle_mock_http(hctx, std::move(body));
         });
     }
     srv.bind("ack_response", [&](int response_id) {
@@ -170,9 +171,9 @@ run_server(cli_options const& options)
     srv.bind("ping", []() { return request_uuid::get_git_version(); });
 
     srv.bind(
-        "submit_async",
-        [&](std::string const& config_json, std::string const& seri_req) {
-            return handle_submit_async(hctx, config_json, seri_req);
+        "submit_async", [&](std::string config_json, std::string seri_req) {
+            return handle_submit_async(
+                hctx, std::move(config_json), std::move(seri_req));
         });
     srv.bind("get_sub_contexts", [&](async_id aid) {
         return handle_get_sub_contexts(hctx, aid);

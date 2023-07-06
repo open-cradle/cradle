@@ -230,7 +230,6 @@ TEST_CASE("convert async_status to string", tag)
     REQUIRE(to_string(async_status::CREATED) == "CREATED");
     REQUIRE(to_string(async_status::SUBS_RUNNING) == "SUBS_RUNNING");
     REQUIRE(to_string(async_status::SELF_RUNNING) == "SELF_RUNNING");
-    REQUIRE(to_string(async_status::CANCELLING) == "CANCELLING");
     REQUIRE(to_string(async_status::CANCELLED) == "CANCELLED");
     REQUIRE(to_string(async_status::FINISHED) == "FINISHED");
     REQUIRE(to_string(async_status::ERROR) == "ERROR");

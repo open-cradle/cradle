@@ -182,6 +182,8 @@ when_all_wrapper(Tuple&& tasks, std::index_sequence<Ix...>)
  * Instead, we need a mechanism where the uuid in the serialization identifies
  * both the function_request_impl _class_ (template instantiation), and the
  * function _value_ in that class.
+ *
+ * All functions in this class's API are thread-safe.
  */
 class cereal_functions_registry_impl
 {
@@ -212,6 +214,7 @@ class cereal_functions_registry_impl
 
  private:
     std::unordered_map<std::string, entry_t> entries_;
+    std::mutex mutex_;
 };
 
 template<typename Intf>
@@ -319,10 +322,10 @@ class function_request_impl : public function_request_intf<Value>
         // The uuid uniquely identifies the function.
         // Store it so that is available during deserialization.
         auto uuid_str{uuid_.str()};
-        std::scoped_lock lock{static_mutex_};
         cereal_functions_registry<base_type>::instance().add_entry(
             uuid_str, create, save_json, load_json);
 
+        std::scoped_lock lock{maching_functions_mutex_};
         auto it = matching_functions_.find(uuid_str);
         if (it == matching_functions_.end())
         {
@@ -595,7 +598,7 @@ class function_request_impl : public function_request_intf<Value>
     load(Archive& archive)
     {
         archive(cereal::make_nvp("args", args_));
-        std::scoped_lock lock{static_mutex_};
+        std::scoped_lock lock{maching_functions_mutex_};
         auto it = matching_functions_.find(uuid_.str());
         if (it == matching_functions_.end())
         {
@@ -608,8 +611,7 @@ class function_request_impl : public function_request_intf<Value>
 
  private:
     // Protector of matching_functions_
-    // TODO check this mutex; it should be global, not one per instantiation
-    static inline std::mutex static_mutex_;
+    static inline std::mutex maching_functions_mutex_;
 
     // The functions matching this request's type, indexed by uuid string.
     // Used only when the uuid is serializable.
