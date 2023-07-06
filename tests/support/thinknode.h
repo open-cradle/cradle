@@ -7,6 +7,9 @@ namespace cradle {
 void
 ensure_thinknode_seri_resolvers();
 
+void
+ensure_all_domains_registered();
+
 } // namespace cradle
 
 #endif

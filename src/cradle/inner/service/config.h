@@ -32,6 +32,12 @@ class service_config
 
     service_config(service_config_map const& config_map);
 
+    service_config_map const&
+    get_config_map() const
+    {
+        return config_map_;
+    }
+
     bool
     contains(std::string const& key) const;
 

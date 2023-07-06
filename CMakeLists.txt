@@ -60,6 +60,7 @@ include(${CMAKE_CURRENT_BINARY_DIR}/conan.cmake)
 conan_cmake_configure(
     REQUIRES
         boost/1.77.0
+        bshoshany-thread-pool/3.3.0
         catch2/2.13.4
         nlohmann_json/3.9.1
         msgpack/3.3.0
@@ -133,15 +134,11 @@ FetchContent_Declare(fetched_cppcoro
     GIT_TAG master)
 FetchContent_MakeAvailable(fetched_cppcoro)
 
-FetchContent_Declare(fetched_thread_pool
-    GIT_REPOSITORY https://github.com/bshoshany/thread-pool
-    GIT_TAG v2.0.0)
-FetchContent_MakeAvailable(fetched_thread_pool)
-
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}")
 
 find_package(Boost REQUIRED COMPONENTS
     filesystem program_options)
+find_package(bshoshany-thread-pool REQUIRED)
 find_package(Catch2 REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(msgpack REQUIRED)
@@ -329,7 +326,7 @@ target_compile_definitions(
 # TODO use recent simdjson
 if(IS_MSVC)
     set_property(
-        SOURCE src/cradle/inner/service/config_map_json.cpp
+        SOURCE src/cradle/inner/service/config_map_from_json.cpp
         APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4189")
 endif()
 target_include_directories(cradle_inner PUBLIC
@@ -338,12 +335,14 @@ target_include_directories(cradle_inner PUBLIC
     src/third-party)
 target_link_libraries(cradle_inner PUBLIC
     Boost::headers
+    bshoshany-thread-pool::bshoshany-thread-pool
     cereal::cereal
     cppcoro
     CURL::libcurl
     fmt::fmt
     lz4::lz4
     msgpack::msgpack
+    nlohmann_json::nlohmann_json
     OpenSSL::OpenSSL
     simdjson::simdjson
     spdlog::spdlog
@@ -408,7 +407,6 @@ target_link_libraries(cradle_typing PUBLIC
     Boost::headers
     Catch2::Catch2
     cppcoro
-    nlohmann_json::nlohmann_json
     spdlog::spdlog
     yaml-cpp::yaml-cpp)
 

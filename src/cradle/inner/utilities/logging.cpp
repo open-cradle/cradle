@@ -40,7 +40,7 @@ create_file_sink()
     auto log_path = get_user_logs_dir(none, "cradle") / "log";
     auto sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
         log_path.string(), 262144, 2);
-    sink->set_pattern("[%H:%M:%S:%e] [thread %t] [%n] %v");
+    sink->set_pattern("[%H:%M:%S:%e] %L [thread %t] [%n] %v");
     return sink;
 }
 
@@ -52,7 +52,7 @@ create_stdout_sink()
 #else
     auto sink = std::make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>();
 #endif
-    std::string pattern{"[%H:%M:%S:%e] [thread %t] [%n] %v"};
+    std::string pattern{"[%H:%M:%S:%e] %L [thread %t] [%n] %v"};
     sink->set_pattern(pattern);
     return sink;
 }
@@ -98,6 +98,17 @@ create_logger(std::string const& name)
         std::make_shared<spdlog::logger>(name, begin(sinks), end(sinks))};
     spdlog::register_logger(logger);
     load_levels();
+    return logger;
+}
+
+std::shared_ptr<spdlog::logger>
+ensure_logger(std::string const& name)
+{
+    auto logger = spdlog::get(name);
+    if (!logger)
+    {
+        logger = create_logger(name);
+    }
     return logger;
 }
 

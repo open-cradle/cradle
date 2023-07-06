@@ -2,7 +2,7 @@
 
 #include <cradle/external/external_api_impl.h>
 #include <cradle/external_api.h>
-#include <cradle/inner/service/config_map_json.h>
+#include <cradle/inner/service/config_map_from_json.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/iam.h>
@@ -23,7 +23,9 @@ make_thinknode_request_context(api_session& session, char const* title)
     return thinknode_request_context{
         session.impl().get_service_core(),
         session.impl().get_thinknode_session(),
-        tasklet};
+        tasklet,
+        false,
+        ""};
 }
 
 api_service::api_service(std::string json_text)

@@ -48,9 +48,9 @@ blob
 make_blob(std::string s)
 {
     auto owner{std::make_shared<string_owner>(std::move(s))};
-    auto data{owner->data()};
+    auto bytes{owner->bytes()};
     auto size{owner->size()};
-    return blob{std::move(owner), data, size};
+    return blob{std::move(owner), bytes, size};
 }
 
 blob
@@ -75,6 +75,13 @@ std::shared_ptr<byte_vector_owner>
 make_shared_buffer(std::size_t size)
 {
     return std::make_shared<byte_vector_owner>(byte_vector(size));
+}
+
+// TODO try to optimize for string_owner
+std::string
+to_string(blob const& x)
+{
+    return std::string{reinterpret_cast<char const*>(x.data()), x.size()};
 }
 
 // Decides whether a blob can be interpreted as a printable string

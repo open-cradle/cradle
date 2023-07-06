@@ -1,15 +1,18 @@
 #include <cradle/inner/remote/proxy.h>
+#include <cradle/inner/service/resources.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/client/registry.h>
 
 namespace cradle {
 
-std::shared_ptr<rpclib_client>
-register_rpclib_client(service_config const& config)
+rpclib_client&
+register_rpclib_client(
+    service_config const& config, inner_resources& resources)
 {
-    auto proxy{std::make_shared<rpclib_client>(config)};
-    register_proxy(proxy);
-    return proxy;
+    auto proxy{std::make_unique<rpclib_client>(config)};
+    auto& res{*proxy};
+    resources.register_proxy(std::move(proxy));
+    return res;
 }
 
 } // namespace cradle

@@ -45,33 +45,15 @@ reset_disk_cache(inner_resources& resources)
     resources.reset_secondary_cache(make_inner_tests_config());
 }
 
-cached_request_resolution_context::cached_request_resolution_context()
+caching_request_resolution_context::caching_request_resolution_context()
 {
     init_test_inner_service(resources);
 }
 
 void
-cached_request_resolution_context::reset_memory_cache()
+caching_request_resolution_context::reset_memory_cache()
 {
     resources.reset_memory_cache(make_inner_tests_config());
-}
-
-void
-ensure_loopback_service()
-{
-    register_loopback_service();
-}
-
-std::shared_ptr<rpclib_client>
-ensure_rpclib_service()
-{
-    // TODO no static here, add func to get previously registered client
-    static std::shared_ptr<rpclib_client> client;
-    if (!client)
-    {
-        client = register_rpclib_client(make_inner_tests_config());
-    }
-    return client;
 }
 
 } // namespace cradle

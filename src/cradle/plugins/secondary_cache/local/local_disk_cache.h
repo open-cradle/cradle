@@ -1,8 +1,8 @@
 #ifndef CRADLE_PLUGINS_SECONDARY_CACHE_LOCAL_LOCAL_DISK_CACHE_H
 #define CRADLE_PLUGINS_SECONDARY_CACHE_LOCAL_LOCAL_DISK_CACHE_H
 
+#include <BS_thread_pool.hpp>
 #include <cppcoro/static_thread_pool.hpp>
-#include <thread-pool/thread_pool.hpp>
 
 #include <cradle/inner/caching/secondary_cache_intf.h>
 #include <cradle/inner/service/config.h>
@@ -60,7 +60,7 @@ class local_disk_cache : public secondary_cache_intf
         return read_pool_;
     }
 
-    thread_pool&
+    BS::thread_pool&
     write_pool()
     {
         return write_pool_;
@@ -69,7 +69,7 @@ class local_disk_cache : public secondary_cache_intf
  private:
     ll_disk_cache ll_cache_;
     cppcoro::static_thread_pool read_pool_;
-    thread_pool write_pool_;
+    BS::thread_pool write_pool_;
 };
 
 } // namespace cradle

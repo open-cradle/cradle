@@ -32,6 +32,10 @@ cppcoro::static_thread_pool&
 service_core_impl::get_local_compute_pool_for_image(
     std::pair<std::string, thinknode_provider_image_info> const& tag)
 {
+    // A tag specifies a Docker image, and an app in that image;
+    // in addition, there is a single tag for lambda functions.
+    // Each different tag has a pool of 4 threads.
+    // TODO configurable number of threads in a local compute pool.
     return local_compute_pool_.try_emplace(tag, 4).first->second;
 }
 

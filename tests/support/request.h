@@ -7,7 +7,7 @@
 #include <cppcoro/task.hpp>
 #include <cppcoro/when_all.hpp>
 
-#include <cradle/inner/service/request.h>
+#include <cradle/inner/resolve/resolve_request.h>
 
 namespace cradle {
 

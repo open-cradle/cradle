@@ -12,25 +12,17 @@ TEST_CASE("get_resources()", "[testing][context]")
 {
     inner_resources resources;
     init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
+    testing_request_context ctx{resources, nullptr, false, ""};
 
     REQUIRE(&ctx.get_resources() == &resources);
-}
-
-TEST_CASE("get_cache()", "[testing][context]")
-{
-    inner_resources resources;
-    init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
-
-    REQUIRE(&ctx.get_cache() == &resources.memory_cache());
+    REQUIRE(&ctx.get_resources().memory_cache() == &resources.memory_cache());
 }
 
 TEST_CASE("remotely(), default", "[testing][context]")
 {
     inner_resources resources;
     init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
+    testing_request_context ctx{resources, nullptr, false, ""};
 
     REQUIRE(!ctx.remotely());
 }
@@ -39,7 +31,7 @@ TEST_CASE("remotely(), set", "[testing][context]")
 {
     inner_resources resources;
     init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr, true};
+    testing_request_context ctx{resources, nullptr, true, "some_proxy"};
 
     REQUIRE(ctx.remotely());
 }
@@ -48,7 +40,7 @@ TEST_CASE("no initial tasklet", "[testing][context]")
 {
     inner_resources resources;
     init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
+    testing_request_context ctx{resources, nullptr, false, ""};
 
     REQUIRE(ctx.get_tasklet() == nullptr);
 }
@@ -58,7 +50,7 @@ TEST_CASE("with initial tasklet", "[testing][context]")
     inner_resources resources;
     init_test_inner_service(resources);
     auto t0 = create_tasklet_tracker("pool", "t0");
-    testing_request_context ctx{resources, t0};
+    testing_request_context ctx{resources, t0, false, ""};
 
     REQUIRE(ctx.get_tasklet() == t0);
 }
@@ -69,7 +61,7 @@ TEST_CASE("push/pop tasklet", "[testing][context]")
     init_test_inner_service(resources);
     auto t0 = create_tasklet_tracker("pool", "t0");
     auto t1 = create_tasklet_tracker("pool", "t1");
-    testing_request_context ctx{resources, nullptr};
+    testing_request_context ctx{resources, nullptr, false, ""};
 
     REQUIRE(ctx.get_tasklet() == nullptr);
     ctx.push_tasklet(t0);
@@ -82,62 +74,20 @@ TEST_CASE("push/pop tasklet", "[testing][context]")
     REQUIRE(ctx.get_tasklet() == nullptr);
 }
 
-TEST_CASE("set/get proxy name", "[testing][context]")
+TEST_CASE("get proxy name", "[testing][context]")
 {
     inner_resources resources;
     init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
+    testing_request_context ctx{resources, nullptr, false, "the name"};
 
-    ctx.proxy_name("the name");
     REQUIRE(ctx.proxy_name() == "the name");
-}
-
-TEST_CASE("get unset proxy name", "[testing][context]")
-{
-    inner_resources resources;
-    init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
-
-    REQUIRE_THROWS(ctx.proxy_name());
 }
 
 TEST_CASE("domain_name()", "[testing][context]")
 {
     inner_resources resources;
     init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
+    testing_request_context ctx{resources, nullptr, false, ""};
 
     REQUIRE(ctx.domain_name() == "testing");
-}
-
-TEST_CASE("local_clone()", "[testing][context]")
-{
-    inner_resources resources;
-    init_test_inner_service(resources);
-    auto t0 = create_tasklet_tracker("pool", "t0");
-    testing_request_context ctx{resources, t0, true};
-    ctx.proxy_name("the name");
-
-    auto ctx1_intf{ctx.local_clone()};
-
-    REQUIRE(dynamic_cast<testing_request_context*>(&*ctx1_intf) != nullptr);
-    auto& ctx1{static_cast<testing_request_context&>(*ctx1_intf)};
-    // Same as the original
-    REQUIRE(&ctx1.get_resources() == &ctx.get_resources());
-    REQUIRE(&ctx1.get_cache() == &ctx.get_cache());
-    REQUIRE(ctx1.domain_name() == ctx.domain_name());
-    // Differences with the original
-    REQUIRE(ctx1.get_tasklet() == nullptr);
-    REQUIRE_THROWS(ctx1.proxy_name());
-    REQUIRE(!ctx1.remotely());
-}
-
-TEST_CASE("make_blob_file_writer()", "[testing][context]")
-{
-    inner_resources resources;
-    init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr};
-
-    auto writer{ctx.make_blob_file_writer(10)};
-    REQUIRE(writer);
 }

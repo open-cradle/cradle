@@ -2,7 +2,7 @@
 
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/service/config_map_file.h>
-#include <cradle/inner/service/config_map_json.h>
+#include <cradle/inner/service/config_map_from_json.h>
 #include <cradle/inner/service/config_map_toml.h>
 
 namespace cradle {

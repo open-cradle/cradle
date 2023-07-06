@@ -1,5 +1,5 @@
-#include <memory>
 #include <stdexcept>
+#include <string>
 
 #include <catch2/catch.hpp>
 
@@ -7,39 +7,27 @@
 
 using namespace cradle;
 
-class test_proxy : public remote_proxy
+namespace {
+
+static char const tag[] = "[inner][remote][proxy]";
+
+} // namespace
+
+TEST_CASE("construct remote_error, one arg", tag)
 {
- public:
-    test_proxy(std::string name) : name_{std::move(name)} {};
+    auto exc{remote_error("argX")};
 
-    std::string
-    name() const override
-    {
-        return name_;
-    }
+    std::string what(exc.what());
 
-    cppcoro::task<serialized_result>
-    resolve_request(remote_context_intf& ctx, std::string seri_req) override
-    {
-        co_return serialized_result(blob());
-    }
-
- private:
-    std::string name_;
-};
-
-TEST_CASE("register and find proxy", "[inner][remote]")
-{
-    auto a_proxy = std::make_shared<test_proxy>("a");
-    auto b_proxy = std::make_shared<test_proxy>("b");
-    register_proxy(a_proxy);
-    register_proxy(b_proxy);
-
-    REQUIRE(find_proxy("b") == b_proxy);
-    REQUIRE(find_proxy("a") == a_proxy);
+    REQUIRE(what.find("argX") != std::string::npos);
 }
 
-TEST_CASE("find unregistered proxy", "[inner][remote]")
+TEST_CASE("construct remote_error, two args", tag)
 {
-    REQUIRE_THROWS_AS(find_proxy("nonesuch"), std::logic_error);
+    auto exc{remote_error("argX", "argY")};
+
+    std::string what(exc.what());
+
+    REQUIRE(what.find("argX") != std::string::npos);
+    REQUIRE(what.find("argY") != std::string::npos);
 }

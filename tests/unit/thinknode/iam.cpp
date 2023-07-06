@@ -54,7 +54,7 @@ TEST_CASE("context contents retrieval", "[thinknode][iam]")
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
     session.access_token = "xyz";
 
-    thinknode_request_context trc{service, session, nullptr};
+    thinknode_request_context trc{service, session, nullptr, false, ""};
     auto contents = cppcoro::sync_wait(get_context_contents(trc, "123"));
     REQUIRE(
         contents

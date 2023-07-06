@@ -18,32 +18,18 @@ TEST_CASE("uuid_error ctor - C-style")
     REQUIRE(strlen(res.what()) > 0);
 }
 
-TEST_CASE("request_uuid ctor - default", "[uuid]")
-{
-    request_uuid res;
-    REQUIRE(res.str() == "");
-    REQUIRE(!res.is_real());
-}
-
 TEST_CASE("request_uuid ctor - Git version", "[uuid]")
 {
     request_uuid res{"base"};
+    res.use_git_version();
     REQUIRE(res.str().starts_with("base+"));
-    REQUIRE(res.is_real());
-}
-
-TEST_CASE("request_uuid ctor - explicit version", "[uuid]")
-{
-    request_uuid res{"base", "vers"};
-    REQUIRE(res.str() == "base+vers");
-    REQUIRE(res.is_real());
 }
 
 TEST_CASE("request_uuid ctor - bad base", "[uuid]")
 {
-    auto matcher = Catch::StartsWith("Invalid character(s) in base uuid ");
-    REQUIRE_THROWS_WITH(new request_uuid("b+ase"), matcher);
-    REQUIRE_THROWS_WITH(new request_uuid("b+ase", "vers"), matcher);
+    REQUIRE_THROWS_WITH(
+        request_uuid{"b+ase"},
+        "Invalid character(s) in request_uuid base b+ase");
 }
 
 TEST_CASE("compare request_id's", "[uuid]")

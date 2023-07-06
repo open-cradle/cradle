@@ -31,6 +31,13 @@ class data_owner
  public:
     virtual ~data_owner() = default;
 
+    // Returns a pointer to the data. Throws if not supported.
+    virtual std::uint8_t*
+    data()
+    {
+        throw not_implemented_error();
+    }
+
     // true if the data is formed by a memory-mapped file
     virtual bool
     maps_file() const
@@ -57,8 +64,8 @@ class data_owner
     }
 };
 
-// A blob is a sequence of bytes.
-// A blob, once constructed or deserialized, should not be changed anymore.
+// A blob is an immutable sequence of bytes: once constructed or deserialized,
+// it must not be changed anymore.
 class blob
 {
  public:

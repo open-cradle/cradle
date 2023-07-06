@@ -2,40 +2,41 @@
 #define CRADLE_TESTS_BENCHMARKS_BENCHMARK_SUPPORT_H
 
 #include <benchmark/benchmark.h>
+#include <cppcoro/sync_wait.hpp>
+#include <cppcoro/task.hpp>
 
 #include "../support/concurrency_testing.h"
-#include <cradle/inner/service/request.h>
+#include "../support/inner_service.h"
+#include <cradle/inner/resolve/resolve_request.h>
 
 namespace cradle {
+
+/*
+ * Handles an exception thrown by a benchmark: marks the benchmark as skipped,
+ * and causes the program to end with an exit code.
+ */
+void
+handle_benchmark_exception(benchmark::State& state, std::string const& what);
+
+/*
+ * Reports a summary on benchmarks skipped with error.
+ * Returns intended main() exit code.
+ * Note that the benchmark library itself does not offer this functionality.
+ */
+int
+check_benchmarks_skipped_with_error();
 
 template<UncachedRequest Req>
 void
 call_resolve_by_ref_loop(Req const& req)
 {
     constexpr int num_loops = 1000;
-    uncached_request_resolution_context ctx{};
+    non_caching_request_resolution_context ctx{};
     auto loop = [&]() -> cppcoro::task<int> {
         int total{};
         for (auto i = 0; i < num_loops; ++i)
         {
-            total += co_await req.resolve(ctx);
-        }
-        co_return total;
-    };
-    cppcoro::sync_wait(loop());
-}
-
-template<UncachedRequestPtr Req>
-void
-call_resolve_by_ptr_loop(Req const& req)
-{
-    constexpr int num_loops = 1000;
-    uncached_request_resolution_context ctx{};
-    auto loop = [&]() -> cppcoro::task<int> {
-        int total{};
-        for (auto i = 0; i < num_loops; ++i)
-        {
-            total += co_await req->resolve(ctx);
+            total += co_await req.resolve_sync(ctx);
         }
         co_return total;
     };
@@ -47,8 +48,9 @@ call_resolve_by_ptr_loop(Req const& req)
 // - Any calculations cached inside the request itself (e.g., its hash), are
 // not measured
 // - Each equals() will immediately return true, so is also not really measured
-template<typename Ctx, RequestOrPtr Req>
-requires(ContextMatchingRequest<Ctx, typename Req::element_type>) void resolve_request_loop(
+template<typename Ctx, Request Req>
+void
+resolve_request_loop(
     benchmark::State& state, Ctx& ctx, Req const& req, int num_loops = 1000)
 {
     constexpr auto caching_level = Req::element_type::caching_level;
@@ -76,9 +78,9 @@ requires(ContextMatchingRequest<Ctx, typename Req::element_type>) void resolve_r
     cppcoro::sync_wait(loop());
 }
 
-template<typename Ctx, RequestOrPtr Req>
-requires(ContextMatchingRequest<Ctx, typename Req::element_type>) void BM_resolve_request(
-    benchmark::State& state, Ctx& ctx, Req const& req)
+template<typename Ctx, Request Req>
+void
+BM_resolve_request(benchmark::State& state, Ctx& ctx, Req const& req)
 {
     for (auto _ : state)
     {

@@ -22,12 +22,8 @@ struct repository_info
     unsigned commits_since_tag;
 };
 
-// Does the given repository correspond to a tagged version of the code?
-inline bool
-is_tagged_version(repository_info const& info)
-{
-    return info.commits_since_tag == 0 && !info.dirty;
-}
+void
+show_version_info(repository_info const& info);
 
 } // namespace cradle
 

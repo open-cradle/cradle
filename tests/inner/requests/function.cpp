@@ -4,8 +4,10 @@
 
 #include <catch2/catch.hpp>
 #include <cereal/archives/json.hpp>
+#include <cppcoro/sync_wait.hpp>
 #include <fmt/format.h>
 
+#include "../../support/inner_service.h"
 #include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/requests/function.h>
 
@@ -30,23 +32,40 @@ func_b()
     return "b";
 }
 
+int
+func_x(int x)
+{
+    return x;
+}
+
 static auto functor_a = []() { return func_a(); };
 static auto functor_b = []() { return func_b(); };
 
 cppcoro::task<std::string>
-coro_a(cached_context_intf& ctx)
+coro_a(context_intf& ctx)
 {
     co_return "a";
 }
 
 cppcoro::task<std::string>
-coro_b(cached_context_intf& ctx)
+coro_b(context_intf& ctx)
 {
     co_return "b";
 }
 
+// The type of this function's result depends on Function and Args types only,
+// not on their values.
+// It is not possible to distuinguish two result values created from different
+// function and/or args values.
+template<typename Function, typename... Args>
+auto
+make_lambda(Function function, Args... args)
+{
+    return [=]() { return function(args...); };
+}
+
 cppcoro::task<std::string>
-make_string(cached_context_intf& ctx, std::string val)
+make_string(context_intf& ctx, std::string val)
 {
     co_return val;
 }
@@ -112,10 +131,106 @@ TEST_CASE("create function_request_erased: different functors, one uuid", tag)
         rq_function_erased(props, functor_b), conflicting_types_uuid_error);
 }
 
-TEST_CASE("create function_request_erased: fully cached, no uuid", tag)
+TEST_CASE(
+    "function_request_erased: identical capturing lambdas, one uuid", tag)
 {
-    request_props<caching_level_type::full> props;
-    REQUIRE_THROWS_AS(rq_function_erased(props, func_a), missing_uuid_error);
+    request_props<caching_level_type::memory> props{make_test_uuid("0004")};
+    auto lambda_a0{make_lambda(func_a)};
+    auto lambda_a1{make_lambda(func_a)};
+    auto req_a0{rq_function_erased(props, lambda_a0)};
+    auto req_a1{rq_function_erased(props, lambda_a1)};
+
+    REQUIRE(req_a0 == req_a1);
+    REQUIRE(!(req_a0 < req_a1));
+    REQUIRE(!(req_a1 < req_a0));
+    REQUIRE(req_a0.hash() == req_a1.hash());
+
+    non_caching_request_resolution_context ctx;
+    auto result_a0{cppcoro::sync_wait(req_a0.resolve_sync(ctx))};
+    auto result_a1{cppcoro::sync_wait(req_a1.resolve_sync(ctx))};
+
+    REQUIRE(result_a0 == "a");
+    REQUIRE(result_a1 == "a");
+}
+
+TEST_CASE(
+    "function_request_erased: lambdas capturing different functions, "
+    "one uuid",
+    tag)
+{
+    // This is illegal usage but the implementation cannot detect that.
+    // The implementation considers the two requests to be equal.
+    // It stores the lambda passed with the first request, and discards
+    // additional lambdas. Thus, resolving the second request gives the same
+    // result as for the first request.
+    request_props<caching_level_type::memory> props{make_test_uuid("0005")};
+    auto lambda_a{make_lambda(func_a)};
+    auto lambda_b{make_lambda(func_b)};
+    auto req_a{rq_function_erased(props, lambda_a)};
+    auto req_b{rq_function_erased(props, lambda_b)};
+
+    REQUIRE(req_a == req_b);
+    REQUIRE(!(req_a < req_b));
+    REQUIRE(!(req_b < req_a));
+    REQUIRE(req_a.hash() == req_b.hash());
+
+    non_caching_request_resolution_context ctx;
+    auto result_a{cppcoro::sync_wait(req_a.resolve_sync(ctx))};
+    auto result_b{cppcoro::sync_wait(req_b.resolve_sync(ctx))};
+
+    REQUIRE(result_a == "a");
+    REQUIRE(result_b == "a");
+}
+
+TEST_CASE(
+    "function_request_erased: lambdas capturing different args, one "
+    "uuid",
+    tag)
+{
+    // A variant on the previous test case.
+    request_props<caching_level_type::memory> props{make_test_uuid("0006")};
+    auto lambda_a{make_lambda(func_x, 2)};
+    auto lambda_b{make_lambda(func_x, 3)};
+    auto req_a{rq_function_erased(props, lambda_a)};
+    auto req_b{rq_function_erased(props, lambda_b)};
+
+    REQUIRE(req_a == req_b);
+    REQUIRE(!(req_a < req_b));
+    REQUIRE(!(req_b < req_a));
+    REQUIRE(req_a.hash() == req_b.hash());
+
+    non_caching_request_resolution_context ctx;
+    auto result_a{cppcoro::sync_wait(req_a.resolve_sync(ctx))};
+    auto result_b{cppcoro::sync_wait(req_b.resolve_sync(ctx))};
+
+    REQUIRE(result_a == 2);
+    REQUIRE(result_b == 2);
+}
+
+TEST_CASE(
+    "compare function_request_erased: indistinguishable lambdas, different "
+    "uuids",
+    tag)
+{
+    request_props<caching_level_type::memory> props_a{make_test_uuid("0010")};
+    request_props<caching_level_type::memory> props_b{make_test_uuid("0011")};
+    auto lambda_a{make_lambda(func_a)};
+    auto lambda_b{make_lambda(func_b)};
+    auto req_a{rq_function_erased(props_a, lambda_a)};
+    auto req_b{rq_function_erased(props_b, lambda_b)};
+
+    // The two requests are based on different uuids so differ.
+    REQUIRE(req_a != req_b);
+    REQUIRE((req_a < req_b || req_b < req_a));
+    // A hash collision is possible but very unlikely.
+    REQUIRE(req_a.hash() != req_b.hash());
+
+    non_caching_request_resolution_context ctx;
+    auto result_a{cppcoro::sync_wait(req_a.resolve_sync(ctx))};
+    auto result_b{cppcoro::sync_wait(req_b.resolve_sync(ctx))};
+
+    REQUIRE(result_a == "a");
+    REQUIRE(result_b == "b");
 }
 
 TEST_CASE("compare function_request_erased with subrequest", tag)
@@ -177,8 +292,8 @@ TEST_CASE("compare function_request_erased: identical C++ functions", tag)
     constexpr bool is_coro{true};
     request_props<caching_level_type::memory, is_coro> props{
         make_test_uuid("0050")};
-    auto req_a0{rq_function_erased_coro<std::string>(props, coro_a)};
-    auto req_a1{rq_function_erased_coro<std::string>(props, coro_a)};
+    auto req_a0{rq_function_erased(props, coro_a)};
+    auto req_a1{rq_function_erased(props, coro_a)};
 
     REQUIRE(req_a0.equals(req_a1));
 
@@ -198,8 +313,8 @@ TEST_CASE("compare function_request_erased: different C++ functions", tag)
         make_test_uuid("0061")};
     // req_a and req_b have the same signature (type), but refer to different
     // C++ functions.
-    auto req_a{rq_function_erased_coro<std::string>(props_a, coro_a)};
-    auto req_b{rq_function_erased_coro<std::string>(props_b, coro_b)};
+    auto req_a{rq_function_erased(props_a, coro_a)};
+    auto req_b{rq_function_erased(props_b, coro_b)};
 
     REQUIRE(!req_a.equals(req_b));
 
@@ -219,10 +334,8 @@ TEST_CASE(
         make_test_uuid("0070")};
     // req_a and req_b have the same signature (type), refer to different
     // C++ functions, but take different args.
-    auto req_a{rq_function_erased_coro<std::string>(
-        props, make_string, std::string{"a"})};
-    auto req_b{rq_function_erased_coro<std::string>(
-        props, make_string, std::string{"b"})};
+    auto req_a{rq_function_erased(props, make_string, std::string{"a"})};
+    auto req_b{rq_function_erased(props, make_string, std::string{"b"})};
 
     REQUIRE(!req_a.equals(req_b));
 
@@ -239,14 +352,12 @@ TEST_CASE("function_request_impl: load unregistered function", tag)
     std::string good_uuid_str{"before_0100_after"};
     std::string bad_uuid_str{"before_0101_after"};
     auto good_uuid{make_test_uuid(good_uuid_str)};
+    auto bad_uuid{make_test_uuid(bad_uuid_str)};
     request_props<caching_level_type::memory> props{good_uuid};
     using value_type = std::string;
     using props_type = decltype(props);
-    using ctx_type = typename props_type::ctx_type;
-    using intf_type = function_request_intf<ctx_type, value_type>;
     using impl_type = function_request_impl<
         value_type,
-        intf_type,
         props_type::func_is_coro,
         decltype(&func_a)>;
 
@@ -254,14 +365,18 @@ TEST_CASE("function_request_impl: load unregistered function", tag)
     std::stringstream os;
     {
         cereal::JSONOutputArchive oarchive(os);
-        oarchive(good_impl);
+        // Cannot do oarchive(good_impl) due to ambiguity between
+        //   function_request_impl::save()
+        // and the global
+        //   save(Archive& archive, function_request_intf<Value> const& intf)
+        good_impl->save(oarchive);
     }
     std::string good_seri = os.str();
 
+    std::shared_ptr<impl_type> bad_impl{std::make_shared<impl_type>(bad_uuid)};
     auto bad_seri{std::regex_replace(
         good_seri, std::regex{good_uuid_str}, bad_uuid_str)};
     std::istringstream is(bad_seri);
     cereal::JSONInputArchive iarchive(is);
-    std::shared_ptr<impl_type> bad_impl;
-    REQUIRE_THROWS_AS(iarchive(bad_impl), no_function_for_uuid_error);
+    REQUIRE_THROWS_AS(bad_impl->load(iarchive), no_function_for_uuid_error);
 }

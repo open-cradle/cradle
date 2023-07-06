@@ -8,6 +8,7 @@
 #include <mutex>
 #include <optional>
 #include <stdexcept>
+#include <tuple>
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
@@ -17,6 +18,7 @@
 #include <cereal/types/memory.hpp>
 #include <cereal/types/tuple.hpp>
 #include <cppcoro/task.hpp>
+#include <cppcoro/when_all.hpp>
 #include <fmt/format.h>
 
 #include <cradle/inner/core/exception.h>
@@ -25,10 +27,11 @@
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/encodings/cereal.h>
-#include <cradle/inner/requests/cereal.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/normalization_uuid.h>
 #include <cradle/inner/requests/uuid.h>
-#include <cradle/inner/service/request.h>
+#include <cradle/inner/requests/value.h>
+#include <cradle/inner/resolve/resolve_request.h>
 
 namespace cradle {
 
@@ -38,7 +41,19 @@ namespace cradle {
  * Currently, a coroutine takes a context as its first argument, whereas
  * a normal function does not. This could be split into four cases
  * (function/coroutine with/without context argument).
+ *
+ * The request classes defined in this file are "type-erased":
+ * the main request object (class function_request_erased) has a shared_ptr
+ * to a function_request_intf object; that object's full type
+ * (i.e., function_request_impl's template arguments) are known in
+ * function_request_erased's constructor only.
  */
+
+class conflicting_types_uuid_error : public uuid_error
+{
+ public:
+    using uuid_error::uuid_error;
+};
 
 class conflicting_functions_uuid_error : public uuid_error
 {
@@ -52,372 +67,217 @@ class no_function_for_uuid_error : public uuid_error
     using uuid_error::uuid_error;
 };
 
-class missing_uuid_error : public uuid_error
+class unregistered_uuid_error : public uuid_error
 {
  public:
     using uuid_error::uuid_error;
 };
 
-/*
- * The first part of this file defines the "original" function requests,
- * that have no type erasure.
- *
- * They do have some drawbacks:
- * - The request class reflects the entire request tree, and tends to grow
- *   fast. Compilation times will become much slower, and compilers will
- *   give up altogether when the tree has more than a few dozen requests.
- * - class function_request_cached stores its arguments twice: once in the
- *   request object itself, once in its captured_id member.
- * - Type-erased objects have some overhead (due to accessing the "_impl"
- *   object through a shared_ptr), but a function_request_cached object also
- *   has a shared_ptr in its captured_id member.
- * - Request identity (uuid) is not really supported.
- * - No disk caching.
- * - Memory caching is theoretically flawed (details below).
- * - No serialization.
- *
- * So normally the type-erased requests (below) should be preferred.
- */
-
-template<typename Value, typename Function, typename... Args>
-class function_request_uncached
-{
- public:
-    using element_type = function_request_uncached;
-    using value_type = Value;
-
-    static constexpr caching_level_type caching_level{
-        caching_level_type::none};
-    static constexpr bool introspective{false};
-
-    function_request_uncached(Function function, Args... args)
-        : function_{std::move(function)}, args_{std::move(args)...}
-    {
-    }
-
-    request_uuid
-    get_uuid() const
-    {
-        // The uuid should cover function_, but C++ does not offer anything
-        // that can be used across application runs.
-        throw not_implemented_error();
-    }
-
-    template<typename Ctx>
-    requires ContextMatchingProps<Ctx, introspective, caching_level>
-        cppcoro::task<Value>
-        resolve(Ctx& ctx) const
-    {
-        // The "func=function_" is a workaround to prevent a gcc-10 internal
-        // compiler error in release builds.
-        co_return co_await std::apply(
-            [&, func = function_](auto&&... args) -> cppcoro::task<Value> {
-                co_return func((co_await resolve_request(
-                    ctx, std::forward<decltype(args)>(args)))...);
-            },
-            args_);
-    }
-
- private:
-    Function function_;
-    std::tuple<Args...> args_;
-};
-
-template<typename Value, typename Function, typename... Args>
-struct arg_type_struct<function_request_uncached<Value, Function, Args...>>
-{
-    using value_type = Value;
-};
-
-template<typename Value, typename Function, typename... Args>
-struct arg_type_struct<
-    std::unique_ptr<function_request_uncached<Value, Function, Args...>>>
-{
-    using value_type = Value;
-};
-
-template<typename Value, typename Function, typename... Args>
-struct arg_type_struct<
-    std::shared_ptr<function_request_uncached<Value, Function, Args...>>>
-{
-    using value_type = Value;
-};
-
-// Due to absence of a usable uuid, these objects are suitable for memory
-// caching only, and cannot be disk cached.
-// (And even memory caching is not guaranteed to work, as it relies on
-// type_info::name() results being unique, and this may not be so.)
-template<
-    caching_level_type Level,
-    typename Value,
-    typename Function,
-    typename... Args>
-    requires(Level != caching_level_type::full)
-class function_request_cached
-{
- public:
-    using element_type = function_request_cached;
-    using value_type = Value;
-
-    static constexpr caching_level_type caching_level = Level;
-    static constexpr bool introspective = false;
-
-    // TODO type_info::name() "can be identical for several types"
-    // (But is there an alternative? C++ can correctly compare type_info or
-    // type_index values, but not map them onto a unique value.)
-    function_request_cached(Function function, Args... args)
-        : id_{make_captured_sha256_hashed_id(
-            typeid(function).name(), args...)},
-          function_{std::move(function)},
-          args_{std::move(args)...}
-    {
-    }
-
-    // *this and other are the same type
-    bool
-    equals(function_request_cached const& other) const
-    {
-        return *id_ == *other.id_;
-    }
-
-    bool
-    less_than(function_request_cached const& other) const
-    {
-        return *id_ < *other.id_;
-    }
-
-    size_t
-    hash() const
-    {
-        return id_->hash();
-    }
-
-    void
-    update_hash(unique_hasher& hasher) const
-    {
-        id_->update_hash(hasher);
-    }
-
-    request_uuid
-    get_uuid() const
-    {
-        // The uuid should cover function_, but C++ does not offer anything
-        // that can be used across application runs.
-        throw not_implemented_error();
-    }
-
-    captured_id const&
-    get_captured_id() const
-    {
-        return id_;
-    }
-
-    template<typename Ctx>
-    requires ContextMatchingProps<Ctx, introspective, caching_level>
-        cppcoro::task<Value>
-        resolve(Ctx& ctx) const
-    {
-        // The "func=function_" is a workaround to prevent a gcc-10 internal
-        // compiler error in release builds.
-        co_return co_await std::apply(
-            [&, func = function_](auto&&... args) -> cppcoro::task<Value> {
-                co_return func((co_await resolve_request(ctx, args))...);
-            },
-            args_);
-    }
-
- private:
-    captured_id id_;
-    Function function_;
-    std::tuple<Args...> args_;
-};
-
-template<
-    caching_level_type Level,
-    typename Value,
-    typename Function,
-    typename... Args>
-struct arg_type_struct<
-    function_request_cached<Level, Value, Function, Args...>>
-{
-    using value_type = Value;
-};
-
-template<
-    caching_level_type Level,
-    typename Value,
-    typename Function,
-    typename... Args>
-struct arg_type_struct<
-    std::unique_ptr<function_request_cached<Level, Value, Function, Args...>>>
-{
-    using value_type = Value;
-};
-
-template<
-    caching_level_type Level,
-    typename Value,
-    typename Function,
-    typename... Args>
-struct arg_type_struct<
-    std::shared_ptr<function_request_cached<Level, Value, Function, Args...>>>
-{
-    using value_type = Value;
-};
-
-// Used for comparing subrequests, where the main requests have the same type;
-// so the subrequests have the same type too.
-template<
-    caching_level_type Level,
-    typename Value,
-    typename Function,
-    typename... Args>
-bool
-operator==(
-    function_request_cached<Level, Value, Function, Args...> const& lhs,
-    function_request_cached<Level, Value, Function, Args...> const& rhs)
-{
-    return lhs.equals(rhs);
-}
-
-template<
-    caching_level_type Level,
-    typename Value,
-    typename Function,
-    typename... Args>
-bool
-operator<(
-    function_request_cached<Level, Value, Function, Args...> const& lhs,
-    function_request_cached<Level, Value, Function, Args...> const& rhs)
-{
-    return lhs.less_than(rhs);
-}
-
-template<
-    caching_level_type Level,
-    typename Value,
-    typename Function,
-    typename... Args>
-size_t
-hash_value(function_request_cached<Level, Value, Function, Args...> const& req)
-{
-    return req.hash();
-}
-
-template<
-    caching_level_type Level,
-    typename Value,
-    typename Function,
-    typename... Args>
+// Visits a request's argument if it's not a subrequest.
+template<typename Val>
 void
-update_unique_hash(
-    unique_hasher& hasher,
-    function_request_cached<Level, Value, Function, Args...> const& req)
+visit_arg(req_visitor_intf& visitor, std::size_t ix, Val const& val)
 {
-    req.update_hash(hasher);
+    visitor.visit_val_arg(ix);
 }
 
-template<caching_level_type Level, typename Function, typename... Args>
-    requires(Level == caching_level_type::none)
-auto rq_function(Function function, Args... args)
+// Visits a request's subrequest argument, and recursively visits that
+// subrequest's arguments.
+template<Request SubReq>
+void
+visit_arg(req_visitor_intf& visitor, std::size_t ix, SubReq const& sub_req)
 {
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_uncached<Value, Function, Args...>{
-        std::move(function), std::move(args)...};
+    static_assert(VisitableRequest<SubReq>);
+    auto sub_visitor = visitor.visit_req_arg(ix);
+    sub_req.accept(*sub_visitor);
 }
 
-template<caching_level_type Level, typename Function, typename... Args>
-    requires(Level != caching_level_type::none)
-auto rq_function(Function function, Args... args)
+// Recursively visits all arguments of a request, and its subrequests.
+template<typename Args, std::size_t... Ix>
+auto
+visit_args(
+    req_visitor_intf& visitor, Args const& args, std::index_sequence<Ix...>)
 {
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return function_request_cached<Level, Value, Function, Args...>{
-        std::move(function), std::move(args)...};
+    (visit_arg(visitor, Ix, std::get<Ix>(args)), ...);
 }
-
-template<
-    typename Value,
-    caching_level_type Level,
-    typename Function,
-    typename... Args>
-    requires(Level != caching_level_type::none)
-auto rq_function(Function function, Args... args)
-{
-    return function_request_cached<Level, Value, Function, Args...>{
-        std::move(function), std::move(args)...};
-}
-
-template<caching_level_type Level, typename Function, typename... Args>
-    requires(Level == caching_level_type::none)
-auto rq_function_up(Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return std::make_unique<
-        function_request_uncached<Value, Function, Args...>>(
-        std::move(function), std::move(args)...);
-}
-
-template<caching_level_type Level, typename Function, typename... Args>
-    requires(Level != caching_level_type::none)
-auto rq_function_up(Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return std::make_unique<
-        function_request_cached<Level, Value, Function, Args...>>(
-        std::move(function), std::move(args)...);
-}
-
-template<caching_level_type Level, typename Function, typename... Args>
-    requires(Level == caching_level_type::none)
-auto rq_function_sp(Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return std::make_shared<
-        function_request_uncached<Value, Function, Args...>>(
-        std::move(function), std::move(args)...);
-}
-
-template<caching_level_type Level, typename Function, typename... Args>
-    requires(Level != caching_level_type::none)
-auto rq_function_sp(Function function, Args... args)
-{
-    using Value = std::invoke_result_t<Function, arg_type<Args>...>;
-    return std::make_shared<
-        function_request_cached<Level, Value, Function, Args...>>(
-        std::move(function), std::move(args)...);
-}
-
-/*
- * The second part of this file defines the "type-erased" requests.
- * The main request object (class function_request_erased) has a shared_ptr
- * to a function_request_intf object; that object's full type
- * (i.e., function_request_impl's template arguments) are known in
- * function_request_erased's constructor only.
- *
- * These classes intend to overcome the drawbacks of the earlier ones.
- */
 
 /*
  * The interface type exposing the functionality that function_request_erased
  * requires outside its constructor.
  *
- * Ctx is the "minimum" context needed to resolve this request.
- * E.g. a "cached" context can be used to resolve a non-cached request.
+ * The references taken by resolve_sync() and resolve_async() are the "minimal"
+ * ones needed.
  */
-template<Context Ctx, typename Value>
+template<typename Value>
 class function_request_intf : public id_interface
 {
  public:
-    using context_type = Ctx;
-
     virtual ~function_request_intf() = default;
 
     virtual request_uuid
     get_uuid() const
         = 0;
 
+    virtual void
+    accept(req_visitor_intf& visitor) const
+        = 0;
+
     virtual cppcoro::task<Value>
-    resolve(Ctx& ctx) const = 0;
+    resolve_sync(local_context_intf& ctx) const = 0;
+
+    virtual cppcoro::task<Value>
+    resolve_async(local_async_context_intf& ctx) const = 0;
+};
+
+template<typename Ctx, typename Args, std::size_t... Ix>
+auto
+make_sync_sub_tasks(Ctx& ctx, Args const& args, std::index_sequence<Ix...>)
+{
+    ResolutionConstraintsLocalSync constraints;
+    return std::make_tuple(
+        resolve_request(ctx, std::get<Ix>(args), constraints)...);
+}
+
+template<typename Ctx, typename Args, std::size_t... Ix>
+auto
+make_async_sub_tasks(Ctx& ctx, Args const& args, std::index_sequence<Ix...>)
+{
+    ResolutionConstraintsLocalAsync constraints;
+    return std::make_tuple(resolve_request(
+        ctx.get_local_sub(Ix), std::get<Ix>(args), constraints)...);
+}
+
+template<typename Tuple, std::size_t... Ix>
+auto
+when_all_wrapper(Tuple&& tasks, std::index_sequence<Ix...>)
+{
+    return cppcoro::when_all(std::get<Ix>(std::forward<Tuple>(tasks))...);
+}
+
+/**
+ * A registry of functions to serialize or deserialize a function_request_impl
+ * object. The functions are identified by a request_uuid value.
+ *
+ * A uuid identifies three functions:
+ * - create() creates a shared_ptr<function_request_impl> object.
+ * - save() serializes a function_request_impl object to JSON.
+ * - load() deserializes a function_request_impl object from JSON.
+ *
+ * This registry forms the basis for an ad-hoc alternative to the cereal
+ * polymorphic types implementation, which is not usable here:
+ * 1. A polymorphic type needs to be registered with CEREAL_REGISTER_TYPE or
+ *    CEREAL_REGISTER_TYPE_WITH_NAME. These put constructs in namespaces, so
+ *    cannot be used within a class or function.
+ *    However, with templated classes like function_request_impl, we cannot use
+ *    these constructs outside a class either, as the type of an instance is
+ *    known only _within_ the class.
+ * 2. Cereal needs to translate the type of a derived class to the name under
+ *    which that polymorphic type will be serialized.
+ *    - We cannot use type_index::name() because that is not portable, and
+ *      because creating a serialized request (e.g. from a WebSocket client)
+ *      would be practically impossible.
+ *    - We cannot use the uuid because that is unique for a
+ *      function_request_impl+function combination, not for just
+ *      function_request_impl.
+ * Instead, we need a mechanism where the uuid in the serialization identifies
+ * both the function_request_impl _class_ (template instantiation), and the
+ * function _value_ in that class.
+ *
+ * All functions in this class's API are thread-safe.
+ */
+class cereal_functions_registry_impl
+{
+ public:
+    using create_t = std::shared_ptr<void>(request_uuid const& uuid);
+    using save_t = void(cereal::JSONOutputArchive& archive, void const* impl);
+    using load_t = void(cereal::JSONInputArchive& archive, void* impl);
+
+    struct entry_t
+    {
+        create_t* create;
+        save_t* save;
+        load_t* load;
+    };
+
+    static cereal_functions_registry_impl&
+    instance();
+
+    void
+    add_entry(
+        std::string const& uuid_str,
+        create_t* create,
+        save_t* save,
+        load_t* load);
+
+    entry_t&
+    find_entry(request_uuid const& uuid);
+
+ private:
+    std::unordered_map<std::string, entry_t> entries_;
+    std::mutex mutex_;
+};
+
+template<typename Intf>
+class cereal_functions_registry
+{
+    using impl_t = cereal_functions_registry_impl;
+    using entry_t = typename impl_t::entry_t;
+    using create_t = typename impl_t::create_t;
+    using save_t = typename impl_t::save_t;
+    using load_t = typename impl_t::load_t;
+
+ public:
+    static cereal_functions_registry&
+    instance()
+    {
+        static cereal_functions_registry instance_;
+        return instance_;
+    }
+
+    cereal_functions_registry() : impl_{impl_t::instance()}
+    {
+    }
+
+    void
+    add_entry(
+        std::string const& uuid_str,
+        create_t* create,
+        save_t* save,
+        load_t* load)
+    {
+        impl_.add_entry(uuid_str, create, save, load);
+    }
+
+    std::shared_ptr<Intf>
+    create(request_uuid const& uuid)
+    {
+        entry_t& entry{impl_.find_entry(uuid)};
+        return std::static_pointer_cast<Intf>(entry.create(uuid));
+    }
+
+    void
+    save(cereal::JSONOutputArchive& archive, Intf const& intf)
+    {
+        entry_t& entry{impl_.find_entry(intf.get_uuid())};
+        entry.save(archive, &intf);
+    }
+
+    // The uuid should be set before deserializing the (rest of) the object.
+    void
+    load(cereal::JSONInputArchive& archive, Intf& intf)
+    {
+        entry_t& entry{impl_.find_entry(intf.get_uuid())};
+        entry.load(archive, &intf);
+    }
+
+ private:
+    impl_t& impl_;
+};
+
+template<typename Head, typename... Tail>
+struct first_element
+{
+    using type = Head;
 };
 
 /*
@@ -428,67 +288,63 @@ class function_request_intf : public id_interface
  * Function must be MoveAssignable but may not be CopyAssignable (e.g. if it's
  * a lambda).
  *
- * Only a small part of this class depends on the context type, so there will
- * be object code duplication if multiple instantiations exist differing in
- * the context (i.e., introspective + caching level) only. Maybe this could be
- * optimized if it becomes an issue.
+ * No part of this class depends on the actual context type used to resolve the
+ * request.
  *
- * If Function is a class, then the type of a function_request_impl
- * instantiation will uniquely identify it.
- * If Function is a C++ function, then the type of a function_request_impl
- * instantiation will correspond to all C++ functions having the same
- * signature, so it must be combined with the function's address to achieve
- * that uniqueness.
- * This uniqeness is relevant when deserializing a type-erased request. Its
- * uuid will identify both the function_request_impl class, and (if
- * relevant) the C++ function. This implies a two-step process: first a
- * function_request_impl object is created of the specified class, then that
- * object's function member is set to the correct (pointer) value.
+ * A function_request_impl object has an associated uuid that should identify
+ * both the function_request_impl instantiation (type), and function value.
+ * It is primarily the caller's responsibility to provide a unique uuid.
+ * The implementation will catch attempts to associate different instantiations
+ * with a single uuid, but in general cannot catch attempts to associate
+ * different function values with a single uuid. This will still happen in case
+ * the function is a plain C++ function, but is impossible if it is a capturing
+ * lambda.
+ *
+ * The uuid identifying both function_request_impl class and function value
+ * leads to a two-step deserialization process: first a function_request_impl
+ * object is created of the specified class, then that object's function member
+ * is set to the correct value.
  */
-template<
-    typename Value,
-    typename Intf,
-    bool AsCoro,
-    typename Function,
-    typename... Args>
-class function_request_impl : public Intf
+template<typename Value, bool AsCoro, typename Function, typename... Args>
+class function_request_impl : public function_request_intf<Value>
 {
  public:
+    using this_type = function_request_impl;
+    using base_type = function_request_intf<Value>;
+
     static constexpr bool func_is_coro = AsCoro;
     static constexpr bool func_is_plain
         = std::is_function_v<std::remove_pointer_t<Function>>;
-    using this_type = function_request_impl;
-    using base_type = Intf;
-    using context_type = typename Intf::context_type;
 
     function_request_impl(request_uuid uuid, Function function, Args... args)
         : uuid_{std::move(uuid)}, args_{std::move(args)...}
     {
-        // Guaranteed by the function_request_erased ctor
-        assert(uuid_.is_real());
-
         // The uuid uniquely identifies the function.
-        // Have a single shared_ptr per function
-        // (though not really necessary).
+        // Store it so that is available during deserialization.
         auto uuid_str{uuid_.str()};
-        std::scoped_lock lock{static_mutex_};
+        cereal_functions_registry<base_type>::instance().add_entry(
+            uuid_str, create, save_json, load_json);
+
+        std::scoped_lock lock{maching_functions_mutex_};
         auto it = matching_functions_.find(uuid_str);
         if (it == matching_functions_.end())
         {
-            register_polymorphic_type<this_type, base_type>(uuid_);
             function_ = std::make_shared<Function>(std::move(function));
             matching_functions_[uuid_str] = function_;
         }
         else
         {
             function_ = matching_functions_[uuid_str];
-            // Attempts to associate more than one Function (type) with
-            // a single uuid will be caught in uuid_registry.
-            // The following check catches attempts to associate more than
-            // one C++ function with a single uuid.
+            // Try to catch attempts to associate different functions with the
+            // same uuid.
+            // - This is possible for plain C++ functions.
+            // - It is not possible to distinguish two lambdas capturing
+            //   different arguments (and thus probably having different
+            //   behaviour).
+            // - Captureless lambdas with the same type are identical.
             if constexpr (func_is_plain)
             {
-                if (**function_ != *function)
+                if (*function_ != function)
                 {
                     throw conflicting_functions_uuid_error(fmt::format(
                         "Multiple C++ functions for uuid {}", uuid_str));
@@ -529,22 +385,13 @@ class function_request_impl : public Intf
     {
         if (!hash_)
         {
-            auto function_type_hash = invoke_hash(get_function_type_index());
+            auto uuid_hash = invoke_hash(uuid_);
             auto args_hash = std::apply(
                 [](auto&&... args) {
                     return combine_hashes(invoke_hash(args)...);
                 },
                 args_);
-            if constexpr (func_is_plain)
-            {
-                auto function_hash = invoke_hash(*function_);
-                hash_ = combine_hashes(
-                    function_type_hash, function_hash, args_hash);
-            }
-            else
-            {
-                hash_ = combine_hashes(function_type_hash, args_hash);
-            }
+            hash_ = combine_hashes(uuid_hash, args_hash);
         }
         return *hash_;
     }
@@ -565,8 +412,15 @@ class function_request_impl : public Intf
         return uuid_;
     }
 
+    void
+    accept(req_visitor_intf& visitor) const override
+    {
+        using Indices = std::index_sequence_for<Args...>;
+        visit_args(visitor, args_, Indices{});
+    }
+
     cppcoro::task<Value>
-    resolve(context_type& ctx) const override
+    resolve_sync(local_context_intf& ctx) const override
     {
         // If there is no coroutine function and no caching in the request
         // tree, there is nothing to co_await on (but how useful would such
@@ -576,51 +430,175 @@ class function_request_impl : public Intf
         // variants take the arg as const&.
         if constexpr (!func_is_coro)
         {
-            // gcc tends to have trouble with this piece of code (leading to
-            // compiler crashes or runtime errors).
-            co_return co_await std::apply(
-                [&](auto&&... args) -> cppcoro::task<Value> {
-                    co_return (*function_)((co_await resolve_request(
-                        ctx, std::forward<decltype(args)>(args)))...);
-                },
-                args_);
+            return resolve_sync_non_coro(ctx);
+        }
+        else if constexpr (sizeof...(Args) == 1)
+        {
+            if constexpr (std::same_as<
+                              typename first_element<Args...>::type,
+                              Value>)
+            {
+                if (is_normalizer())
+                {
+                    return resolve_sync_normalizer(ctx);
+                }
+            }
+            // Object code for the following line will still be generated if
+            // this is a normalizer, but it won't be called in that case.
+            return resolve_sync_coro(ctx);
         }
         else
         {
-            co_return co_await std::apply(
-                [&](auto&&... args) -> cppcoro::task<Value> {
-                    co_return co_await (*function_)(
-                        ctx,
-                        (co_await resolve_request(
-                            ctx, std::forward<decltype(args)>(args)))...);
-                },
-                args_);
+            return resolve_sync_coro(ctx);
+        }
+    }
+
+    cppcoro::task<Value>
+    resolve_async(local_async_context_intf& ctx) const override
+    {
+        if constexpr (!func_is_coro)
+        {
+            // TODO make resolve_async() for non-coro really async
+            return resolve_sync_non_coro(ctx);
+        }
+        else if constexpr (sizeof...(Args) == 1)
+        {
+            if constexpr (std::same_as<
+                              typename first_element<Args...>::type,
+                              Value>)
+            {
+                if (is_normalizer())
+                {
+                    return resolve_async_normalizer(ctx);
+                }
+            }
+            return resolve_async_coro(ctx);
+        }
+        else
+        {
+            return resolve_async_coro(ctx);
         }
     }
 
  private:
-    // cereal-related
-
-    friend class cereal::access;
-    function_request_impl()
+    cppcoro::task<Value>
+    resolve_sync_non_coro(local_context_intf& ctx) const
     {
+        // gcc tends to have trouble with this piece of code (leading to
+        // compiler crashes or runtime errors).
+        ResolutionConstraintsLocalSync constraints;
+        co_return co_await std::apply(
+            [&](auto&&... args) -> cppcoro::task<Value> {
+                co_return (*function_)((co_await resolve_request(
+                    ctx, std::forward<decltype(args)>(args), constraints))...);
+            },
+            args_);
+    }
+
+    cppcoro::task<Value>
+    resolve_sync_coro(local_context_intf& ctx) const
+    {
+        using Indices = std::index_sequence_for<Args...>;
+        auto sub_tasks = make_sync_sub_tasks(ctx, args_, Indices{});
+        co_return co_await std::apply(
+            *function_,
+            std::tuple_cat(
+                std::tie(ctx),
+                co_await when_all_wrapper(std::move(sub_tasks), Indices{})));
+    }
+
+    cppcoro::task<Value>
+    resolve_async_coro(local_async_context_intf& ctx) const
+    {
+        // Throws on error or cancellation.
+        // If a subtask throws (because of cancellation or otherwise),
+        // the main task will wait until all other subtasks have finished
+        // (or thrown).
+        // This justifies passing contexts around by reference.
+        try
+        {
+            using Indices = std::index_sequence_for<Args...>;
+            auto sub_tasks = make_async_sub_tasks(ctx, args_, Indices{});
+            ctx.update_status(async_status::SUBS_RUNNING);
+            auto sub_results
+                = co_await when_all_wrapper(std::move(sub_tasks), Indices{});
+            ctx.update_status(async_status::SELF_RUNNING);
+            // Rescheduling allows tasks to run in parallel, but is not
+            // always opportune
+            co_await ctx.reschedule_if_opportune();
+            auto result = co_await std::apply(
+                *function_,
+                std::tuple_cat(std::tie(ctx), std::move(sub_results)));
+            ctx.update_status(async_status::FINISHED);
+            co_return result;
+        }
+        catch (async_cancelled const&)
+        {
+            ctx.update_status(async_status::CANCELLED);
+            throw;
+        }
+        catch (std::exception const& e)
+        {
+            ctx.update_status_error(e.what());
+            throw;
+        }
+    }
+
+    // Shortcuts resolving a request generated by a normalize_arg() call:
+    // just return the value that was passed to normalize_arg().
+    cppcoro::task<Value>
+    resolve_sync_normalizer(local_context_intf& ctx) const
+    {
+        co_return std::get<0>(args_);
+    }
+
+    cppcoro::task<Value>
+    resolve_async_normalizer(local_async_context_intf& ctx) const
+    {
+        ctx.update_status(async_status::FINISHED);
+        co_return std::get<0>(args_);
     }
 
  public:
+    // cereal-related
+
+    // Construct an object to be deserialized.
+    // The uuid is serialized in function_request_erased, not here.
+    function_request_impl(request_uuid const& uuid) : uuid_{uuid}
+    {
+    }
+
+    static std::shared_ptr<void>
+    create(request_uuid const& uuid)
+    {
+        return std::make_shared<this_type>(uuid);
+    }
+
+    static void
+    save_json(cereal::JSONOutputArchive& archive, void const* impl)
+    {
+        static_cast<this_type const*>(impl)->save(archive);
+    }
+
+    static void
+    load_json(cereal::JSONInputArchive& archive, void* impl)
+    {
+        static_cast<this_type*>(impl)->load(archive);
+    }
+
     template<typename Archive>
     void
     save(Archive& archive) const
     {
-        // Trust archive to be save-only
-        const_cast<function_request_impl*>(this)->load_save(archive);
+        archive(cereal::make_nvp("args", args_));
     }
 
     template<typename Archive>
     void
     load(Archive& archive)
     {
-        load_save(archive);
-        std::scoped_lock lock{static_mutex_};
+        archive(cereal::make_nvp("args", args_));
+        std::scoped_lock lock{maching_functions_mutex_};
         auto it = matching_functions_.find(uuid_.str());
         if (it == matching_functions_.end())
         {
@@ -632,19 +610,8 @@ class function_request_impl : public Intf
     }
 
  private:
-    // Adding the make_nvp's allows changing the order of uuid and args
-    // in the JSON.
-    template<typename Archive>
-    void
-    load_save(Archive& archive)
-    {
-        archive(
-            cereal::make_nvp("uuid", uuid_), cereal::make_nvp("args", args_));
-    }
-
- private:
     // Protector of matching_functions_
-    static inline std::mutex static_mutex_;
+    static inline std::mutex maching_functions_mutex_;
 
     // The functions matching this request's type, indexed by uuid string.
     // Used only when the uuid is serializable.
@@ -672,16 +639,15 @@ class function_request_impl : public Intf
     mutable unique_hasher::result_t unique_hash_;
     mutable bool have_unique_hash_{false};
 
-    std::type_index
-    get_function_type_index() const
+    bool
+    is_normalizer() const
     {
-        // The typeid() is evaluated at compile time
-        return std::type_index(typeid(Function));
+        return uuid_.str().starts_with("normalization<");
     }
 
     // *this and other are the same type, so their function types (i.e.,
     // typeid(Function)) are identical. The functions themselves might still
-    // differ if they are plain C++ functions.
+    // differ, in which case the uuid's should be different.
     // Likewise, argument types will be identical, but their values might
     // differ.
     bool
@@ -691,12 +657,9 @@ class function_request_impl : public Intf
         {
             return true;
         }
-        if constexpr (func_is_plain)
+        if (uuid_ != other.uuid_)
         {
-            if (**function_ != **other.function_)
-            {
-                return false;
-            }
+            return false;
         }
         return args_ == other.args_;
     }
@@ -709,13 +672,9 @@ class function_request_impl : public Intf
         {
             return false;
         }
-        if constexpr (func_is_plain)
+        if (uuid_ != other.uuid_)
         {
-            if (**function_ != **other.function_)
-            {
-                // Clang refuses to compare using <
-                return std::less<Function>{}(*function_, *other.function_);
-            }
+            return uuid_ < other.uuid_;
         }
         return args_ < other.args_;
     }
@@ -735,29 +694,84 @@ class function_request_impl : public Intf
     }
 };
 
-// Request properties that would be identical between similar requests
+void
+check_title_is_valid(std::string const& title);
+
+// Request (resolution) properties that would be identical between similar
+// requests
+// - Request attributes (AsCoro)
+// - How it should be resolved (Level, Introspective)
+// All requests in a tree (main request, subrequests) must have the same
+// request_props, so that the main request's uuid defines the complete
+// request type.
 template<
     caching_level_type Level,
     bool AsCoro = false,
-    bool Introspective = false,
-    typename Ctx = ctx_type_for_props<Introspective, Level>>
+    bool Introspective = false>
 struct request_props
 {
     static constexpr caching_level_type level = Level;
     static constexpr bool func_is_coro = AsCoro;
     static constexpr bool introspective = Introspective;
-    using ctx_type = Ctx;
 
     request_uuid uuid_;
     std::string title_; // Used only if introspective
 
-    request_props(
-        request_uuid uuid = request_uuid(), std::string title = std::string())
-        : uuid_(std::move(uuid)), title_(std::move(title))
+#if 0
+    // Constructor for a request that won't be serialized, won't be fully
+    // cached, and won't be introspected
+    // Currently no callers. The request_uuid default ctor is private.
+    // If needed after all, putting request_uuid in a unique_ptr might
+    // be better than creating a request_uuid with an empty string.
+    request_props()
     {
-        assert(!(introspective && title_.empty()));
+        static_assert(level != caching_level_type::full);
+        static_assert(!introspective);
+    }
+#endif
+
+    // Constructor for a request that
+    // - Can be serialized
+    // - Can be fully cached (but will be only if the Level template argument
+    //   is caching_level_type::full)
+    // - Cannnot be introspected
+    explicit request_props(request_uuid uuid) : uuid_{std::move(uuid)}
+    {
+        static_assert(!introspective);
+    }
+
+    // Constructor for a request that
+    // - Can be serialized
+    // - Can be fully cached (but will be only if the Level template argument
+    //   is caching_level_type::full)
+    // - Can be introspected (but will be only if the Introspective template
+    //   argument holds true)
+    request_props(request_uuid uuid, std::string title)
+        : uuid_{std::move(uuid)}, title_{std::move(title)}
+    {
+        check_title_is_valid(title_);
     }
 };
+
+// Serialize a function_request_impl object, given a type-erased
+// function_request_intf reference.
+template<typename Archive, typename Value>
+void
+save(Archive& archive, function_request_intf<Value> const& intf)
+{
+    using intf_type = function_request_intf<Value>;
+    cereal_functions_registry<intf_type>::instance().save(archive, intf);
+}
+
+// Deserialize a function_request_impl object, given a type-erased
+// function_request_intf reference.
+template<typename Archive, typename Value>
+void
+load(Archive& archive, function_request_intf<Value>& intf)
+{
+    using intf_type = function_request_intf<Value>;
+    cereal_functions_registry<intf_type>::instance().load(archive, intf);
+}
 
 /*
  * A function request that erases function and arguments types
@@ -787,28 +801,20 @@ template<typename Value, typename Props>
 class function_request_erased
 {
  public:
-    static constexpr caching_level_type caching_level = Props::level;
-    static constexpr bool introspective = Props::introspective;
-
     using element_type = function_request_erased;
     using value_type = Value;
-    using ctx_type = typename Props::ctx_type;
-    using intf_type = function_request_intf<ctx_type, Value>;
+    using intf_type = function_request_intf<Value>;
     using props_type = Props;
+
+    static constexpr caching_level_type caching_level = Props::level;
+    static constexpr bool introspective = Props::introspective;
 
     template<typename Function, typename... Args>
     function_request_erased(Props props, Function function, Args... args)
         : title_{std::move(props.title_)}
     {
-        // TODO make is_real() a compile-time thing
-        if (!props.uuid_.is_real())
-        {
-            throw missing_uuid_error{
-                "Real uuid needed for type-erased request"};
-        }
         using impl_type = function_request_impl<
             Value,
-            intf_type,
             Props::func_is_coro,
             Function,
             Args...>;
@@ -856,12 +862,22 @@ class function_request_erased
         return impl_->get_uuid();
     }
 
-    template<typename Ctx>
-    requires ContextMatchingProps<Ctx, introspective, caching_level>
-        cppcoro::task<Value>
-        resolve(Ctx& ctx) const
+    void
+    accept(req_visitor_intf& visitor) const
     {
-        return impl_->resolve(ctx);
+        impl_->accept(visitor);
+    }
+
+    cppcoro::task<Value>
+    resolve_sync(local_context_intf& ctx) const
+    {
+        return impl_->resolve_sync(ctx);
+    }
+
+    cppcoro::task<Value>
+    resolve_async(local_async_context_intf& ctx) const
+    {
+        return impl_->resolve_async(ctx);
     }
 
     std::string
@@ -892,16 +908,27 @@ class function_request_erased
     void
     save(Archive& archive) const
     {
-        archive(
-            cereal::make_nvp("impl", impl_),
-            cereal::make_nvp("title", title_));
+        // At least for JSON, there is no difference between multiple archive()
+        // calls, or putting everything in one call.
+        impl_->get_uuid().save_with_name(archive, "uuid");
+        archive(cereal::make_nvp("title", title_));
+        ::cradle::save(archive, *impl_);
     }
 
     template<typename Archive>
     void
     load(Archive& archive)
     {
-        archive(impl_, title_);
+        auto uuid{request_uuid::load_with_name(archive, "uuid")};
+        archive(cereal::make_nvp("title", title_));
+        // Create a mostly empty function_request_impl object. uuid defines its
+        // exact type (function_request_impl class instantiation), which could
+        // be different from the one with which this function_request_erased
+        // instantiation was registered.
+        impl_ = cereal_functions_registry<intf_type>::instance().create(
+            std::move(uuid));
+        // Deserialize the remainder of the function_request_impl object.
+        ::cradle::load(archive, *impl_);
         init_captured_id();
     }
 
@@ -973,11 +1000,17 @@ auto rq_function_erased(Props props, Function function, Args... args)
 }
 
 // Creates a type-erased request for a function that is a coroutine.
-// Value cannot be derived in this case so must be explicitly specified.
-template<typename Value, typename Props, typename Function, typename... Args>
+template<typename Props, typename Function, typename... Args>
     requires(Props::func_is_coro)
-auto rq_function_erased_coro(Props props, Function function, Args... args)
+auto rq_function_erased(Props props, Function function, Args... args)
 {
+    // Rely on the coroutine returning cppcoro::task<Value>,
+    // which is a class that has a value_type member.
+    // Function's first argument is a reference to some context type.
+    using Value = typename std::invoke_result_t<
+        Function,
+        context_intf&,
+        arg_type<Args>...>::value_type;
     return function_request_erased<Value, Props>{
         std::move(props), std::move(function), std::move(args)...};
 }
@@ -992,7 +1025,7 @@ auto rq_function_erased_coro(Props props, Function function, Args... args)
  * being a simple value would often be convenient.
  *
  * The major problem with allowing both is that they lead to different types
- * of the main function_request_erased template class. Each variant needs its
+ * of the main function_request_impl template class. Each variant needs its
  * own uuid, and must be registered separately. If several arguments can
  * have a template type, the number of combinations quickly becomes
  * unmanageable.
@@ -1009,15 +1042,23 @@ auto rq_function_erased_coro(Props props, Function function, Args... args)
  *   for this mechanism.
  * - A set of normalize_arg() functions that convert an argument to the
  *   normalized function_request_erased form.
+ *
+ * function_request_impl's resolve_sync() and resolve_async() optimize
+ * these requests so that the resolution overhead should be minimal, and
+ * there should be no need for identity_func() or identity_coro() calls.
  */
 
 // Checks that Arg is a value of type ValueType, or a request resolving to that
 // type.
 template<typename Arg, typename ValueType>
 concept TypedArg
-    = std::convertible_to<
-          Arg,
-          ValueType> || (std::same_as<typename Arg::value_type, ValueType> && std::same_as<function_request_erased<ValueType, typename Arg::props_type>, Arg>);
+    = std::convertible_to<Arg, ValueType>
+      || (std::same_as<typename Arg::value_type, ValueType>
+          && std::same_as<
+              function_request_erased<ValueType, typename Arg::props_type>,
+              Arg>)
+      || (std::same_as<typename Arg::value_type, ValueType>
+          && std::same_as<value_request<ValueType>, Arg>);
 
 // Function returning the given value as-is; similar to std::identity.
 template<typename Value>
@@ -1035,34 +1076,13 @@ identity_coro(context_intf& ctx, Value value)
     co_return value;
 }
 
-// Contains the uuid string for a normalize_arg request. The uuid (only)
-// depends on the value type that the request resolves to.
-// Note: don't put the request_uuid itself in the struct as it depends
-// on the static Git version which is also evaluated at C++ initialization
-// time.
-// TODO put specializations in separate .h?
-template<typename Value>
-struct normalization_uuid
-{
-};
-
-template<>
-struct normalization_uuid<std::string>
-{
-    static const inline std::string uuid_str{"normalization_uuid<string>"};
-};
-
-template<>
-struct normalization_uuid<blob>
-{
-    static const inline std::string uuid_str{"normalization_uuid<blob>"};
-};
-
-template<typename Value>
+template<typename Value, bool func_is_coro>
 auto
 make_normalization_uuid()
 {
-    return request_uuid{normalization_uuid<Value>::uuid_str};
+    return request_uuid{
+        func_is_coro ? normalization_uuid_str<Value>::coro
+                     : normalization_uuid_str<Value>::func};
 }
 
 /*
@@ -1076,59 +1096,82 @@ make_normalization_uuid()
  *   normalize_arg(Arg const& arg);
  *
  * Value and Props must be specified, Arg will be deduced.
- * Props is a request_props instantiation, and must equal the one for the main
+ * Props is a request_props instantiation, and must be the one for the main
  * request.
  *
- * TODO uuid must differ between different Props types.
+ * The uuid for the main request defines the Props for the main request's
+ * function_request_erased class, and for all arguments that are subrequests.
+ * The uuid for a subrequest need only define the function_request_impl
+ * instantiation. In normalization requests, the function is fixed
+ * (identity_func or identity_coro), meaning the uuid depends only on:
+ * - The Value type
+ * - Whether the function is a "normal" one or a coroutine
  */
 
 // Normalizes a value argument in a non-coroutine context.
 template<typename Value, typename Props>
-requires(!Request<Value> && !Props::func_is_coro) auto normalize_arg(
-    Value const& arg)
+    requires(!Request<Value> && !Props::func_is_coro)
+auto normalize_arg(Value const& arg)
 {
-    Props props{make_normalization_uuid<Value>(), "arg"};
+    Props props{make_normalization_uuid<Value, false>(), "arg"};
     return rq_function_erased(std::move(props), identity_func<Value>, arg);
 }
 
 // Normalizes a value argument in a coroutine context.
 template<typename Value, typename Props>
-requires(!Request<Value> && Props::func_is_coro) auto normalize_arg(
-    Value const& arg)
+    requires(!Request<Value> && Props::func_is_coro)
+auto normalize_arg(Value const& arg)
 {
-    Props props{make_normalization_uuid<Value>(), "arg"};
-    return rq_function_erased_coro<Value>(
-        std::move(props), identity_coro<Value>, arg);
+    Props props{make_normalization_uuid<Value, true>(), "arg"};
+    return rq_function_erased(std::move(props), identity_coro<Value>, arg);
 }
 
 // Normalizes a C-style string argument in a non-coroutine context.
 template<typename Value, typename Props>
-requires(
-    std::same_as<
-        Value,
-        std::string> && !Props::func_is_coro) auto normalize_arg(char const*
-                                                                     arg)
+    requires(std::same_as<Value, std::string> && !Props::func_is_coro)
+auto normalize_arg(char const* arg)
 {
-    Props props{make_normalization_uuid<Value>(), "arg"};
+    Props props{make_normalization_uuid<Value, false>(), "arg"};
     return rq_function_erased(
         std::move(props), identity_func<std::string>, std::string{arg});
 }
 
 // Normalizes a C-style string argument in a coroutine context.
 template<typename Value, typename Props>
-requires(std::same_as<Value, std::string>&&
-             Props::func_is_coro) auto normalize_arg(char const* arg)
+    requires(std::same_as<Value, std::string> && Props::func_is_coro)
+auto normalize_arg(char const* arg)
 {
-    Props props{make_normalization_uuid<Value>(), "arg"};
-    return rq_function_erased_coro<Value>(
+    Props props{make_normalization_uuid<Value, true>(), "arg"};
+    return rq_function_erased(
         std::move(props), identity_coro<std::string>, std::string{arg});
+}
+
+// Normalizes a value_request argument in a non-coroutine context.
+template<typename Value, typename Props>
+    requires(!Props::func_is_coro)
+auto normalize_arg(value_request<Value> const& arg)
+{
+    Props props{make_normalization_uuid<Value, false>(), "arg"};
+    return rq_function_erased(
+        std::move(props), identity_func<Value>, arg.get_value());
+}
+
+// Normalizes a value_request argument in a coroutine context.
+template<typename Value, typename Props>
+    requires(Props::func_is_coro)
+auto normalize_arg(value_request<Value> const& arg)
+{
+    Props props{make_normalization_uuid<Value, true>(), "arg"};
+    return rq_function_erased(
+        std::move(props), identity_coro<Value>, arg.get_value());
 }
 
 // Normalizes a function_request_erased argument (returned as-is).
 // If a subrequest is passed as argument, its Props must equal those for the
 // main request.
 template<typename Value, typename Props, typename Arg>
-requires std::same_as<function_request_erased<Value, Props>, Arg> auto
+    requires std::same_as<function_request_erased<Value, Props>, Arg>
+auto
 normalize_arg(Arg const& arg)
 {
     return arg;

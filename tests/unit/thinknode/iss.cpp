@@ -34,7 +34,7 @@ TEST_CASE("ISS object resolution", "[thinknode][iss]")
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
     session.access_token = "xyz";
 
-    thinknode_request_context ctx{service, session, nullptr};
+    thinknode_request_context ctx{service, session, nullptr, false, ""};
     auto id = cppcoro::sync_wait(
         resolve_iss_object_to_immutable(ctx, "123", "abc", false));
     REQUIRE(id == "def");
@@ -65,7 +65,7 @@ TEST_CASE("ISS object metadata", "[thinknode][iss]")
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
     session.access_token = "xyz";
 
-    thinknode_request_context ctx{service, session, nullptr};
+    thinknode_request_context ctx{service, session, nullptr, false, ""};
     auto metadata
         = cppcoro::sync_wait(get_iss_object_metadata(ctx, "123", "abc"));
     REQUIRE(
@@ -97,7 +97,7 @@ TEST_CASE("ISS immutable retrieval", "[thinknode][iss]")
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
     session.access_token = "xyz";
 
-    thinknode_request_context ctx{service, session, nullptr};
+    thinknode_request_context ctx{service, session, nullptr, false, ""};
     auto data = cppcoro::sync_wait(retrieve_immutable(ctx, "123", "abc"));
     REQUIRE(data == dynamic("the-data"));
 
@@ -234,7 +234,7 @@ TEST_CASE("ISS POST", "[thinknode][iss]")
     session.access_token = "xyz";
 
     auto id = cppcoro::sync_wait(post_iss_object(
-        thinknode_request_context{service, session, nullptr},
+        thinknode_request_context{service, session, nullptr, false, ""},
         "123",
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
         dynamic("payload")));
@@ -263,7 +263,7 @@ TEST_CASE("ISS object copy", "[thinknode][iss]")
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
     session.access_token = "xyz";
 
-    thinknode_request_context ctx{service, session, nullptr};
+    thinknode_request_context ctx{service, session, nullptr, false, ""};
     cppcoro::sync_wait(shallowly_copy_iss_object(ctx, "abc", "123", "def"));
 
     REQUIRE(mock_http.is_complete());

@@ -17,6 +17,7 @@
 // Ensure to #include only from the msgpack inside rpclib
 #include <cradle/inner/encodings/msgpack_adaptors_rpclib.h>
 #include <cradle/inner/requests/uuid.h>
+#include <cradle/inner/utilities/git.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/domain/all/all_domains.h>
 #include <cradle/plugins/secondary_cache/all_plugins.h>
@@ -25,10 +26,10 @@
 #include <cradle/rpclib/common/common.h>
 #include <cradle/rpclib/server/handlers.h>
 #include <cradle/typing/service/core.h>
+#include <cradle/version_info.h>
 
 using namespace cradle;
 
-// TODO maybe this should be a config_map?
 struct cli_options
 {
     std::string log_level{"info"};
@@ -82,7 +83,7 @@ parse_options(int argc, char const* const* argv)
 
     if (vm.count("version"))
     {
-        std::cout << "TODO version\n";
+        show_version_info(version_info);
         std::exit(0);
     }
 
@@ -141,7 +142,8 @@ run_server(cli_options const& options)
     service_core service;
     service_config config{create_config_map(options)};
     service.initialize(config);
-    rpclib_handler_context hctx{service, *my_logger};
+    service.ensure_async_db();
+    rpclib_handler_context hctx{config, service, *my_logger};
 
     register_and_initialize_all_domains();
 
@@ -151,30 +153,48 @@ run_server(cli_options const& options)
     // TODO we need a session concept and a "start session" / "register"
     // (notification) message
     srv.bind(
-        "resolve_sync",
-        [&](std::string const& domain_name, std::string const& seri_req) {
+        "resolve_sync", [&](std::string config_json, std::string seri_req) {
             // TODO create origin tasklet somewhere
-            return cppcoro::sync_wait(
-                handle_resolve_sync(hctx, domain_name, seri_req));
+            return handle_resolve_sync(
+                hctx, std::move(config_json), std::move(seri_req));
         });
     if (options.testing)
     {
         // No mocking in production server
-        srv.bind("mock_http", [&](std::string const& body) {
-            return cppcoro::sync_wait(handle_mock_http(hctx, body));
+        srv.bind("mock_http", [&](std::string body) {
+            return handle_mock_http(hctx, std::move(body));
         });
     }
     srv.bind("ack_response", [&](int response_id) {
-        return cppcoro::sync_wait(handle_ack_response(hctx, response_id));
+        return handle_ack_response(hctx, response_id);
     });
     srv.bind("ping", []() { return request_uuid::get_git_version(); });
 
-    auto num_threads = config.get_number_or_default(
-        rpclib_config_keys::SERVER_CONCURRENCY, 22);
-    srv.async_run(num_threads);
+    srv.bind(
+        "submit_async", [&](std::string config_json, std::string seri_req) {
+            return handle_submit_async(
+                hctx, std::move(config_json), std::move(seri_req));
+        });
+    srv.bind("get_sub_contexts", [&](async_id aid) {
+        return handle_get_sub_contexts(hctx, aid);
+    });
+    srv.bind("get_async_status", [&](async_id aid) {
+        return handle_get_async_status(hctx, aid);
+    });
+    srv.bind("get_async_error_message", [&](async_id aid) {
+        return handle_get_async_error_message(hctx, aid);
+    });
+    srv.bind("get_async_response", [&](async_id root_aid) {
+        return handle_get_async_response(hctx, root_aid);
+    });
+    srv.bind("request_cancellation", [&](async_id aid) {
+        return handle_request_cancellation(hctx, aid);
+    });
+    srv.bind("finish_async", [&](async_id root_aid) {
+        return handle_finish_async(hctx, root_aid);
+    });
 
-    // TODO find a more elegant way to wait forever
-    std::this_thread::sleep_for(std::chrono::years(1));
+    srv.run();
 
     rpc::this_server().stop();
 }

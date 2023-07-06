@@ -13,7 +13,7 @@ content:
 The fields are:
 
 * `request_id`: identifies this request; set by the client
-* `context_id`: see [here](data.md)
+* `context_id`: see [here](thinknode_data.md)
 * `calculation_id`: identifies the calculation; this is a reference id
 
 Example response:

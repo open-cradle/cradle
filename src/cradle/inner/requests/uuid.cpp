@@ -1,7 +1,69 @@
+#include <stdexcept>
+
+#include <fmt/format.h>
+
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/version_info.h>
 
 namespace cradle {
+
+request_uuid::request_uuid(std::string base) : str_{std::move(base)}
+{
+    // Check the base string for validity:
+    // - It must not be empty
+    // - '+' prefixes an extension, so is not allowed
+    if (str_.empty())
+    {
+        throw uuid_error{"request_uuid base is empty"};
+    }
+    if (str_.find_first_of("+") != std::string::npos)
+    {
+        throw uuid_error{
+            fmt::format("Invalid character(s) in request_uuid base {}", str_)};
+    }
+}
+
+request_uuid&
+request_uuid::set_level(caching_level_type level)
+{
+    check_not_finalized();
+    level_ = level;
+    include_level_ = true;
+    return *this;
+}
+
+request_uuid&
+request_uuid::use_git_version()
+{
+    check_not_finalized();
+    use_git_version_ = true;
+    return *this;
+}
+
+void
+request_uuid::check_not_finalized() const
+{
+    if (finalized_)
+    {
+        throw std::logic_error("request_id object already finalized");
+    }
+}
+
+void
+request_uuid::do_finalize() const
+{
+    if (include_level_)
+    {
+        static const char* const level_exts[] = {"+none", "+mem", "+full"};
+        str_ += level_exts[static_cast<int>(level_)];
+    }
+    if (use_git_version_)
+    {
+        str_ += '+';
+        str_ += get_git_version();
+    }
+    finalized_ = true;
+}
 
 std::string const&
 request_uuid::get_git_version()
@@ -18,25 +80,6 @@ request_uuid::get_git_version()
         }
     }
     return git_version_;
-}
-
-// Checks a base string for invalid characters:
-// - '+' separates base and version parts
-void
-request_uuid::check_base(std::string const& base)
-{
-    if (base.find_first_of("+") != std::string::npos)
-    {
-        std::stringstream os;
-        os << "Invalid character(s) in base uuid " << base;
-        throw uuid_error(os.str());
-    }
-}
-
-std::string
-request_uuid::combine(std::string const& base, std::string const& version)
-{
-    return base + '+' + version;
 }
 
 } // namespace cradle
