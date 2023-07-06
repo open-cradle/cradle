@@ -14,6 +14,14 @@ struct json_config_error : public std::logic_error
     using logic_error::logic_error;
 };
 
+// The simdjson documentation recommends to "make a parser once and reuse it".
+// Benchmarks indicate this is indeed twice as fast.
+// However, in a multi-threaded environment, the one parser needs to be
+// protected by a mutex, and concurrent threads (like rpclib server handlers)
+// might need to wait on each other.
+simdjson::dom::parser the_parser;
+std::mutex the_mutex;
+
 config_value
 parse_json_value(simdjson::dom::element const& json)
 {
@@ -79,15 +87,6 @@ parse_json_doc(simdjson::dom::element const& json)
 service_config_map
 read_config_map_from_json(std::string const& json_text)
 {
-    // The simdjson documentation recommends to "make a parser once and reuse
-    // it". In a multi-threaded environment, that one parser needs to be
-    // protected by a mutex.
-    // TODO still a good idea?
-    // TODO as it is, the static objects will be created when this function is
-    // first called. There's still room for race conditions.
-    static simdjson::dom::parser the_parser;
-    static std::mutex the_mutex;
-
     std::scoped_lock<std::mutex> guard(the_mutex);
 
     simdjson::dom::element doc

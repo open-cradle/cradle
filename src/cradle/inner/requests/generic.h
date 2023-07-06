@@ -462,27 +462,7 @@ template<typename Ctx>
 concept DefinitelyAsyncContext = std::is_final_v<Ctx> && AsyncContext<Ctx> && !
 SyncContext<Ctx>;
 
-template<typename Ctx>
-concept LocalAsyncContext
-    = std::convertible_to<Ctx&, local_async_context_intf&>;
-
-template<typename Ctx>
-concept RemoteAsyncContext
-    = std::convertible_to<Ctx&, remote_async_context_intf&>;
-
-// A context that supports caching, which will happen when the request demands
-// it
-template<typename Ctx>
-concept CachingContext = std::convertible_to<Ctx&, caching_context_intf&>;
-
-// A context that supports introspection, which will happen when the request
-// demands it
-template<typename Ctx>
-concept IntrospectiveContext
-    = std::convertible_to<Ctx&, introspective_context_intf&>;
-
 // Any context implementation class should be valid
-// TODO ValidContext obsolete? What about other Context concepts?
 template<typename Ctx>
 concept ValidContext
     = Context<Ctx>
