@@ -10,12 +10,14 @@
 #include "../../support/request.h"
 #include "../../support/tasklet_testing.h"
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/service/request.h>
+#include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/service/resources.h>
 
 using namespace cradle;
 
-TEST_CASE("create value request", "[requests]")
+static char const tag[] = "[inner][requests][value]";
+
+TEST_CASE("create value request", tag)
 {
     std::string s0{"abc"};
     auto req0{rq_value(s0)};
@@ -25,9 +27,9 @@ TEST_CASE("create value request", "[requests]")
     REQUIRE(req1.get_value() == std::string{"def"});
 }
 
-TEST_CASE("evaluate value request", "[requests]")
+TEST_CASE("evaluate value request", tag)
 {
-    uncached_request_resolution_context ctx{};
+    non_caching_request_resolution_context ctx{};
 
     auto req{rq_value(87)};
 
@@ -36,10 +38,10 @@ TEST_CASE("evaluate value request", "[requests]")
     REQUIRE(res == 87);
 }
 
-TEST_CASE("evaluate value requests in parallel", "[requests]")
+TEST_CASE("evaluate value requests in parallel", tag)
 {
     static constexpr int num_requests = 7;
-    uncached_request_resolution_context ctx{};
+    non_caching_request_resolution_context ctx{};
     std::vector<value_request<int>> requests;
     for (int i = 0; i < num_requests; ++i)
     {

@@ -1,79 +1,45 @@
 #ifndef CRADLE_THINKNODE_CONTEXT_H
 #define CRADLE_THINKNODE_CONTEXT_H
 
-#include <vector>
-
-#include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/context_base.h>
+#include <cradle/inner/service/config.h>
 #include <cradle/thinknode/types.hpp>
+#include <cradle/typing/service/core.h>
 
 namespace cradle {
 
-struct immutable_cache;
-class service_core;
-class tasklet_tracker;
-
-struct thinknode_request_context : public cached_introspective_context_intf,
-                                   public remote_context_intf
+struct thinknode_request_context final : public sync_context_base
 {
     service_core& service;
     thinknode_session session;
 
+    // Constructor called from thinknode_domain::make_local_sync_context()
+    thinknode_request_context(
+        service_core& service, service_config const& config);
+
+    // Other-purposes constructor
     thinknode_request_context(
         service_core& service,
         thinknode_session session,
         tasklet_tracker* tasklet,
-        bool remotely = false);
+        bool remotely,
+        std::string proxy_name);
 
     ~thinknode_request_context();
 
-    inner_resources&
-    get_resources() override;
-
-    immutable_cache&
-    get_cache() override;
-
-    tasklet_tracker*
-    get_tasklet() override;
-
-    void
-    push_tasklet(tasklet_tracker* tasklet) override;
-
-    void
-    pop_tasklet() override;
-
-    bool
-    remotely() const override
-    {
-        return remotely_;
-    }
-
-    void
-    proxy_name(std::string const& name);
-
     std::string const&
-    proxy_name() const override;
+    domain_name() const override;
 
-    std::string const&
-    domain_name() const override
-    {
-        return domain_name_;
-    }
-
-    std::unique_ptr<remote_context_intf>
-    local_clone() const override;
+    service_config
+    make_config() const override;
 
     std::string const&
     api_url() const
     {
         return session.api_url;
     }
-
- private:
-    std::vector<tasklet_tracker*> tasklets_;
-    bool remotely_;
-    std::string proxy_name_;
-    std::string domain_name_{"thinknode"};
 };
+static_assert(ValidContext<thinknode_request_context>);
 
 } // namespace cradle
 

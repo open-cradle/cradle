@@ -19,9 +19,10 @@
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/io/mock_http.h>
+#include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/value.h>
-#include <cradle/inner/service/request.h>
+#include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/typing/service/core.h>
@@ -31,7 +32,7 @@ using namespace cradle;
 
 namespace {
 
-static char const tag[] = "[inner][service][seri_catalog]";
+static char const tag[] = "[thinknode][iss_req]";
 
 template<typename Request>
 auto
@@ -135,8 +136,8 @@ make_post_iss_request_subreq(std::string payload = "payload")
     std::string uuid_text{fmt::format("uuid_100_{}", static_cast<int>(Level))};
     thinknode_request_props<Level> props{
         request_uuid(uuid_text), "make_blob_coro"};
-    auto make_blob_request = rq_function_erased_coro<blob>(
-        props, make_blob_coro, rq_value(payload));
+    auto make_blob_request
+        = rq_function_erased(props, make_blob_coro, rq_value(payload));
     return rq_post_iss_object<Level>(
         "123",
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
@@ -165,7 +166,7 @@ test_post_iss_requests_parallel(
     if (remotely)
     {
         ensure_thinknode_seri_resolvers();
-        ensure_loopback_service();
+        register_loopback_service(make_inner_tests_config(), service);
     }
 
     mock_http_script script;
@@ -193,8 +194,8 @@ test_post_iss_requests_parallel(
     {
         tasklet = create_tasklet_tracker("my_pool", "my_title");
     }
-    thinknode_request_context ctx{service, session, tasklet, remotely};
-    ctx.proxy_name("loopback");
+    thinknode_request_context ctx{
+        service, session, tasklet, remotely, "loopback"};
 
     auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
 
@@ -329,6 +330,7 @@ TEST_CASE("ISS POST resolution - subreq, fully cached, parallel", tag)
 
 TEST_CASE("ISS POST resolution - remote", tag)
 {
+    ensure_all_domains_registered();
     test_post_iss_request(
         make_post_iss_request_constant<caching_level_type::full>(),
         false,
@@ -377,7 +379,7 @@ test_retrieve_immutable_object_parallel(
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
     session.access_token = "xyz";
     tasklet_tracker* tasklet = nullptr;
-    thinknode_request_context ctx{service, session, tasklet};
+    thinknode_request_context ctx{service, session, tasklet, false, ""};
 
     auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
 
@@ -513,7 +515,7 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT creation - template arg", tag)
     };
     auto req0{rq_retrieve_immutable_object<level>(
         context_id,
-        rq_function_erased_coro<std::string>(
+        rq_function_erased(
             thinknode_request_props<level>{make_uuid(), "arg"}, coro))};
     // The second argument in req1 will be "normalized" to the same thing
     // passed to req0.

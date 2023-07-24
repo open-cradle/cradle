@@ -1,5 +1,7 @@
 #include <cassert>
 
+#include <fmt/format.h>
+
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/requests/generic.h>
 
@@ -26,16 +28,37 @@ tasklet_context::~tasklet_context()
     }
 }
 
-remote_context_intf*
-to_remote_context_intf(context_intf& ctx)
+std::string
+to_string(async_status s)
 {
-    if (!ctx.remotely())
+    char const* res = nullptr;
+    switch (s)
     {
-        return nullptr;
+        case async_status::CREATED:
+            res = "CREATED";
+            break;
+        case async_status::SUBS_RUNNING:
+            res = "SUBS_RUNNING";
+            break;
+        case async_status::SELF_RUNNING:
+            res = "SELF_RUNNING";
+            break;
+        case async_status::CANCELLED:
+            res = "CANCELLED";
+            break;
+        case async_status::AWAITING_RESULT:
+            res = "AWAITING_RESULT";
+            break;
+        case async_status::FINISHED:
+            res = "FINISHED";
+            break;
+        case async_status::ERROR:
+            res = "ERROR";
+            break;
+        default:
+            return fmt::format("bad async_status {}", static_cast<int>(s));
     }
-    remote_context_intf* rem_ctx = dynamic_cast<remote_context_intf*>(&ctx);
-    assert(rem_ctx != nullptr);
-    return rem_ctx;
+    return std::string{res};
 }
 
 } // namespace cradle

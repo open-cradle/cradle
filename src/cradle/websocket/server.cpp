@@ -41,8 +41,8 @@
 #include <cradle/inner/io/http_requests.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/requests/function.h>
-#include <cradle/inner/service/request.h>
-#include <cradle/inner/service/seri_req.h>
+#include <cradle/inner/resolve/resolve_request.h>
+#include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
 #include <cradle/inner/utilities/logging.h>
@@ -1444,8 +1444,8 @@ make_thinknode_request_context(
         server.core,
         get_client(server.clients, request.client).session,
         request.tasklet,
-        remotely};
-    ctx.proxy_name("rpclib");
+        remotely,
+        "rpclib"};
     return ctx;
 }
 
@@ -1472,10 +1472,6 @@ process_message(websocket_server_impl& server, client_request request)
                 client.name = registration.name;
                 client.session = registration.session;
             });
-            // TODO keep reference to thinknode_domain object?
-            thinknode_domain dom;
-            dom.initialize();
-            dom.set_session(registration.session);
             send_response(
                 server,
                 request,
@@ -1778,8 +1774,8 @@ process_message(websocket_server_impl& server, client_request request)
             // serialized will be response, serialized as msgpack
             auto ctx{
                 make_thinknode_request_context(server, request, rr.remote)};
-            auto seri_result
-                = co_await resolve_serialized_request(ctx, rr.json_text);
+            auto seri_result = co_await resolve_serialized_request(
+                ctx, std::move(rr.json_text));
             blob seri_value = seri_result.value();
             // TODO msgpack -> dynamic -> msgpack
             // - First conversion here
@@ -1923,7 +1919,8 @@ initialize(websocket_server_impl& server, service_config const& config)
             on_message(server, hdl, message);
         });
 
-    register_rpclib_client(config);
+    register_and_initialize_thinknode_domain();
+    register_rpclib_client(config, server.core);
 }
 
 websocket_server::websocket_server(service_config const& config)

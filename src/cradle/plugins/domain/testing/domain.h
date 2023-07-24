@@ -16,9 +16,22 @@ class testing_domain : public domain
     std::string
     name() const override;
 
-    std::shared_ptr<context_intf>
-    make_local_context(inner_resources& service) override;
+    std::shared_ptr<sync_context_intf>
+    make_local_sync_context(
+        inner_resources& resources,
+        service_config const& config) const override;
+
+    std::shared_ptr<async_context_intf>
+    make_local_async_context(
+        inner_resources& resources,
+        service_config const& config) const override;
 };
+
+/*
+ * Registers and initializes the testing domain.
+ */
+void
+register_and_initialize_testing_domain();
 
 } // namespace cradle
 
