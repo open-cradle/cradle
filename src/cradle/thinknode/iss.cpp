@@ -193,6 +193,25 @@ retrieve_immutable(
         std::move(function_name));
 }
 
+// TODO: Don't use this. Instead create blobs in shared memory in the first
+// place.
+template<class Context>
+blob
+to_shared_memory(Context& ctx, blob const& original)
+{
+    std::shared_ptr<data_owner> owner;
+    uint8_t* data{nullptr};
+
+    auto writer = ctx.service.make_blob_file_writer(original.size());
+    owner = writer;
+    data = writer->data();
+
+    memcpy(data, original.data(), original.size());
+
+    owner->on_write_completed();
+    return blob{std::move(owner), as_bytes(data), original.size()};
+}
+
 cppcoro::task<blob>
 retrieve_immutable_blob_uncached(
     thinknode_request_context ctx, string context_id, string immutable_id)
@@ -203,7 +222,7 @@ retrieve_immutable_blob_uncached(
         {{"Authorization", "Bearer " + ctx.session.access_token},
          {"Accept", "application/octet-stream"}});
     auto response = co_await async_http_request(ctx, query);
-    co_return response.body;
+    co_return to_shared_memory(ctx, response.body);
 }
 
 cppcoro::shared_task<blob>

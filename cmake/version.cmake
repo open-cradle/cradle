@@ -45,6 +45,6 @@ list(SUBLIST fragments 0 ${index} CRADLE_VERSION)
 string(JOIN "-" CRADLE_VERSION "${CRADLE_VERSION}")
 
 # Generate the C++ code to represent all this.
-configure_file("${CMAKE_CURRENT_LIST_DIR}/version_info.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src/cradle/version_info.h"
-    @ONLY)
+# configure_file("${CMAKE_CURRENT_LIST_DIR}/version_info.h.in"
+#     "${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src/cradle/version_info.h"
+#     @ONLY)
