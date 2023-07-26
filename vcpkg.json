@@ -18,6 +18,7 @@
         "boost-program-options",
         "boost-stacktrace",
         "boost-uuid",
+        "bshoshany-thread-pool",
         "bzip2",
         "catch2",
         "cereal",
