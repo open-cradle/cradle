@@ -139,7 +139,7 @@ TEST_CASE("app version info", "[thinknode][apm]")
             date(2017, boost::gregorian::Apr, 26),
             boost::posix_time::time_duration(1, 2, 3)));
 
-    thinknode_request_context trc{service, session, nullptr};
+    thinknode_request_context trc{service, session, nullptr, false, ""};
     auto version_info = cppcoro::sync_wait(
         get_app_version_info(trc, "acme", "pets", "2.0.0"));
     REQUIRE(version_info == expected_version_info);

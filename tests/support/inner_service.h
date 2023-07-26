@@ -17,66 +17,102 @@ init_test_inner_service(inner_resources& resources);
 void
 reset_disk_cache(inner_resources& resources);
 
-struct uncached_request_resolution_context : public context_intf
+struct non_caching_request_resolution_context final
+    : public local_context_intf,
+      public sync_context_intf
 {
+    // context_intf
     bool
     remotely() const override
     {
         return false;
     }
+
+    bool
+    is_async() const override
+    {
+        return false;
+    }
+
+    // local_context_intf
+    std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory) override
+    {
+        throw not_implemented_error();
+    }
+
+    void
+    on_value_complete() override
+    {
+        throw not_implemented_error();
+    }
 };
 
-struct cached_request_resolution_context : public cached_context_intf
+static_assert(ValidContext<non_caching_request_resolution_context>);
+
+struct caching_request_resolution_context final : public local_context_intf,
+                                                  public sync_context_intf,
+                                                  public caching_context_intf
 {
     inner_resources resources;
 
-    cached_request_resolution_context();
+    caching_request_resolution_context();
 
+    // context_intf
+    bool
+    remotely() const override
+    {
+        return false;
+    }
+
+    bool
+    is_async() const override
+    {
+        return false;
+    }
+
+    // local_context_intf
+    std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory) override
+    {
+        throw not_implemented_error();
+    }
+
+    void
+    on_value_complete() override
+    {
+        throw not_implemented_error();
+    }
+
+    // caching_context_intf
     inner_resources&
     get_resources() override
     {
         return resources;
     }
 
-    immutable_cache&
-    get_cache() override
-    {
-        return resources.memory_cache();
-    }
-
-    bool
-    remotely() const override
-    {
-        return false;
-    }
-
+    // other
     void
     reset_memory_cache();
 };
 
+static_assert(ValidContext<caching_request_resolution_context>);
+
 template<caching_level_type level>
 struct request_resolution_context_struct
 {
-    using type = cached_request_resolution_context;
+    using type = caching_request_resolution_context;
 };
 
 template<>
 struct request_resolution_context_struct<caching_level_type::none>
 {
-    using type = uncached_request_resolution_context;
+    using type = non_caching_request_resolution_context;
 };
 
 template<caching_level_type level>
 using request_resolution_context =
     typename request_resolution_context_struct<level>::type;
-
-// Ensure that the "remote" loopback service is available
-void
-ensure_loopback_service();
-
-// Ensure that an rpclib client and server are available; returns the client
-std::shared_ptr<rpclib_client>
-ensure_rpclib_service();
 
 } // namespace cradle
 

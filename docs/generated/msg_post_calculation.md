@@ -30,7 +30,7 @@ content:
 The fields are:
 
 * `request_id`: identifies this request; set by the client
-* `context_id`: see [here](data.md)
+* `context_id`: see [here](thinknode_data.md)
 * `calculation`: the calculation to perform
 
 Example response:

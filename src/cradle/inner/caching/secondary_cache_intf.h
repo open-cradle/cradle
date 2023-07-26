@@ -26,9 +26,14 @@ class secondary_cache_intf
 
     // Reads the value for key.
     // Returns blob{} if the value is not in the cache.
+    // Throws on other errors.
+    // This could be a coroutine so takes arguments by value.
     virtual cppcoro::task<blob>
     read(std::string key) = 0;
 
+    // This operation may be synchronous or asynchronous.
+    // If synchronous, it will throw on errors.
+    // This could be a coroutine so takes arguments by value.
     virtual cppcoro::task<void>
     write(std::string key, blob value) = 0;
 };

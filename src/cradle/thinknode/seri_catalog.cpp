@@ -1,6 +1,6 @@
 #include <cereal/types/map.hpp>
 
-#include <cradle/inner/service/seri_catalog.h>
+#include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
 
@@ -30,18 +30,6 @@ namespace cradle {
  * objects must also be registered, hence the register_seri_resolver()
  * calls.
  */
-namespace {
-
-template<Request Req>
-void
-register_tn_resolver(Req const& req)
-{
-    using Ctx = thinknode_request_context;
-    register_seri_resolver<Ctx, Req>(req);
-}
-
-} // namespace
-
 void
 register_thinknode_seri_resolvers()
 {
@@ -53,13 +41,13 @@ register_thinknode_seri_resolvers()
     // the "normalizing" subrequests also get registered.
     // A (maybe better) alternative would be to register these subrequests
     // independently.
-    register_tn_resolver(rq_retrieve_immutable_object<level>(
+    register_seri_resolver(rq_retrieve_immutable_object<level>(
         "sample context id", "sample immutable id"));
-    register_tn_resolver(rq_post_iss_object<level>(
+    register_seri_resolver(rq_post_iss_object<level>(
         "sample context id", sample_thinknode_info, blob()));
-    register_tn_resolver(rq_get_iss_object_metadata<level>(
+    register_seri_resolver(rq_get_iss_object_metadata<level>(
         "sample context id", "sample object id"));
-    register_tn_resolver(rq_resolve_iss_object_to_immutable<level>(
+    register_seri_resolver(rq_resolve_iss_object_to_immutable<level>(
         "sample context id", "sample object id", false));
 }
 

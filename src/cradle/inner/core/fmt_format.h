@@ -9,6 +9,7 @@
 
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/core/type_interfaces.h>
+#include <cradle/inner/requests/generic.h>
 
 template<>
 struct fmt::formatter<cradle::blob>
@@ -35,6 +36,24 @@ struct fmt::formatter<cradle::blob>
         std::ostringstream ss;
         ss << b;
         return fmt::format_to(ctx.out(), "{}", ss.str());
+    }
+};
+
+template<>
+struct fmt::formatter<cradle::async_status>
+{
+    constexpr auto
+    parse(format_parse_context& ctx) -> decltype(ctx.begin())
+    {
+        return ctx.begin();
+    }
+
+    template<typename FormatContext>
+    auto
+    format(cradle::async_status const& s, FormatContext& ctx) const
+        -> decltype(ctx.out())
+    {
+        return fmt::format_to(ctx.out(), "{}", to_string(s));
     }
 };
 

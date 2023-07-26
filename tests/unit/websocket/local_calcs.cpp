@@ -29,7 +29,7 @@ TEST_CASE("local calcs", "[local_calcs][ws]")
     // resolve_calc_to_value. However, it's still a useful test to see if those
     // Thinknode calculations can be dynamically converted to the new generic
     // calculations and resolved to the same value.
-    thinknode_request_context trc{core, session, nullptr};
+    thinknode_request_context trc{core, session, nullptr, false, ""};
     auto eval = [&](thinknode_calc_request const& request) {
         return cppcoro::sync_wait(resolve_calc_to_value(
             trc,

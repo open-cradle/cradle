@@ -1,6 +1,6 @@
-#include <cstdlib>
 #include <stdexcept>
 
+#include <cradle/inner/core/exception.h>
 #include <cradle/thinknode/context.h>
 #include <cradle/thinknode/domain.h>
 #include <cradle/thinknode/seri_catalog.h>
@@ -14,43 +14,35 @@ thinknode_domain::initialize()
     register_thinknode_seri_resolvers();
 }
 
-void
-thinknode_domain::set_session(thinknode_session const& session)
-{
-    session_ = session;
-}
-
 std::string
 thinknode_domain::name() const
 {
     return "thinknode";
 }
 
-std::shared_ptr<context_intf>
-thinknode_domain::make_local_context(inner_resources& service)
+std::shared_ptr<sync_context_intf>
+thinknode_domain::make_local_sync_context(
+    inner_resources& resources, service_config const& config) const
 {
-    ensure_session();
-    assert(dynamic_cast<service_core*>(&service) != nullptr);
-    auto& tn_service = static_cast<service_core&>(service);
-    // TODO need initial tasklet?
-    return std::make_shared<thinknode_request_context>(
-        tn_service, session_, nullptr);
+    assert(dynamic_cast<service_core*>(&resources) != nullptr);
+    auto& tn_resources = static_cast<service_core&>(resources);
+    return std::make_shared<thinknode_request_context>(tn_resources, config);
+}
+
+std::shared_ptr<async_context_intf>
+thinknode_domain::make_local_async_context(
+    inner_resources& resources, service_config const& config) const
+{
+    throw not_implemented_error(
+        "thinknode_domain::make_local_async_context()");
 }
 
 void
-thinknode_domain::ensure_session()
+register_and_initialize_thinknode_domain()
 {
-    if (session_.api_url.size() > 0)
-    {
-        return;
-    }
-    char const* access_token = std::getenv("CRADLE_THINKNODE_API_TOKEN");
-    if (!access_token)
-    {
-        throw std::logic_error("No session and no CRADLE_THINKNODE_API_TOKEN");
-    }
-    session_
-        = thinknode_session{"https://mgh.thinknode.io/api/v1.0", access_token};
+    auto the_domain{std::make_shared<thinknode_domain>()};
+    register_domain(the_domain);
+    the_domain->initialize();
 }
 
 } // namespace cradle

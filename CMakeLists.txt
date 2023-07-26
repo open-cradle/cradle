@@ -139,6 +139,7 @@ find_package(lz4 CONFIG REQUIRED)
 find_package(cereal CONFIG REQUIRED)
 find_package(rpclib CONFIG REQUIRED)
 find_package(tomlplusplus CONFIG REQUIRED)
+find_path(BSHOSHANY_THREAD_POOL_INCLUDE_DIRS "BS_thread_pool.hpp")
 
 # TODO: Isolate these so they're only required for testing.
 find_package(Catch2 CONFIG REQUIRED)
@@ -338,7 +339,7 @@ add_dependencies(cradle_inner version_info)
 # TODO use recent simdjson
 if(IS_MSVC)
     set_property(
-        SOURCE src/cradle/inner/service/config_map_json.cpp
+        SOURCE src/cradle/inner/service/config_map_from_json.cpp
         APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4189")
 endif()
 record_public_include_directory(cradle_inner
@@ -353,6 +354,10 @@ record_public_include_directory(cradle_inner
     ${CMAKE_CURRENT_SOURCE_DIR}/src/third-party
     include/third-party
     "*.[ih]*")
+record_public_include_directory(cradle_inner
+    ${BSHOSHANY_THREAD_POOL_INCLUDE_DIRS}
+    include/third-party
+    "*.[ih]*")
 target_link_libraries(cradle_inner PUBLIC
     Boost::headers
     cereal::cereal
@@ -362,6 +367,7 @@ target_link_libraries(cradle_inner PUBLIC
     lz4::lz4
     msgpackc-cxx
     OpenSSL::SSL
+    nlohmann_json::nlohmann_json
     simdjson::simdjson
     spdlog::spdlog
     tomlplusplus::tomlplusplus)
@@ -430,7 +436,6 @@ target_link_libraries(cradle_typing PUBLIC
     Boost::headers
     Catch2::Catch2
     cppcoro
-    nlohmann_json::nlohmann_json
     spdlog::spdlog
     yaml-cpp)
 

@@ -10,7 +10,7 @@
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/value.h>
-#include <cradle/inner/service/request.h>
+#include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/rpclib/client/proxy.h>
@@ -24,6 +24,7 @@
 
 #include "../support/inner_service.h"
 #include "../support/outer_service.h"
+#include "../support/thinknode.h"
 #include "benchmark_support.h"
 
 using namespace cradle;
@@ -54,35 +55,25 @@ BENCHMARK(BM_create_post_iss_request<caching_level_type::full>)
 
 static void
 register_remote_services(
-    std::string const& proxy_name, http_response const& response)
+    inner_resources& resources,
+    std::string const& proxy_name,
+    http_response const& response)
 {
-    static bool registered_resolvers = false;
-    if (!registered_resolvers)
-    {
-        register_thinknode_seri_resolvers();
-        registered_resolvers = true;
-    }
+    ensure_thinknode_seri_resolvers();
+    ensure_all_domains_registered();
     if (proxy_name == "loopback")
     {
-        static bool registered_loopback;
-        if (!registered_loopback)
-        {
-            register_loopback_service();
-            registered_loopback = true;
-        }
+        register_loopback_service(make_inner_tests_config(), resources);
     }
     else if (proxy_name == "rpclib")
     {
-        // TODO no static here, add func to get previously registered client
-        static std::shared_ptr<rpclib_client> rpclib_client;
-        if (!rpclib_client)
-        {
-            rpclib_client = register_rpclib_client(make_outer_tests_config());
-        }
+        auto& rpclib_client
+            = register_rpclib_client(make_outer_tests_config(), resources);
+
         // TODO should body be blob or string?
         auto const& body{response.body};
         std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
-        rpclib_client->mock_http(s);
+        rpclib_client.mock_http(s);
     }
     else
     {
@@ -111,12 +102,13 @@ BM_try_resolve_thinknode_request(
     session.api_url = api_url;
     session.access_token = "xyz";
     bool remotely = proxy_name != nullptr;
-    thinknode_request_context ctx{service, session, nullptr, remotely};
     if (remotely)
     {
-        register_remote_services(proxy_name, response);
-        ctx.proxy_name(proxy_name);
+        register_remote_services(service, proxy_name, response);
     }
+    std::string proxy_name_string{proxy_name ? proxy_name : ""};
+    thinknode_request_context ctx{
+        service, session, nullptr, remotely, proxy_name_string};
 
     // Fill the appropriate cache if any
     auto init = [&]() -> cppcoro::task<void> {
@@ -203,11 +195,11 @@ BM_resolve_thinknode_request(
     }
     catch (std::exception& e)
     {
-        state.SkipWithError(e.what());
+        handle_benchmark_exception(state, e.what());
     }
     catch (...)
     {
-        state.SkipWithError("Caught unknown exception");
+        handle_benchmark_exception(state, "Caught unknown exception");
     }
 }
 

@@ -88,7 +88,8 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
                 std::string name{owner->mapped_file()};
                 uint32_t size = static_cast<uint32_t>(name.size());
                 o.type = msgpack::type::STR;
-                char* ptr = static_cast<char*>(o.zone.allocate_align(size, MSGPACK_ZONE_ALIGNOF(char)));
+                char* ptr = static_cast<char*>(
+                    o.zone.allocate_align(size, MSGPACK_ZONE_ALIGNOF(char)));
                 o.via.str.ptr = ptr;
                 o.via.str.size = size;
                 std::memcpy(ptr, name.c_str(), size);
