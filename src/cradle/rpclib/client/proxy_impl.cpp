@@ -192,9 +192,8 @@ rpclib_client_impl::server_is_running()
     }
     logger_->info(
         "received pong {}: rpclib server is running", server_git_version);
-    // TODO: Reenable this.
     // Detect a rogue rpclib server instance (TODO finetune)
-    // verify_git_version(server_git_version);
+    verify_git_version(server_git_version);
     // rpc_client_->set_timeout(30);
     return true;
 }
