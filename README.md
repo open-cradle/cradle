@@ -111,6 +111,14 @@ directory:
 
 (Each file should contain just the secret string.)
 
+## Other Packages
+
+### Ubuntu
+
+You may also need to install these packages:
+
+`sudo apt-get install zip pkg-config`
+
 ## Invoking CMake
 
 Once you have everything set up, you can run CMake to generate your build
