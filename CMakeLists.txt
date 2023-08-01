@@ -256,9 +256,8 @@ elseif("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "GitCache" OR
             if("${CRADLE_COMMIT_HASH}" STREQUAL "")
                 # Get the current commit hash for the CRADLE repository.
                 execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
-                    OUTPUT_VARIABLE commit_hash)
-                # Strip trailing newline.
-                string(REPLACE "\n" "" commit_hash "${commit_hash}")
+                    OUTPUT_VARIABLE commit_hash
+                    OUTPUT_STRIP_TRAILING_WHITESPACE)
             else()
                 set(commit_hash ${CRADLE_COMMIT_HASH})
             endif()
