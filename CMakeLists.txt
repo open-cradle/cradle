@@ -377,13 +377,9 @@ file(GLOB_RECURSE srcs_plugins_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/testing/*.cpp")
 add_library(cradle_plugins_inner STATIC ${srcs_plugins_inner})
 record_public_include_directory(cradle_plugins_inner
-    ${generated_src_dir}
-    include/generated
-    "*.hpp")
-record_public_include_directory(cradle_plugins_inner
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     include
-    "*.h*")
+    "*.h")
 target_link_libraries(cradle_plugins_inner PUBLIC
     cradle_inner
     lib_third_party
@@ -401,13 +397,9 @@ target_sources(cradle_rpclib_client PRIVATE
     ${srcs_rpclib_client}
     ${deploy_dir_file})
 record_public_include_directory(cradle_rpclib_client
-    ${generated_src_dir}
-    include/generated
-    "*.hpp")
-record_public_include_directory(cradle_rpclib_client
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     include
-    "*.h*")
+    "*.h")
 target_link_libraries(cradle_rpclib_client PUBLIC
     cradle_inner
     Boost::filesystem
@@ -428,7 +420,7 @@ record_public_include_directory(cradle_typing
 record_public_include_directory(cradle_typing
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     include
-    "*.h*")
+    "*.h")
 target_link_libraries(cradle_typing PUBLIC
     cradle_inner
     Boost::headers

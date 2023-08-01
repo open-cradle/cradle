@@ -1,8 +1,8 @@
 #include <fmt/format.h>
 
 #include <cradle/inner/core/exception.h>
+#include <cradle/inner/io/http_requests.h>
 #include <cradle/plugins/secondary_cache/http/http_cache.h>
-#include <cradle/typing/io/http_requests.hpp>
 
 namespace cradle {
 
