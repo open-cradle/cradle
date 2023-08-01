@@ -36,7 +36,6 @@ jobs:
         export CXX=`which g++-10`
         ${CXX} --version
         scripts/set-up-python.sh --python=python3
-        source .venv/bin/activate
         cmake -Bbuild -DCMAKE_BUILD_TYPE=${{matrix.config}} \
           -D"CMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
           .
