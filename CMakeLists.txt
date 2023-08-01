@@ -253,20 +253,20 @@ elseif("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "GitCache" OR
     if("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "GitCache")
         message(STATUS "Retrieving preprocessed files from Git cache")
         find_package(Git)
-            if("${CRADLE_COMMIT_HASH}" STREQUAL "")
-                # Get the current commit hash for the CRADLE repository.
-                execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
-                    OUTPUT_VARIABLE commit_hash
-                    OUTPUT_STRIP_TRAILING_WHITESPACE)
-            else()
-                set(commit_hash ${CRADLE_COMMIT_HASH})
-            endif()
-            # This fails if CMake is reinvoked, but given that it is only meant
-            # to be used in automated builds of CRADLE as a dependency, it
-            # seems fine to leave it as is until another use case emerges.
-            execute_process(
-                COMMAND ${GIT_EXECUTABLE} clone https://github.com/open-cradle/preprocessor-output
-                WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+        if("${CRADLE_COMMIT_HASH}" STREQUAL "")
+            # Get the current commit hash for the CRADLE repository.
+            execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+                OUTPUT_VARIABLE commit_hash
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+        else()
+            set(commit_hash ${CRADLE_COMMIT_HASH})
+        endif()
+        # This fails if CMake is reinvoked, but given that it is only meant to
+        # be used in automated builds of CRADLE as a dependency, it seems fine
+        # to leave it as is until another use case emerges.
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} clone https://github.com/open-cradle/preprocessor-output
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
         execute_process(
             COMMAND ${GIT_EXECUTABLE} checkout "output-${commit_hash}"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/preprocessor-output")
