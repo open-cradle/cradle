@@ -66,12 +66,6 @@ class request_uuid
     request_uuid&
     set_level(caching_level_type level);
 
-    // Causes the base uuid to be combined with Git information to produce
-    // something unique across application runs on different builds.
-    // It is unclear how useful this is.
-    request_uuid&
-    use_git_version();
-
     // Returns the full uuid (base + any extensions)
     std::string const&
     str() const
@@ -91,9 +85,6 @@ class request_uuid
     {
         return str() <=> other.str();
     }
-
-    static std::string const&
-    get_git_version();
 
     // Serialize using cereal.
     // This results in JSON
@@ -122,8 +113,6 @@ class request_uuid
     // Used in load_with_name() only
     request_uuid() = default;
 
-    inline static std::string git_version_;
-
     // str_ is the full string if finalized_, base until then
     mutable std::string str_;
     mutable bool finalized_{false};
@@ -131,7 +120,6 @@ class request_uuid
     // Modifiers
     bool include_level_{false};
     caching_level_type level_{};
-    bool use_git_version_{false};
 
     void
     check_not_finalized() const;

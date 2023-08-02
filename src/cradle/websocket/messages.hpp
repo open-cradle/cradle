@@ -298,7 +298,6 @@ union client_message_content
     cradle::results_api_query local_results_api_query;
     cradle::introspection_control_request introspection_control;
     cradle::introspection_status_request introspection_status_query;
-    cradle::nil_t requests_meta_info_query;
     cradle::resolve_request_request resolve_request;
 };
 
@@ -351,14 +350,6 @@ struct introspection_status_response
     std::vector<tasklet_overview> tasklets;
 };
 
-// Information on the requests subsystem
-api(struct)
-struct requests_meta_info_response
-{
-    // The Git version string forming part of some request uuid's
-    std::string git_version;
-};
-
 api(union)
 union server_message_content
 {
@@ -384,7 +375,6 @@ union server_message_content
     cradle::local_results_api_response local_results_api_response;
     nil_t introspection_control_response;
     cradle::introspection_status_response introspection_status_response;
-    cradle::requests_meta_info_response requests_meta_info_response;
     cradle::dynamic resolve_request_response;
 };
 

@@ -168,7 +168,7 @@ run_server(cli_options const& options)
     srv.bind("ack_response", [&](int response_id) {
         return handle_ack_response(hctx, response_id);
     });
-    srv.bind("ping", []() { return request_uuid::get_git_version(); });
+    srv.bind("ping", []() { return RPCLIB_PROTOCOL; });
 
     srv.bind(
         "submit_async", [&](std::string config_json, std::string seri_req) {

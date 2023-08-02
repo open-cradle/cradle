@@ -11,8 +11,6 @@ from cradle.session import Session
 def make_req(session: Session, uuid_base: str, title: str, args: List) -> Any:
     # Request metadata
     uuid = uuid_base
-    # Or, if using Git version:
-    # uuid = f'{uuid_base}+{session.git_version}'
 
     # Args
     args_data = {f'tuple_element{i}': arg for i, arg in enumerate(args)}
