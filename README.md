@@ -28,6 +28,14 @@ versions of the supported compilers) likely won't work.
 CRADLE is built using CMake and requires a relatively recent version. It's
 known to work on 3.18 and 3.19. It should work on more recent versions as well.
 
+### vcpkg
+
+CRADLE uses vcpkg to manage dependencies. If you don't already have vcpkg,
+visit https://vcpkg.io/en/getting-started and following the instructions in the
+'Install vcpkg' section for your OS. You don't need to follow any of the other
+instructions, but you should note the path at which you installed vcpkg as
+you'll need that for running CMake.
+
 ### OCaml
 
 CRADLE has a custom preprocessor that's written in OCaml, so the build process
@@ -48,8 +56,7 @@ choco install ocpwin
 
 ### Python
 
-CRADLE uses Python (3.x) both indirectly (via Conan) and directly (for some
-testing purposes).
+CRADLE uses Python (3.x) for some testing purposes.
 
 #### Ubuntu
 
@@ -82,7 +89,7 @@ you can do so yourself if you like.
 Either way, you should install the following packages:
 
 ```shell
-pip install conan gcovr pytest websocket-client msgpack
+pip install gcovr pytest requests websocket-client msgpack pyyaml
 ```
 
 ## Secrets
@@ -104,23 +111,39 @@ directory:
 
 (Each file should contain just the secret string.)
 
-## Building
+## Other Packages
 
-Once you have everything set up, actually building follows the standard CMake
-form:
+### Ubuntu
+
+You may also need to install these packages:
+
+`sudo apt-get install zip pkg-config`
+
+## Invoking CMake
+
+Once you have everything set up, you can run CMake to generate your build
+files. The only tricky part about this is that you must include the vcpkg
+toolchain file.
+
+### Via the Command Line
 
 ```shell
-cmake -Bbuild .
+cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake .
 ```
 
 or
 
 ```shell
-cmake -Bbuild -DCMAKE_BUILD_TYPE=Release .
+cmake -Bbuild -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake -DCMAKE_BUILD_TYPE=Release .
 ```
 
-You should also be able to use the CMake integration tools in Visual Studio
-Code (tested) or Visual Studio (untested).
+### Within Visual Studio Code
+
+Visual Studio Code provides CMake integration tools. CRADLE will work with
+these as long as you edit the `cmake.configureArgs` setting to include
+`-DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake`.
+(This setting appears as `Cmake: Configure Args` in the Settings UI and can be
+updated at the workspace level if you prefer to keep it CRADLE-specific.)
 
 ## Testing
 
@@ -136,4 +159,5 @@ moment, and it's not really clear that the current form has any purpose in the
 project moving forward.)
 
 ## Documentation
+
 More [documentation](docs/generated/README.md).

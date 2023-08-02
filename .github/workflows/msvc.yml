@@ -17,12 +17,10 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Cache
-      uses: actions/cache@v3
+    # TODO: The preprocessing job shouldn't require vcpkg.
+    - uses: friendlyanon/setup-vcpkg@v1
       with:
-        path: |
-          ~/.conan/data
-        key: ${{runner.os}}-GCC-10-${{matrix.config}}
+        committish: 662dbb50e63af15baa2909b7eac5b1b87e86a0aa
 
     - name: Install
       run: |
@@ -36,14 +34,27 @@ jobs:
         ${CXX} --version
         scripts/set-up-python.sh --python=python3
         source .venv/bin/activate
-        cmake -Bbuild -DCMAKE_BUILD_TYPE=Debug .
+        cmake -Bbuild -DCMAKE_BUILD_TYPE=Debug \
+          -D"CMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+          .
         cmake --build build --target preprocessing -j4
 
-    - name: Upload preprocessed headers
+    - name: Upload preprocessed headers as build artifact
       uses: actions/upload-artifact@v3
       with:
         name: preprocessed
         path: build/generated
+
+    - name: Deploy preprocessed headers to preprocessor-output repo
+      uses: JamesIves/github-pages-deploy-action@v4.4.1
+      with:
+        repository-name: open-cradle/preprocessor-output
+        branch: output
+        target-folder: generated
+        tag: output-${{ github.sha }}
+        token: ${{ secrets.CRADLE_PREPROCESSOR_OUTPUT_TOKEN }}
+        folder: build/generated
+        single-commit: true
 
   VS2019:
     runs-on: windows-2019
@@ -58,16 +69,9 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Cache
-      uses: actions/cache@v3
+    - uses: friendlyanon/setup-vcpkg@v1
       with:
-        path: |
-          C:/.conan/data
-        key: ${{runner.os}}-MSVC-2019-${{matrix.config}}
-
-    - name: Install Conan
-      run: |
-        pip install conan==1.59.0
+        committish: 662dbb50e63af15baa2909b7eac5b1b87e86a0aa
 
     - name: Download preprocessed headers
       uses: actions/download-artifact@v3
@@ -75,16 +79,22 @@ jobs:
         name: preprocessed
         path: preprocessed
 
+    - name: Set Up Python
+      run: |
+        pip install pyyaml
+
     - name: Configure
       run: >
         cmake -Bbuild -DCMAKE_BUILD_TYPE=${{matrix.config}}
-        -DPREPROCESSOR_USAGE=External
-        -DEXTERNALLY_PREPROCESSED_DIRECTORY=preprocessed
-        -DLOCAL_DOCKER_TESTING=OFF
+        -D"CMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+        -DCRADLE_PREPROCESSOR_USAGE=External
+        -DCRADLE_EXTERNALLY_PREPROCESSED_DIRECTORY=preprocessed
+        -DCRADLE_LOCAL_DOCKER_TESTING=OFF
 
     - name: Build
       run: |
         cmake --build build --config ${{matrix.config}} -j4
+        Get-ChildItem -Recurse build
 
     - name: Test
       run: |

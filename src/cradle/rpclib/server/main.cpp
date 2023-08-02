@@ -147,7 +147,7 @@ run_server(cli_options const& options)
 
     register_and_initialize_all_domains();
 
-    rpc::server srv(options.port);
+    rpc::server srv("127.0.0.1", options.port);
     my_logger->info("listening on port {}", srv.port());
 
     // TODO we need a session concept and a "start session" / "register"

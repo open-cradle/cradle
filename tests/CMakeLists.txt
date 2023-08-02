@@ -21,8 +21,7 @@ add_library(test_lib_unit OBJECT ${test_srcs_unit})
 target_link_libraries(test_lib_unit PUBLIC
     cradle_websocket
     cradle_plugins_typing
-    cradle_plugins_inner
-    fakeit::fakeit)
+    cradle_plugins_inner)
 
 # Add the unit test runner.
 add_executable(unit_test_runner)
@@ -31,7 +30,7 @@ target_sources(unit_test_runner PRIVATE
     support/outer_service.cpp
     support/thinknode.cpp)
 target_include_directories(unit_test_runner PUBLIC
-    ${generated_src_dirs}
+    ${generated_src_dir}
     src)
 target_link_libraries(unit_test_runner PRIVATE
     test_lib_runner
@@ -46,7 +45,7 @@ add_custom_target(
     # tests within that. (Some of them perform file I/O.)
     COMMAND ${CMAKE_COMMAND} -E remove_directory unit-testing
     COMMAND ${CMAKE_COMMAND} -E make_directory unit-testing
-    COMMAND ${CMAKE_COMMAND} -E chdir unit-testing ${CMAKE_COMMAND} -E env CRADLE_DEPLOY_DIR=${CMAKE_CURRENT_BINARY_DIR}/deploy CRADLE_THINKNODE_API_TOKEN=${API_TOKEN} CRADLE_THINKNODE_DOCKER_AUTH=${DOCKER_AUTH} $<TARGET_FILE:unit_test_runner>
+    COMMAND ${CMAKE_COMMAND} -E chdir unit-testing ${CMAKE_COMMAND} -E env CRADLE_DEPLOY_DIR=${CMAKE_CURRENT_BINARY_DIR} CRADLE_THINKNODE_API_TOKEN=${API_TOKEN} CRADLE_THINKNODE_DOCKER_AUTH=${DOCKER_AUTH} $<TARGET_FILE:unit_test_runner>
     WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
     DEPENDS unit_test_runner)
 add_test(
@@ -99,7 +98,7 @@ add_executable(external_test_runner)
 target_sources(external_test_runner PRIVATE
     support/outer_service.cpp)
 target_include_directories(external_test_runner PUBLIC
-    ${generated_src_dirs}
+    ${generated_src_dir}
     src)
 target_link_libraries(external_test_runner PRIVATE
     test_lib_external
@@ -152,7 +151,7 @@ target_sources(all_unit_tests_runner PRIVATE
     support/outer_service.cpp
     support/thinknode.cpp)
 target_include_directories(all_unit_tests_runner PUBLIC
-    ${generated_src_dirs}
+    ${generated_src_dir}
     src)
 target_link_libraries(all_unit_tests_runner
     test_lib_runner
@@ -168,7 +167,7 @@ add_custom_target(
     # tests within that. (Some of them perform file I/O.)
     COMMAND ${CMAKE_COMMAND} -E remove_directory all-unit-testing
     COMMAND ${CMAKE_COMMAND} -E make_directory all-unit-testing
-    COMMAND ${CMAKE_COMMAND} -E chdir all-unit-testing ${CMAKE_COMMAND} -E env CRADLE_DEPLOY_DIR=${CMAKE_CURRENT_BINARY_DIR}/deploy CRADLE_THINKNODE_API_TOKEN=${API_TOKEN} CRADLE_THINKNODE_DOCKER_AUTH=${DOCKER_AUTH} $<TARGET_FILE:all_unit_tests_runner>
+    COMMAND ${CMAKE_COMMAND} -E chdir all-unit-testing ${CMAKE_COMMAND} -E env CRADLE_DEPLOY_DIR=${CMAKE_CURRENT_BINARY_DIR} CRADLE_THINKNODE_API_TOKEN=${API_TOKEN} CRADLE_THINKNODE_DOCKER_AUTH=${DOCKER_AUTH} $<TARGET_FILE:all_unit_tests_runner>
     WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
     DEPENDS all_unit_tests_runner)
 add_dependencies(all_unit_tests rpclib_server)
@@ -208,7 +207,7 @@ target_link_libraries(test_lib_benchmark PUBLIC
 
 add_executable(benchmark_test_runner)
 target_sources(benchmark_test_runner PRIVATE
-    support/inner_service.cpp 
+    support/inner_service.cpp
     support/outer_service.cpp
     support/thinknode.cpp)
 target_link_libraries(benchmark_test_runner PRIVATE

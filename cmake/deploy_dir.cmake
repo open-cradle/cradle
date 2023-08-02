@@ -6,6 +6,8 @@ else()
     set(exe_ext "")
 endif()
 
+get_filename_component(deploy_dir "${deployed_executable}" DIRECTORY)
+
 message(VERBOSE "Generating ${output_file} from ${input_file}")
 
 file(MAKE_DIRECTORY ${output_dir})

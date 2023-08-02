@@ -7,6 +7,8 @@
 #include <optional>
 #include <string>
 
+#include <fmt/ostream.h>
+
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/fs/types.h>
 
@@ -190,5 +192,20 @@ struct http_connection : http_connection_interface
 };
 
 } // namespace cradle
+
+template<>
+struct fmt::formatter<cradle::http_request_method> : fmt::ostream_formatter
+{
+};
+
+template<>
+struct fmt::formatter<cradle::http_request> : fmt::ostream_formatter
+{
+};
+
+template<>
+struct fmt::formatter<cradle::http_response> : fmt::ostream_formatter
+{
+};
 
 #endif

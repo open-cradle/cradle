@@ -13,7 +13,7 @@
 
 using namespace cradle;
 
-#ifdef LOCAL_DOCKER_TESTING
+#ifdef CRADLE_LOCAL_DOCKER_TESTING
 TEST_CASE("local calcs", "[local_calcs][ws]")
 {
     service_core core;
