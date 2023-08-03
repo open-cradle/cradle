@@ -32,14 +32,6 @@ request_uuid::set_level(caching_level_type level)
     return *this;
 }
 
-request_uuid&
-request_uuid::use_git_version()
-{
-    check_not_finalized();
-    use_git_version_ = true;
-    return *this;
-}
-
 void
 request_uuid::check_not_finalized() const
 {
@@ -57,29 +49,7 @@ request_uuid::do_finalize() const
         static const char* const level_exts[] = {"+none", "+mem", "+full"};
         str_ += level_exts[static_cast<int>(level_)];
     }
-    if (use_git_version_)
-    {
-        str_ += '+';
-        str_ += get_git_version();
-    }
     finalized_ = true;
-}
-
-std::string const&
-request_uuid::get_git_version()
-{
-    if (git_version_.empty())
-    {
-        git_version_ = ::version_info.commit_object_name;
-        if (::version_info.dirty)
-        {
-            // If there are local modifications, it becomes the user's
-            // responsibility to manually remove outdated files like the
-            // disk cache.
-            git_version_ += "-dirty";
-        }
-    }
-    return git_version_;
 }
 
 } // namespace cradle

@@ -67,7 +67,7 @@ class rpclib_client_impl
     ack_response(uint32_t pool_id);
 
     void
-    verify_git_version(std::string const& server_git_version);
+    verify_rpclib_protocol(std::string const& server_rpclib_protocol);
 
  private:
     inline static std::shared_ptr<spdlog::logger> logger_;

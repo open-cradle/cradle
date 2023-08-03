@@ -177,11 +177,11 @@ bool
 rpclib_client_impl::server_is_running()
 {
     logger_->info("test whether rpclib server is running");
-    std::string server_git_version;
+    std::string server_rpclib_protocol;
     try
     {
         rpc_client_ = std::make_unique<rpc::client>(localhost_, port_);
-        server_git_version = ping();
+        server_rpclib_protocol = ping();
     }
     catch (rpc::system_error& e)
     {
@@ -191,25 +191,25 @@ rpclib_client_impl::server_is_running()
         return false;
     }
     logger_->info(
-        "received pong {}: rpclib server is running", server_git_version);
-    // Detect a rogue rpclib server instance (TODO finetune)
-    verify_git_version(server_git_version);
+        "received pong {}: rpclib server is running", server_rpclib_protocol);
+    // Detect an incompatible rpclib server instance.
+    verify_rpclib_protocol(server_rpclib_protocol);
     // rpc_client_->set_timeout(30);
     return true;
 }
 
 void
-rpclib_client_impl::verify_git_version(std::string const& server_git_version)
+rpclib_client_impl::verify_rpclib_protocol(
+    std::string const& server_rpclib_protocol)
 {
-    std::string client_git_version{request_uuid::get_git_version()};
-    if (server_git_version != client_git_version)
+    if (server_rpclib_protocol != RPCLIB_PROTOCOL)
     {
         auto msg{fmt::format(
             "rpclib server has {}, client has {}",
-            server_git_version,
-            client_git_version)};
+            server_rpclib_protocol,
+            RPCLIB_PROTOCOL)};
         logger_->error(msg);
-        throw remote_error("code version mismatch", msg);
+        throw remote_error("rpclib protocol mismatch", msg);
     }
 }
 
