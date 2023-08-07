@@ -301,6 +301,18 @@ set(intgen_src_dir
 # Establish the location of deploy_dir.h (which will be created later on).
 set(deploy_dir_file "${intgen_src_dir}/cradle/deploy_dir.h")
 
+# Create deploy_dir.h for providing access to the rpclib server executable.
+add_custom_command(
+    OUTPUT ${deploy_dir_file}
+    COMMAND ${CMAKE_COMMAND}
+        -D input_dir=${CMAKE_CURRENT_SOURCE_DIR}/cmake
+        -D output_dir=${intgen_src_dir}/cradle
+        -D deployed_executable="$<TARGET_FILE:rpclib_server>"
+        -D compiler_id=${CMAKE_CXX_COMPILER_ID}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.cmake
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.h.in)
+add_custom_target(deploy_dir_file_target DEPENDS ${deploy_dir_file})
+
 # Set up a public include directory for a target in a way that's compatible
 # with installing the headers in those directories for use by clients.
 # Note that using file sets may solve this problem more elegantly, but they are
@@ -395,8 +407,8 @@ file(GLOB_RECURSE srcs_rpclib_client CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/client/*.cpp")
 add_library(cradle_rpclib_client STATIC)
 target_sources(cradle_rpclib_client PRIVATE
-    ${srcs_rpclib_client}
-    ${deploy_dir_file})
+    ${srcs_rpclib_client})
+add_dependencies(cradle_rpclib_client deploy_dir_file_target)
 record_public_include_directory(cradle_rpclib_client
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     include
@@ -512,17 +524,6 @@ target_link_libraries(rpclib_server PRIVATE
     fmt::fmt
     rpclib::rpc
     spdlog::spdlog)
-
-# Create deploy_dir.h for providing access to the rpclib server executable.
-add_custom_command(
-    OUTPUT ${deploy_dir_file}
-    COMMAND ${CMAKE_COMMAND}
-        -D input_dir=${CMAKE_CURRENT_SOURCE_DIR}/cmake
-        -D output_dir=${intgen_src_dir}/cradle
-        -D deployed_executable="$<TARGET_FILE:rpclib_server>"
-        -D compiler_id=${CMAKE_CXX_COMPILER_ID}
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.cmake
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.h.in)
 
 # Convenience target denoting all servers
 add_custom_target(servers)

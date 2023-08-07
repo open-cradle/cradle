@@ -175,7 +175,9 @@ target_sources(manual_test_runner PRIVATE
     support/inner_service.cpp)
 target_include_directories(manual_test_runner PUBLIC
     ${generated_src_dir}
+    ${int_gen_src_dir}
     src)
+add_dependencies(manual_test_runner deploy_dir_file_target)
 target_link_libraries(manual_test_runner PRIVATE
     test_lib_manual
     test_lib_runner)
