@@ -160,6 +160,26 @@ target_link_libraries(all_unit_tests_runner
     test_lib_inner
     test_lib_plugins)
 
+# Define an object library covering the source files in manual/.
+file(GLOB_RECURSE test_srcs_manual CONFIGURE_DEPENDS
+    "manual/*.cpp")
+add_library(test_lib_manual OBJECT ${test_srcs_manual})
+target_link_libraries(test_lib_manual PUBLIC
+    cradle_inner
+    cradle_plugins_inner)
+
+# Add the manual test runner.
+# The runner should be invoked directly, not via CMake.
+add_executable(manual_test_runner)
+target_sources(manual_test_runner PRIVATE
+    support/inner_service.cpp)
+target_include_directories(manual_test_runner PUBLIC
+    ${generated_src_dir}
+    src)
+target_link_libraries(manual_test_runner PRIVATE
+    test_lib_manual
+    test_lib_runner)
+
 # Add a target running all unit tests (including external and inner).
 add_custom_target(
     all_unit_tests

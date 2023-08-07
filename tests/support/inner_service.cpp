@@ -4,6 +4,7 @@
 #include <cradle/inner/fs/utilities.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/service/resources.h>
+#include <cradle/plugins/requests_storage/http/http_requests_storage.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache_plugin.h>
 #include <cradle/rpclib/client/proxy.h>
@@ -23,6 +24,7 @@ static service_config_map const inner_config_map{
     {local_disk_cache_config_keys::NUM_THREADS_READ_POOL, 2U},
     {local_disk_cache_config_keys::NUM_THREADS_WRITE_POOL, 2U},
     {blob_cache_config_keys::DIRECTORY, tests_cache_dir},
+    {http_requests_storage_config_keys::PORT, 9092U},
 };
 
 service_config

@@ -34,7 +34,7 @@ class inner_resources_impl
         return *memory_cache_;
     }
 
-    secondary_cache_intf&
+    secondary_storage_intf&
     secondary_cache()
     {
         return *secondary_cache_;
@@ -78,7 +78,7 @@ class inner_resources_impl
  private:
     std::mutex mutex_;
     std::unique_ptr<cradle::immutable_cache> memory_cache_;
-    std::unique_ptr<secondary_cache_intf> secondary_cache_;
+    std::unique_ptr<secondary_storage_intf> secondary_cache_;
     std::unique_ptr<blob_file_directory> blob_dir_;
     std::unique_ptr<async_db> async_db_instance_;
     std::unordered_map<std::string, std::unique_ptr<remote_proxy>> proxies_;

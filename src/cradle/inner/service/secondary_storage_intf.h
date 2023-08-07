@@ -1,7 +1,7 @@
-#ifndef CRADLE_INNER_CACHING_SECONDARY_CACHE_INTF_H
-#define CRADLE_INNER_CACHING_SECONDARY_CACHE_INTF_H
+#ifndef CRADLE_INNER_SERVICE_SECONDARY_STORAGE_INTF_H
+#define CRADLE_INNER_SERVICE_SECONDARY_STORAGE_INTF_H
 
-// Interface to a secondary cache (e.g., a disk cache).
+// Interface to a secondary storage (e.g., a disk cache).
 // The implementation will be provided by a plugin.
 
 #include <string>
@@ -13,10 +13,10 @@
 
 namespace cradle {
 
-class secondary_cache_intf
+class secondary_storage_intf
 {
  public:
-    virtual ~secondary_cache_intf() = default;
+    virtual ~secondary_storage_intf() = default;
 
     // Currently called from benchmark tests only, where it is expected to
     // empty the cache, but that's not what's happening.
@@ -25,7 +25,7 @@ class secondary_cache_intf
         = 0;
 
     // Reads the value for key.
-    // Returns blob{} if the value is not in the cache.
+    // Returns blob{} if the value is not in the storage.
     // Throws on other errors.
     // This could be a coroutine so takes arguments by value.
     virtual cppcoro::task<blob>

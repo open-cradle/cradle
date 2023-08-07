@@ -374,6 +374,7 @@ target_link_libraries(cradle_inner PUBLIC
 # A library for the plugins depending on the inner library
 file(GLOB_RECURSE srcs_plugins_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/secondary_cache/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/requests_storage/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/testing/*.cpp")
 add_library(cradle_plugins_inner STATIC ${srcs_plugins_inner})
 record_public_include_directory(cradle_plugins_inner

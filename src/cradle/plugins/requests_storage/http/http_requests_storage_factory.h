@@ -1,11 +1,11 @@
-#ifndef CRADLE_PLUGINS_SECONDARY_CACHE_LOCAL_LOCAL_DISK_CACHE_FACTORY_H
-#define CRADLE_PLUGINS_SECONDARY_CACHE_LOCAL_LOCAL_DISK_CACHE_FACTORY_H
+#ifndef CRADLE_PLUGINS_REQUESTS_STORAGE_HTTP_HTTP_REQUESTS_STORAGE_FACTORY_H
+#define CRADLE_PLUGINS_REQUESTS_STORAGE_HTTP_HTTP_REQUESTS_STORAGE_FACTORY_H
 
 #include <cradle/inner/service/resources.h>
 
 namespace cradle {
 
-class local_disk_cache_factory : public secondary_storage_factory
+class http_requests_storage_factory : public secondary_storage_factory
 {
  public:
     std::unique_ptr<secondary_storage_intf>

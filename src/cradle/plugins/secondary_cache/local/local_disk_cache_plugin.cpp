@@ -7,7 +7,7 @@ namespace cradle {
 void
 activate_local_disk_cache_plugin()
 {
-    register_secondary_cache_factory(
+    register_secondary_storage_factory(
         local_disk_cache_config_values::PLUGIN_NAME,
         std::make_unique<local_disk_cache_factory>());
 }

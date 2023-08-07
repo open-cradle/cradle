@@ -9,13 +9,13 @@
 
 #include <cradle/inner/caching/immutable.h>
 #include <cradle/inner/caching/immutable/cache.h>
-#include <cradle/inner/caching/secondary_cache_intf.h>
 #include <cradle/inner/caching/secondary_cache_serialization.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/resolve/remote.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/service/secondary_cached_blob.h>
+#include <cradle/inner/service/secondary_storage_intf.h>
 
 /*
  * Service resolving a request to a value

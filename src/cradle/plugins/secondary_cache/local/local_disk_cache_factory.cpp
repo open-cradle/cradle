@@ -4,7 +4,7 @@
 
 namespace cradle {
 
-std::unique_ptr<secondary_cache_intf>
+std::unique_ptr<secondary_storage_intf>
 local_disk_cache_factory::create(
     inner_resources& resources, service_config const& config)
 {
