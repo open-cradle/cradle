@@ -64,6 +64,9 @@ endif()
 # Define profiling options.
 option(CRADLE_GPROF_PROFILING "Enable CPU profiling using gprof" OFF)
 
+# Define TSan (ThreadSanitizer) options.
+option(CRADLE_THREAD_SANITIZER "Enable ThreadSanitizer (TSan)" OFF)
+
 # Detect the compiler.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(IS_CLANG true)
@@ -203,11 +206,6 @@ if(IS_MSVC)
     add_compile_options(/bigobj)
 endif()
 
-# Enable the address sanitizer (for now).
-# if(IS_MSVC)
-#     add_compile_options(/fsanitize=address /Zi)
-# endif()
-
 # Exclude as much of the Windows API as possible to avoid #define pollution
 # and speed up builds. Note that this has to be done via command-line arguments
 # due to the use of precompiled hearders.
@@ -226,6 +224,16 @@ elseif(IS_CLANG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
                         -fcoverage-mapping)
     string(APPEND CMAKE_EXE_LINKER_FLAGS
            " -fprofile-instr-generate -fcoverage-mapping")
+endif()
+
+if(CRADLE_THREAD_SANITIZER)
+    message(STATUS "Enabling ThreadSanitizer")
+    if(IS_GCC OR IS_CLANG)
+        add_compile_options(-fsanitize=thread -g)
+        string(APPEND CMAKE_EXE_LINKER_FLAGS " -fsanitize=thread")
+    elseif(IS_MSVC)
+       add_compile_options(/fsanitize=address /Zi)
+    endif()
 endif()
 
 # Preprocess the API headers.
@@ -301,6 +309,18 @@ set(intgen_src_dir
 # Establish the location of deploy_dir.h (which will be created later on).
 set(deploy_dir_file "${intgen_src_dir}/cradle/deploy_dir.h")
 
+# Create deploy_dir.h for providing access to the rpclib server executable.
+add_custom_command(
+    OUTPUT ${deploy_dir_file}
+    COMMAND ${CMAKE_COMMAND}
+        -D input_dir=${CMAKE_CURRENT_SOURCE_DIR}/cmake
+        -D output_dir=${intgen_src_dir}/cradle
+        -D deployed_executable="$<TARGET_FILE:rpclib_server>"
+        -D compiler_id=${CMAKE_CXX_COMPILER_ID}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.cmake
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.h.in)
+add_custom_target(deploy_dir_file_target DEPENDS ${deploy_dir_file})
+
 # Set up a public include directory for a target in a way that's compatible
 # with installing the headers in those directories for use by clients.
 # Note that using file sets may solve this problem more elegantly, but they are
@@ -374,6 +394,7 @@ target_link_libraries(cradle_inner PUBLIC
 # A library for the plugins depending on the inner library
 file(GLOB_RECURSE srcs_plugins_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/secondary_cache/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/requests_storage/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/testing/*.cpp")
 add_library(cradle_plugins_inner STATIC ${srcs_plugins_inner})
 record_public_include_directory(cradle_plugins_inner
@@ -394,8 +415,8 @@ file(GLOB_RECURSE srcs_rpclib_client CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/client/*.cpp")
 add_library(cradle_rpclib_client STATIC)
 target_sources(cradle_rpclib_client PRIVATE
-    ${srcs_rpclib_client}
-    ${deploy_dir_file})
+    ${srcs_rpclib_client})
+add_dependencies(cradle_rpclib_client deploy_dir_file_target)
 record_public_include_directory(cradle_rpclib_client
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     include
@@ -511,17 +532,6 @@ target_link_libraries(rpclib_server PRIVATE
     fmt::fmt
     rpclib::rpc
     spdlog::spdlog)
-
-# Create deploy_dir.h for providing access to the rpclib server executable.
-add_custom_command(
-    OUTPUT ${deploy_dir_file}
-    COMMAND ${CMAKE_COMMAND}
-        -D input_dir=${CMAKE_CURRENT_SOURCE_DIR}/cmake
-        -D output_dir=${intgen_src_dir}/cradle
-        -D deployed_executable="$<TARGET_FILE:rpclib_server>"
-        -D compiler_id=${CMAKE_CXX_COMPILER_ID}
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.cmake
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.h.in)
 
 # Convenience target denoting all servers
 add_custom_target(servers)

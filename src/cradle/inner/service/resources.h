@@ -12,12 +12,12 @@
 #include <cradle/inner/blob_file/blob_file.h>
 #include <cradle/inner/blob_file/blob_file_dir.h>
 #include <cradle/inner/caching/immutable/cache.h>
-#include <cradle/inner/caching/secondary_cache_intf.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/io/http_requests.h>
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/service/config.h>
+#include <cradle/inner/service/secondary_storage_intf.h>
 
 namespace cradle {
 
@@ -36,7 +36,7 @@ struct inner_config_keys
     // (Mandatory string)
     // Specifies the factory to use to create a secondary cache implementation.
     // The string should equal a key passed to
-    // register_secondary_cache_factory().
+    // register_secondary_storage_factory().
     inline static std::string const SECONDARY_CACHE_FACTORY{
         "secondary_cache/factory"};
 
@@ -50,22 +50,23 @@ struct inner_config_keys
     inline static std::string const ASYNC_CONCURRENCY{"async_concurrency"};
 };
 
-// Factory of secondary_cache_intf objects.
+// Factory of secondary_storage_intf objects.
 // A "disk cache" type of plugin would implement one such factory.
-class secondary_cache_factory
+class secondary_storage_factory
 {
  public:
-    virtual ~secondary_cache_factory() = default;
+    virtual ~secondary_storage_factory() = default;
 
-    virtual std::unique_ptr<secondary_cache_intf>
+    virtual std::unique_ptr<secondary_storage_intf>
     create(inner_resources& resources, service_config const& config) = 0;
 };
 
 // Registers a secondary cache factory, identified by a key.
 // A plugin would call this function in its initialization.
 void
-register_secondary_cache_factory(
-    std::string const& key, std::unique_ptr<secondary_cache_factory> factory);
+register_secondary_storage_factory(
+    std::string const& key,
+    std::unique_ptr<secondary_storage_factory> factory);
 
 class inner_resources
 {
@@ -90,7 +91,7 @@ class inner_resources
     cradle::immutable_cache&
     memory_cache();
 
-    secondary_cache_intf&
+    secondary_storage_intf&
     secondary_cache();
 
     std::shared_ptr<blob_file_writer>

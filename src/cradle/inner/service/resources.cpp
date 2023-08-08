@@ -6,7 +6,6 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
-#include <cradle/inner/caching/secondary_cache_intf.h>
 #include <cradle/inner/core/monitoring.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/fs/file_io.h>
@@ -15,15 +14,16 @@
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/service/resources_impl.h>
+#include <cradle/inner/service/secondary_storage_intf.h>
 
 namespace cradle {
 
-static std::map<std::string, std::unique_ptr<secondary_cache_factory>>
+static std::map<std::string, std::unique_ptr<secondary_storage_factory>>
     secondary_cache_factories;
 
 void
-register_secondary_cache_factory(
-    std::string const& key, std::unique_ptr<secondary_cache_factory> factory)
+register_secondary_storage_factory(
+    std::string const& key, std::unique_ptr<secondary_storage_factory> factory)
 {
     secondary_cache_factories.emplace(key, std::move(factory));
 }
@@ -70,7 +70,7 @@ inner_resources::memory_cache()
     return impl_->memory_cache();
 }
 
-secondary_cache_intf&
+secondary_storage_intf&
 inner_resources::secondary_cache()
 {
     return impl_->secondary_cache();

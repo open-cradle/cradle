@@ -4,8 +4,8 @@
 #include <BS_thread_pool.hpp>
 #include <cppcoro/static_thread_pool.hpp>
 
-#include <cradle/inner/caching/secondary_cache_intf.h>
 #include <cradle/inner/service/config.h>
+#include <cradle/inner/service/secondary_storage_intf.h>
 #include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
 
 namespace cradle {
@@ -34,7 +34,7 @@ struct local_disk_cache_config_values
     inline static std::string const PLUGIN_NAME{"local_disk_cache"};
 };
 
-class local_disk_cache : public secondary_cache_intf
+class local_disk_cache : public secondary_storage_intf
 {
  public:
     local_disk_cache(service_config const& config);

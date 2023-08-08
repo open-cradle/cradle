@@ -4,6 +4,7 @@
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/service/resources.h>
+#include <cradle/plugins/domain/testing/domain.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/plugins/domain/testing/seri_catalog.h>
 #include <cradle/plugins/serialization/request/cereal_json.h>
@@ -18,6 +19,7 @@ static char const tag[] = "[inner][resolve][seri_req]";
 static void
 test_resolve(bool remotely)
 {
+    register_and_initialize_testing_domain();
     register_testing_seri_resolvers();
     inner_resources resources;
     init_test_inner_service(resources);

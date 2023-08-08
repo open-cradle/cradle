@@ -566,7 +566,7 @@ open_and_check_db(ll_disk_cache_impl& cache)
     // Get the version number embedded in the database.
     cache.database_version_query
         = prepare_statement(cache, "pragma user_version;");
-    int database_version;
+    int database_version{};
     execute_prepared_statement(
         cache,
         cache.database_version_query,

@@ -15,7 +15,6 @@
 #include <boost/crc.hpp>
 #endif
 
-#include <cradle/inner/caching/secondary_cache_intf.h>
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/core/type_interfaces.h>
@@ -24,6 +23,7 @@
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/fs/types.h>
 #include <cradle/inner/service/resources.h>
+#include <cradle/inner/service/secondary_storage_intf.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 
 namespace cradle {

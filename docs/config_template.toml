@@ -45,6 +45,10 @@ num_threads_write_pool = 2
 # HTTP port
 port = 9090
 
+[http_requests_storage]
+# HTTP port
+port = 9092
+
 [blob_cache]
 directory = "/home/user/.cache/cradle"
 
