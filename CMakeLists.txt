@@ -64,6 +64,9 @@ endif()
 # Define profiling options.
 option(CRADLE_GPROF_PROFILING "Enable CPU profiling using gprof" OFF)
 
+# Define TSan (ThreadSanitizer) options.
+option(CRADLE_THREAD_SANITIZER "Enable ThreadSanitizer (TSan)" OFF)
+
 # Detect the compiler.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(IS_CLANG true)
@@ -203,11 +206,6 @@ if(IS_MSVC)
     add_compile_options(/bigobj)
 endif()
 
-# Enable the address sanitizer (for now).
-# if(IS_MSVC)
-#     add_compile_options(/fsanitize=address /Zi)
-# endif()
-
 # Exclude as much of the Windows API as possible to avoid #define pollution
 # and speed up builds. Note that this has to be done via command-line arguments
 # due to the use of precompiled hearders.
@@ -226,6 +224,16 @@ elseif(IS_CLANG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
                         -fcoverage-mapping)
     string(APPEND CMAKE_EXE_LINKER_FLAGS
            " -fprofile-instr-generate -fcoverage-mapping")
+endif()
+
+if(CRADLE_THREAD_SANITIZER)
+    message(STATUS "Enabling ThreadSanitizer")
+    if(IS_GCC OR IS_CLANG)
+        add_compile_options(-fsanitize=thread -g)
+        string(APPEND CMAKE_EXE_LINKER_FLAGS " -fsanitize=thread")
+    elseif(IS_MSVC)
+       add_compile_options(/fsanitize=address /Zi)
+    endif()
 endif()
 
 # Preprocess the API headers.

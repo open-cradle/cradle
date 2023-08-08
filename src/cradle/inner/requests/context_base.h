@@ -351,7 +351,7 @@ class local_async_context_base : public local_async_context_intf,
     local_async_context_base* parent_;
     bool is_req_;
     async_id id_;
-    async_status status_;
+    std::atomic<async_status> status_;
     std::string errmsg_;
     bool using_result_{false};
     blob result_;
