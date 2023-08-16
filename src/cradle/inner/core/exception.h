@@ -29,7 +29,7 @@ CRADLE_DEFINE_ERROR_INFO(boost::stacktrace::stacktrace, stacktrace)
 
 #define CRADLE_THROW(x)                                                       \
     BOOST_THROW_EXCEPTION(                                                    \
-        (x) << stacktrace_info(boost::stacktrace::stacktrace()))
+        (x) << cradle::stacktrace_info(boost::stacktrace::stacktrace()))
 
 using boost::get_error_info;
 
