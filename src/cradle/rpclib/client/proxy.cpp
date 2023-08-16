@@ -72,6 +72,12 @@ rpclib_client::finish_async(async_id root_aid)
     return pimpl_->finish_async(root_aid);
 }
 
+tasklet_info_tuple_list
+rpclib_client::get_tasklet_infos(bool include_finished)
+{
+    return pimpl_->get_tasklet_infos(include_finished);
+}
+
 void
 rpclib_client::mock_http(std::string const& response_body)
 {

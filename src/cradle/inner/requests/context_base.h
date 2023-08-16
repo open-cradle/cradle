@@ -97,7 +97,7 @@ class sync_context_base : public local_context_intf,
     get_tasklet() override;
 
     void
-    push_tasklet(tasklet_tracker* tasklet) override;
+    push_tasklet(tasklet_tracker& tasklet) override;
 
     void
     pop_tasklet() override;
@@ -317,24 +317,14 @@ class local_async_context_base : public local_async_context_intf,
     }
 
     // introspective_context_intf
-    // TODO add support for introspection
     tasklet_tracker*
-    get_tasklet() override
-    {
-        return nullptr;
-    }
+    get_tasklet() override;
 
     void
-    push_tasklet(tasklet_tracker* tasklet) override
-    {
-        throw not_implemented_error();
-    }
+    push_tasklet(tasklet_tracker& tasklet) override;
 
     void
-    pop_tasklet() override
-    {
-        throw not_implemented_error();
-    }
+    pop_tasklet() override;
 
     // Other
     void
@@ -362,6 +352,7 @@ class local_async_context_base : public local_async_context_intf,
     std::vector<std::shared_ptr<local_async_context_base>> subs_;
     std::atomic<int> num_subs_not_running_;
     std::vector<std::shared_ptr<blob_file_writer>> blob_file_writers_;
+    std::vector<tasklet_tracker*> tasklets_;
 
     void
     check_set_get_result_precondition(bool is_get_result);

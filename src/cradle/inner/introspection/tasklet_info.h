@@ -6,10 +6,11 @@
 #include <string>
 #include <vector>
 
+#include <cradle/inner/introspection/tasklet.h>
+
 namespace cradle {
 
 class tasklet_impl;
-class tasklet_tracker;
 
 /**
  * Types of tasklet lifecycle events
@@ -95,7 +96,7 @@ class tasklet_info
     bool
     have_client() const
     {
-        return client_id_ >= 0;
+        return client_id_ != NO_TASKLET_ID;
     }
 
     int

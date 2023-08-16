@@ -16,6 +16,7 @@
 
 // Ensure to #include only from the msgpack inside rpclib
 #include <cradle/inner/encodings/msgpack_adaptors_rpclib.h>
+#include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/utilities/git.h>
 #include <cradle/inner/utilities/logging.h>
@@ -150,11 +151,13 @@ run_server(cli_options const& options)
     rpc::server srv("127.0.0.1", options.port);
     my_logger->info("listening on port {}", srv.port());
 
+    // TODO enable introspection only on demand
+    introspection_set_capturing_enabled(true);
+
     // TODO we need a session concept and a "start session" / "register"
     // (notification) message
     srv.bind(
         "resolve_sync", [&](std::string config_json, std::string seri_req) {
-            // TODO create origin tasklet somewhere
             return handle_resolve_sync(
                 hctx, std::move(config_json), std::move(seri_req));
         });
@@ -192,6 +195,9 @@ run_server(cli_options const& options)
     });
     srv.bind("finish_async", [&](async_id root_aid) {
         return handle_finish_async(hctx, root_aid);
+    });
+    srv.bind("get_tasklet_infos", [&](bool include_finished) {
+        return handle_get_tasklet_infos(hctx, include_finished);
     });
 
     srv.run();

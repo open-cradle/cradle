@@ -96,6 +96,8 @@ shared_task_wrapper(
     captured_id cache_key,
     std::string summary)
 {
+    // TODO on_before_await() is called when this coroutine is created, not
+    // when it is being co_await'ed on
     client->on_before_await(summary, *cache_key);
     auto res = co_await shared_task;
     client->on_after_await();

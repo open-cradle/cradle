@@ -8,10 +8,12 @@
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/fmt_format.h>
+#include <cradle/inner/introspection/tasklet_impl.h>
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/requests/domain.h>
 #include <cradle/inner/resolve/seri_req.h>
+#include <cradle/inner/resolve/util.h>
 #include <cradle/inner/service/config_map_from_json.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/rpclib/server/handlers.h>
@@ -43,6 +45,18 @@ handle_exception(rpclib_handler_context& hctx, std::exception& e)
     rpc::this_handler().respond_error(e.what());
 }
 
+cppcoro::task<serialized_result>
+resolve_serialized_introspective(
+    introspective_context_intf& ctx, std::string seri_req)
+{
+    // Ensure that the tasklet's first timestamp coincides (almost) with the
+    // "co_await shared_task".
+    co_await dummy_coroutine();
+    coawait_introspection guard{ctx, "rpclib", "resolve_sync"};
+    auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(ctx)};
+    co_return co_await resolve_serialized_local(loc_ctx, std::move(seri_req));
+}
+
 static rpclib_response
 resolve_sync(
     rpclib_handler_context& hctx,
@@ -57,9 +71,24 @@ resolve_sync(
     logger.info("resolve_sync {}: {}", domain_name, seri_req);
     auto dom = find_domain(domain_name);
     auto ctx{dom->make_local_sync_context(service, config)};
-    auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(*ctx)};
-    auto seri_result = cppcoro::sync_wait(
-        resolve_serialized_local(loc_ctx, std::move(seri_req)));
+    cppcoro::task<serialized_result> task;
+    auto optional_client_tasklet_id
+        = config.get_optional_number(remote_config_keys::TASKLET_ID);
+    auto* intr_ctx = cast_ctx_to_ptr<introspective_context_intf>(*ctx);
+    if (optional_client_tasklet_id && intr_ctx)
+    {
+        auto* client_tasklet = create_tasklet_tracker(
+            static_cast<int>(*optional_client_tasklet_id));
+        intr_ctx->push_tasklet(*client_tasklet);
+        task
+            = resolve_serialized_introspective(*intr_ctx, std::move(seri_req));
+    }
+    else
+    {
+        auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(*ctx)};
+        task = resolve_serialized_local(loc_ctx, std::move(seri_req));
+    }
+    auto seri_result{cppcoro::sync_wait(std::move(task))};
     // TODO try to get rid of .value()
     blob result = seri_result.value();
     logger.info("result {}", result);
@@ -303,6 +332,73 @@ catch (std::exception& e)
 {
     handle_exception(hctx, e);
     return int{};
+}
+
+namespace {
+
+template<typename TimePoint>
+static decltype(auto)
+to_millis(TimePoint time_point)
+{
+    auto duration = duration_cast<std::chrono::milliseconds>(
+        time_point.time_since_epoch());
+    return duration.count();
+}
+
+static tasklet_event_tuple
+make_event_tuple(tasklet_event const& event)
+{
+    return tasklet_event_tuple{
+        to_millis(event.when()), to_string(event.what()), event.details()};
+}
+
+bool
+is_placeholder_info(tasklet_info const& info)
+{
+    return info.pool_name() == "client";
+}
+
+tasklet_info_tuple
+make_info_tuple(tasklet_info const& info)
+{
+    int client_id{NO_TASKLET_ID};
+    if (info.have_client())
+    {
+        client_id = info.client_id();
+    }
+    std::vector<tasklet_event_tuple> events;
+    for (auto const& e : info.events())
+    {
+        events.push_back(make_event_tuple(e));
+    }
+    return tasklet_info_tuple{
+        info.own_id(),
+        info.pool_name(),
+        info.title(),
+        client_id,
+        std::move(events)};
+}
+
+} // namespace
+
+tasklet_info_tuple_list
+handle_get_tasklet_infos(rpclib_handler_context& hctx, bool include_finished)
+try
+{
+    tasklet_info_tuple_list result;
+    for (auto info : get_tasklet_infos(include_finished))
+    {
+        if (!is_placeholder_info(info))
+        {
+            result.push_back(make_info_tuple(info));
+        }
+    }
+    return result;
+}
+catch (std::exception& e)
+{
+    handle_exception(hctx, e);
+    return tasklet_info_tuple_list{};
 }
 
 } // namespace cradle

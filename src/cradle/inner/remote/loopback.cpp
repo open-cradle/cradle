@@ -181,6 +181,13 @@ loopback_service::finish_async(async_id root_aid)
     get_async_db().remove_tree(root_aid);
 }
 
+tasklet_info_tuple_list
+loopback_service::get_tasklet_infos(bool include_finished)
+{
+    logger_->info("get_tasklet_infos {}", include_finished);
+    throw not_implemented_error("TODO loopback_service::get_tasklet_infos");
+}
+
 async_db&
 loopback_service::get_async_db()
 {

@@ -3,6 +3,8 @@
 #include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 
+#include <cradle/inner/introspection/tasklet.h>
+#include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/requests.h>
@@ -56,7 +58,8 @@ test_make_some_blob(bool use_shared_memory)
     inner_resources service;
     init_test_inner_service(service);
     register_rpclib_client(make_inner_tests_config(), service);
-    testing_request_context ctx{service, nullptr, remotely, proxy_name};
+    auto* tasklet{create_tasklet_tracker("test", "make_some_blob")};
+    testing_request_context ctx{service, tasklet, remotely, proxy_name};
 
     auto req{rq_make_some_blob<caching_level>(10000, use_shared_memory)};
     auto response = cppcoro::sync_wait(resolve_request(ctx, req));
@@ -68,6 +71,7 @@ test_make_some_blob(bool use_shared_memory)
 
 TEST_CASE("resolve to a plain blob", "[rpclib]")
 {
+    introspection_set_capturing_enabled(true);
     test_make_some_blob(false);
 }
 

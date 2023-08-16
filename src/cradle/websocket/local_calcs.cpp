@@ -52,14 +52,14 @@ perform_local_function_calc(
     auto const version_info
         = co_await resolve_context_app(ctx, context_id, account, app);
     auto const image = as_private(*version_info.manifest->provider).image;
-
     auto pool_name = std::string{"local@"} + app;
-    tasklet_context tasklet_guard{ctx, pool_name, "local calc"};
+
     co_await get_local_compute_pool_for_image(
         ctx.service, std::make_pair(app, image))
         .schedule();
 
-    auto tasklet{ctx.get_tasklet()};
+    auto tasklet
+        = create_tasklet_tracker(pool_name, "local calc", ctx.get_tasklet());
     auto run_guard = tasklet_run(tasklet);
     co_return supervise_thinknode_calculation(
         ctx.service, account, app, image, name, std::move(args));
