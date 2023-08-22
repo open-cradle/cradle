@@ -1,3 +1,4 @@
+#include <atomic>
 #include <cassert>
 #include <stdexcept>
 
@@ -143,7 +144,7 @@ local_async_context_base::local_async_context_base(
         id_,
         parent_id,
         is_req ? "REQ" : "VAL",
-        status_.load());
+        status_.load(std::memory_order_relaxed));
 }
 
 std::shared_ptr<data_owner>
@@ -291,7 +292,7 @@ local_async_context_base::update_status(async_status status)
     logger.info(
         "local_async_context_base {} update_status {} -> {}",
         id_,
-        status_.load(),
+        status_.load(std::memory_order_relaxed),
         status);
     // Invariant: if this context's status is AWAITING_RESULT or FINISHED,
     // then all its subcontexts' statuses are FINISHED.
@@ -315,7 +316,7 @@ local_async_context_base::update_status_error(std::string const& errmsg)
     logger.info(
         "local_async_context_base {} update_status_error: {} -> ERROR: {}",
         id_,
-        status_.load(),
+        status_.load(std::memory_order_relaxed),
         errmsg);
     status_ = async_status::ERROR;
     errmsg_ = errmsg;
@@ -341,7 +342,7 @@ local_async_context_base::check_set_get_result_precondition(bool is_get_result)
             id_,
             is_get_result ? "is_get_result" : "is_set_result",
             using_result_,
-            status_.load()));
+            status_.load(std::memory_order_relaxed)));
     }
 }
 

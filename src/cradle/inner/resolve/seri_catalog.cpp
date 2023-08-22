@@ -42,6 +42,7 @@ seri_catalog::find_uuid_str(std::string const& seri_req)
 std::shared_ptr<seri_resolver_intf>
 seri_catalog::find_resolver(std::string const& uuid_str)
 {
+    std::scoped_lock lock{mutex_};
     std::shared_ptr<seri_resolver_intf> resolver;
     try
     {

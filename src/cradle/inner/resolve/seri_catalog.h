@@ -2,6 +2,7 @@
 #define CRADLE_INNER_RESOLVE_SERI_CATALOG_H
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
@@ -38,6 +39,7 @@ class seri_catalog
     void
     register_resolver(Req const& req)
     {
+        std::scoped_lock lock{mutex_};
         auto uuid_str{req.get_uuid().str()};
         map_[uuid_str] = std::make_shared<seri_resolver_impl<Req>>();
     }
@@ -53,6 +55,7 @@ class seri_catalog
     resolve(local_context_intf& ctx, std::string seri_req);
 
  private:
+    std::mutex mutex_;
     std::unordered_map<std::string, std::shared_ptr<seri_resolver_intf>> map_;
 
     std::string
