@@ -1,5 +1,5 @@
-#include <cradle/typing/service/core.h>
-#include <cradle/typing/service/core_impl.h>
+#include <cradle/thinknode/service/core.h>
+#include <cradle/thinknode/service/core_impl.h>
 
 namespace cradle {
 

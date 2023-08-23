@@ -17,7 +17,7 @@
 #include <cradle/inner/service/config_map_from_json.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/rpclib/server/handlers.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 
 namespace cradle {
 

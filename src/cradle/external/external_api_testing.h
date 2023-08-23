@@ -4,7 +4,7 @@
 #define CRADLE_EXTERNAL_API_TESTING_H
 
 #include <cradle/external_api.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 
 namespace cradle {
 

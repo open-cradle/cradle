@@ -77,12 +77,12 @@ class local_atst_context final : public local_async_context_base
     void
     set_result(blob result) override;
 
-    // Other
+    // test_context_intf
     void
-    apply_fail_submit_async();
+    apply_fail_submit_async() override;
 
     void
-    apply_resolve_async_delay();
+    apply_resolve_async_delay() override;
 
  private:
     bool fail_submit_async_{false};

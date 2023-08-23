@@ -16,6 +16,7 @@
         "boost-numeric-conversion",
         "boost-process",
         "boost-program-options",
+        "boost-random",
         "boost-stacktrace",
         "boost-uuid",
         "bshoshany-thread-pool",

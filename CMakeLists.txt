@@ -128,7 +128,7 @@ FetchContent_MakeAvailable(fetched_cppcoro)
 
 # Find core dependencies.
 find_package(Boost REQUIRED COMPONENTS
-    filesystem program_options)
+    filesystem program_options random)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(msgpack CONFIG REQUIRED)
 find_package(CURL CONFIG REQUIRED)
@@ -477,7 +477,8 @@ file(GLOB_RECURSE srcs_plugins_thinknode CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/all/*.cpp")
 add_library(cradle_plugins_thinknode STATIC ${srcs_plugins_thinknode})
 target_link_libraries(cradle_plugins_thinknode PUBLIC
-    cradle_thinknode)
+    cradle_thinknode
+    cradle_plugins_inner)
 
 # The websocket library adds more Thinknode requests, and a WebSocket interface
 file(GLOB_RECURSE srcs_websocket CONFIGURE_DEPENDS
@@ -494,10 +495,13 @@ if(IS_MSVC)
         APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4996 /wd4127 /wd4267 /wd4244")
 endif()
 target_sources(cradle_websocket PRIVATE ${generated_headers} ${generated_srcs})
+# Boost::random required by websocketpp even though not advertised
 target_link_libraries(cradle_websocket PUBLIC
     cradle_thinknode
     cradle_rpclib_client
+    cradle_plugins_inner
     Boost::headers
+    Boost::random
     cereal::cereal
     cppcoro
     spdlog::spdlog
@@ -515,7 +519,6 @@ target_link_libraries(cradle_external PUBLIC
 add_executable(websocket_server src/server.cpp)
 target_link_libraries(websocket_server
     cradle_websocket
-    cradle_plugins_inner
     Boost::program_options)
 
 # The rpclib server

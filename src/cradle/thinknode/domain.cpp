@@ -4,7 +4,7 @@
 #include <cradle/thinknode/context.h>
 #include <cradle/thinknode/domain.h>
 #include <cradle/thinknode/seri_catalog.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 
 namespace cradle {
 

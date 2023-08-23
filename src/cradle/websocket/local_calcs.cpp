@@ -18,13 +18,13 @@
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/functional.h>
 #include <cradle/thinknode/caching.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/thinknode/supervisor.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/dynamic.h>
 #include <cradle/typing/core/unique_hash.h>
 #include <cradle/typing/encodings/msgpack.h>
 #include <cradle/typing/encodings/native.h>
-#include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/logging.h>
 #include <cradle/websocket/server_api.h>
 

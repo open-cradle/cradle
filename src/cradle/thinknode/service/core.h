@@ -1,7 +1,7 @@
 #ifndef CRADLE_TYPING_SERVICE_CORE_H
 #define CRADLE_TYPING_SERVICE_CORE_H
 
-// Services exposed by the typing subsystem.
+// Services exposed by the thinknode subsystem.
 
 #include <memory>
 #include <string>

@@ -18,8 +18,8 @@
 #include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/thinknode/seri_catalog.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/typing/encodings/msgpack.h>
-#include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
 #include "../support/inner_service.h"

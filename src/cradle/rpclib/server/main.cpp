@@ -26,7 +26,7 @@
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/rpclib/common/common.h>
 #include <cradle/rpclib/server/handlers.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/version_info.h>
 
 using namespace cradle;

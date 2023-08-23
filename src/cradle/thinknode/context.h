@@ -3,8 +3,8 @@
 
 #include <cradle/inner/requests/context_base.h>
 #include <cradle/inner/service/config.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/thinknode/types.hpp>
-#include <cradle/typing/service/core.h>
 
 namespace cradle {
 

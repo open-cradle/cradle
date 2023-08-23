@@ -11,7 +11,7 @@
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/rpclib/common/common.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 
 namespace cradle {
 

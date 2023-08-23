@@ -17,9 +17,9 @@
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/thinknode/ipc.h>
 #include <cradle/thinknode/messages.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/typing/encodings/json.h>
 #include <cradle/typing/io/http_requests.hpp>
-#include <cradle/typing/service/core.h>
 
 namespace asio = boost::asio;
 using asio::ip::tcp;

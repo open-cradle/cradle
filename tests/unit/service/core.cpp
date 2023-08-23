@@ -1,4 +1,4 @@
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 
 #include <cppcoro/sync_wait.hpp>
 

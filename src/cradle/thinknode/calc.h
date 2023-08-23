@@ -6,9 +6,9 @@
 
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/thinknode/context.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/thinknode/types.hpp>
 #include <cradle/typing/core.h>
-#include <cradle/typing/service/core.h>
 
 namespace cradle {
 

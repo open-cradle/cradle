@@ -8,7 +8,7 @@
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/thinknode/caching.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 
 using namespace cradle;
 

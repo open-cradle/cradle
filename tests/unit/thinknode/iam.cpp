@@ -4,7 +4,7 @@
 
 #include <cradle/inner/core/monitoring.h>
 #include <cradle/inner/io/mock_http.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
 using namespace cradle;

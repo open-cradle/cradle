@@ -14,6 +14,7 @@
 #include <cradle/inner/blob_file/blob_file.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/test_context.h>
 #include <cradle/inner/service/resources.h>
 
 /*
@@ -182,7 +183,8 @@ class local_tree_context_base
  */
 class local_async_context_base : public local_async_context_intf,
                                  public caching_context_intf,
-                                 public introspective_context_intf
+                                 public introspective_context_intf,
+                                 public test_context_intf
 {
  public:
     local_async_context_base(
@@ -325,6 +327,17 @@ class local_async_context_base : public local_async_context_intf,
 
     void
     pop_tasklet() override;
+
+    // test_context_intf
+    virtual void
+    apply_fail_submit_async() override
+    {
+    }
+
+    virtual void
+    apply_resolve_async_delay() override
+    {
+    }
 
     // Other
     void

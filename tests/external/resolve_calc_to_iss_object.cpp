@@ -2,8 +2,8 @@
 
 #include <cradle/external_api.h>
 #include <cradle/inner/introspection/tasklet.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/typing/encodings/msgpack.h>
-#include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 #include <cradle/websocket/calculations.h>
 

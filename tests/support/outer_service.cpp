@@ -6,7 +6,7 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache_plugin.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 
 namespace cradle {
 

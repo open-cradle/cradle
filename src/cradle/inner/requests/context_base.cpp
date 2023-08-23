@@ -5,8 +5,8 @@
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/remote/wait_async.h>
+#include <cradle/inner/requests/context_base.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/domain/testing/context.h>
 
 namespace cradle {
 

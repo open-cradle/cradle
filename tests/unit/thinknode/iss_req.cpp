@@ -25,7 +25,7 @@
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
 using namespace cradle;

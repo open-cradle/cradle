@@ -22,12 +22,12 @@
 #include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/iss.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/thinknode/supervisor.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/typing/core/dynamic.h>
 #include <cradle/typing/encodings/msgpack.h>
 #include <cradle/typing/encodings/native.h>
-#include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/logging.h>
 #include <cradle/websocket/local_calcs.h>
 #include <cradle/websocket/server_api.h>

@@ -8,9 +8,9 @@
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/remote/loopback_impl.h>
 #include <cradle/inner/requests/domain.h>
+#include <cradle/inner/requests/test_context.h>
 #include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/utilities/logging.h>
-#include <cradle/plugins/domain/testing/context.h>
 
 namespace cradle {
 
@@ -62,9 +62,9 @@ resolve_async(
     std::string seri_req)
 {
     auto& logger{loopback->get_logger()};
-    if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*actx))
+    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
     {
-        atst_ctx->apply_resolve_async_delay();
+        test_ctx->apply_resolve_async_delay();
     }
     logger.info("resolve_async start");
     // TODO update status to STARTED or so
@@ -97,9 +97,9 @@ loopback_service::submit_async(service_config config, std::string seri_req)
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
     auto dom = find_domain(domain_name);
     auto ctx{dom->make_local_async_context(resources_, config)};
-    if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*ctx))
+    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*ctx))
     {
-        atst_ctx->apply_fail_submit_async();
+        test_ctx->apply_fail_submit_async();
     }
     auto actx = cast_ctx_to_shared_ptr<local_async_context_intf>(ctx);
     actx->using_result();
