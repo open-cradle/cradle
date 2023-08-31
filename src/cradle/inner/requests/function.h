@@ -179,7 +179,7 @@ when_all_wrapper(Tuple&& tasks, std::index_sequence<Ix...>)
  *
  * All functions in this class's API are thread-safe.
  */
-class cereal_functions_registry_impl
+class cereal_functions_registry
 {
  public:
     using create_t = std::shared_ptr<void>(request_uuid const& uuid);
@@ -193,7 +193,7 @@ class cereal_functions_registry_impl
         load_t* load;
     };
 
-    static cereal_functions_registry_impl&
+    static cereal_functions_registry&
     instance();
 
     void
@@ -203,71 +203,40 @@ class cereal_functions_registry_impl
         save_t* save,
         load_t* load);
 
-    entry_t&
-    find_entry(request_uuid const& uuid);
-
- private:
-    std::unordered_map<std::string, entry_t> entries_;
-    std::mutex mutex_;
-};
-
-template<typename Intf>
-class cereal_functions_registry
-{
-    using impl_t = cereal_functions_registry_impl;
-    using entry_t = typename impl_t::entry_t;
-    using create_t = typename impl_t::create_t;
-    using save_t = typename impl_t::save_t;
-    using load_t = typename impl_t::load_t;
-
- public:
-    // TODO why this singleton? All funcs could be static's - in the impl
-    // class.
-    static cereal_functions_registry&
-    instance()
-    {
-        static cereal_functions_registry instance_;
-        return instance_;
-    }
-
-    cereal_functions_registry() : impl_{impl_t::instance()}
-    {
-    }
-
-    void
-    add_entry(
-        std::string const& uuid_str,
-        create_t* create,
-        save_t* save,
-        load_t* load)
-    {
-        impl_.add_entry(uuid_str, create, save, load);
-    }
-
+    // Intf should be a function_request_intf instantiation.
+    template<typename Intf>
     std::shared_ptr<Intf>
     create(request_uuid const& uuid)
     {
-        entry_t& entry{impl_.find_entry(uuid)};
+        entry_t& entry{find_entry(uuid)};
         return std::static_pointer_cast<Intf>(entry.create(uuid));
     }
 
+    // Intf should be a function_request_intf instantiation.
+    template<typename Intf>
     void
     save(cereal::JSONOutputArchive& archive, Intf const& intf)
     {
-        entry_t& entry{impl_.find_entry(intf.get_uuid())};
+        entry_t& entry{find_entry(intf.get_uuid())};
         entry.save(archive, &intf);
     }
 
+    // Intf should be a function_request_intf instantiation.
     // The uuid should be set before deserializing the (rest of) the object.
+    template<typename Intf>
     void
     load(cereal::JSONInputArchive& archive, Intf& intf)
     {
-        entry_t& entry{impl_.find_entry(intf.get_uuid())};
+        entry_t& entry{find_entry(intf.get_uuid())};
         entry.load(archive, &intf);
     }
 
  private:
-    impl_t& impl_;
+    std::unordered_map<std::string, entry_t> entries_;
+    std::mutex mutex_;
+
+    entry_t&
+    find_entry(request_uuid const& uuid);
 };
 
 template<typename Head, typename... Tail>
@@ -315,10 +284,8 @@ class function_request_impl : public function_request_intf<Value>
     function_request_impl(request_uuid uuid, Function function, Args... args)
         : uuid_{std::move(uuid)}, args_{std::move(args)...}
     {
-        // The uuid uniquely identifies the function.
-        // Store it so that is available during deserialization.
         auto uuid_str{uuid_.str()};
-        cereal_functions_registry<base_type>::instance().add_entry(
+        cereal_functions_registry::instance().add_entry(
             uuid_str, create, save_json, load_json);
 
         std::scoped_lock lock{maching_functions_mutex_};
@@ -560,7 +527,9 @@ class function_request_impl : public function_request_intf<Value>
     // cereal-related
 
     // Construct an object to be deserialized.
-    // The uuid is serialized in function_request_erased, not here.
+    // The uuid uniquely identifies the function. It is deserialized in
+    // function_request_erased, and stored here so that is available during
+    // deserialization, which populates the remainder of this object.
     function_request_impl(request_uuid const& uuid) : uuid_{uuid}
     {
     }
@@ -725,8 +694,7 @@ class proxy_request_base : public function_request_intf<Value>
         : uuid_{std::move(uuid)}, args_{std::move(args)...}
     {
         auto uuid_str{uuid_.str()};
-        // TODO don't really need cereal_functions_registry?!
-        cereal_functions_registry<intf_type>::instance().add_entry(
+        cereal_functions_registry::instance().add_entry(
             uuid_str, nullptr, save_json, nullptr);
     }
 
@@ -999,7 +967,7 @@ void
 save(Archive& archive, function_request_intf<Value> const& intf)
 {
     using intf_type = function_request_intf<Value>;
-    cereal_functions_registry<intf_type>::instance().save(archive, intf);
+    cereal_functions_registry::instance().save<intf_type>(archive, intf);
 }
 
 // Deserialize a function_request_impl object, given a type-erased
@@ -1009,7 +977,7 @@ void
 load(Archive& archive, function_request_intf<Value>& intf)
 {
     using intf_type = function_request_intf<Value>;
-    cereal_functions_registry<intf_type>::instance().load(archive, intf);
+    cereal_functions_registry::instance().load<intf_type>(archive, intf);
 }
 
 /*
@@ -1188,7 +1156,7 @@ class function_request_erased
         // exact type (function_request_impl class instantiation), which could
         // be different from the one with which this function_request_erased
         // instantiation was registered.
-        impl_ = cereal_functions_registry<intf_type>::instance().create(
+        impl_ = cereal_functions_registry::instance().create<intf_type>(
             std::move(uuid));
         // Deserialize the remainder of the function_request_impl object.
         ::cradle::load(archive, *impl_);

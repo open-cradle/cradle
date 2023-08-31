@@ -16,7 +16,7 @@ check_title_is_valid(std::string const& title)
     }
 }
 
-using entry_t = cereal_functions_registry_impl::entry_t;
+using entry_t = cereal_functions_registry::entry_t;
 
 static bool
 operator==(entry_t const& lhs, entry_t const& rhs)
@@ -31,15 +31,17 @@ operator!=(entry_t const& lhs, entry_t const& rhs)
     return !(lhs == rhs);
 }
 
-cereal_functions_registry_impl&
-cereal_functions_registry_impl::instance()
+cereal_functions_registry&
+cereal_functions_registry::instance()
 {
-    static cereal_functions_registry_impl the_instance;
+    // The singleton is part of the main program, and any dynamically loaded
+    // library will see this instance.
+    static cereal_functions_registry the_instance;
     return the_instance;
 }
 
 void
-cereal_functions_registry_impl::add_entry(
+cereal_functions_registry::add_entry(
     std::string const& uuid_str, create_t* create, save_t* save, load_t* load)
 {
     // This function is called when a function_request_impl object is created,
@@ -76,7 +78,7 @@ cereal_functions_registry_impl::add_entry(
 }
 
 entry_t&
-cereal_functions_registry_impl::find_entry(request_uuid const& uuid)
+cereal_functions_registry::find_entry(request_uuid const& uuid)
 {
     std::scoped_lock lock{mutex_};
     std::string uuid_str{uuid.str()};
@@ -85,7 +87,7 @@ cereal_functions_registry_impl::find_entry(request_uuid const& uuid)
     {
         // This should be an internal error.
         throw unregistered_uuid_error{fmt::format(
-            "cereal_functions_registry_impl: no entry for {}", uuid_str)};
+            "cereal_functions_registry: no entry for {}", uuid_str)};
     }
     return it->second;
 }
