@@ -136,6 +136,18 @@ class remote_proxy
     virtual tasklet_info_tuple_list
     get_tasklet_infos(bool include_finished)
         = 0;
+
+    // Dynamically loads a shared library, and calls an initialization
+    // function. There (currently?) is no way to unload the library.
+    //
+    // dir_path is an absolute path to the directory containg the shared
+    // library file.
+    // dll_name is the library name as specified in CMakeLists.txt.
+    // On Linux, dll_name "bla" translates to file name "libbla.so";
+    // on Windows, it would be "bla.dll".
+    virtual void
+    load_shared_library(std::string dir_path, std::string dll_name)
+        = 0;
 };
 
 } // namespace cradle

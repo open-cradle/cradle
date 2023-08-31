@@ -155,6 +155,16 @@ rpclib_client_impl::get_tasklet_infos(bool include_finished)
 }
 
 void
+rpclib_client_impl::load_shared_library(
+    std::string dir_path, std::string dll_name)
+{
+    logger_->debug("load_shared_library {} {}", dir_path, dll_name);
+    do_rpc_call(
+        "load_shared_library", std::move(dir_path), std::move(dll_name));
+    logger_->debug("load_shared_library done");
+}
+
+void
 rpclib_client_impl::mock_http(std::string const& response_body)
 {
     logger_->debug("mock_http start");

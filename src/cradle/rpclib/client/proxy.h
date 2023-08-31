@@ -61,6 +61,9 @@ class rpclib_client : public remote_proxy
     tasklet_info_tuple_list
     get_tasklet_infos(bool include_finished) override;
 
+    void
+    load_shared_library(std::string dir_path, std::string dll_name) override;
+
     // Instructs the RPC server to mock all HTTP requests, returning a 200
     // response with response_body for each.
     void

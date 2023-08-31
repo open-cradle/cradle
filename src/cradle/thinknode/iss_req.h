@@ -22,6 +22,15 @@ namespace cradle {
 template<caching_level_type Level>
 using thinknode_request_props = request_props<Level, true, true>;
 
+using thinknode_proxy_props
+    = request_props<caching_level_type::full, true, true, true>;
+
+// Note: thinknode_proxy_props and thinknode_server_props differ so will
+// corresponding function_request_erased instantiations. This should be no
+// problem (?!).
+using thinknode_server_props
+    = request_props<caching_level_type::full, true, true, false>;
+
 // Creates a function_request_erased object representing a
 // "post ISS object" request,
 // where object_data is either a blob, or a subrequest yielding a blob.
@@ -34,6 +43,43 @@ rq_post_iss_object(
     using props_type = thinknode_request_props<Level>;
     request_uuid uuid{"rq_post_iss_object"};
     uuid.set_level(Level);
+    std::string title{"post_iss_object"};
+    std::string url_type_template{get_url_type_template(schema)};
+    return rq_function_erased(
+        props_type{std::move(uuid), std::move(title)},
+        post_iss_object_generic_template_url,
+        std::move(context_id),
+        std::move(url_type_template),
+        normalize_arg<blob, props_type>(std::move(object_data)));
+}
+
+template<typename ObjectData>
+    requires TypedArg<ObjectData, blob>
+auto
+rq_post_iss_object_v1(
+    std::string context_id, thinknode_type_info schema, ObjectData object_data)
+{
+    using props_type = thinknode_proxy_props;
+    // Note server must register exact same uuid, so no level
+    request_uuid uuid{"rq_post_iss_object_v1"};
+    std::string title{"post_iss_object"};
+    std::string url_type_template{get_url_type_template(schema)};
+    return rq_function_erased<std::string>(
+        props_type{std::move(uuid), std::move(title)},
+        std::move(context_id),
+        std::move(url_type_template),
+        normalize_arg<blob, props_type>(std::move(object_data)));
+}
+
+template<typename ObjectData>
+    requires TypedArg<ObjectData, blob>
+auto
+rq_post_iss_object_v1_impl(
+    std::string context_id, thinknode_type_info schema, ObjectData object_data)
+{
+    using props_type = thinknode_server_props;
+    // Note server must register exact same uuid, so no level
+    request_uuid uuid{"rq_post_iss_object_v1"};
     std::string title{"post_iss_object"};
     std::string url_type_template{get_url_type_template(schema)};
     return rq_function_erased(

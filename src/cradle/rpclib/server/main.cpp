@@ -199,6 +199,12 @@ run_server(cli_options const& options)
     srv.bind("get_tasklet_infos", [&](bool include_finished) {
         return handle_get_tasklet_infos(hctx, include_finished);
     });
+    srv.bind(
+        "load_shared_library",
+        [&](std::string dir_path, std::string dll_name) {
+            handle_load_shared_library(
+                hctx, std::move(dir_path), std::move(dll_name));
+        });
 
     srv.run();
 

@@ -395,7 +395,7 @@ record_public_include_directory(lib_third_party
 # The library for the inner core
 file(GLOB_RECURSE srcs_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/inner/*.cpp")
-add_library(cradle_inner STATIC ${srcs_inner})
+add_library(cradle_inner SHARED ${srcs_inner})
 add_dependencies(cradle_inner version_info)
 # simdjson.h "local variable is initialized but not referenced"
 # Only when building from Visual Studio GUI, not from command line?!
@@ -422,6 +422,7 @@ record_public_include_directory(cradle_inner
     include/third-party
     "*.[ih]*")
 target_link_libraries(cradle_inner PUBLIC
+    Boost::filesystem
     Boost::headers
     cereal::cereal
     cppcoro
@@ -440,7 +441,7 @@ file(GLOB_RECURSE srcs_plugins_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/secondary_cache/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/requests_storage/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/testing/*.cpp")
-add_library(cradle_plugins_inner STATIC ${srcs_plugins_inner})
+add_library(cradle_plugins_inner SHARED ${srcs_plugins_inner})
 record_public_include_directory(cradle_plugins_inner
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     include
@@ -467,7 +468,6 @@ record_public_include_directory(cradle_rpclib_client
     "*.h")
 target_link_libraries(cradle_rpclib_client PUBLIC
     cradle_inner
-    Boost::filesystem
     Boost::headers
     cppcoro
     rpclib::rpc
@@ -588,6 +588,9 @@ target_link_libraries(rpclib_server PRIVATE
 # Convenience target denoting all servers
 add_custom_target(servers)
 add_dependencies(servers websocket_server rpclib_server)
+
+# Create DLLs
+add_subdirectory(src/cradle-dll)
 
 if (CRADLE_ENABLE_TESTING)
     # Retrieve the token info if it exists

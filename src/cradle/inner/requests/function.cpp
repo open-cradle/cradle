@@ -1,5 +1,8 @@
 #include <stdexcept>
 
+#include <fmt/format.h>
+#include <spdlog/spdlog.h>
+
 #include <cradle/inner/requests/function.h>
 
 namespace cradle {
@@ -28,11 +31,10 @@ operator!=(entry_t const& lhs, entry_t const& rhs)
     return !(lhs == rhs);
 }
 
-static cereal_functions_registry_impl the_instance;
-
 cereal_functions_registry_impl&
 cereal_functions_registry_impl::instance()
 {
+    static cereal_functions_registry_impl the_instance;
     return the_instance;
 }
 
@@ -40,6 +42,26 @@ void
 cereal_functions_registry_impl::add_entry(
     std::string const& uuid_str, create_t* create, save_t* save, load_t* load)
 {
+    // This function is called when a function_request_impl object is created,
+    // so can be called multiple times for the same uuid. Especially for
+    // a request like "normalization<blob,coro>", simultaneous calls are even
+    // possible while registering the requests in
+    // seri_catalog::register_resolver().
+    // TODO still need mutex now that seri_catalog objects are better isolated?
+    //
+    // Normally, the create/save/load triple would be identical for all
+    // add_entry() calls for a given uuid. This changes when request
+    // implementations can be dynamically loaded. Assuming that the ODR holds
+    // across DLLs, it should be OK to (de-)serialize requests implemented in
+    // DLL X, calling the corresponding create/save/load functions implemented
+    // in DLL Y. Until DLL Y is unloaded...
+    //
+    // For the normalization functions, it seems possible to avoid this problem
+    // by registering the requests separately. That suggestion already appeared
+    // in thinknode/seri_catalog.cpp.
+    //
+    // TODO support unloading create/save/load
+    auto logger{spdlog::get("cradle")};
     std::scoped_lock lock{mutex_};
     entry_t new_entry{create, save, load};
     auto it = entries_.find(uuid_str);
@@ -49,8 +71,7 @@ cereal_functions_registry_impl::add_entry(
     }
     else if (it->second != new_entry)
     {
-        throw conflicting_types_uuid_error{
-            fmt::format("conflicting types for uuid {}", uuid_str)};
+        logger->warn("conflicting entries for uuid {}", uuid_str);
     }
 }
 

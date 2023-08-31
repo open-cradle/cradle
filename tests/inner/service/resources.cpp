@@ -85,6 +85,12 @@ class test_proxy : public remote_proxy
         throw not_implemented_error{"test_proxy::get_tasklet_infos()"};
     }
 
+    void
+    load_shared_library(std::string dir_path, std::string dll_name) override
+    {
+        throw not_implemented_error("test_proxy::load_shared_library()");
+    }
+
  private:
     std::string name_;
 };

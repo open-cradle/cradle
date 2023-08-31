@@ -79,6 +79,13 @@ rpclib_client::get_tasklet_infos(bool include_finished)
 }
 
 void
+rpclib_client::load_shared_library(std::string dir_path, std::string dll_name)
+{
+    return pimpl_->load_shared_library(
+        std::move(dir_path), std::move(dll_name));
+}
+
+void
 rpclib_client::mock_http(std::string const& response_body)
 {
     pimpl_->mock_http(response_body);

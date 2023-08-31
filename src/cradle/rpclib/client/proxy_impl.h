@@ -61,6 +61,9 @@ class rpclib_client_impl
     get_tasklet_infos(bool include_finished);
 
     void
+    load_shared_library(std::string dir_path, std::string dll_name);
+
+    void
     mock_http(std::string const& response_body);
 
     std::string

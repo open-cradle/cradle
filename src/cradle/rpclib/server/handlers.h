@@ -100,6 +100,10 @@ handle_finish_async(rpclib_handler_context& hctx, async_id root_aid);
 tasklet_info_tuple_list
 handle_get_tasklet_infos(rpclib_handler_context& hctx, bool include_finished);
 
+void
+handle_load_shared_library(
+    rpclib_handler_context& hctx, std::string dir_path, std::string dll_name);
+
 } // namespace cradle
 
 #endif

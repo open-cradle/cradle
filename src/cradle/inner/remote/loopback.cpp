@@ -188,6 +188,14 @@ loopback_service::get_tasklet_infos(bool include_finished)
     throw not_implemented_error("TODO loopback_service::get_tasklet_infos");
 }
 
+void
+loopback_service::load_shared_library(
+    std::string dir_path, std::string dll_name)
+{
+    logger_->info("load_shared_library {} {}", dir_path, dll_name);
+    throw not_implemented_error("loopback_service::load_shared_library()");
+}
+
 async_db&
 loopback_service::get_async_db()
 {

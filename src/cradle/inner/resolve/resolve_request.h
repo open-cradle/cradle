@@ -275,6 +275,7 @@ template<Context Ctx, Request Req, typename Constraints>
 cppcoro::shared_task<typename Req::value_type>
 resolve_request_local(Ctx& ctx, Req const& req, Constraints constraints)
 {
+    // TODO static_assert(!req.is_proxy);
     // Second decision (based on constraints if possible): sync or async
     // This is the last time that constraints are used.
     if constexpr (constraints.force_async)

@@ -125,10 +125,10 @@ TEST_CASE("create function_request_erased: identical functors, one uuid", tag)
 
 TEST_CASE("create function_request_erased: different functors, one uuid", tag)
 {
+    // This is a valid use case when dynamically loading shared libraries.
     request_props<caching_level_type::memory> props{make_test_uuid("0003")};
     REQUIRE_NOTHROW(rq_function_erased(props, functor_a));
-    REQUIRE_THROWS_AS(
-        rq_function_erased(props, functor_b), conflicting_types_uuid_error);
+    REQUIRE_NOTHROW(rq_function_erased(props, functor_b));
 }
 
 TEST_CASE(

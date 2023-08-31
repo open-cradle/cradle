@@ -50,6 +50,9 @@ class loopback_service : public remote_proxy
     tasklet_info_tuple_list
     get_tasklet_infos(bool include_finished) override;
 
+    void
+    load_shared_library(std::string dir_path, std::string dll_name) override;
+
  private:
     inner_resources& resources_;
     bool testing_;

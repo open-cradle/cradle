@@ -1,6 +1,8 @@
 #include <functional>
+#include <memory>
 #include <stdexcept>
 #include <thread>
+#include <vector>
 
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
@@ -8,6 +10,7 @@
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/fmt_format.h>
+#include <cradle/inner/dll/shared_library.h>
 #include <cradle/inner/introspection/tasklet_impl.h>
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/config.h>
@@ -399,6 +402,21 @@ catch (std::exception& e)
 {
     handle_exception(hctx, e);
     return tasklet_info_tuple_list{};
+}
+
+void
+handle_load_shared_library(
+    rpclib_handler_context& hctx, std::string dir_path, std::string dll_name)
+try
+{
+    auto& logger{hctx.logger()};
+    logger.info("handle_load_shared_library({}, {})", dir_path, dll_name);
+
+    load_shared_library(dir_path, dll_name);
+}
+catch (std::exception& e)
+{
+    handle_exception(hctx, e);
 }
 
 } // namespace cradle
