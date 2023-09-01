@@ -40,6 +40,23 @@ using remote_context_spec = std::tuple<async_id, bool>;
 // tree on a remote.
 using remote_context_spec_list = std::vector<remote_context_spec>;
 
+using tasklet_event_tuple = std::tuple<uint64_t, std::string, std::string>;
+// 1. millis since epoch (note: won't fit in uint32_t)
+// 2. tasklet_event_type converted to string
+// 3. details
+
+using tasklet_event_tuple_list = std::vector<tasklet_event_tuple>;
+
+using tasklet_info_tuple
+    = std::tuple<int, std::string, std::string, int, tasklet_event_tuple_list>;
+// 1. own tasklet id
+// 2. pool name
+// 3. tasklet title
+// 4. client tasklet id
+// 5. tasklet events
+
+using tasklet_info_tuple_list = std::vector<tasklet_info_tuple>;
+
 /*
  * Proxy for a remote (server) capable of resolving requests, synchronously
  * and/or asynchronously.
@@ -113,6 +130,11 @@ class remote_proxy
     // exception was thrown).
     virtual void
     finish_async(async_id root_aid)
+        = 0;
+
+    // Retrieve introspection info
+    virtual tasklet_info_tuple_list
+    get_tasklet_infos(bool include_finished)
         = 0;
 };
 

@@ -11,7 +11,7 @@
 
 namespace cradle {
 
-int tasklet_impl::next_id = 0;
+int tasklet_impl::next_id = 1;
 
 // Called only from tasklet_admin::new_tasklet(),
 // protected by its lock.
@@ -33,6 +33,16 @@ tasklet_impl::tasklet_impl(
         s << ", on behalf of " << client->own_id();
     }
     log(s.str());
+}
+
+tasklet_impl::tasklet_impl(int rpc_client_id)
+    : id_{-rpc_client_id},
+      pool_name_{"client"},
+      title_{"client"},
+      client_{nullptr},
+      finished_{true}
+{
+    log(fmt::format("client {}", rpc_client_id));
 }
 
 tasklet_impl::~tasklet_impl()
@@ -152,6 +162,22 @@ tasklet_admin::new_tasklet(
     }
 }
 
+tasklet_tracker*
+tasklet_admin::new_tasklet(int rpc_client_id)
+{
+    if (capturing_enabled_)
+    {
+        std::scoped_lock admin_lock{mutex_};
+        auto tasklet = new tasklet_impl{rpc_client_id};
+        tasklets_.push_back(tasklet);
+        return tasklet;
+    }
+    else
+    {
+        return nullptr;
+    }
+}
+
 void
 tasklet_admin::set_capturing_enabled(bool enabled)
 {
@@ -220,6 +246,12 @@ create_tasklet_tracker(
     tasklet_tracker* client)
 {
     return tasklet_admin::instance().new_tasklet(pool_name, title, client);
+}
+
+tasklet_tracker*
+create_tasklet_tracker(int rpc_client_id)
+{
+    return tasklet_admin::instance().new_tasklet(rpc_client_id);
 }
 
 } // namespace cradle

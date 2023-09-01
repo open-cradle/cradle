@@ -35,10 +35,16 @@ class tasklet_impl : public tasklet_tracker
     using events_container
         = std::array<std::optional<tasklet_event>, num_tasklet_event_types>;
 
+    // Normal constructor
     tasklet_impl(
         std::string const& pool_name,
         std::string const& title,
         tasklet_impl* client = nullptr);
+
+    // Constructor for a placeholder object on an RPC server, representing the
+    // corresponding tasklet on the RPC client
+    tasklet_impl(int rpc_client_id);
+
     ~tasklet_impl();
 
     bool
@@ -154,6 +160,13 @@ class tasklet_admin
         std::string const& pool_name,
         std::string const& title,
         tasklet_tracker* client = nullptr);
+
+    /**
+     * Creates a new tasklet object on an RPC server, corresponding to a
+     * tasklet on an RPC client
+     */
+    tasklet_tracker*
+    new_tasklet(int rpc_client_id);
 
     /**
      * Enables or disables capturing of introspection events

@@ -144,6 +144,16 @@ rpclib_client_impl::finish_async(async_id root_aid)
     logger_->debug("finish_async done");
 }
 
+tasklet_info_tuple_list
+rpclib_client_impl::get_tasklet_infos(bool include_finished)
+{
+    logger_->debug("get_tasklet_infos {}", include_finished);
+    auto infos = do_rpc_call("get_tasklet_infos", include_finished)
+                     .as<tasklet_info_tuple_list>();
+    logger_->debug("get_tasklet_infos done");
+    return infos;
+}
+
 void
 rpclib_client_impl::mock_http(std::string const& response_body)
 {

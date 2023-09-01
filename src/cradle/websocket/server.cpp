@@ -1748,9 +1748,10 @@ process_message(websocket_server_impl& server, client_request request)
             break;
         }
         case client_message_content_tag::INTROSPECTION_STATUS_QUERY: {
+            auto& proxy{server.core.get_proxy("rpclib")};
             auto const& isq = as_introspection_status_query(content);
-            auto response
-                = make_introspection_status_response(isq.include_finished);
+            auto response = make_introspection_status_response(
+                proxy, isq.include_finished);
             send_response(
                 server,
                 request,
@@ -1865,6 +1866,11 @@ on_message(
         {
             std::ostringstream os;
             os << "websocket: " << get_tag(message.content);
+            if (is_resolve_request(message.content))
+            {
+                auto const& rr = as_resolve_request(message.content);
+                os << (rr.remote ? " (remote)" : " (local)");
+            }
             tasklet = create_tasklet_tracker("server", os.str());
             server.async_scope.spawn(schedule_on(
                 server.pool,

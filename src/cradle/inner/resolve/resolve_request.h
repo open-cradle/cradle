@@ -13,6 +13,7 @@
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/resolve/remote.h>
+#include <cradle/inner/resolve/util.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/service/secondary_cached_blob.h>
 #include <cradle/inner/service/secondary_storage_intf.h>
@@ -168,21 +169,24 @@ resolve_request_on_memory_cache_miss(
     }
 }
 
+// co_await's a shared_task, with introspection (in the form of a dedicated
+// tasklet) tracking that co_await.
 template<CachedIntrospectiveRequest Req>
 cppcoro::shared_task<typename Req::value_type>
-resolve_request_introspective(
+coawait_introspective(
+    introspective_context_intf& ctx,
     Req const& req,
-    cppcoro::shared_task<typename Req::value_type> shared_task,
-    tasklet_tracker& client)
+    cppcoro::shared_task<typename Req::value_type> shared_task)
 {
-    client.on_before_await(
-        req.get_introspection_title(), *req.get_captured_id());
-    auto res = co_await shared_task;
-    client.on_after_await();
-    co_return res;
+    // Ensure that the tasklet's first timestamp coincides (almost) with the
+    // "co_await shared_task".
+    co_await dummy_coroutine();
+    coawait_introspection guard{
+        ctx, "resolve_request", req.get_introspection_title()};
+    co_return co_await shared_task;
 }
 
-template<Context Ctx, CachedNonIntrospectiveRequest Req, BoolConst Async>
+template<Context Ctx, CachedRequest Req, BoolConst Async>
 cppcoro::shared_task<typename Req::value_type>
 resolve_request_cached(Ctx& ctx, Req const& req, Async async)
 {
@@ -195,31 +199,14 @@ resolve_request_cached(Ctx& ctx, Req const& req, Async async)
             return resolve_request_on_memory_cache_miss(
                 ctx, req, async, internal_cache, key);
         }};
+    if constexpr (IntrospectiveRequest<Req>)
+    {
+        auto& intr_ctx = cast_ctx_to_ref<introspective_context_intf>(ctx);
+        return coawait_introspective(intr_ctx, req, ptr.task());
+    }
     // ptr owns a reference to the cache record, and thus to the shared_task,
     // but its lifetime ends here, so the shared_task must be copied.
     return ptr.task();
-}
-
-template<Context Ctx, CachedIntrospectiveRequest Req, BoolConst Async>
-cppcoro::shared_task<typename Req::value_type>
-resolve_request_cached(Ctx& ctx, Req const& req, Async async)
-{
-    auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
-    immutable_cache_ptr<typename Req::value_type> ptr{
-        cac_ctx.get_resources().memory_cache(),
-        req.get_captured_id(),
-        [&](detail::immutable_cache_impl& internal_cache,
-            captured_id const& key) {
-            return resolve_request_on_memory_cache_miss(
-                ctx, req, async, internal_cache, key);
-        }};
-    auto shared_task = ptr.task();
-    auto& intr_ctx = cast_ctx_to_ref<introspective_context_intf>(ctx);
-    if (auto* tasklet = intr_ctx.get_tasklet())
-    {
-        return resolve_request_introspective(req, shared_task, *tasklet);
-    }
-    return shared_task;
 }
 
 template<Context Ctx, CachedRequest Req>

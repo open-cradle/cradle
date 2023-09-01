@@ -405,14 +405,16 @@ class introspective_context_intf : public virtual context_intf
  public:
     virtual ~introspective_context_intf() = default;
 
+    // Should return "most recent tasklet for this context" or nullptr
     virtual tasklet_tracker*
     get_tasklet()
         = 0;
 
     virtual void
-    push_tasklet(tasklet_tracker* tasklet)
+    push_tasklet(tasklet_tracker& tasklet)
         = 0;
 
+    // Must match a preceding push_tasklet() call
     virtual void
     pop_tasklet()
         = 0;
@@ -561,21 +563,6 @@ struct arg_type_struct
 // Yields the type of an argument to an rq_function-like call
 template<typename T>
 using arg_type = typename arg_type_struct<T>::value_type;
-
-// tasklet_tracker context, ending when the destructor is called
-class tasklet_context
-{
- public:
-    tasklet_context(
-        introspective_context_intf& ctx,
-        std::string const& pool_name,
-        std::string const& title);
-
-    ~tasklet_context();
-
- private:
-    introspective_context_intf* ctx_{nullptr};
-};
 
 // Casts a context_intf reference to DestCtx*.
 // Returns nullptr if the runtime type doesn't match.

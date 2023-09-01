@@ -84,7 +84,10 @@ class Tasklet:
             text += f' on pool {self.pool_name}'
         text += f' [{self.description}'
         if self.client_id is not None:
-            text += f' on behalf of {self.client_id}'
+            if self.client_id >= 0:
+                text += f' on behalf of {self.client_id}'
+            else:
+                text += f' on behalf of LOCAL {-self.client_id}'
         text += ']'
         for event in self.events:
             if event.name == 'scheduled':
@@ -109,36 +112,52 @@ class Tasklet:
         return None
 
 
-class Snapshot:
+# A machine is local (possibly RPC client) or an RPC server
+class MachineSnapshot:
+    machine_name: str
     tasklets: List[Tasklet]
+
+    def __init__(self, machine_name: str):
+        self.machine_name = machine_name
+        self.tasklets = []
+
+
+class Snapshot:
+    machines: List[MachineSnapshot]
 
     def __init__(self, json: JsonData):
         self.json = json
         self.now = create_datetime(json['now'])
-        self.create_tasklets()
+        self.create_machines()
 
-    def create_tasklets(self) -> None:
-        self.tasklets = []
-        for tasklet_json in self.json['tasklets']:
-            tasklet = Tasklet(tasklet_json)
-            self.tasklets.append(tasklet)
+    def create_machines(self) -> None:
+        self.machines = []
+        for machine_json in self.json['machines']:
+            machine_name = machine_json['machine_name']
+            machine = MachineSnapshot(machine_name)
+            self.machines.append(machine)
+            for tasklet_json in machine_json['tasklets']:
+                tasklet = Tasklet(tasklet_json)
+                machine.tasklets.append(tasklet)
 
     def dump(self, include_tasklets: bool = False) -> None:
-        pool_names = {t.pool_name for t in self.tasklets}
-        for pool_name in sorted(pool_names):
-            self.dump_pool_oneliner(pool_name)
-            if include_tasklets:
-                self.dump_tasklets_for_pool(pool_name)
+        for machine in self.machines:
+            print(f'== Snapshot for {machine.machine_name.upper()}')
+            pool_names = {t.pool_name for t in machine.tasklets}
+            for pool_name in sorted(pool_names):
+                self.dump_pool_oneliner(machine, pool_name)
+                if include_tasklets:
+                    self.dump_tasklets_for_pool(machine, pool_name)
 
-    def dump_pool_oneliner(self, pool_name: str) -> None:
-        tasklet_ids = [t.own_id for t in self.tasklets if t.pool_name == pool_name]
+    def dump_pool_oneliner(self, machine: MachineSnapshot, pool_name: str) -> None:
+        tasklet_ids = [t.own_id for t in machine.tasklets if t.pool_name == pool_name]
         text = f'Pool {pool_name} has {len(tasklet_ids)} task(s):'
         for tid in tasklet_ids:
             text += f' {tid}'
         print(text)
 
-    def dump_tasklets_for_pool(self, pool_name: str) -> None:
-        for tasklet in self.tasklets:
+    def dump_tasklets_for_pool(self, machine: MachineSnapshot, pool_name: str) -> None:
+        for tasklet in machine.tasklets:
             if tasklet.pool_name == pool_name:
                 tasklet.dump(self.now, False, '    ')
 

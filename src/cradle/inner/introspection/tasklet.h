@@ -7,6 +7,13 @@
 
 namespace cradle {
 
+// A tasklet is identified by an id:
+// - Id value 0 is reserved to mean "no id".
+// - A positive id identifies a local tasklet.
+// - Negative id's are used on an RPC server only. Id -X corresponds to the
+//   tasklet with id X in the RPC client.
+static constexpr int NO_TASKLET_ID{};
+
 /**
  * Tracks a "tasklet": a conceptual task, implemented as a coroutine
  *
@@ -49,6 +56,9 @@ class tasklet_tracker
     on_finished()
         = 0;
 
+    // on_before_wait() and on_after_await() are only being used for old-style
+    // Thinknode requests
+    // TODO consider removing them, and tasklet_await
     virtual void
     on_before_await(std::string const& msg, id_interface const& cache_key)
         = 0;
@@ -76,6 +86,17 @@ create_tasklet_tracker(
     std::string const& pool_name,
     std::string const& title,
     tasklet_tracker* client = nullptr);
+
+/**
+ * Start tracking a new tasklet on an RPC server, reflecting an RPC client
+ * tasklet
+ *
+ * The return value will be nullptr if tracking is disabled.
+ * rpc_client_id is the id of the tasklet on the RPC client, and thus should be
+ * positive.
+ */
+tasklet_tracker*
+create_tasklet_tracker(int rpc_client_id);
 
 /**
  * Tracks the major states of a tasklet (running / finished)

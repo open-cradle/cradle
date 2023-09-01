@@ -45,12 +45,12 @@ perform_lambda_calc(
     auto app = string{"any"};
     auto image = make_thinknode_provider_image_info_with_tag("unused");
     auto pool_name = std::string{"lambda@"} + app;
-    tasklet_context tasklet_guard{ctx, pool_name, "lambda func"};
     co_await get_local_compute_pool_for_image(
         ctx.service, std::make_pair(app, image))
         .schedule();
 
-    auto tasklet{ctx.get_tasklet()};
+    auto tasklet
+        = create_tasklet_tracker(pool_name, "lambda func", ctx.get_tasklet());
     auto run_guard = tasklet_run(tasklet);
     co_return function.object(std::move(args), tasklet);
 }

@@ -2,6 +2,8 @@ import random
 
 import pytest
 
+from decode_json import get_tasklets_in_pool
+
 
 def create_calculation(a, b, c):
     return \
@@ -46,7 +48,7 @@ def create_calculation(a, b, c):
 def num_tasklets_in_http_pool(session):
     pool_name = 'HTTP'
     json = session.query_introspection_status(True)
-    tasklets_in_pool = [t for t in json['tasklets'] if t['pool_name'] == pool_name]
+    tasklets_in_pool = get_tasklets_in_pool(json, pool_name)
     return len(tasklets_in_pool)
 
 

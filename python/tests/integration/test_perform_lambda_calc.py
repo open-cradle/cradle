@@ -2,6 +2,8 @@ import random
 
 import pytest
 
+from decode_json import get_tasklets_in_pool
+
 
 # The "sleep" sample lambda takes one floating-point argument,
 # sleeps for so many seconds, then returns 42.
@@ -22,7 +24,7 @@ def create_calculation(seconds):
 def num_tasklets_in_lambda_pool(session):
     pool_name = 'lambda@any'
     json = session.query_introspection_status(True)
-    tasklets_in_pool = [t for t in json['tasklets'] if t['pool_name'] == pool_name]
+    tasklets_in_pool = get_tasklets_in_pool(json, pool_name)
     return len(tasklets_in_pool)
 
 
