@@ -204,9 +204,13 @@ resolve_request_cached(Ctx& ctx, Req const& req, Async async)
         auto& intr_ctx = cast_ctx_to_ref<introspective_context_intf>(ctx);
         return coawait_introspective(intr_ctx, req, ptr.task());
     }
-    // ptr owns a reference to the cache record, and thus to the shared_task,
-    // but its lifetime ends here, so the shared_task must be copied.
-    return ptr.task();
+    else
+    {
+        // ptr owns a reference to the cache record, and thus to the
+        // shared_task, but its lifetime ends here, so the shared_task must
+        // be copied.
+        return ptr.task();
+    }
 }
 
 template<Context Ctx, CachedRequest Req>
