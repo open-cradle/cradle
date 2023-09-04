@@ -269,6 +269,15 @@ struct first_element
  * leads to a two-step deserialization process: first a function_request_impl
  * object is created of the specified class, then that object's function member
  * is set to the correct value.
+ *
+ * This class owns two singletons: maching_functions_mutex_ and
+ * matching_functions_. In case of DLLs, the dynamic loader will use a single,
+ * global, matching_functions_ variable for all identical function_request_impl
+ * instantiations (Linux), or one variable per DLL (Windows). In the Linux
+ * case, when a DLL is unloaded, the global variable's function pointers would
+ * become dangling. In the Windows case, the set of all known uuid's is spread
+ * over several variables, but each variable will be consulted only for the
+ * uuid's supported by the corresponding DLL.
  */
 template<typename Value, bool AsCoro, typename Function, typename... Args>
 class function_request_impl : public function_request_intf<Value>
