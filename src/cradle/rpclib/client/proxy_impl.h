@@ -57,6 +57,9 @@ class rpclib_client_impl
     void
     finish_async(async_id root_aid);
 
+    tasklet_info_tuple_list
+    get_tasklet_infos(bool include_finished);
+
     void
     mock_http(std::string const& response_body);
 

@@ -58,13 +58,16 @@ class rpclib_client : public remote_proxy
     void
     finish_async(async_id root_aid) override;
 
+    tasklet_info_tuple_list
+    get_tasklet_infos(bool include_finished) override;
+
     // Instructs the RPC server to mock all HTTP requests, returning a 200
     // response with response_body for each.
     void
     mock_http(std::string const& response_body);
 
     // Tests if the rpclib server is running, throws rpc::system_error if not.
-    // Returns the Git version identifying the code base.
+    // Returns a compatibility identifier.
     std::string
     ping();
 

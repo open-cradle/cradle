@@ -7,6 +7,7 @@
 #include <spdlog/spdlog.h>
 
 #include <cradle/inner/core/type_definitions.h>
+#include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/rpclib/common/common.h>
@@ -95,6 +96,9 @@ handle_request_cancellation(rpclib_handler_context& hctx, async_id aid);
 
 int
 handle_finish_async(rpclib_handler_context& hctx, async_id root_aid);
+
+tasklet_info_tuple_list
+handle_get_tasklet_infos(rpclib_handler_context& hctx, bool include_finished);
 
 } // namespace cradle
 

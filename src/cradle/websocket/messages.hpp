@@ -328,7 +328,7 @@ union error_response
 api(struct)
 struct tasklet_msg_event
 {
-    integer when; // Milliseconds since epoch
+    integer when; // Milliseconds since epoch (64-bit number)
     std::string what;
     std::string details;
 };
@@ -343,11 +343,19 @@ struct tasklet_overview
     std::vector<tasklet_msg_event> events;
 };
 
+// A machine is local (possibly RPC client) or an RPC server
+api(struct)
+struct tasklet_machine_overview
+{
+    std::string machine_name;
+    std::vector<tasklet_overview> tasklets;
+};
+
 api(struct)
 struct introspection_status_response
 {
-    integer now; // Milliseconds since epoch
-    std::vector<tasklet_overview> tasklets;
+    integer now; // Milliseconds since epoch (64-bit number)
+    std::vector<tasklet_machine_overview> machines;
 };
 
 api(union)

@@ -67,9 +67,9 @@ sync_context_base::get_tasklet()
 }
 
 void
-sync_context_base::push_tasklet(tasklet_tracker* tasklet)
+sync_context_base::push_tasklet(tasklet_tracker& tasklet)
 {
-    tasklets_.push_back(tasklet);
+    tasklets_.push_back(&tasklet);
 }
 
 void
@@ -171,6 +171,37 @@ local_async_context_base::on_value_complete()
     {
         writer->on_write_completed();
     }
+}
+
+// Returns the last tasklet from the vector formed by concatenating the tasklet
+// vectors from all ancestor contexts, and from this context.
+tasklet_tracker*
+local_async_context_base::get_tasklet()
+{
+    if (!tasklets_.empty())
+    {
+        return tasklets_.back();
+    }
+    else if (parent_ != nullptr)
+    {
+        return parent_->get_tasklet();
+    }
+    else
+    {
+        return nullptr;
+    }
+}
+
+void
+local_async_context_base::push_tasklet(tasklet_tracker& tasklet)
+{
+    tasklets_.push_back(&tasklet);
+}
+
+void
+local_async_context_base::pop_tasklet()
+{
+    tasklets_.pop_back();
 }
 
 void

@@ -34,7 +34,7 @@ tasklet_info::tasklet_info(tasklet_impl const& impl)
     : own_id_{impl.own_id()},
       pool_name_{impl.pool_name()},
       title_{impl.title()},
-      client_id_{impl.client() ? impl.client()->own_id() : -1}
+      client_id_{impl.client() ? impl.client()->own_id() : NO_TASKLET_ID}
 {
     for (auto const& opt_evt : impl.optional_events())
     {

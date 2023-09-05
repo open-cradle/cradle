@@ -58,6 +58,12 @@ thinknode_request_context::make_config() const
         {thinknode_config_keys::API_URL, session.api_url},
         {thinknode_config_keys::ACCESS_TOKEN, session.access_token},
     };
+    if (!tasklets_.empty())
+    {
+        config_map.insert(std::pair{
+            remote_config_keys::TASKLET_ID,
+            static_cast<std::size_t>(tasklets_.back()->own_id())});
+    }
     return service_config{config_map};
 }
 

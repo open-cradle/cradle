@@ -64,9 +64,9 @@ TEST_CASE("push/pop tasklet", "[testing][context]")
     testing_request_context ctx{resources, nullptr, false, ""};
 
     REQUIRE(ctx.get_tasklet() == nullptr);
-    ctx.push_tasklet(t0);
+    ctx.push_tasklet(*t0);
     REQUIRE(ctx.get_tasklet() == t0);
-    ctx.push_tasklet(t1);
+    ctx.push_tasklet(*t1);
     REQUIRE(ctx.get_tasklet() == t1);
     ctx.pop_tasklet();
     REQUIRE(ctx.get_tasklet() == t0);

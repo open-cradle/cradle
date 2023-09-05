@@ -47,6 +47,9 @@ class loopback_service : public remote_proxy
     void
     finish_async(async_id root_aid) override;
 
+    tasklet_info_tuple_list
+    get_tasklet_infos(bool include_finished) override;
+
  private:
     inner_resources& resources_;
     bool testing_;
