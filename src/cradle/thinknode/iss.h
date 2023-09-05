@@ -13,6 +13,13 @@ namespace cradle {
 struct http_connection_interface;
 
 cppcoro::task<string>
+post_iss_object_uncached(
+    thinknode_request_context ctx,
+    string context_id,
+    string url_type_string,
+    blob object_data);
+
+cppcoro::task<string>
 resolve_iss_object_to_immutable_uncached(
     thinknode_request_context ctx,
     string context_id,
