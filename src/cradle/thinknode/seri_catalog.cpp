@@ -62,7 +62,7 @@ register_thinknode_seri_resolvers()
         "sample context id", "sample object id"));
     cat.register_resolver(rq_resolve_iss_object_to_immutable<level>(
         "sample context id", "sample object id", false));
-    meta_catalog::instance().add_static_catalog(cat);
+    meta_catalog::instance().add_catalog(cat);
 }
 
 } // namespace cradle

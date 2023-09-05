@@ -584,6 +584,21 @@ class function_request_impl : public function_request_intf<Value>
         function_ = it->second;
     }
 
+ public:
+    // DLL-related
+
+    // Deallocate all resources associated with uuid_str.
+    // Remove all references and pointers related to uuid, in the singletons
+    // associated with this class instantiation. This will be called when the
+    // DLL able to resolve uuid is unloaded, so that matching_functions_
+    // pointers would become dangling. It is redundant for Windows(-like)
+    // dynamic loaders. It should be redundant for Linux(-like) dynamic loaders
+    // assuming these pointers become unreachable on DLL unload.
+    // TODO add to cereal_functions_registry::entry_t, and ensure it gets
+    // called
+    static void
+    unregister(std::string const& uuid_str);
+
  private:
     // Protector of matching_functions_
     static inline std::mutex maching_functions_mutex_;

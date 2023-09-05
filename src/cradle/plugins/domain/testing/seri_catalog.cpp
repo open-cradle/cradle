@@ -30,7 +30,7 @@ register_testing_seri_resolvers()
         rq_make_some_blob<caching_level_type::full>(1, false));
     cat.register_resolver(
         rq_cancellable_coro<caching_level_type::memory>(0, 0));
-    meta_catalog::instance().add_static_catalog(cat);
+    meta_catalog::instance().add_catalog(cat);
 }
 
 } // namespace cradle

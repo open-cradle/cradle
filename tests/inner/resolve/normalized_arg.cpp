@@ -53,7 +53,7 @@ TEST_CASE("resolve serialized requests with normalized args", tag)
         func_props, plus_two_func, normalize_arg<int, func_props_t>(0)));
     cat.register_resolver(rq_function_erased(
         coro_props, plus_two_coro, normalize_arg<int, coro_props_t>(0)));
-    meta_catalog::instance().add_static_catalog(cat);
+    meta_catalog::instance().add_catalog(cat);
 
     non_caching_request_resolution_context ctx;
 

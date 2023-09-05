@@ -1,10 +1,10 @@
 #ifndef CRADLE_INNER_RESOLVE_META_CATALOG_H
 #define CRADLE_INNER_RESOLVE_META_CATALOG_H
 
-#include <memory>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 
-#include <boost/dll.hpp>
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/requests/generic.h>
@@ -13,32 +13,21 @@
 
 namespace cradle {
 
-class meta_catalog_impl;
-
-// Singleton catalog of all global seri_catalog objects in the system.
-// These objects originate from the main program or from a DLL; in either case,
-// they must be static's.
+// Singleton catalog of all seri_catalog objects in the system, and the
+// capability to resolve serialized requests through any of them.
+// A seri_catalog object originates from the main program or from a DLL.
+// Ownership lies elsewhere; the objects could e.g. be singletons themselves.
 class meta_catalog
 {
  public:
     static meta_catalog&
     instance();
 
-    meta_catalog();
-
-    // catalog should be a static object (in the main program).
     void
-    add_static_catalog(seri_catalog& catalog);
+    add_catalog(seri_catalog& catalog);
 
-    // catalog should be a static object (in the DLL).
-    // When lib's destructor is called, the library will/may be unloaded, and
-    // the catalog reference becomes dangling. The meta_catalog must somehow
-    // handle this (e.g. by never letting go of the lib unique_ptr).
     void
-    add_dll_catalog(
-        seri_catalog& catalog,
-        std::string dll_path,
-        std::unique_ptr<boost::dll::shared_library> lib);
+    remove_catalog(seri_catalog& catalog);
 
     /**
      * Locally resolves a serialized request to a serialized response.
@@ -50,7 +39,14 @@ class meta_catalog
     resolve(local_context_intf& ctx, std::string seri_req);
 
  private:
-    std::unique_ptr<meta_catalog_impl> impl_;
+    std::mutex mutex_;
+    std::unordered_map<std::string, seri_catalog*> catalogs_map_;
+
+    std::string
+    extract_uuid_str(std::string const& seri_req);
+
+    std::shared_ptr<seri_resolver_intf>
+    find_resolver(std::string const& uuid_str);
 };
 
 } // namespace cradle
