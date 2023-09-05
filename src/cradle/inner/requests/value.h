@@ -27,11 +27,11 @@ class value_request
         caching_level_type::none};
     static constexpr bool introspective{false};
 
-    value_request(Value const& value) : value_{value}
+    value_request(Value const& value) : value_(value)
     {
     }
 
-    value_request(Value&& value) : value_{std::move(value)}
+    value_request(Value&& value) : value_(std::move(value))
     {
     }
 
