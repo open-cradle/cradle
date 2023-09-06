@@ -80,6 +80,11 @@ using DefaultResolutionConstraints = ResolutionConstraints<
 template<typename T>
 concept BoolConst = requires { std::same_as<decltype(T::value), bool>; };
 
+// Visual C++ 14.30 (2022) has trouble with the use of `if constexpr` in this
+// file and likes to report C4702 warnings (unreachable code) for lines that
+// aren't reached during individual traversals of the `if constexpr` paths.
+#pragma warning(disable : 4702)
+
 template<Context Ctx, Request Req, BoolConst Async>
 cppcoro::shared_task<typename Req::value_type>
 resolve_request_uncached(Ctx& ctx, Req const& req, Async async)
@@ -260,8 +265,8 @@ resolve_request_async(Ctx& ctx, Req const& req)
 
 template<Context Ctx, typename Val, typename Constraints>
     requires(!Request<Val>)
-cppcoro::shared_task<Val> resolve_request_local(
-    Ctx& ctx, Val const& val, Constraints constraints)
+cppcoro::shared_task<Val>
+resolve_request_local(Ctx& ctx, Val const& val, Constraints constraints)
 {
     // async status, if appropriate, should already be FINISHED
     co_return val;
@@ -318,7 +323,8 @@ template<
     typename Val,
     typename Constraints = NoResolutionConstraints>
     requires(!Request<Val>)
-cppcoro::task<Val> resolve_request(
+cppcoro::task<Val>
+resolve_request(
     Ctx& ctx, Val const& val, Constraints constraints = Constraints())
 {
     static_assert(!constraints.force_remote);
