@@ -71,18 +71,6 @@ resolve_iss_object_to_immutable_uncached(
     }
 }
 
-cppcoro::task<string>
-resolve_iss_object_to_immutable_generic(
-    context_intf& ctx,
-    string context_id,
-    string object_id,
-    bool ignore_upgrades)
-{
-    auto& tctx{cast_ctx_to_ref<thinknode_request_context>(ctx)};
-    return resolve_iss_object_to_immutable_uncached(
-        tctx, std::move(context_id), std::move(object_id), ignore_upgrades);
-}
-
 cppcoro::shared_task<string>
 resolve_iss_object_to_immutable(
     thinknode_request_context ctx,
@@ -147,15 +135,6 @@ get_iss_object_metadata_uncached(
     }
 }
 
-cppcoro::task<std::map<string, string>>
-get_iss_object_metadata_generic(
-    context_intf& ctx, string context_id, string object_id)
-{
-    auto& tctx{cast_ctx_to_ref<thinknode_request_context>(ctx)};
-    return get_iss_object_metadata_uncached(
-        tctx, std::move(context_id), std::move(object_id));
-}
-
 cppcoro::shared_task<std::map<string, string>>
 get_iss_object_metadata(
     thinknode_request_context ctx, string context_id, string object_id)
@@ -214,6 +193,25 @@ retrieve_immutable(
         std::move(function_name));
 }
 
+// TODO: Don't use this. Instead create blobs in shared memory in the first
+// place.
+template<class Context>
+blob
+to_shared_memory(Context& ctx, blob const& original)
+{
+    std::shared_ptr<data_owner> owner;
+    uint8_t* data{nullptr};
+
+    auto writer = ctx.service.make_blob_file_writer(original.size());
+    owner = writer;
+    data = writer->data();
+
+    memcpy(data, original.data(), original.size());
+
+    owner->on_write_completed();
+    return blob{std::move(owner), as_bytes(data), original.size()};
+}
+
 cppcoro::task<blob>
 retrieve_immutable_blob_uncached(
     thinknode_request_context ctx, string context_id, string immutable_id)
@@ -224,16 +222,7 @@ retrieve_immutable_blob_uncached(
         {{"Authorization", "Bearer " + ctx.session.access_token},
          {"Accept", "application/octet-stream"}});
     auto response = co_await async_http_request(ctx, query);
-    co_return response.body;
-}
-
-cppcoro::task<blob>
-retrieve_immutable_blob_generic(
-    context_intf& ctx, string context_id, string immutable_id)
-{
-    auto& tctx{cast_ctx_to_ref<thinknode_request_context>(ctx)};
-    return retrieve_immutable_blob_uncached(
-        tctx, std::move(context_id), std::move(immutable_id));
+    co_return to_shared_memory(ctx, response.body);
 }
 
 cppcoro::shared_task<blob>
@@ -544,21 +533,6 @@ post_iss_object_uncached_template_url(
         std::move(ctx),
         std::move(context_id),
         std::move(url_type_string),
-        std::move(object_data));
-}
-
-cppcoro::task<string>
-post_iss_object_generic_template_url(
-    context_intf& ctx,
-    string context_id,
-    string url_type_template_string,
-    blob object_data)
-{
-    auto& tctx{cast_ctx_to_ref<thinknode_request_context>(ctx)};
-    return post_iss_object_uncached_template_url(
-        tctx,
-        std::move(context_id),
-        std::move(url_type_template_string),
         std::move(object_data));
 }
 

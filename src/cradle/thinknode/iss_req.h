@@ -9,6 +9,7 @@
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/requests/function.h>
+#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss.h>
 
 namespace cradle {
