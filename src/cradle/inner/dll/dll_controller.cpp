@@ -1,4 +1,5 @@
 #include <cradle/inner/dll/dll_controller.h>
+#include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/meta_catalog.h>
 
 namespace cradle {
@@ -6,12 +7,6 @@ namespace cradle {
 dll_controller::dll_controller(std::string path, std::string name)
     : path_{std::move(path)}, name_{std::move(name)}
 {
-}
-
-dll_controller::~dll_controller()
-{
-    fmt::print(
-        "!! ~dll_controller {} {}\n", name_, (lib_ ? "HAVE LIB" : "NO LIB"));
 }
 
 void
@@ -22,9 +17,7 @@ dll_controller::load()
     auto mode{
         boost::dll::load_mode::rtld_now | boost::dll::load_mode::rtld_local
         | boost::dll::load_mode::rtld_deepbind};
-    fmt::print("!! dll_controller {} before init\n", name_);
     lib_ = std::make_unique<boost::dll::shared_library>(path_, mode);
-    fmt::print("!! dll_controller {} after init\n", name_);
 
     typedef void init_func_t();
     std::string const init_func_name{"CRADLE_init"};
@@ -43,11 +36,13 @@ dll_controller::load()
 void
 dll_controller::unload()
 {
+    for (auto const& uuid_str : catalog_->get_all_uuid_strs())
+    {
+        cereal_functions_registry::instance().remove_entry_if_exists(uuid_str);
+    }
     meta_catalog::instance().remove_catalog(*catalog_);
     catalog_ = nullptr;
-    fmt::print("!! dll_controller {} before reset\n", name_);
     lib_.reset();
-    fmt::print("!! dll_controller {} after reset\n", name_);
 }
 
 } // namespace cradle

@@ -12,15 +12,13 @@
 
 using namespace cradle;
 
-#if 0
 namespace {
 
 static char const tag[] = "[inner][resolve][proxy]";
 
 } // namespace
-#endif
 
-TEST_CASE("evaluate proxy request", "[X]")
+TEST_CASE("evaluate proxy request", tag)
 {
     inner_resources resources;
     init_test_inner_service(resources);
@@ -51,7 +49,7 @@ TEST_CASE("evaluate proxy request", "[X]")
 // dynamic loader implementation, the two functions use the same, global,
 // function_request_impl::matching_functions_ singleton (Linux), or a per-DLL
 // one (Windows). Both should work correctly.
-TEST_CASE("two DLLs defining same-typed requests", "[Y]")
+TEST_CASE("two DLLs defining same-typed requests", tag)
 {
     inner_resources resources;
     init_test_inner_service(resources);
@@ -76,4 +74,40 @@ TEST_CASE("two DLLs defining same-typed requests", "[Y]")
     auto mul_actual
         = cppcoro::sync_wait(resolve_request(ctx, mul_req, constraints));
     REQUIRE(mul_actual == mul_expected);
+}
+
+TEST_CASE("unload/reload DLL", tag)
+{
+    inner_resources resources;
+    init_test_inner_service(resources);
+    auto config{make_inner_tests_config()};
+    auto& proxy = register_rpclib_client(config, resources);
+    proxy.unload_shared_library("test_inner_dll_v1.*");
+
+    auto req{rq_test_adder_v1(7, 2)};
+    int expected{7 + 2};
+
+    tasklet_tracker* tasklet{nullptr};
+    bool remotely{true};
+    testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
+    ResolutionConstraintsRemoteSync constraints;
+
+    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
+
+    auto res0 = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
+    REQUIRE(res0 == expected);
+
+    for (int i = 0; i < 3; ++i)
+    {
+        proxy.unload_shared_library("test_inner_dll_v1.*");
+
+        REQUIRE_THROWS_WITH(
+            cppcoro::sync_wait(resolve_request(ctx, req, constraints)),
+            Catch::Contains("no resolver registered for uuid"));
+
+        proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
+
+        auto res1 = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
+        REQUIRE(res1 == expected);
+    }
 }

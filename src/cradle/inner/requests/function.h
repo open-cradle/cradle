@@ -203,6 +203,9 @@ class cereal_functions_registry
         save_t* save,
         load_t* load);
 
+    void
+    remove_entry_if_exists(std::string const& uuid_str);
+
     // Intf should be a function_request_intf instantiation.
     template<typename Intf>
     std::shared_ptr<Intf>

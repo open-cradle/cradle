@@ -416,9 +416,6 @@ try
 }
 catch (std::exception& e)
 {
-    fmt::print("!! EXCEPTION\n");
-    fmt::print("!! {}\n", typeid(e).name());
-    fmt::print("!! {}\n", e.what());
     handle_exception(hctx, e);
 }
 

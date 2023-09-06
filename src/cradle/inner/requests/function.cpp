@@ -67,14 +67,20 @@ cereal_functions_registry::add_entry(
     std::scoped_lock lock{mutex_};
     entry_t new_entry{create, save, load};
     auto it = entries_.find(uuid_str);
-    if (it == entries_.end())
+    if (it != entries_.end() && it->second != new_entry)
     {
-        entries_[uuid_str] = new_entry;
+        logger->warn(
+            "cereal_functions_registry: conflicting entries for uuid {}",
+            uuid_str);
     }
-    else if (it->second != new_entry)
-    {
-        logger->warn("conflicting entries for uuid {}", uuid_str);
-    }
+    entries_.insert_or_assign(std::move(uuid_str), std::move(new_entry));
+}
+
+void
+cereal_functions_registry::remove_entry_if_exists(std::string const& uuid_str)
+{
+    std::scoped_lock lock{mutex_};
+    entries_.erase(uuid_str);
 }
 
 entry_t&

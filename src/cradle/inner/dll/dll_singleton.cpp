@@ -60,7 +60,6 @@ dll_singleton::remove_one(std::string const& dll_name)
         throw std::out_of_range{
             fmt::format("no DLL loaded named {}", dll_name)};
     }
-    fmt::print("dll_singleton: remove {}\n", it->first);
     res.push_back(std::move(it->second));
     controllers_.erase(it);
     return res;
@@ -75,7 +74,6 @@ dll_singleton::remove_matching(std::string const& dll_name_regex)
     {
         if (std::regex_match(it->first, re))
         {
-            fmt::print("dll_singleton: remove {}\n", it->first);
             res.push_back(std::move(it->second));
             it = controllers_.erase(it);
         }
