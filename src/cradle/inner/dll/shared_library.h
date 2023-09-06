@@ -3,9 +3,16 @@
 
 // TODO should this be in inner? Used by rpclib server only.
 
+#include <stdexcept>
 #include <string>
 
 namespace cradle {
+
+class dll_load_error : public std::runtime_error
+{
+ public:
+    using std::runtime_error::runtime_error;
+};
 
 /*
  * Loads a shared library and registers its seri resolvers.
@@ -27,6 +34,16 @@ namespace cradle {
  */
 void
 load_shared_library(std::string const& dir_path, std::string const& dll_name);
+
+/*
+ * Unloads a shared library and unregisters its seri resolvers.
+ *
+ * TODO postpone actual unload as long as its resolvers are active.
+ *
+ * dll_name is as for load_shared_library(), or a regex if it contains "*".
+ */
+void
+unload_shared_library(std::string const& dll_name);
 
 } // namespace cradle
 

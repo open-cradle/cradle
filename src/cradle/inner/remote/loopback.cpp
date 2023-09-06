@@ -196,6 +196,13 @@ loopback_service::load_shared_library(
     throw not_implemented_error("loopback_service::load_shared_library()");
 }
 
+void
+loopback_service::unload_shared_library(std::string dll_name)
+{
+    logger_->info("unload_shared_library {}", dll_name);
+    throw not_implemented_error("loopback_service::unload_shared_library()");
+}
+
 async_db&
 loopback_service::get_async_db()
 {

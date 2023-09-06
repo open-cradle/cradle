@@ -104,6 +104,10 @@ void
 handle_load_shared_library(
     rpclib_handler_context& hctx, std::string dir_path, std::string dll_name);
 
+void
+handle_unload_shared_library(
+    rpclib_handler_context& hctx, std::string dll_name);
+
 } // namespace cradle
 
 #endif

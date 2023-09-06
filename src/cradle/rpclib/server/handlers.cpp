@@ -416,6 +416,24 @@ try
 }
 catch (std::exception& e)
 {
+    fmt::print("!! EXCEPTION\n");
+    fmt::print("!! {}\n", typeid(e).name());
+    fmt::print("!! {}\n", e.what());
+    handle_exception(hctx, e);
+}
+
+void
+handle_unload_shared_library(
+    rpclib_handler_context& hctx, std::string dll_name)
+try
+{
+    auto& logger{hctx.logger()};
+    logger.info("handle_unload_shared_library({})", dll_name);
+
+    unload_shared_library(dll_name);
+}
+catch (std::exception& e)
+{
     handle_exception(hctx, e);
 }
 

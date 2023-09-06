@@ -86,6 +86,12 @@ rpclib_client::load_shared_library(std::string dir_path, std::string dll_name)
 }
 
 void
+rpclib_client::unload_shared_library(std::string dll_name)
+{
+    return pimpl_->unload_shared_library(std::move(dll_name));
+}
+
+void
 rpclib_client::mock_http(std::string const& response_body)
 {
     pimpl_->mock_http(response_body);

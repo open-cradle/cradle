@@ -205,6 +205,9 @@ run_server(cli_options const& options)
             handle_load_shared_library(
                 hctx, std::move(dir_path), std::move(dll_name));
         });
+    srv.bind("unload_shared_library", [&](std::string dll_name) {
+        handle_unload_shared_library(hctx, std::move(dll_name));
+    });
 
     srv.run();
 

@@ -6,12 +6,16 @@
 
 #include <boost/dll.hpp>
 
+#include <cradle/inner/resolve/seri_catalog.h>
+
 namespace cradle {
 
 class dll_controller
 {
  public:
     dll_controller(std::string path, std::string name);
+
+    ~dll_controller();
 
     void
     load();
@@ -35,6 +39,7 @@ class dll_controller
     std::string path_;
     std::string name_;
     std::unique_ptr<boost::dll::shared_library> lib_;
+    seri_catalog* catalog_{};
 };
 
 } // namespace cradle

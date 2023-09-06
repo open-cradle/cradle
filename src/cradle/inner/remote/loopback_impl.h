@@ -53,6 +53,9 @@ class loopback_service : public remote_proxy
     void
     load_shared_library(std::string dir_path, std::string dll_name) override;
 
+    void
+    unload_shared_library(std::string dll_name) override;
+
  private:
     inner_resources& resources_;
     bool testing_;

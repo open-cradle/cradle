@@ -165,6 +165,14 @@ rpclib_client_impl::load_shared_library(
 }
 
 void
+rpclib_client_impl::unload_shared_library(std::string dll_name)
+{
+    logger_->debug("unload_shared_library {}", dll_name);
+    do_rpc_call("unload_shared_library", std::move(dll_name));
+    logger_->debug("unload_shared_library done");
+}
+
+void
 rpclib_client_impl::mock_http(std::string const& response_body)
 {
     logger_->debug("mock_http start");

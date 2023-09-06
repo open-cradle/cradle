@@ -5,6 +5,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include <cradle/inner/dll/dll_controller.h>
 
@@ -23,13 +24,24 @@ class dll_singleton
     dll_controller*
     find(std::string const& dll_name);
 
-    std::unique_ptr<dll_controller>
+    // Removes controllers matching dll_name, and transfers their ownership to
+    // the caller.
+    // If dll_name is a simple name, returns exactly one controller.
+    // If dll_name contains a "*", the size of the returned vector can be 0, 1
+    // or more.
+    std::vector<std::unique_ptr<dll_controller>>
     remove(std::string const& dll_name);
 
  private:
     std::mutex mutex_;
     std::unordered_map<std::string, std::unique_ptr<dll_controller>>
         controllers_;
+
+    std::vector<std::unique_ptr<dll_controller>>
+    remove_one(std::string const& dll_name);
+
+    std::vector<std::unique_ptr<dll_controller>>
+    remove_matching(std::string const& dll_name);
 };
 
 } // namespace cradle

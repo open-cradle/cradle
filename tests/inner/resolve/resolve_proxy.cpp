@@ -12,17 +12,20 @@
 
 using namespace cradle;
 
+#if 0
 namespace {
 
 static char const tag[] = "[inner][resolve][proxy]";
 
 } // namespace
+#endif
 
-TEST_CASE("evaluate proxy request", tag)
+TEST_CASE("evaluate proxy request", "[X]")
 {
     inner_resources resources;
     init_test_inner_service(resources);
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
+    proxy.unload_shared_library("test_inner_dll_v1.*");
 
     auto req{rq_test_adder_v1(7, 2)};
     int expected{7 + 2};
@@ -48,11 +51,12 @@ TEST_CASE("evaluate proxy request", tag)
 // dynamic loader implementation, the two functions use the same, global,
 // function_request_impl::matching_functions_ singleton (Linux), or a per-DLL
 // one (Windows). Both should work correctly.
-TEST_CASE("two DLLs defining same-typed requests", tag)
+TEST_CASE("two DLLs defining same-typed requests", "[Y]")
 {
     inner_resources resources;
     init_test_inner_service(resources);
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
+    proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};
     bool remotely{true};
     testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
