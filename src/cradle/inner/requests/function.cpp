@@ -42,7 +42,11 @@ cereal_functions_registry::instance()
 
 void
 cereal_functions_registry::add_entry(
-    std::string const& uuid_str, create_t* create, save_t* save, load_t* load)
+    std::string const& uuid_str,
+    create_t* create,
+    save_t* save,
+    load_t* load,
+    unregister_t* unregister)
 {
     // This function is called when a function_request_impl object is created,
     // so can be called multiple times for the same uuid. Especially for
@@ -61,14 +65,12 @@ cereal_functions_registry::add_entry(
     // For the normalization functions, it seems possible to avoid this problem
     // by registering the requests separately. That suggestion already appeared
     // in thinknode/seri_catalog.cpp.
-    //
-    // TODO support unloading create/save/load
-    auto logger{spdlog::get("cradle")};
     std::scoped_lock lock{mutex_};
-    entry_t new_entry{create, save, load};
+    entry_t new_entry{create, save, load, unregister};
     auto it = entries_.find(uuid_str);
     if (it != entries_.end() && it->second != new_entry)
     {
+        auto logger{spdlog::get("cradle")};
         logger->warn(
             "cereal_functions_registry: conflicting entries for uuid {}",
             uuid_str);
@@ -79,15 +81,29 @@ cereal_functions_registry::add_entry(
 void
 cereal_functions_registry::remove_entry_if_exists(std::string const& uuid_str)
 {
+    auto logger{spdlog::get("cradle")};
+    logger->debug(
+        "cereal_functions_registry: remove_entry_if_exists {}", uuid_str);
     std::scoped_lock lock{mutex_};
-    entries_.erase(uuid_str);
+    auto it = find_checked(uuid_str);
+    if (auto* unregister = it->second.unregister)
+    {
+        logger->debug("cereal_functions_registry: unregister {}", uuid_str);
+        unregister(uuid_str);
+    }
+    entries_.erase(it);
 }
 
 entry_t&
 cereal_functions_registry::find_entry(request_uuid const& uuid)
 {
     std::scoped_lock lock{mutex_};
-    std::string uuid_str{uuid.str()};
+    return find_checked(uuid.str())->second;
+}
+
+cereal_functions_registry::entries_t::iterator
+cereal_functions_registry::find_checked(std::string const& uuid_str)
+{
     auto it = entries_.find(uuid_str);
     if (it == entries_.end())
     {
@@ -95,7 +111,7 @@ cereal_functions_registry::find_entry(request_uuid const& uuid)
         throw unregistered_uuid_error{fmt::format(
             "cereal_functions_registry: no entry for {}", uuid_str)};
     }
-    return it->second;
+    return it;
 }
 
 } // namespace cradle

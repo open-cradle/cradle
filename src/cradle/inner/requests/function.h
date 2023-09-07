@@ -156,6 +156,8 @@ when_all_wrapper(Tuple&& tasks, std::index_sequence<Ix...>)
  * - create() creates a shared_ptr<function_request_impl> object.
  * - save() serializes a function_request_impl object to JSON.
  * - load() deserializes a function_request_impl object from JSON.
+ * - unregisters() removes data associated with the uuid, destroying the
+ * ability to resolve the uuid.
  *
  * This registry forms the basis for an ad-hoc alternative to the cereal
  * polymorphic types implementation, which is not usable here:
@@ -185,12 +187,14 @@ class cereal_functions_registry
     using create_t = std::shared_ptr<void>(request_uuid const& uuid);
     using save_t = void(cereal::JSONOutputArchive& archive, void const* impl);
     using load_t = void(cereal::JSONInputArchive& archive, void* impl);
+    using unregister_t = void(std::string const& uuid_str);
 
     struct entry_t
     {
         create_t* create;
         save_t* save;
         load_t* load;
+        unregister_t* unregister;
     };
 
     static cereal_functions_registry&
@@ -201,7 +205,8 @@ class cereal_functions_registry
         std::string const& uuid_str,
         create_t* create,
         save_t* save,
-        load_t* load);
+        load_t* load,
+        unregister_t* unregister);
 
     void
     remove_entry_if_exists(std::string const& uuid_str);
@@ -235,11 +240,15 @@ class cereal_functions_registry
     }
 
  private:
-    std::unordered_map<std::string, entry_t> entries_;
+    using entries_t = std::unordered_map<std::string, entry_t>;
+    entries_t entries_;
     std::mutex mutex_;
 
     entry_t&
     find_entry(request_uuid const& uuid);
+
+    entries_t::iterator
+    find_checked(std::string const& uuid_str);
 };
 
 template<typename Head, typename... Tail>
@@ -298,34 +307,45 @@ class function_request_impl : public function_request_intf<Value>
     {
         auto uuid_str{uuid_.str()};
         cereal_functions_registry::instance().add_entry(
-            uuid_str, create, save_json, load_json);
+            uuid_str, create, save_json, load_json, unregister);
 
         std::scoped_lock lock{maching_functions_mutex_};
-        auto it = matching_functions_.find(uuid_str);
-        if (it == matching_functions_.end())
+        bool must_store_function{true};
+        if constexpr (func_is_plain)
         {
-            function_ = std::make_shared<Function>(std::move(function));
-            matching_functions_[uuid_str] = function_;
-        }
-        else
-        {
-            function_ = matching_functions_[uuid_str];
-            // Try to catch attempts to associate different functions with the
-            // same uuid.
-            // - This is possible for plain C++ functions.
+            // Try to see if the correct function is already stored, and to
+            // catch attempts to associate different functions with the same
+            // uuid.
+            // - The check is possible for plain C++ functions.
             // - It is not possible to distinguish two lambdas capturing
             //   different arguments (and thus probably having different
             //   behaviour).
             // - Captureless lambdas with the same type are identical.
-            // TODO still a valid check with dynamically loaded .so?
-            if constexpr (func_is_plain)
+            auto it = matching_functions_.find(uuid_str);
+            if (it != matching_functions_.end())
             {
-                if (*function_ != function)
+                if (*it->second == function)
                 {
+                    function_ = it->second;
+                    must_store_function = false;
+                }
+                else
+                {
+                    // TODO should this be a warning? It would be consistent
+                    // with cereal_functions_registry. Two DLLs having the same
+                    // implementation for some uuid (and satisfying the ODR)
+                    // looks like a valid use case.
                     throw conflicting_functions_uuid_error(fmt::format(
                         "Multiple C++ functions for uuid {}", uuid_str));
                 }
             }
+        }
+        if (must_store_function)
+        {
+            // If matching_functions_ already has an entry for uuid_str, it
+            // might be obsolete and unusable, so replace it.
+            function_ = std::make_shared<Function>(std::move(function));
+            matching_functions_.insert_or_assign(uuid_str, function_);
         }
     }
 
@@ -592,15 +612,25 @@ class function_request_impl : public function_request_intf<Value>
 
     // Deallocate all resources associated with uuid_str.
     // Remove all references and pointers related to uuid, in the singletons
-    // associated with this class instantiation. This will be called when the
-    // DLL able to resolve uuid is unloaded, so that matching_functions_
-    // pointers would become dangling. It is redundant for Windows(-like)
-    // dynamic loaders. It should be redundant for Linux(-like) dynamic loaders
-    // assuming these pointers become unreachable on DLL unload.
-    // TODO add to cereal_functions_registry::entry_t, and ensure it gets
-    // called
+    // associated with this class instantiation. This must be called when the
+    // DLL able to resolve uuid is unloaded, to prevent dangling pointers in
+    // matching_functions_.
+    //
+    // For Windows(-like) dynamic loaders, these singletons are destroyed when
+    // the DLL is unloaded, so calling this function would be redundant.
+    //
+    // For Linux(-like) dynamic loaders, these pointers become dangling on DLL
+    // unload, but as the framework cannot resolve the corresponding uuid
+    // anymore after, they should be unreachable. When a DLL is (re-)loaded
+    // that can resolve the uuid, the pointers get overwritten. So there should
+    // be no real need to call this function, but removing the dangling
+    // pointers is cleaner and safer.
     static void
-    unregister(std::string const& uuid_str);
+    unregister(std::string const& uuid_str)
+    {
+        std::scoped_lock lock{maching_functions_mutex_};
+        matching_functions_.erase(uuid_str);
+    }
 
  private:
     // Protector of matching_functions_
@@ -722,7 +752,7 @@ class proxy_request_base : public function_request_intf<Value>
     {
         auto uuid_str{uuid_.str()};
         cereal_functions_registry::instance().add_entry(
-            uuid_str, nullptr, save_json, nullptr);
+            uuid_str, nullptr, save_json, nullptr, nullptr);
     }
 
     request_uuid

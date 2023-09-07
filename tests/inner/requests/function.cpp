@@ -158,11 +158,9 @@ TEST_CASE(
     "one uuid",
     tag)
 {
-    // This is illegal usage but the implementation cannot detect that.
-    // The implementation considers the two requests to be equal.
-    // It stores the lambda passed with the first request, and discards
-    // additional lambdas. Thus, resolving the second request gives the same
-    // result as for the first request.
+    // This is legal if the two lambdas come from different DLLs (and their
+    // implementations are identical). The two requests should resolve to the
+    // specified values.
     request_props<caching_level_type::memory> props{make_test_uuid("0005")};
     auto lambda_a{make_lambda(func_a)};
     auto lambda_b{make_lambda(func_b)};
@@ -179,7 +177,7 @@ TEST_CASE(
     auto result_b{cppcoro::sync_wait(req_b.resolve_sync(ctx))};
 
     REQUIRE(result_a == "a");
-    REQUIRE(result_b == "a");
+    REQUIRE(result_b == "b");
 }
 
 TEST_CASE(
@@ -204,7 +202,7 @@ TEST_CASE(
     auto result_b{cppcoro::sync_wait(req_b.resolve_sync(ctx))};
 
     REQUIRE(result_a == 2);
-    REQUIRE(result_b == 2);
+    REQUIRE(result_b == 3);
 }
 
 TEST_CASE(

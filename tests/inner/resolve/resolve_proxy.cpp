@@ -97,17 +97,49 @@ TEST_CASE("unload/reload DLL", tag)
     auto res0 = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
     REQUIRE(res0 == expected);
 
-    for (int i = 0; i < 3; ++i)
-    {
-        proxy.unload_shared_library("test_inner_dll_v1.*");
+    proxy.unload_shared_library("test_inner_dll_v1.*");
 
-        REQUIRE_THROWS_WITH(
-            cppcoro::sync_wait(resolve_request(ctx, req, constraints)),
-            Catch::Contains("no resolver registered for uuid"));
+    REQUIRE_THROWS_WITH(
+        cppcoro::sync_wait(resolve_request(ctx, req, constraints)),
+        Catch::Contains("no resolver registered for uuid"));
 
-        proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
+    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
 
-        auto res1 = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
-        REQUIRE(res1 == expected);
-    }
+    auto res1 = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
+    REQUIRE(res1 == expected);
+}
+
+TEST_CASE("unload/reload two DLLs", tag)
+{
+    inner_resources resources;
+    init_test_inner_service(resources);
+    auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
+    proxy.unload_shared_library("test_inner_dll_x.*");
+    tasklet_tracker* tasklet{nullptr};
+    bool remotely{true};
+    testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
+    ResolutionConstraintsRemoteSync constraints;
+
+    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0");
+    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x1");
+    proxy.unload_shared_library("test_inner_dll_x.*");
+
+    auto add_req{rq_test_adder_x0(7, 2)};
+    int add_expected{7 + 2};
+    auto mul_req{rq_test_multiplier_x1(7, 2)};
+    int mul_expected{7 * 2};
+
+    // Insert another DLL to increase the chance that x0 and x1 are loaded
+    // at different addresses than before.
+    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
+
+    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0");
+    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x1");
+
+    auto add_actual
+        = cppcoro::sync_wait(resolve_request(ctx, add_req, constraints));
+    REQUIRE(add_actual == add_expected);
+    auto mul_actual
+        = cppcoro::sync_wait(resolve_request(ctx, mul_req, constraints));
+    REQUIRE(mul_actual == mul_expected);
 }
