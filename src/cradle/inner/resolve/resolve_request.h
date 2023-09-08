@@ -83,7 +83,9 @@ concept BoolConst = requires { std::same_as<decltype(T::value), bool>; };
 // Visual C++ 14.30 (2022) has trouble with the use of `if constexpr` in this
 // file and likes to report C4702 warnings (unreachable code) for lines that
 // aren't reached during individual traversals of the `if constexpr` paths.
+#ifdef _MSC_VER
 #pragma warning(disable : 4702)
+#endif
 
 template<Context Ctx, Request Req, BoolConst Async>
 cppcoro::shared_task<typename Req::value_type>
