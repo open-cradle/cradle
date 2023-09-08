@@ -9,6 +9,11 @@ namespace cradle {
 // with a coroutine.
 // CANCELLED, FINISHED and ERROR are final statuses: once a task ends up in
 // one of these, its status won't change anymore.
+// Note that ERROR also seems to show up as a #define on Windows, so first we
+// need to clean that up.
+#ifdef ERROR
+#undef ERROR
+#endif
 enum class async_status
 {
     CREATED, // Task was created
