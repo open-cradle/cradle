@@ -12,6 +12,12 @@ rpclib_client::~rpclib_client()
 {
 }
 
+void
+rpclib_client::set_logger(std::shared_ptr<spdlog::logger> logger)
+{
+    rpclib_client_impl::set_logger(std::move(logger));
+}
+
 std::string
 rpclib_client::name() const
 {

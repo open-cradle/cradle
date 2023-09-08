@@ -28,6 +28,12 @@ class rpclib_client : public remote_proxy
 
     ~rpclib_client();
 
+    // Set a logger to be used by rpclib_client instances.
+    // This should be called prior to the creation of any rpclib_client
+    // instances. If it's not called, a default logger will be provided.
+    static void
+    set_logger(std::shared_ptr<spdlog::logger> logger);
+
     std::string
     name() const override;
 

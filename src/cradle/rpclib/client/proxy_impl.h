@@ -27,6 +27,13 @@ class rpclib_client_impl
 
     ~rpclib_client_impl();
 
+    // Set a logger to be used by rpclib_client_impl instances.
+    static void
+    set_logger(std::shared_ptr<spdlog::logger> logger)
+    {
+        logger_ = std::move(logger);
+    }
+
     spdlog::logger&
     get_logger()
     {
