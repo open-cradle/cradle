@@ -109,12 +109,20 @@ handle_resolve_sync(
     std::string seri_req)
 try
 {
+#if 1
+    // Why dispatch to another thread?
+    // The intention is to have at least one thread handling RPC messages even
+    // if all request-resolving threads are busy.
+    // TODO try achieving this without dispatching.
     auto fut = hctx.request_pool().submit(
         resolve_sync,
         std::ref(hctx),
         std::move(config_json),
         std::move(seri_req));
     return fut.get();
+#else
+    return resolve_sync(hctx, std::move(config_json), std::move(seri_req));
+#endif
 }
 catch (std::exception& e)
 {
