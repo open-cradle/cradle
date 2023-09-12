@@ -490,7 +490,7 @@ coerce_value_impl(
             {
                 try
                 {
-                    value = {parse_ptime(cast<string>(value))};
+                    value = dynamic{parse_ptime(cast<string>(value))};
                     break;
                 }
                 catch (...)
