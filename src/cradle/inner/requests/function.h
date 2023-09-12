@@ -335,8 +335,8 @@ class function_request_impl : public function_request_intf<Value>
                     // with cereal_functions_registry. Two DLLs having the same
                     // implementation for some uuid (and satisfying the ODR)
                     // looks like a valid use case.
-                    throw conflicting_functions_uuid_error(fmt::format(
-                        "Multiple C++ functions for uuid {}", uuid_str));
+                    fmt::print(
+                        "!! Multiple C++ functions for uuid {}\n", uuid_str);
                 }
             }
         }

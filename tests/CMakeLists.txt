@@ -78,6 +78,16 @@ add_library(test_inner_dll_x1 MODULE ${srcs_inner_dll_x1})
 target_link_libraries(test_inner_dll_x1 PUBLIC
     cradle_inner)
 
+# Create another DLL, containing the resolvers from x0 and x1.
+# Used in inner/resolve/resolve_proxy.cpp.
+set(srcs_inner_dll_x0x1
+    "inner-dll/x0/adder_x0_impl.cpp"
+    "inner-dll/x1/multiplier_x1_impl.cpp"
+    "inner-dll/x0x1/seri_catalog_x0x1.cpp")
+add_library(test_inner_dll_x0x1 MODULE ${srcs_inner_dll_x0x1})
+target_link_libraries(test_inner_dll_x0x1 PUBLIC
+    cradle_inner)
+
 # Create a C++ header file defining the location of the dynamically-loaded test DLLs.
 set(test_dlls_dir_file "${intgen_src_dir}/cradle/test_dlls_dir.h")
 add_custom_command(
@@ -123,7 +133,8 @@ add_dependencies(inner_tests
     copy_cradle_dlls
     test_inner_dll_v1
     test_inner_dll_x0
-    test_inner_dll_x1)
+    test_inner_dll_x1
+    test_inner_dll_x0x1)
 add_test(
     NAME inner_tests
     COMMAND ${CMAKE_COMMAND}

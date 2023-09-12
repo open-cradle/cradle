@@ -143,3 +143,44 @@ TEST_CASE("unload/reload two DLLs", tag)
         = cppcoro::sync_wait(resolve_request(ctx, mul_req, constraints));
     REQUIRE(mul_actual == mul_expected);
 }
+
+TEST_CASE("unload DLL sharing resolvers", tag)
+{
+    inner_resources resources;
+    init_test_inner_service(resources);
+    auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
+    proxy.unload_shared_library("test_inner_dll_x.*");
+    tasklet_tracker* tasklet{nullptr};
+    bool remotely{true};
+    testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
+    ResolutionConstraintsRemoteSync constraints;
+
+    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0x1");
+    // TODO next line fails with
+    // "Multiple C++ functions for uuid test-adder-x0"
+    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0");
+    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x1");
+
+    auto add_req{rq_test_adder_x0(7, 2)};
+    int add_expected{7 + 2};
+    auto mul_req{rq_test_multiplier_x1(7, 2)};
+    int mul_expected{7 * 2};
+
+    auto add_actual0
+        = cppcoro::sync_wait(resolve_request(ctx, add_req, constraints));
+    REQUIRE(add_actual0 == add_expected);
+    auto mul_actual0
+        = cppcoro::sync_wait(resolve_request(ctx, mul_req, constraints));
+    REQUIRE(mul_actual0 == mul_expected);
+
+    proxy.unload_shared_library("test_inner_dll_x0x1");
+
+    // TODO if we get here, next line fails with
+    // "no resolver registered for uuid test-adder-x0"
+    auto add_actual1
+        = cppcoro::sync_wait(resolve_request(ctx, add_req, constraints));
+    REQUIRE(add_actual1 == add_expected);
+    auto mul_actual1
+        = cppcoro::sync_wait(resolve_request(ctx, mul_req, constraints));
+    REQUIRE(mul_actual1 == mul_expected);
+}
