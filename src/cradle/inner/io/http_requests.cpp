@@ -292,8 +292,12 @@ struct curl_progress_data
 };
 
 static int
-curl_progress_callback(
-    void* clientp, double dltotal, double dlnow, double ultotal, double ulnow)
+curl_xfer_callback(
+    void* clientp,
+    curl_off_t dltotal,
+    curl_off_t dlnow,
+    curl_off_t ultotal,
+    curl_off_t ulnow)
 {
     curl_progress_data* data = reinterpret_cast<curl_progress_data*>(clientp);
     try
@@ -302,7 +306,7 @@ curl_progress_callback(
         (*data->reporter)(
             (dltotal + ultotal == 0)
                 ? 0.f
-                : float((dlnow + ulnow) / (dltotal + ultotal)));
+                : float(double(dlnow + ulnow) / double(dltotal + ultotal)));
     }
     catch (...)
     {
@@ -430,8 +434,8 @@ http_connection::perform_request(
     progress_data.check_in = &check_in;
     progress_data.reporter = &reporter;
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0);
-    curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, curl_progress_callback);
-    curl_easy_setopt(curl, CURLOPT_PROGRESSDATA, &progress_data);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, curl_xfer_callback);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &progress_data);
 
     // Perform the request.
     CURLcode result = curl_easy_perform(curl);

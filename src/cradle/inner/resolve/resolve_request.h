@@ -77,8 +77,12 @@ using DefaultResolutionConstraints = ResolutionConstraints<
     DefinitelySyncContext<Ctx>,
     DefinitelyAsyncContext<Ctx>>;
 
+// Holds for std::true_type and std::false_type only
 template<typename T>
-concept BoolConst = requires { std::same_as<decltype(T::value), bool>; };
+concept BoolConst
+    = requires {
+          requires std::same_as<std::remove_const_t<decltype(T::value)>, bool>;
+      };
 
 template<Context Ctx, Request Req, BoolConst Async>
 cppcoro::shared_task<typename Req::value_type>

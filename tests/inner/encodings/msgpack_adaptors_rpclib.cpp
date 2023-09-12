@@ -143,6 +143,6 @@ test_both_throw(blob const& x)
 TEST_CASE(
     "msgpack encoding throws on blob >= 4GB (rpclib)", "[encodings][msgpack]")
 {
-    std::byte data[1];
+    std::byte data[1]{};
     test_both_throw(blob(data, 0x1'00'00'00'00));
 }

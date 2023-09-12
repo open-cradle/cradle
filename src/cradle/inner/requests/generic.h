@@ -487,10 +487,13 @@ concept ValidContext
 template<typename T>
 concept Request
     = requires {
-          std::same_as<typename T::element_type, T>;
+          requires std::same_as<typename T::element_type, T>;
           typename T::value_type;
-          std::same_as<decltype(T::caching_level), caching_level_type>;
-          std::same_as<decltype(T::introspective), bool>;
+          requires std::same_as<
+              std::remove_const_t<decltype(T::caching_level)>,
+              caching_level_type>;
+          requires std::
+              same_as<std::remove_const_t<decltype(T::introspective)>, bool>;
       } && requires(T const& req) {
                {
                    req.get_uuid()
