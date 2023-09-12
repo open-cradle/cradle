@@ -80,7 +80,7 @@ TEST_CASE("date type interface", "[core][types]")
     // Try parsing a malformed date.
     try
     {
-        from_dynamic<date>("asdf");
+        from_dynamic<date>(dynamic{"asdf"});
         FAIL("no exception thrown");
     }
     catch (parsing_error& e)
@@ -130,7 +130,8 @@ TEST_CASE("optional type interface", "[core][types]")
     // Try converting an invalid dynamic value to an optional.
     try
     {
-        from_dynamic<optional<string>>(dynamic({{"asdf", nil}}));
+        from_dynamic<optional<string>>(
+            dynamic{{dynamic{"asdf"}, dynamic{nil}}});
         FAIL("no exception thrown");
     }
     catch (invalid_optional_type& e)

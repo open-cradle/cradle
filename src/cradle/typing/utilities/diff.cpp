@@ -66,7 +66,7 @@ compute_map_diff(
     // The simplest possible diff is to just treat the whole map as being
     // updated.
     value_diff simple_diff;
-    simple_diff.push_back(make_update_item(path, dynamic(a), dynamic(b)));
+    simple_diff.push_back(make_update_item(path, dynamic{a}, dynamic{b}));
 
     // Try to generated a more compact diff by diffing individual fields.
     value_diff compressed_diff;
@@ -196,7 +196,7 @@ compute_array_diff(
     // The simplest possible diff is to just treat the whole array as being
     // updated.
     value_diff simple_diff;
-    simple_diff.push_back(make_update_item(path, dynamic(a), dynamic(b)));
+    simple_diff.push_back(make_update_item(path, dynamic{a}, dynamic{b}));
 
     // We also detect three common cases for compression:
     // * one or more items were inserted somewhere in the array
@@ -344,7 +344,7 @@ apply_value_diff_item(
                 field->second = apply_value_diff_item(
                     field->second, path, path_index + 1, op, new_value);
             }
-            return dynamic(map);
+            return dynamic{map};
         }
         case value_type::INTEGER: {
             if (initial.type() != value_type::ARRAY)
@@ -380,7 +380,7 @@ apply_value_diff_item(
                 array[index] = apply_value_diff_item(
                     array[index], path, path_index + 1, op, new_value);
             }
-            return dynamic(array);
+            return dynamic{array};
         }
         default:
             throw invalid_diff_path();
@@ -396,7 +396,7 @@ apply_value_diff(dynamic const& v, value_diff const& diff)
     for (auto const& item : diff)
     {
         patched = apply_value_diff_item(
-            patched, item.path, 0, item.op, item.b ? *item.b : dynamic());
+            patched, item.path, 0, item.op, item.b ? *item.b : dynamic{});
     }
     return patched;
 }

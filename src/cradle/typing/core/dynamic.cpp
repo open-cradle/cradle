@@ -79,7 +79,7 @@ dynamic::dynamic(std::initializer_list<dynamic> list)
     }
     else
     {
-        *this = dynamic_array(list);
+        *this = dynamic_array{list};
     }
 }
 
@@ -100,7 +100,7 @@ operator<<(std::ostream& os, dynamic const& v)
 std::ostream&
 operator<<(std::ostream& os, std::list<dynamic> const& v)
 {
-    os << dynamic(std::vector<dynamic>{std::begin(v), std::end(v)});
+    os << dynamic{std::vector<dynamic>{std::begin(v), std::end(v)}};
     return os;
 }
 
@@ -181,7 +181,7 @@ get_field(dynamic_map& r, string const& field)
 bool
 get_field(dynamic const** v, dynamic_map const& r, string const& field)
 {
-    auto i = r.find(dynamic(field));
+    auto i = r.find(dynamic{field});
     if (i == r.end())
         return false;
     *v = &i->second;
@@ -191,7 +191,7 @@ get_field(dynamic const** v, dynamic_map const& r, string const& field)
 bool
 get_field(dynamic** v, dynamic_map& r, string const& field)
 {
-    auto i = r.find(dynamic(field));
+    auto i = r.find(dynamic{field});
     if (i == r.end())
         return false;
     *v = &i->second;
@@ -215,16 +215,17 @@ type_info_query<dynamic>::get(api_type_info* info)
 }
 
 void
-add_dynamic_path_element(boost::exception& e, dynamic const& path_element)
+add_dynamic_path_element(boost::exception& e, dynamic path_element)
 {
     std::list<dynamic>* info = get_error_info<dynamic_value_path_info>(e);
     if (info)
     {
-        info->push_front(path_element);
+        info->push_front(std::move(path_element));
     }
     else
     {
-        e << dynamic_value_path_info(std::list<dynamic>({path_element}));
+        e << dynamic_value_path_info(
+            std::list<dynamic>({std::move(path_element)}));
     }
 }
 
@@ -489,7 +490,7 @@ coerce_value_impl(
             {
                 try
                 {
-                    value = dynamic(parse_ptime(cast<string>(value)));
+                    value = {parse_ptime(cast<string>(value))};
                     break;
                 }
                 catch (...)
@@ -526,7 +527,7 @@ coerce_value_impl(
                 // Check that coercion doesn't change the value.
                 if (boost::numeric_cast<double>(i) == d)
                 {
-                    value = dynamic(i);
+                    value = dynamic{i};
                     break;
                 }
             }
@@ -540,7 +541,7 @@ coerce_value_impl(
             if (value.type() == value_type::ARRAY
                 && cast<dynamic_array>(value).empty())
             {
-                value = dynamic_map();
+                value = dynamic_map{};
                 break;
             }
             // Since we can't mutate the keys in the map, first check to see if

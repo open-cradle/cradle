@@ -474,11 +474,11 @@ to_dynamic(cradle::dynamic* v, optional<T> const& x)
     cradle::dynamic_map map;
     if (x)
     {
-        to_dynamic(&map[cradle::dynamic("some")], *x);
+        to_dynamic(&map[cradle::dynamic{"some"}], *x);
     }
     else
     {
-        to_dynamic(&map[cradle::dynamic("none")], cradle::nil);
+        to_dynamic(&map[cradle::dynamic{"none"}], cradle::nil);
     }
     *v = std::move(map);
 }

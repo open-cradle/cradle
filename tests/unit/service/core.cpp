@@ -22,5 +22,5 @@ TEST_CASE("HTTP requests", "[service][core]")
     auto body = parse_json_response(response);
     REQUIRE(
         get_field(cast<dynamic_map>(body), "args")
-        == dynamic({{"color", "navy"}}));
+        == dynamic{{dynamic{"color"}, dynamic{"navy"}}});
 }

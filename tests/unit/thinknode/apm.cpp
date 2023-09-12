@@ -134,7 +134,7 @@ TEST_CASE("app version info", "[thinknode][apm]")
                                 thinknode_integer_type())))))},
             {},
             {})),
-        "tmadden",
+        dynamic{"tmadden"},
         ptime(
             date(2017, boost::gregorian::Apr, 26),
             boost::posix_time::time_duration(1, 2, 3)));

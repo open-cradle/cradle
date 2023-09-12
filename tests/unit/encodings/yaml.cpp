@@ -1,3 +1,4 @@
+#include "cradle/typing/core/type_definitions.h"
 #include <cradle/typing/encodings/yaml.h>
 
 #include <cradle/inner/utilities/text.h>
@@ -68,57 +69,57 @@ TEST_CASE("basic YAML encoding", "[encodings][yaml]")
         R"(
 
         )",
-        nil);
+        dynamic{nil});
     test_yaml_encoding(
         R"(
             false
         )",
-        false);
+        dynamic{false});
     test_yaml_encoding(
         R"(
             true
         )",
-        true);
+        dynamic{true});
     test_yaml_encoding(
         R"(
             "true"
         )",
-        "true");
+        dynamic{"true"});
     test_yaml_encoding(
         R"(
             1
         )",
-        integer(1));
+        dynamic{integer(1)});
     test_yaml_encoding(
         R"(
             -1
         )",
-        integer(-1));
+        dynamic{integer(-1)});
     test_yaml_encoding(
         R"(
             1.25
         )",
-        1.25);
+        dynamic{1.25});
     test_yaml_encoding(
         R"(
             "1.25"
         )",
-        "1.25");
+        dynamic{"1.25"});
     test_one_way_yaml_encoding(
         R"(
             0x10
         )",
-        integer(16));
+        dynamic{integer(16)});
     test_one_way_yaml_encoding(
         R"(
             0o10
         )",
-        integer(8));
+        dynamic{integer(8)});
     test_one_way_yaml_encoding(
         R"(
             "hi"
         )",
-        "hi");
+        dynamic{"hi"});
 
     // Try some arrays.
     test_yaml_encoding(
@@ -127,12 +128,12 @@ TEST_CASE("basic YAML encoding", "[encodings][yaml]")
             - 2
             - 3
         )",
-        dynamic({integer(1), integer(2), integer(3)}));
+        {dynamic{integer(1)}, dynamic{integer(2)}, dynamic{integer(3)}});
     test_yaml_encoding(
         R"(
             []
         )",
-        dynamic_array());
+        dynamic{dynamic_array{}});
 
     // Try a map with string keys.
     test_yaml_encoding(
@@ -140,7 +141,7 @@ TEST_CASE("basic YAML encoding", "[encodings][yaml]")
             happy: true
             n: 4.125
         )",
-        {{"happy", true}, {"n", 4.125}});
+        {{dynamic{"happy"}, dynamic{true}}, {dynamic{"n"}, dynamic{4.125}}});
 
     // Try a map with non-string keys.
     test_yaml_encoding(
@@ -148,24 +149,26 @@ TEST_CASE("basic YAML encoding", "[encodings][yaml]")
             false: 4.125
             0.125: xyz
         )",
-        dynamic_map({{false, 4.125}, {0.125, "xyz"}}));
+        dynamic{dynamic_map{
+            {dynamic{false}, dynamic{4.125}},
+            {dynamic{0.125}, dynamic{"xyz"}}}});
 
     // Try some ptimes.
     test_yaml_encoding(
         R"(
             "2017-04-26T01:02:03.000Z"
         )",
-        ptime(
+        dynamic{ptime(
             date(2017, boost::gregorian::Apr, 26),
-            boost::posix_time::time_duration(1, 2, 3)));
+            boost::posix_time::time_duration(1, 2, 3))});
     test_yaml_encoding(
         R"(
             "2017-05-26T13:02:03.456Z"
         )",
-        ptime(
+        dynamic{ptime(
             date(2017, boost::gregorian::May, 26),
             boost::posix_time::time_duration(13, 2, 3)
-                + boost::posix_time::milliseconds(456)));
+                + boost::posix_time::milliseconds(456))});
 
     // Try some thing that look like a ptime at first and check that they're
     // just treated as strings.
@@ -173,62 +176,62 @@ TEST_CASE("basic YAML encoding", "[encodings][yaml]")
         R"(
             "2017-05-26T13:13:03.456ZABC"
         )",
-        "2017-05-26T13:13:03.456ZABC");
+        dynamic{"2017-05-26T13:13:03.456ZABC"});
     test_one_way_yaml_encoding(
         R"(
             "2017-05-26T13:XX:03.456Z"
         )",
-        "2017-05-26T13:XX:03.456Z");
+        dynamic{"2017-05-26T13:XX:03.456Z"});
     test_one_way_yaml_encoding(
         R"(
             "2017-05-26T13:03.456Z"
         )",
-        "2017-05-26T13:03.456Z");
+        dynamic{"2017-05-26T13:03.456Z"});
     test_one_way_yaml_encoding(
         R"(
             "2017-05-26T42:00:03.456Z"
         )",
-        "2017-05-26T42:00:03.456Z");
+        dynamic{"2017-05-26T42:00:03.456Z"});
     test_one_way_yaml_encoding(
         R"(
             "X017-05-26T13:02:03.456Z"
         )",
-        "X017-05-26T13:02:03.456Z");
+        dynamic{"X017-05-26T13:02:03.456Z"});
     test_one_way_yaml_encoding(
         R"(
             "2X17-05-26T13:02:03.456Z"
         )",
-        "2X17-05-26T13:02:03.456Z");
+        dynamic{"2X17-05-26T13:02:03.456Z"});
     test_one_way_yaml_encoding(
         R"(
             "20X7-05-26T13:02:03.456Z"
         )",
-        "20X7-05-26T13:02:03.456Z");
+        dynamic{"20X7-05-26T13:02:03.456Z"});
     test_one_way_yaml_encoding(
         R"(
             "201X-05-26T13:02:03.456Z"
         )",
-        "201X-05-26T13:02:03.456Z");
+        dynamic{"201X-05-26T13:02:03.456Z"});
     test_one_way_yaml_encoding(
         R"(
             "2017X05-26T13:02:03.456Z"
         )",
-        "2017X05-26T13:02:03.456Z");
+        dynamic{"2017X05-26T13:02:03.456Z"});
     test_one_way_yaml_encoding(
         R"(
             "2017-05-26T13:02:03.456_"
         )",
-        "2017-05-26T13:02:03.456_");
+        dynamic{"2017-05-26T13:02:03.456_"});
     test_one_way_yaml_encoding(
         R"(
             "2017-05-26T13:02:03.456_"
         )",
-        "2017-05-26T13:02:03.456_");
+        dynamic{"2017-05-26T13:02:03.456_"});
     test_one_way_yaml_encoding(
         R"(
             "2017-05-26T13:02:03.45Z"
         )",
-        "2017-05-26T13:02:03.45Z");
+        dynamic{"2017-05-26T13:02:03.45Z"});
 
     // Try a blob.
     test_yaml_encoding(
@@ -236,7 +239,7 @@ TEST_CASE("basic YAML encoding", "[encodings][yaml]")
             type: base64-encoded-blob
             blob: c29tZSBibG9iIGRhdGE=
         )",
-        make_string_literal_blob("some blob data"));
+        dynamic{make_string_literal_blob("some blob data")});
 
     // Try some other things that aren't blobs but look similar.
     test_yaml_encoding(
@@ -244,35 +247,40 @@ TEST_CASE("basic YAML encoding", "[encodings][yaml]")
             blob: 1
             type: blob
         )",
-        {{"type", "blob"}, {"blob", integer(1)}});
+        {{dynamic{"type"}, dynamic{"blob"}},
+         {dynamic{"blob"}, dynamic{integer(1)}}});
     test_yaml_encoding(
         R"(
             blob: awe
             type: 12
         )",
-        {{"type", integer(12)}, {"blob", "awe"}});
+        {{dynamic{"type"}, dynamic{integer(12)}},
+         {dynamic{"blob"}, dynamic{"awe"}}});
 }
 
 TEST_CASE("diagnostic YAML encoding", "[encodings][yaml]")
 {
     auto empty_blob = make_string_literal_blob("");
-    test_diagnostic_yaml_encoding(empty_blob, "0-bytes blob");
+    test_diagnostic_yaml_encoding(dynamic{empty_blob}, "0-bytes blob");
 
     auto small_blob = make_string_literal_blob("small blob");
-    test_diagnostic_yaml_encoding(small_blob, R"("10-bytes blob: smallblob")");
+    test_diagnostic_yaml_encoding(
+        dynamic{small_blob}, R"("10-bytes blob: smallblob")");
 
     byte_vector large_vector(16384);
     auto large_blob{make_blob(large_vector)};
     test_diagnostic_yaml_encoding(
-        large_blob,
+        dynamic{large_blob},
         R"("16384-bytes blob: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ... 00 00 00 00")");
 
     auto unprintable_blob = make_string_literal_blob("\xf1wxyz");
     test_diagnostic_yaml_encoding(
-        unprintable_blob, R"("5-bytes blob: f1 77 78 79 7a")");
+        dynamic{unprintable_blob}, R"("5-bytes blob: f1 77 78 79 7a")");
 
     test_diagnostic_yaml_encoding(
-        dynamic_map({{false, small_blob}, {0.125, "xyz"}}),
+        dynamic{dynamic_map{
+            {dynamic{false}, dynamic{small_blob}},
+            {dynamic{0.125}, dynamic{"xyz"}}}},
         R"(
             false: "10-bytes blob: smallblob"
             0.125: xyz

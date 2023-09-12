@@ -16,202 +16,258 @@ test_diff(dynamic const& a, dynamic const& b, value_diff const& expected_diff)
 TEST_CASE("simple diffs", "[core][diff]")
 {
     test_diff(
-        dynamic("foo"),
-        dynamic("bar"),
+        dynamic{"foo"},
+        dynamic{"bar"},
         {make_value_diff_item(
             {},
             value_diff_op::UPDATE,
-            some(dynamic("foo")),
-            some(dynamic("bar")))});
+            some(dynamic{"foo"}),
+            some(dynamic{"bar"}))});
 }
 
 TEST_CASE("array diffs", "[core][diff]")
 {
     test_diff(
-        dynamic{0., 1., 2.},
-        dynamic{0., 1., 3.},
+        {dynamic{0.}, dynamic{1.}, dynamic{2.}},
+        {dynamic{0.}, dynamic{1.}, dynamic{3.}},
         {make_value_diff_item(
-            {integer(2)},
+            {dynamic{integer(2)}},
             value_diff_op::UPDATE,
-            some(dynamic(2.)),
-            some(dynamic(3.)))});
+            some(dynamic{2.}),
+            some(dynamic{3.}))});
 
     test_diff(
-        dynamic{0., 1., 2.},
-        dynamic{1., 3.},
+        {dynamic{0.}, dynamic{1.}, dynamic{2.}},
+        {dynamic{1.}, dynamic{3.}},
         {make_value_diff_item(
             {},
             value_diff_op::UPDATE,
-            some(dynamic{0., 1., 2.}),
-            some(dynamic{1., 3.}))});
+            some(dynamic{dynamic{0.}, dynamic{1.}, dynamic{2.}}),
+            some(dynamic{dynamic{1.}, dynamic{3.}}))});
 
     test_diff(
-        dynamic{0., 3., 2., 4., 5., 6., 7.},
-        dynamic{1., 3., 2., 0., 5., 6., 7.},
+        {dynamic{0.},
+         dynamic{3.},
+         dynamic{2.},
+         dynamic{4.},
+         dynamic{5.},
+         dynamic{6.},
+         dynamic{7.}},
+        {dynamic{1.},
+         dynamic{3.},
+         dynamic{2.},
+         dynamic{0.},
+         dynamic{5.},
+         dynamic{6.},
+         dynamic{7.}},
         {make_value_diff_item(
-             {integer(0)},
+             {dynamic{integer(0)}},
              value_diff_op::UPDATE,
-             some(dynamic(0.)),
-             some(dynamic(1.))),
+             some(dynamic{0.}),
+             some(dynamic{1.})),
          make_value_diff_item(
-             {integer(3)},
+             {dynamic{integer(3)}},
              value_diff_op::UPDATE,
-             some(dynamic(4.)),
-             some(dynamic(0.)))});
+             some(dynamic{4.}),
+             some(dynamic{0.}))});
 
     test_diff(
-        dynamic{0., 1., 2.},
-        dynamic{1., 1., 2.},
+        {dynamic{0.}, dynamic{1.}, dynamic{2.}},
+        {dynamic{1.}, dynamic{1.}, dynamic{2.}},
         {make_value_diff_item(
-            {integer(0)},
+            {dynamic{integer(0)}},
             value_diff_op::UPDATE,
-            some(dynamic(0.)),
-            some(dynamic(1.)))});
+            some(dynamic{0.}),
+            some(dynamic{1.}))});
 
     test_diff(
-        dynamic{0., 1., 2.},
-        dynamic{0., 1.},
+        {dynamic{0.}, dynamic{1.}, dynamic{2.}},
+        {dynamic{0.}, dynamic{1.}},
         {make_value_diff_item(
-            {integer(2)}, value_diff_op::DELETE, some(dynamic(2.)), none)});
+            {dynamic{integer(2)}},
+            value_diff_op::DELETE,
+            some(dynamic{2.}),
+            none)});
 
     test_diff(
-        dynamic{0., 1., 2.},
-        dynamic{0., 2.},
+        {dynamic{0.}, dynamic{1.}, dynamic{2.}},
+        {dynamic{0.}, dynamic{2.}},
         {make_value_diff_item(
-            {integer(1)}, value_diff_op::DELETE, some(dynamic(1.)), none)});
+            {dynamic{integer(1)}},
+            value_diff_op::DELETE,
+            some(dynamic{1.}),
+            none)});
 
     test_diff(
-        dynamic{0., 1., 2.},
-        dynamic{1., 2.},
+        {dynamic{0.}, dynamic{1.}, dynamic{2.}},
+        {dynamic{1.}, dynamic{2.}},
         {make_value_diff_item(
-            {integer(0)}, value_diff_op::DELETE, some(dynamic(0.)), none)});
+            {dynamic{integer(0)}},
+            value_diff_op::DELETE,
+            some(dynamic{0.}),
+            none)});
 
     test_diff(
-        dynamic{3., 1., 2., 4., 6., 0., 4.},
-        dynamic{2., 4., 6., 0., 4.},
+        dynamic{
+            dynamic{3.},
+            dynamic{1.},
+            dynamic{2.},
+            dynamic{4.},
+            dynamic{6.},
+            dynamic{0.},
+            dynamic{4.}},
+        dynamic{
+            dynamic{2.}, dynamic{4.}, dynamic{6.}, dynamic{0.}, dynamic{4.}},
         {make_value_diff_item(
-             {integer(1)}, value_diff_op::DELETE, some(dynamic(1.)), none),
+             {dynamic{integer(1)}},
+             value_diff_op::DELETE,
+             some(dynamic{1.}),
+             none),
          make_value_diff_item(
-             {integer(0)}, value_diff_op::DELETE, some(dynamic(3.)), none)});
+             {dynamic{integer(0)}},
+             value_diff_op::DELETE,
+             some(dynamic{3.}),
+             none)});
 
     test_diff(
-        dynamic{3., 1., 0., 2.},
-        dynamic{2.},
+        dynamic{dynamic{3.}, dynamic{1.}, dynamic{0.}, dynamic{2.}},
+        dynamic{dynamic{2.}},
         {make_value_diff_item(
             {},
             value_diff_op::UPDATE,
-            some(dynamic{3., 1., 0., 2.}),
+            some(dynamic{dynamic{3.}, dynamic{1.}, dynamic{0.}, dynamic{2.}}),
             some(dynamic{2.}))});
 
     test_diff(
-        dynamic{0., 1.},
-        dynamic{0., 2., 1.},
+        dynamic{dynamic{0.}, dynamic{1.}},
+        dynamic{dynamic{0.}, dynamic{2.}, dynamic{1.}},
         {make_value_diff_item(
-            {integer(1)}, value_diff_op::INSERT, none, dynamic(2.))});
+            {dynamic{integer(1)}}, value_diff_op::INSERT, none, dynamic{2.})});
 
     test_diff(
-        dynamic{1., 2.},
-        dynamic{0., 1., 2.},
+        dynamic{dynamic{1.}, dynamic{2.}},
+        dynamic{dynamic{0.}, dynamic{1.}, dynamic{2.}},
         {make_value_diff_item(
-            {integer(0)}, value_diff_op::INSERT, none, dynamic(0.))});
+            {dynamic{integer(0)}}, value_diff_op::INSERT, none, dynamic{0.})});
 
     test_diff(
-        dynamic{0., 1.},
-        dynamic{0., 1., 2.},
+        {dynamic{0.}, dynamic{1.}},
+        {dynamic{0.}, dynamic{1.}, dynamic{2.}},
         {make_value_diff_item(
-            {integer(2)}, value_diff_op::INSERT, none, dynamic(2.))});
+            {dynamic{integer(2)}}, value_diff_op::INSERT, none, dynamic{2.})});
 
     test_diff(
-        dynamic{0., 1., 4., 3., 1.},
-        dynamic{0., 3., 2., 1., 4., 3., 1.},
+        {dynamic{0.}, dynamic{1.}, dynamic{4.}, dynamic{3.}, dynamic{1.}},
+        {dynamic{0.},
+         dynamic{3.},
+         dynamic{2.},
+         dynamic{1.},
+         dynamic{4.},
+         dynamic{3.},
+         dynamic{1.}},
         {make_value_diff_item(
-             {integer(1)}, value_diff_op::INSERT, none, dynamic(3.)),
+             {dynamic{integer(1)}}, value_diff_op::INSERT, none, dynamic{3.}),
          make_value_diff_item(
-             {integer(2)}, value_diff_op::INSERT, none, dynamic(2.))});
+             {dynamic{integer(2)}},
+             value_diff_op::INSERT,
+             none,
+             dynamic{2.})});
 }
 
 TEST_CASE("map diffs", "[core][diff]")
 {
     test_diff(
-        dynamic{{"foo", 0.}, {"bar", 1.}},
-        dynamic{{"foo", 3.}, {"bar", 1.}},
+        {{dynamic{"foo"}, dynamic{0.}}, {dynamic{"bar"}, dynamic{1.}}},
+        {{dynamic{"foo"}, dynamic{3.}}, {dynamic{"bar"}, dynamic{1.}}},
         {make_value_diff_item(
-            {dynamic("foo")},
+            {dynamic{"foo"}},
             value_diff_op::UPDATE,
-            some(dynamic(0.)),
-            some(dynamic(3.)))});
+            some(dynamic{0.}),
+            some(dynamic{3.}))});
 
     test_diff(
-        dynamic{{"foo", 0.}, {"bar", 1.}},
-        dynamic{{"foo", 0.}},
+        {{dynamic{"foo"}, dynamic{0.}}, {dynamic{"bar"}, dynamic{1.}}},
+        {{dynamic{"foo"}, dynamic{0.}}},
         {make_value_diff_item(
-            {dynamic("bar")},
+            {dynamic{"bar"}},
             value_diff_op::DELETE,
-            some(dynamic(1.)),
+            some(dynamic{1.}),
             none)});
 
     test_diff(
-        dynamic{{"foo", 0.}},
-        dynamic{{"foo", 0.}, {"bar", 1.}},
+        {{dynamic{"foo"}, dynamic{0.}}},
+        {{dynamic{"foo"}, dynamic{0.}}, {dynamic{"bar"}, dynamic{1.}}},
         {make_value_diff_item(
-            {dynamic("bar")},
+            {dynamic{"bar"}},
             value_diff_op::INSERT,
             none,
-            some(dynamic(1.)))});
+            some(dynamic{1.}))});
 
     test_diff(
         dynamic{
-            {"abc", 1.},
-            {"foo", 0.},
-            {"bar", 1.},
-            {"other",
-             "irrelevant but unchanged stuff to ensure that the 'simple' diff "
-             "is larger than the 'compressed' one"}},
+            {dynamic{"abc"}, dynamic{1.}},
+            {dynamic{"foo"}, dynamic{0.}},
+            {dynamic{"bar"}, dynamic{1.}},
+            {dynamic{"other"},
+             dynamic{
+                 "irrelevant but unchanged stuff to ensure that the 'simple' "
+                 "diff is larger than the 'compressed' one"}}},
         dynamic{
-            {"abc", 1.},
-            {"foo", 3.},
-            {"baz", 0.},
-            {"other",
-             "irrelevant but unchanged stuff to ensure that the 'simple' diff "
-             "is larger than the 'compressed' one"}},
+            {dynamic{"abc"}, dynamic{1.}},
+            {dynamic{"foo"}, dynamic{3.}},
+            {dynamic{"baz"}, dynamic{0.}},
+            {dynamic{"other"},
+             dynamic{
+                 "irrelevant but unchanged stuff to ensure that the 'simple' "
+                 "diff is larger than the 'compressed' one"}}},
         {make_value_diff_item(
-             {dynamic("bar")}, value_diff_op::DELETE, dynamic(1.), none),
+             {dynamic{"bar"}}, value_diff_op::DELETE, dynamic{1.}, none),
          make_value_diff_item(
-             {dynamic("baz")}, value_diff_op::INSERT, none, some(dynamic(0.))),
+             {dynamic{"baz"}}, value_diff_op::INSERT, none, some(dynamic{0.})),
          make_value_diff_item(
-             {dynamic("foo")},
+             {dynamic{"foo"}},
              value_diff_op::UPDATE,
-             some(dynamic(0.)),
-             some(dynamic(3.)))});
+             some(dynamic{0.}),
+             some(dynamic{3.}))});
 }
 
 TEST_CASE("nested diffs", "[core][diff]")
 {
-    auto map_a = dynamic{{"foo", 0.}, {"bar", 1.}};
-    auto map_b = dynamic{{"foo", 3.}, {"baz", 0.}};
-    auto map_c = dynamic{{"related", 0.}};
-    auto map_d = dynamic{{"un", 5.}, {"related", 0.}};
+    auto map_a = dynamic{
+        {dynamic{"foo"}, dynamic{0.}}, {dynamic{"bar"}, dynamic{1.}}};
+    auto map_b = dynamic{
+        {dynamic{"foo"}, dynamic{3.}}, {dynamic{"baz"}, dynamic{0.}}};
+    auto map_c = dynamic{{dynamic{"related"}, dynamic{0.}}};
+    auto map_d = dynamic{
+        {dynamic{"un"}, dynamic{5.}}, {dynamic{"related"}, dynamic{0.}}};
 
     test_diff(
         dynamic{map_c, map_a},
         dynamic{map_d, map_b},
         {make_value_diff_item(
-             {integer(0), dynamic("un")},
+             {dynamic{integer(0)}, dynamic{"un"}},
              value_diff_op::INSERT,
              none,
-             some(dynamic(5.))),
+             some(dynamic{5.})),
          make_value_diff_item(
-             {integer(1)}, value_diff_op::UPDATE, some(map_a), some(map_b))});
+             {dynamic{integer(1)}},
+             value_diff_op::UPDATE,
+             some(map_a),
+             some(map_b))});
 
-    auto map_e = dynamic{{"un", {0., 5.}}, {"related", 0.}};
-    auto map_f = dynamic{{"un", {0., 4.}}, {"related", 0.}};
+    auto map_e = dynamic{
+        {dynamic{"un"}, {dynamic{0.}, dynamic{5.}}},
+        {dynamic{"related"}, dynamic{0.}}};
+    auto map_f = dynamic{
+        {dynamic{"un"}, {dynamic{0.}, dynamic{4.}}},
+        {dynamic{"related"}, dynamic{0.}}};
 
     test_diff(
         dynamic{map_a, map_b, map_e},
         dynamic{map_a, map_b, map_f},
         {make_value_diff_item(
-            {integer(2), dynamic("un"), integer(1)},
+            {dynamic{integer(2)}, dynamic{"un"}, dynamic{integer(1)}},
             value_diff_op::UPDATE,
-            some(dynamic(5.)),
-            some(dynamic(4.)))});
+            some(dynamic{5.}),
+            some(dynamic{4.}))});
 }

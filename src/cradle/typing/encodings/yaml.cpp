@@ -56,7 +56,7 @@ read_yaml_value(YAML::Node const& yaml)
     {
         case YAML::NodeType::Null:
         default: // to avoid warnings
-            return nil;
+            return dynamic{nil};
         case YAML::NodeType::Scalar: {
             // This case captures strings, booleans, integers, and doubles.
             // First, check to see if the value was explicitly quoted.
@@ -78,23 +78,23 @@ read_yaml_value(YAML::Node const& yaml)
                         // expected a string here.
                         if (to_value_string(t) == s)
                         {
-                            return t;
+                            return dynamic{t};
                         }
                     }
                     catch (...)
                     {
                     }
                 }
-                return s;
+                return dynamic{s};
             }
             else // The value wasn't quoted.
             {
                 auto s = yaml.as<string>();
                 // Try to interpret it as a boolean.
                 if (s == "true")
-                    return true;
+                    return dynamic{true};
                 if (s == "false")
-                    return false;
+                    return dynamic{false};
                 // Try to interpret it as a number.
                 if (!s.compare(0, 2, "0x"))
                 {
@@ -103,7 +103,7 @@ read_yaml_value(YAML::Node const& yaml)
                     stream >> std::hex >> i;
                     if (!stream.fail() && stream.tellg() == std::streampos(-1))
                     {
-                        return i;
+                        return dynamic{i};
                     }
                 }
                 if (!s.compare(0, 2, "0o"))
@@ -113,25 +113,25 @@ read_yaml_value(YAML::Node const& yaml)
                     stream >> std::oct >> i;
                     if (!stream.fail() && stream.tellg() == std::streampos(-1))
                     {
-                        return i;
+                        return dynamic{i};
                     }
                 }
                 {
                     integer i;
                     if (boost::conversion::try_lexical_convert(s, i))
                     {
-                        return i;
+                        return dynamic{i};
                     }
                 }
                 {
                     double d;
                     if (boost::conversion::try_lexical_convert(s, d))
                     {
-                        return d;
+                        return dynamic{d};
                     }
                 }
                 // If all else fails, it must just be a string.
-                return s;
+                return dynamic{s};
             }
         }
         case YAML::NodeType::Sequence: {
@@ -141,7 +141,7 @@ read_yaml_value(YAML::Node const& yaml)
             {
                 array.push_back(read_yaml_value(i));
             }
-            return array;
+            return dynamic{array};
         }
         case YAML::NodeType::Map: {
             // An object is analogous to a map, but blobs are also encoded as
@@ -165,7 +165,8 @@ read_yaml_value(YAML::Node const& yaml)
                         encoded.c_str(),
                         encoded.length(),
                         get_mime_base64_character_set());
-                    return make_blob(std::move(decoded), decoded_size);
+                    return dynamic{
+                        make_blob(std::move(decoded), decoded_size)};
                 }
                 else
                 {
@@ -191,7 +192,7 @@ read_yaml_value(YAML::Node const& yaml)
                     map[read_yaml_value(i->first)]
                         = read_yaml_value(i->second);
                 }
-                return map;
+                return dynamic{map};
             }
         }
     }

@@ -7,5 +7,5 @@ using namespace cradle;
 
 TEST_CASE("format dynamic", "[core][fmt]")
 {
-    REQUIRE(fmt::format("{}", dynamic(false)) == "false");
+    REQUIRE(fmt::format("{}", dynamic{false}) == "false");
 }
