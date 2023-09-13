@@ -11,15 +11,32 @@ int
 adder_v1_func(int a, int b);
 
 inline auto
-rq_test_adder_v1_impl(int a, int b)
+rq_test_adder_v1p_impl(int a, int b)
 {
     constexpr bool is_proxy{false};
     using props_type
         = request_props<caching_level_type::none, false, false, is_proxy>;
-    request_uuid uuid{"test-adder-v1"};
+    request_uuid uuid{"test-adder-v1p"};
     std::string title{"test-adder"};
     return rq_function_erased(
         props_type{std::move(uuid), std::move(title)}, adder_v1_func, a, b);
+}
+
+template<typename A, typename B>
+    requires TypedArg<A, int> && TypedArg<B, int>
+auto
+rq_test_adder_v1n_impl(A a, B b)
+{
+    constexpr bool is_proxy{false};
+    using props_type
+        = request_props<caching_level_type::none, false, false, is_proxy>;
+    request_uuid uuid{"test-adder-v1n"};
+    std::string title{"test-adder"};
+    return rq_function_erased(
+        props_type{std::move(uuid), std::move(title)},
+        adder_v1_func,
+        normalize_arg<int, props_type>(std::move(a)),
+        normalize_arg<int, props_type>(std::move(b)));
 }
 
 } // namespace cradle

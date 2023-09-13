@@ -18,7 +18,8 @@ extern "C" BOOST_SYMBOL_EXPORT void
 CRADLE_init()
 {
     auto& cat{get_catalog()};
-    cat.register_resolver(rq_test_adder_v1_impl(2, 3));
+    cat.register_resolver(rq_test_adder_v1p_impl(2, 3));
+    cat.register_resolver(rq_test_adder_v1n_impl(2, 3));
 }
 
 extern "C" BOOST_SYMBOL_EXPORT seri_catalog*

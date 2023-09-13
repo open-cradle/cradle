@@ -5,6 +5,7 @@
 #include <string>
 
 #include <boost/dll.hpp>
+#include <spdlog/spdlog.h>
 
 #include <cradle/inner/resolve/seri_catalog.h>
 
@@ -36,6 +37,7 @@ class dll_controller
  private:
     std::string path_;
     std::string name_;
+    std::shared_ptr<spdlog::logger> logger_;
     std::unique_ptr<boost::dll::shared_library> lib_;
     seri_catalog* catalog_{};
 };

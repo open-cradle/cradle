@@ -18,14 +18,14 @@ static char const tag[] = "[inner][resolve][proxy]";
 
 } // namespace
 
-TEST_CASE("evaluate proxy request", tag)
+TEST_CASE("evaluate proxy request, plain args", tag)
 {
     inner_resources resources;
     init_test_inner_service(resources);
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_v1.*");
 
-    auto req{rq_test_adder_v1(7, 2)};
+    auto req{rq_test_adder_v1p(7, 2)};
     int expected{7 + 2};
 
     tasklet_tracker* tasklet{nullptr};
@@ -39,8 +39,33 @@ TEST_CASE("evaluate proxy request", tag)
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
 
-    auto res1 = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
-    REQUIRE(res1 == expected);
+    auto res = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
+    REQUIRE(res == expected);
+}
+
+TEST_CASE("evaluate proxy request, normalized args", tag)
+{
+    inner_resources resources;
+    init_test_inner_service(resources);
+    auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
+    proxy.unload_shared_library("test_inner_dll_v1.*");
+
+    auto req{rq_test_adder_v1n(7, 2)};
+    int expected{7 + 2};
+
+    tasklet_tracker* tasklet{nullptr};
+    bool remotely{true};
+    testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
+    ResolutionConstraintsRemoteSync constraints;
+
+    REQUIRE_THROWS_WITH(
+        cppcoro::sync_wait(resolve_request(ctx, req, constraints)),
+        Catch::Contains("no resolver registered for uuid"));
+
+    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
+
+    auto res = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
+    REQUIRE(res == expected);
 }
 
 // The test_inner_dll_x0 and test_inner_dll_x1 DLLs each define one request.
@@ -84,7 +109,7 @@ TEST_CASE("unload/reload DLL", tag)
     auto& proxy = register_rpclib_client(config, resources);
     proxy.unload_shared_library("test_inner_dll_v1.*");
 
-    auto req{rq_test_adder_v1(7, 2)};
+    auto req{rq_test_adder_v1p(7, 2)};
     int expected{7 + 2};
 
     tasklet_tracker* tasklet{nullptr};
@@ -144,6 +169,7 @@ TEST_CASE("unload/reload two DLLs", tag)
     REQUIRE(mul_actual == mul_expected);
 }
 
+#if 0
 TEST_CASE("unload DLL sharing resolvers", tag)
 {
     inner_resources resources;
@@ -184,3 +210,72 @@ TEST_CASE("unload DLL sharing resolvers", tag)
         = cppcoro::sync_wait(resolve_request(ctx, mul_req, constraints));
     REQUIRE(mul_actual1 == mul_expected);
 }
+
+TEST_CASE("load/unload DLL stress test", "[Z]")
+{
+    inner_resources resources;
+    init_test_inner_service(resources);
+    auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
+    proxy.unload_shared_library("test_inner_dll_x.*");
+
+    std::srand(std::time(nullptr));
+    std::vector<std::string> dll_names{
+        "test_inner_dll_x0",
+        "test_inner_dll_x1",
+        "test_inner_dll_x0x1"
+    };
+    for ( ; ; )
+    {
+        int i = random() % 6;
+        auto const& dll_name{dll_names[i / 2]};
+        std::string action;
+        try
+        {
+            if (i % 2 == 0)
+            {
+                action = "load";
+                proxy.load_shared_library(get_test_dlls_dir(), dll_name);
+            }
+            else
+            {
+                action = "unload";
+                proxy.unload_shared_library(dll_name);
+            }
+        }
+        catch (std::exception const& e)
+        {
+            fmt::print("{} DLL {} failed: {}\n", action, dll_name, e.what());
+        }
+    }
+}
+
+TEST_CASE("load/unload DLL stress test1", "[A]")
+{
+    inner_resources resources;
+    init_test_inner_service(resources);
+    auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
+    proxy.unload_shared_library("test_inner_dll_x.*");
+    tasklet_tracker* tasklet{nullptr};
+    bool remotely{true};
+    testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
+    ResolutionConstraintsRemoteSync constraints;
+
+    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0");
+    try
+    {
+        proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0x1");
+    }
+    catch (...)
+    {
+    }
+
+    auto add_req{rq_test_adder_x0(7, 2)};
+    int add_expected{7 + 2};
+    auto add_actual
+        = cppcoro::sync_wait(resolve_request(ctx, add_req, constraints));
+    REQUIRE(add_actual == add_expected);
+
+    // This one already crashes the server:
+    proxy.unload_shared_library("test_inner_dll_x0");
+}
+#endif

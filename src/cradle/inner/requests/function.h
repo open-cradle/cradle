@@ -306,6 +306,12 @@ class function_request_impl : public function_request_intf<Value>
         : uuid_{std::move(uuid)}, args_{std::move(args)...}
     {
         auto uuid_str{uuid_.str()};
+        // TODO if registering a resolver and an exception occurs, the
+        // add_entry should not happen
+        // TODO move add_entry call to new function_request_intf.register()
+        // function called from register_resolver()
+        // TODO maybe also storing in matching_functions_ but then the
+        // make_shared<Function> call will always happen
         cereal_functions_registry::instance().add_entry(
             uuid_str, create, save_json, load_json, unregister);
 
@@ -335,8 +341,8 @@ class function_request_impl : public function_request_intf<Value>
                     // with cereal_functions_registry. Two DLLs having the same
                     // implementation for some uuid (and satisfying the ODR)
                     // looks like a valid use case.
-                    fmt::print(
-                        "!! Multiple C++ functions for uuid {}\n", uuid_str);
+                    throw conflicting_functions_uuid_error(fmt::format(
+                        "Multiple C++ functions for uuid {}", uuid_str));
                 }
             }
         }
@@ -1407,7 +1413,7 @@ make_normalization_uuid()
 
 // Normalizes a value argument in a non-coroutine context.
 template<typename Value, typename Props>
-    requires(!Request<Value> && !Props::func_is_coro)
+    requires(!Request<Value> && !Props::func_is_coro && !Props::is_proxy)
 auto normalize_arg(Value const& arg)
 {
     Props props{make_normalization_uuid<Value, false>(), "arg"};
@@ -1416,16 +1422,28 @@ auto normalize_arg(Value const& arg)
 
 // Normalizes a value argument in a coroutine context.
 template<typename Value, typename Props>
-    requires(!Request<Value> && Props::func_is_coro)
+    requires(!Request<Value> && Props::func_is_coro && !Props::is_proxy)
 auto normalize_arg(Value const& arg)
 {
     Props props{make_normalization_uuid<Value, true>(), "arg"};
     return rq_function_erased(std::move(props), identity_coro<Value>, arg);
 }
 
+// Normalizes a value argument in a proxy context.
+template<typename Value, typename Props>
+    requires(!Request<Value> && Props::is_proxy)
+auto normalize_arg(Value const& arg)
+{
+    // TODO what about Props::func_is_coro ?
+    Props props{make_normalization_uuid<Value, Props::func_is_coro>(), "arg"};
+    return rq_function_erased<Value>(std::move(props), arg);
+}
+
 // Normalizes a C-style string argument in a non-coroutine context.
 template<typename Value, typename Props>
-    requires(std::same_as<Value, std::string> && !Props::func_is_coro)
+    requires(
+        std::same_as<Value, std::string> && !Props::func_is_coro
+        && !Props::is_proxy)
 auto normalize_arg(char const* arg)
 {
     Props props{make_normalization_uuid<Value, false>(), "arg"};
@@ -1435,7 +1453,9 @@ auto normalize_arg(char const* arg)
 
 // Normalizes a C-style string argument in a coroutine context.
 template<typename Value, typename Props>
-    requires(std::same_as<Value, std::string> && Props::func_is_coro)
+    requires(
+        std::same_as<Value, std::string> && Props::func_is_coro
+        && !Props::is_proxy)
 auto normalize_arg(char const* arg)
 {
     Props props{make_normalization_uuid<Value, true>(), "arg"};
@@ -1443,9 +1463,18 @@ auto normalize_arg(char const* arg)
         std::move(props), identity_coro<std::string>, std::string{arg});
 }
 
+// Normalizes a C-style string argument in a proxy context.
+template<typename Value, typename Props>
+    requires(std::same_as<Value, std::string> && Props::is_proxy)
+auto normalize_arg(char const* arg)
+{
+    Props props{make_normalization_uuid<Value, Props::func_is_coro>(), "arg"};
+    return rq_function_erased<Value>(std::move(props), std::string{arg});
+}
+
 // Normalizes a value_request argument in a non-coroutine context.
 template<typename Value, typename Props>
-    requires(!Props::func_is_coro)
+    requires(!Props::func_is_coro && !Props::is_proxy)
 auto normalize_arg(value_request<Value> const& arg)
 {
     Props props{make_normalization_uuid<Value, false>(), "arg"};
@@ -1455,12 +1484,21 @@ auto normalize_arg(value_request<Value> const& arg)
 
 // Normalizes a value_request argument in a coroutine context.
 template<typename Value, typename Props>
-    requires(Props::func_is_coro)
+    requires(Props::func_is_coro && !Props::is_proxy)
 auto normalize_arg(value_request<Value> const& arg)
 {
     Props props{make_normalization_uuid<Value, true>(), "arg"};
     return rq_function_erased(
         std::move(props), identity_coro<Value>, arg.get_value());
+}
+
+// Normalizes a value_request argument in a proxy context.
+template<typename Value, typename Props>
+    requires(Props::is_proxy)
+auto normalize_arg(value_request<Value> const& arg)
+{
+    Props props{make_normalization_uuid<Value, Props::func_is_coro>(), "arg"};
+    return rq_function_erased<Value>(std::move(props), arg.get_value());
 }
 
 // Normalizes a function_request_erased argument (returned as-is).

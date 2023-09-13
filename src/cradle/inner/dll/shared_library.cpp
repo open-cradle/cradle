@@ -33,6 +33,8 @@ load_shared_library(std::string const& dir_path, std::string const& dll_name)
             dir_path,
             dll_name,
             what);
+        // TODO unload() may also fail
+        controller->unload();
         throw dll_load_error{what};
     }
     // TODO what if the following fails?
