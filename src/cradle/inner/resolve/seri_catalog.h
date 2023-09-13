@@ -28,6 +28,10 @@ namespace cradle {
 class seri_catalog
 {
  public:
+    // TODO add dtor deregistering all in map_
+    // TODO register_resolver() also needed for (de_)serializing a request;
+    // rename?
+
     /**
      * Registers a resolver for a uuid, from a template/sample request object.
      *
@@ -39,9 +43,14 @@ class seri_catalog
     void
     register_resolver(Req const& req)
     {
+        // Not thread-safe (not needed: see above).
         // TODO add Request::is_proxy and throw here if true
-        auto uuid_str{req.get_uuid().str()};
-        map_[uuid_str] = std::make_shared<seri_resolver_impl<Req>>();
+        // TODO maybe associate DLL id with this catalog and pass to
+        // register_uuid()
+        req.register_uuid();
+        // map_ should not yet have an entry for uuid_str.
+        map_.insert_or_assign(
+            req.get_uuid().str(), std::make_shared<seri_resolver_impl<Req>>());
     }
 
     // Returns all uuids registered in this catalog.

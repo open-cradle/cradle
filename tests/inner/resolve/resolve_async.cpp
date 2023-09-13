@@ -337,6 +337,8 @@ checker_coro(async_context_intf& ctx)
     logger->info("checker_coro(ctx {})", ctx.get_id());
     for (int i = 0; i < 20; ++i)
     {
+        // TODO this hangs when resolve_request() doesn't make it to the RPC
+        // server
         auto status = co_await ctx.get_status_coro();
         logger->info("checker_coro {}: {}", i, status);
         if (status == async_status::FINISHED)

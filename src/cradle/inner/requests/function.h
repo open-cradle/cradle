@@ -113,6 +113,10 @@ class function_request_intf : public id_interface
         = 0;
 
     virtual void
+    register_uuid()
+        = 0;
+
+    virtual void
     accept(req_visitor_intf& visitor) const
         = 0;
 
@@ -257,6 +261,21 @@ struct first_element
     using type = Head;
 };
 
+// This function should be a no-op unless the argument results from a
+// normalize_arg() call.
+template<typename Arg>
+void
+register_uuid_for_normalized_arg(Arg const& arg)
+{
+}
+
+template<typename Args, std::size_t... Ix>
+void
+register_uuid_for_normalized_args(Args const& args, std::index_sequence<Ix...>)
+{
+    (register_uuid_for_normalized_arg(std::get<Ix>(args)), ...);
+}
+
 /*
  * The actual type created by function_request_erased, but visible only in its
  * constructor (and erased elsewhere).
@@ -297,62 +316,48 @@ class function_request_impl : public function_request_intf<Value>
  public:
     using this_type = function_request_impl;
     using base_type = function_request_intf<Value>;
+    using ArgIndices = std::index_sequence_for<Args...>;
 
     static constexpr bool func_is_coro = AsCoro;
     static constexpr bool func_is_plain
         = std::is_function_v<std::remove_pointer_t<Function>>;
 
+    // function has to be stored in this object so that the request can be
+    // resolved. If this object is created in a "register resolver" context,
+    // function must also be stored in matching_functions_. function should be
+    // moveable but not necessarily copyable; the solution is to put it in a
+    // shared_ptr wrapper.
     function_request_impl(request_uuid uuid, Function function, Args... args)
-        : uuid_{std::move(uuid)}, args_{std::move(args)...}
+        : uuid_{std::move(uuid)},
+          function_{std::make_shared<Function>(std::move(function))},
+          args_{std::move(args)...}
+    {
+    }
+
+    void
+    register_uuid() override
     {
         auto uuid_str{uuid_.str()};
-        // TODO if registering a resolver and an exception occurs, the
-        // add_entry should not happen
-        // TODO move add_entry call to new function_request_intf.register()
-        // function called from register_resolver()
-        // TODO maybe also storing in matching_functions_ but then the
-        // make_shared<Function> call will always happen
+        // TODO add_entry() must throw if an entry already exists for uuid_str.
+        // An alternative would be to associate a DLL id with the entry, making
+        // it possible to have resolvers for one uuid in multiple DLLs.
         cereal_functions_registry::instance().add_entry(
             uuid_str, create, save_json, load_json, unregister);
 
         std::scoped_lock lock{maching_functions_mutex_};
-        bool must_store_function{true};
-        if constexpr (func_is_plain)
+        if (matching_functions_.find(uuid_str) != matching_functions_.end())
         {
-            // Try to see if the correct function is already stored, and to
-            // catch attempts to associate different functions with the same
-            // uuid.
-            // - The check is possible for plain C++ functions.
-            // - It is not possible to distinguish two lambdas capturing
-            //   different arguments (and thus probably having different
-            //   behaviour).
-            // - Captureless lambdas with the same type are identical.
-            auto it = matching_functions_.find(uuid_str);
-            if (it != matching_functions_.end())
-            {
-                if (*it->second == function)
-                {
-                    function_ = it->second;
-                    must_store_function = false;
-                }
-                else
-                {
-                    // TODO should this be a warning? It would be consistent
-                    // with cereal_functions_registry. Two DLLs having the same
-                    // implementation for some uuid (and satisfying the ODR)
-                    // looks like a valid use case.
-                    throw conflicting_functions_uuid_error(fmt::format(
-                        "Multiple C++ functions for uuid {}", uuid_str));
-                }
-            }
+            // Should not happen; maybe an earlier exception prevented the
+            // unregister() call.
+            fmt::print(
+                "ERROR: multiple C++ functions for uuid {}\n", uuid_str);
         }
-        if (must_store_function)
-        {
-            // If matching_functions_ already has an entry for uuid_str, it
-            // might be obsolete and unusable, so replace it.
-            function_ = std::make_shared<Function>(std::move(function));
-            matching_functions_.insert_or_assign(uuid_str, function_);
-        }
+        // matching_functions_ should not yet have an entry for uuid_str; if it
+        // does, the existing entry cannot be trusted, so replace it.
+        matching_functions_.insert_or_assign(uuid_str, function_);
+
+        // Register uuids for any args resulting from normalize_arg()
+        register_uuid_for_normalized_args(args_, ArgIndices{});
     }
 
     // other will be a function_request_impl, but possibly instantiated from
@@ -417,8 +422,7 @@ class function_request_impl : public function_request_intf<Value>
     void
     accept(req_visitor_intf& visitor) const override
     {
-        using Indices = std::index_sequence_for<Args...>;
-        visit_args(visitor, args_, Indices{});
+        visit_args(visitor, args_, ArgIndices{});
     }
 
     cppcoro::task<Value>
@@ -500,13 +504,13 @@ class function_request_impl : public function_request_intf<Value>
     cppcoro::task<Value>
     resolve_sync_coro(local_context_intf& ctx) const
     {
-        using Indices = std::index_sequence_for<Args...>;
-        auto sub_tasks = make_sync_sub_tasks(ctx, args_, Indices{});
+        auto sub_tasks = make_sync_sub_tasks(ctx, args_, ArgIndices{});
         co_return co_await std::apply(
             *function_,
             std::tuple_cat(
                 std::tie(ctx),
-                co_await when_all_wrapper(std::move(sub_tasks), Indices{})));
+                co_await when_all_wrapper(
+                    std::move(sub_tasks), ArgIndices{})));
     }
 
     cppcoro::task<Value>
@@ -519,11 +523,10 @@ class function_request_impl : public function_request_intf<Value>
         // This justifies passing contexts around by reference.
         try
         {
-            using Indices = std::index_sequence_for<Args...>;
-            auto sub_tasks = make_async_sub_tasks(ctx, args_, Indices{});
+            auto sub_tasks = make_async_sub_tasks(ctx, args_, ArgIndices{});
             ctx.update_status(async_status::SUBS_RUNNING);
-            auto sub_results
-                = co_await when_all_wrapper(std::move(sub_tasks), Indices{});
+            auto sub_results = co_await when_all_wrapper(
+                std::move(sub_tasks), ArgIndices{});
             ctx.update_status(async_status::SELF_RUNNING);
             // Rescheduling allows tasks to run in parallel, but is not
             // always opportune
@@ -761,6 +764,13 @@ class proxy_request_base : public function_request_intf<Value>
             uuid_str, nullptr, save_json, nullptr, nullptr);
     }
 
+    // Proxy requests should not be registered.
+    void
+    register_uuid() override
+    {
+        throw not_implemented_error{"proxy_request_base::register_uuid"};
+    }
+
     request_uuid
     get_uuid() const override
     {
@@ -773,7 +783,7 @@ class proxy_request_base : public function_request_intf<Value>
     accept(req_visitor_intf& visitor) const override
     {
         // TODO cheap throw from any unimplemented function
-        assert(false);
+        throw not_implemented_error{"proxy_request_base::accept"};
     }
 
     cppcoro::task<Value>
@@ -1116,6 +1126,12 @@ class function_request_erased
         init_captured_id();
     }
 
+    void
+    register_uuid() const
+    {
+        impl_->register_uuid();
+    }
+
     // *this and other are the same type; however, their impl_'s types could
     // differ (especially if these are subrequests).
     bool
@@ -1247,6 +1263,15 @@ struct arg_type_struct<function_request_erased<Value, Props>>
 {
     using value_type = Value;
 };
+
+// Arg should result from normalize_arg()
+template<typename Value, typename Props>
+void
+register_uuid_for_normalized_arg(
+    function_request_erased<Value, Props> const& arg)
+{
+    arg.register_uuid();
+}
 
 // Used for comparing subrequests, where the main requests have the same type;
 // so the subrequests have the same type too.

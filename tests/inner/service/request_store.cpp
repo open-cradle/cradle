@@ -4,6 +4,7 @@
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/requests/function.h>
+#include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/inner/service/request_store.h>
 
 using namespace cradle;
@@ -80,10 +81,12 @@ TEST_CASE("get_request_key()", tag)
 
 TEST_CASE("store request in storage", tag)
 {
+    seri_catalog cat;
     request_props<caching_level_type::full> props{make_test_uuid(200)};
     mock_storage storage;
 
     auto req0{rq_function_erased(props, add2, 1, 2)};
+    cat.register_resolver(req0);
     cppcoro::sync_wait(store_request(req0, storage));
 
     REQUIRE(storage.size() == 1);
@@ -96,8 +99,10 @@ TEST_CASE("store request in storage", tag)
 
 TEST_CASE("load request from storage (hit)", tag)
 {
+    seri_catalog cat;
     request_props<caching_level_type::full> props{make_test_uuid(300)};
     auto req_written{rq_function_erased(props, add2, 1, 2)};
+    cat.register_resolver(req_written);
     mock_storage storage;
     cppcoro::sync_wait(store_request(req_written, storage));
 
@@ -109,8 +114,10 @@ TEST_CASE("load request from storage (hit)", tag)
 
 TEST_CASE("load request from storage (miss)", tag)
 {
+    seri_catalog cat;
     request_props<caching_level_type::full> props{make_test_uuid(400)};
     auto req_written{rq_function_erased(props, add2, 1, 2)};
+    cat.register_resolver(req_written);
     auto req_not_written{rq_function_erased(props, add2, 1, 3)};
     mock_storage storage;
     cppcoro::sync_wait(store_request(req_written, storage));

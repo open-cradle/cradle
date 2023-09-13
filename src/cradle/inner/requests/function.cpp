@@ -40,6 +40,7 @@ cereal_functions_registry::instance()
     return the_instance;
 }
 
+// TODO add "DLL id" arg ane make it part of entry_t
 void
 cereal_functions_registry::add_entry(
     std::string const& uuid_str,
@@ -68,6 +69,8 @@ cereal_functions_registry::add_entry(
     std::scoped_lock lock{mutex_};
     entry_t new_entry{create, save, load, unregister};
     auto it = entries_.find(uuid_str);
+    // TODO a (DLL id, uuid) combination must occur only once; except for
+    // "normalize_arg" uuids
     if (it != entries_.end() && it->second != new_entry)
     {
         auto logger{spdlog::get("cradle")};
@@ -78,6 +81,7 @@ cereal_functions_registry::add_entry(
     entries_.insert_or_assign(std::move(uuid_str), std::move(new_entry));
 }
 
+// TODO add function to remove all entries for a given DLL
 void
 cereal_functions_registry::remove_entry_if_exists(std::string const& uuid_str)
 {
@@ -94,6 +98,7 @@ cereal_functions_registry::remove_entry_if_exists(std::string const& uuid_str)
     entries_.erase(it);
 }
 
+// TODO maybe add "DLL id" arg as preferred one?
 entry_t&
 cereal_functions_registry::find_entry(request_uuid const& uuid)
 {

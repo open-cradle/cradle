@@ -23,6 +23,7 @@
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/resolve/resolve_request.h>
+#include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/thinknode/service/core.h>
@@ -255,7 +256,9 @@ test_post_iss_request(
 
 TEST_CASE("ISS POST serialization - value", tag)
 {
+    seri_catalog cat;
     auto req{make_post_iss_request_constant<caching_level_type::full>()};
+    cat.register_resolver(req);
     // With this test_request lambda, testing serialization includes testing
     // that the deserialized request can be resolved.
     auto test_request
@@ -269,7 +272,9 @@ TEST_CASE("ISS POST serialization - value", tag)
 
 TEST_CASE("ISS POST serialization - subreq", tag)
 {
+    seri_catalog cat;
     auto req{make_post_iss_request_subreq<caching_level_type::full>()};
+    cat.register_resolver(req);
     auto test_request
         = [](auto const& req1) { test_post_iss_request(req1, false); };
     test_serialize_thinknode_request(

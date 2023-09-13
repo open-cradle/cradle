@@ -10,6 +10,7 @@
 #include "../../support/inner_service.h"
 #include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/requests/function.h>
+#include <cradle/inner/resolve/seri_catalog.h>
 
 using namespace cradle;
 
@@ -107,6 +108,8 @@ TEST_CASE(
     REQUIRE_NOTHROW(rq_function_erased(props, func_a));
 }
 
+#if 0
+// TODO remove this test case and conflicting_functions_uuid_error if the check won't come back.
 TEST_CASE(
     "create function_request_erased: different C++ functions, one uuid", tag)
 {
@@ -115,6 +118,7 @@ TEST_CASE(
     REQUIRE_THROWS_AS(
         rq_function_erased(props, func_b), conflicting_functions_uuid_error);
 }
+#endif
 
 TEST_CASE("create function_request_erased: identical functors, one uuid", tag)
 {
@@ -253,21 +257,39 @@ TEST_CASE("compare function_request_erased with subrequest", tag)
     REQUIRE((req0a < req1a || req1a < req0a));
 }
 
+template<typename A, typename B>
+    requires TypedArg<A, int> && TypedArg<B, int>
+static auto
+rq_0022(A a, B b)
+{
+    using props_type = request_props<caching_level_type::full>;
+    using arg_props_type = request_props<caching_level_type::memory>;
+    return rq_function_erased(
+        props_type{make_test_uuid("0022")},
+        add2,
+        normalize_arg<int, arg_props_type>(std::move(a)),
+        normalize_arg<int, arg_props_type>(std::move(b)));
+}
+
 TEST_CASE(
     "function_request_erased identity: subrequests with different functors",
     tag)
 {
-    request_props<caching_level_type::memory> props0a{make_test_uuid("0020")};
-    request_props<caching_level_type::memory> props0b{make_test_uuid("0021")};
+    seri_catalog cat;
+    using props0_type = request_props<caching_level_type::memory>;
+    props0_type props0a{make_test_uuid("0020")};
+    props0_type props0b{make_test_uuid("0021")};
     auto req0a{rq_function_erased(props0a, add2, 1, 2)};
     auto req0b{rq_function_erased(props0b, mul2, 1, 2)};
+    cat.register_resolver(req0a);
+    cat.register_resolver(req0b);
 
     REQUIRE(!req0a.equals(req0b));
     REQUIRE((req0a.less_than(req0b) || req0b.less_than(req0a)));
 
-    request_props<caching_level_type::full> props1{make_test_uuid("0022")};
-    auto req1a{rq_function_erased(props1, add2, req0a, 3)};
-    auto req1b{rq_function_erased(props1, add2, req0b, 3)};
+    cat.register_resolver(rq_0022(0, 1));
+    auto req1a{rq_0022(req0a, 3)};
+    auto req1b{rq_0022(req0b, 3)};
 
     REQUIRE(!req1a.equals(req1b));
     REQUIRE((req1a.less_than(req1b) || req1b.less_than(req1a)));
