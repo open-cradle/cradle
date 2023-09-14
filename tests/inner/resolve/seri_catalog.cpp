@@ -73,11 +73,14 @@ TEST_CASE("call unregistered resolver", tag)
     init_test_inner_service(resources);
     testing_request_context ctx{resources, nullptr, false, ""};
 
+#if 0
     // Even serialization now fails if the request was not registered:
     REQUIRE_THROWS_WITH(
         serialize_request(req),
         Catch::Contains("cereal_functions_registry: no entry for"));
-#if 0
+#else
+    std::string seri_req{serialize_request(req)};
+
     REQUIRE_THROWS_WITH(
         cppcoro::sync_wait(meta_catalog::instance().resolve(ctx, seri_req)),
         Catch::StartsWith("no resolver registered for uuid"));

@@ -21,8 +21,7 @@ using entry_t = cereal_functions_registry::entry_t;
 static bool
 operator==(entry_t const& lhs, entry_t const& rhs)
 {
-    return lhs.create == rhs.create && lhs.save == rhs.save
-           && lhs.load == rhs.load;
+    return lhs.create == rhs.create;
 }
 
 static bool
@@ -40,13 +39,11 @@ cereal_functions_registry::instance()
     return the_instance;
 }
 
-// TODO add "DLL id" arg ane make it part of entry_t
 void
 cereal_functions_registry::add_entry(
+    std::string const& cat_name,
     std::string const& uuid_str,
     create_t* create,
-    save_t* save,
-    load_t* load,
     unregister_t* unregister)
 {
     // This function is called when a function_request_impl object is created,
@@ -56,7 +53,7 @@ cereal_functions_registry::add_entry(
     // seri_catalog::register_resolver().
     // TODO still need mutex now that seri_catalog objects are better isolated?
     //
-    // Normally, the create/save/load triple would be identical for all
+    // Normally, the create function would be identical for all
     // add_entry() calls for a given uuid. This changes when request
     // implementations can be dynamically loaded. Assuming that the ODR holds
     // across DLLs, it should be OK to (de-)serialize requests implemented in
@@ -67,7 +64,7 @@ cereal_functions_registry::add_entry(
     // by registering the requests separately. That suggestion already appeared
     // in thinknode/seri_catalog.cpp.
     std::scoped_lock lock{mutex_};
-    entry_t new_entry{create, save, load, unregister};
+    entry_t new_entry{cat_name, create, unregister};
     auto it = entries_.find(uuid_str);
     // TODO a (DLL id, uuid) combination must occur only once; except for
     // "normalize_arg" uuids
@@ -81,34 +78,38 @@ cereal_functions_registry::add_entry(
     entries_.insert_or_assign(std::move(uuid_str), std::move(new_entry));
 }
 
-// TODO add function to remove all entries for a given DLL
 void
-cereal_functions_registry::remove_entry_if_exists(std::string const& uuid_str)
+cereal_functions_registry::unregister_catalog(std::string const& cat_name)
 {
     auto logger{spdlog::get("cradle")};
     logger->debug(
-        "cereal_functions_registry: remove_entry_if_exists {}", uuid_str);
+        "cereal_functions_registry: unregister_catalog {}", cat_name);
     std::scoped_lock lock{mutex_};
-    auto it = find_checked(uuid_str);
-    if (auto* unregister = it->second.unregister)
+    for (auto it = entries_.begin(); it != entries_.end();)
     {
-        logger->debug("cereal_functions_registry: unregister {}", uuid_str);
-        unregister(uuid_str);
+        if (it->second.cat_name == cat_name)
+        {
+            if (auto* unregister = it->second.unregister)
+            {
+                std::string const& uuid_str{it->first};
+                logger->debug(
+                    "cereal_functions_registry: unregister {}", uuid_str);
+                unregister(uuid_str);
+            }
+            it = entries_.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
     }
-    entries_.erase(it);
 }
 
-// TODO maybe add "DLL id" arg as preferred one?
 entry_t&
 cereal_functions_registry::find_entry(request_uuid const& uuid)
 {
     std::scoped_lock lock{mutex_};
-    return find_checked(uuid.str())->second;
-}
-
-cereal_functions_registry::entries_t::iterator
-cereal_functions_registry::find_checked(std::string const& uuid_str)
-{
+    std::string uuid_str{uuid.str()};
     auto it = entries_.find(uuid_str);
     if (it == entries_.end())
     {
@@ -116,7 +117,7 @@ cereal_functions_registry::find_checked(std::string const& uuid_str)
         throw unregistered_uuid_error{fmt::format(
             "cereal_functions_registry: no entry for {}", uuid_str)};
     }
-    return it;
+    return it->second;
 }
 
 } // namespace cradle

@@ -35,11 +35,14 @@ class meta_catalog
      * The request is characterized by a uuid encoded in seri_req.
      * Throws uuid_error if the uuid does not appear in any seri catalog.
      */
+    // TODO replace with find_resolver()
+    // and add find_function_entry()
     cppcoro::task<serialized_result>
     resolve(local_context_intf& ctx, std::string seri_req);
 
  private:
     std::mutex mutex_;
+    // TODO should be multimap?
     std::unordered_map<std::string, seri_catalog*> catalogs_map_;
 
     std::string

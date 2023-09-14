@@ -30,7 +30,7 @@ class seri_catalog
  public:
     // TODO add dtor deregistering all in map_
     // TODO register_resolver() also needed for (de_)serializing a request;
-    // rename?
+    // rename? register_uuid() for (de-)serializing and resolving
 
     /**
      * Registers a resolver for a uuid, from a template/sample request object.
@@ -47,7 +47,7 @@ class seri_catalog
         // TODO add Request::is_proxy and throw here if true
         // TODO maybe associate DLL id with this catalog and pass to
         // register_uuid()
-        req.register_uuid();
+        req.register_uuid("TODO cat name");
         // map_ should not yet have an entry for uuid_str.
         map_.insert_or_assign(
             req.get_uuid().str(), std::make_shared<seri_resolver_impl<Req>>());

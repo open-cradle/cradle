@@ -102,6 +102,9 @@ visit_args(
  * The references taken by resolve_sync() and resolve_async() are the "minimal"
  * ones needed.
  */
+typedef void
+unregister_function_t(std::string const& uuid_str);
+
 template<typename Value>
 class function_request_intf : public id_interface
 {
@@ -113,7 +116,15 @@ class function_request_intf : public id_interface
         = 0;
 
     virtual void
-    register_uuid()
+    register_uuid(std::string const& cat_name)
+        = 0;
+
+    virtual void
+    save(cereal::JSONOutputArchive& archive) const
+        = 0;
+
+    virtual void
+    load(cereal::JSONInputArchive& archive)
         = 0;
 
     virtual void
@@ -156,10 +167,8 @@ when_all_wrapper(Tuple&& tasks, std::index_sequence<Ix...>)
  * A registry of functions to serialize or deserialize a function_request_impl
  * object. The functions are identified by a request_uuid value.
  *
- * A uuid identifies three functions:
+ * A uuid identifies two functions:
  * - create() creates a shared_ptr<function_request_impl> object.
- * - save() serializes a function_request_impl object to JSON.
- * - load() deserializes a function_request_impl object from JSON.
  * - unregisters() removes data associated with the uuid, destroying the
  * ability to resolve the uuid.
  *
@@ -189,15 +198,12 @@ class cereal_functions_registry
 {
  public:
     using create_t = std::shared_ptr<void>(request_uuid const& uuid);
-    using save_t = void(cereal::JSONOutputArchive& archive, void const* impl);
-    using load_t = void(cereal::JSONInputArchive& archive, void* impl);
     using unregister_t = void(std::string const& uuid_str);
 
     struct entry_t
     {
+        std::string cat_name;
         create_t* create;
-        save_t* save;
-        load_t* load;
         unregister_t* unregister;
     };
 
@@ -206,14 +212,13 @@ class cereal_functions_registry
 
     void
     add_entry(
+        std::string const& cat_name,
         std::string const& uuid_str,
         create_t* create,
-        save_t* save,
-        load_t* load,
         unregister_t* unregister);
 
     void
-    remove_entry_if_exists(std::string const& uuid_str);
+    unregister_catalog(std::string const& cat_name);
 
     // Intf should be a function_request_intf instantiation.
     template<typename Intf>
@@ -224,25 +229,6 @@ class cereal_functions_registry
         return std::static_pointer_cast<Intf>(entry.create(uuid));
     }
 
-    // Intf should be a function_request_intf instantiation.
-    template<typename Intf>
-    void
-    save(cereal::JSONOutputArchive& archive, Intf const& intf)
-    {
-        entry_t& entry{find_entry(intf.get_uuid())};
-        entry.save(archive, &intf);
-    }
-
-    // Intf should be a function_request_intf instantiation.
-    // The uuid should be set before deserializing the (rest of) the object.
-    template<typename Intf>
-    void
-    load(cereal::JSONInputArchive& archive, Intf& intf)
-    {
-        entry_t& entry{find_entry(intf.get_uuid())};
-        entry.load(archive, &intf);
-    }
-
  private:
     using entries_t = std::unordered_map<std::string, entry_t>;
     entries_t entries_;
@@ -250,9 +236,6 @@ class cereal_functions_registry
 
     entry_t&
     find_entry(request_uuid const& uuid);
-
-    entries_t::iterator
-    find_checked(std::string const& uuid_str);
 };
 
 template<typename Head, typename... Tail>
@@ -265,15 +248,16 @@ struct first_element
 // normalize_arg() call.
 template<typename Arg>
 void
-register_uuid_for_normalized_arg(Arg const& arg)
+register_uuid_for_normalized_arg(std::string const& cat_name, Arg const& arg)
 {
 }
 
 template<typename Args, std::size_t... Ix>
 void
-register_uuid_for_normalized_args(Args const& args, std::index_sequence<Ix...>)
+register_uuid_for_normalized_args(
+    std::string const& cat_name, Args const& args, std::index_sequence<Ix...>)
 {
-    (register_uuid_for_normalized_arg(std::get<Ix>(args)), ...);
+    (register_uuid_for_normalized_arg(cat_name, std::get<Ix>(args)), ...);
 }
 
 /*
@@ -335,29 +319,29 @@ class function_request_impl : public function_request_intf<Value>
     }
 
     void
-    register_uuid() override
+    register_uuid(std::string const& cat_name) override
     {
         auto uuid_str{uuid_.str()};
         // TODO add_entry() must throw if an entry already exists for uuid_str.
         // An alternative would be to associate a DLL id with the entry, making
         // it possible to have resolvers for one uuid in multiple DLLs.
         cereal_functions_registry::instance().add_entry(
-            uuid_str, create, save_json, load_json, unregister);
+            cat_name, uuid_str, create, unregister);
 
         std::scoped_lock lock{maching_functions_mutex_};
         if (matching_functions_.find(uuid_str) != matching_functions_.end())
         {
             // Should not happen; maybe an earlier exception prevented the
             // unregister() call.
-            fmt::print(
-                "ERROR: multiple C++ functions for uuid {}\n", uuid_str);
+            fmt::print("ERR: multiple C++ functions for uuid {}\n", uuid_str);
         }
         // matching_functions_ should not yet have an entry for uuid_str; if it
         // does, the existing entry cannot be trusted, so replace it.
         matching_functions_.insert_or_assign(uuid_str, function_);
 
         // Register uuids for any args resulting from normalize_arg()
-        register_uuid_for_normalized_args(args_, ArgIndices{});
+        // TODO how can we unregister these? Do we need to?
+        register_uuid_for_normalized_args(cat_name, args_, ArgIndices{});
     }
 
     // other will be a function_request_impl, but possibly instantiated from
@@ -581,28 +565,14 @@ class function_request_impl : public function_request_intf<Value>
         return std::make_shared<this_type>(uuid);
     }
 
-    static void
-    save_json(cereal::JSONOutputArchive& archive, void const* impl)
-    {
-        static_cast<this_type const*>(impl)->save(archive);
-    }
-
-    static void
-    load_json(cereal::JSONInputArchive& archive, void* impl)
-    {
-        static_cast<this_type*>(impl)->load(archive);
-    }
-
-    template<typename Archive>
     void
-    save(Archive& archive) const
+    save(cereal::JSONOutputArchive& archive) const override
     {
         archive(cereal::make_nvp("args", args_));
     }
 
-    template<typename Archive>
     void
-    load(Archive& archive)
+    load(cereal::JSONInputArchive& archive) override
     {
         archive(cereal::make_nvp("args", args_));
         std::scoped_lock lock{maching_functions_mutex_};
@@ -759,14 +729,11 @@ class proxy_request_base : public function_request_intf<Value>
     proxy_request_base(request_uuid uuid, Args... args)
         : uuid_{std::move(uuid)}, args_{std::move(args)...}
     {
-        auto uuid_str{uuid_.str()};
-        cereal_functions_registry::instance().add_entry(
-            uuid_str, nullptr, save_json, nullptr, nullptr);
     }
 
     // Proxy requests should not be registered.
     void
-    register_uuid() override
+    register_uuid(std::string const& cat_name) override
     {
         throw not_implemented_error{"proxy_request_base::register_uuid"};
     }
@@ -801,17 +768,16 @@ class proxy_request_base : public function_request_intf<Value>
  public:
     // cereal-related
 
-    static void
-    save_json(cereal::JSONOutputArchive& archive, void const* impl)
-    {
-        static_cast<this_type const*>(impl)->save(archive);
-    }
-
-    template<typename Archive>
     void
-    save(Archive& archive) const
+    save(cereal::JSONOutputArchive& archive) const override
     {
         archive(cereal::make_nvp("args", args_));
+    }
+
+    void
+    load(cereal::JSONInputArchive& archive) override
+    {
+        throw not_implemented_error{"proxy_request_base::load"};
     }
 
  protected:
@@ -1033,26 +999,6 @@ struct request_props
     }
 };
 
-// Serialize a function_request_impl object, given a type-erased
-// function_request_intf reference.
-template<typename Archive, typename Value>
-void
-save(Archive& archive, function_request_intf<Value> const& intf)
-{
-    using intf_type = function_request_intf<Value>;
-    cereal_functions_registry::instance().save<intf_type>(archive, intf);
-}
-
-// Deserialize a function_request_impl object, given a type-erased
-// function_request_intf reference.
-template<typename Archive, typename Value>
-void
-load(Archive& archive, function_request_intf<Value>& intf)
-{
-    using intf_type = function_request_intf<Value>;
-    cereal_functions_registry::instance().load<intf_type>(archive, intf);
-}
-
 /*
  * A function request that erases function and arguments types
  *
@@ -1127,9 +1073,9 @@ class function_request_erased
     }
 
     void
-    register_uuid() const
+    register_uuid(std::string const& cat_name) const
     {
-        impl_->register_uuid();
+        impl_->register_uuid(cat_name);
     }
 
     // *this and other are the same type; however, their impl_'s types could
@@ -1208,26 +1154,26 @@ class function_request_erased
     // Equivalent alternative:
     //   function_request_erased<...> req;
     //   req.load(archive)
-    template<typename Archive>
-    explicit function_request_erased(Archive& archive)
+    explicit function_request_erased(cereal::JSONInputArchive& archive)
     {
         load(archive);
     }
 
-    template<typename Archive>
     void
-    save(Archive& archive) const
+    save(cereal::JSONOutputArchive& archive) const
     {
         // At least for JSON, there is no difference between multiple archive()
         // calls, or putting everything in one call.
         impl_->get_uuid().save_with_name(archive, "uuid");
         archive(cereal::make_nvp("title", title_));
-        ::cradle::save(archive, *impl_);
+        impl_->save(archive);
     }
 
-    template<typename Archive>
+    // This gets called directly from cereal, for subrequests.
+    // No additional arguments are possible, so the uuid-to-creator map must be
+    // in some global registry that can be accessed here.
     void
-    load(Archive& archive)
+    load(cereal::JSONInputArchive& archive)
     {
         auto uuid{request_uuid::load_with_name(archive, "uuid")};
         archive(cereal::make_nvp("title", title_));
@@ -1238,7 +1184,7 @@ class function_request_erased
         impl_ = cereal_functions_registry::instance().create<intf_type>(
             std::move(uuid));
         // Deserialize the remainder of the function_request_impl object.
-        ::cradle::load(archive, *impl_);
+        impl_->load(archive);
         init_captured_id();
     }
 
@@ -1268,9 +1214,10 @@ struct arg_type_struct<function_request_erased<Value, Props>>
 template<typename Value, typename Props>
 void
 register_uuid_for_normalized_arg(
+    std::string const& cat_name,
     function_request_erased<Value, Props> const& arg)
 {
-    arg.register_uuid();
+    arg.register_uuid(cat_name);
 }
 
 // Used for comparing subrequests, where the main requests have the same type;

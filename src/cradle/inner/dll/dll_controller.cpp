@@ -45,10 +45,7 @@ void
 dll_controller::unload()
 {
     logger_->info("dll_controller::unload() {}", name_);
-    for (auto const& uuid_str : catalog_->get_all_uuid_strs())
-    {
-        cereal_functions_registry::instance().remove_entry_if_exists(uuid_str);
-    }
+    cereal_functions_registry::instance().unregister_catalog(name_);
     meta_catalog::instance().remove_catalog(*catalog_);
     catalog_ = nullptr;
     lib_.reset();

@@ -23,6 +23,7 @@ serialize_request(Req const& req)
     return os.str();
 }
 
+// Not really a plugin as a lot of code assumes cereal + JSON
 template<typename Req>
 auto
 deserialize_request(std::string const& seri_req)
