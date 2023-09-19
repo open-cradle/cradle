@@ -67,6 +67,9 @@ option(CRADLE_GPROF_PROFILING "Enable CPU profiling using gprof" OFF)
 # Define TSan (ThreadSanitizer) options.
 option(CRADLE_THREAD_SANITIZER "Enable ThreadSanitizer (TSan)" OFF)
 
+# Define UBSan (UndefinedBehaviorSanitizer) options.
+option(CRADLE_UNDEFINED_BEHAVIOR_SANITIZER "Enable UndefinedBehaviorSanitizer (UBSan)" OFF)
+
 # Detect the compiler.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(IS_CLANG true)
@@ -269,6 +272,18 @@ if(CRADLE_THREAD_SANITIZER)
         string(APPEND CMAKE_EXE_LINKER_FLAGS " -fsanitize=thread")
     elseif(IS_MSVC)
        add_compile_options(/fsanitize=address /Zi)
+    endif()
+endif()
+
+if(CRADLE_UNDEFINED_BEHAVIOR_SANITIZER)
+    message(STATUS "Enabling UndefinedBehaviorSanitizer")
+    if(IS_CLANG)
+        # Make sure to use clang++ (not ld) as a linker; e.g.
+        # CMAKE_LINKER:FILEPATH=/usr/bin/clang++-15
+        add_compile_options(-fsanitize=undefined)
+        string(APPEND CMAKE_EXE_LINKER_FLAGS " -fsanitize=undefined")
+    else()
+        message(FATAL_ERROR "UBSan supported for Clang only")
     endif()
 endif()
 
