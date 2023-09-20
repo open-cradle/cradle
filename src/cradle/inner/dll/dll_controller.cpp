@@ -1,3 +1,5 @@
+#include <fmt/format.h>
+
 #include <cradle/inner/dll/dll_controller.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/meta_catalog.h>
@@ -39,8 +41,10 @@ dll_controller::load()
         = lib_->get<get_catalog_func_t>(get_catalog_func_name);
     catalog_ = get_catalog_func();
     meta_catalog::instance().add_catalog(*catalog_);
-    logger_->info(
-        "load done for {} -> id {}", name_, catalog_->get_cat_id().value());
+    auto cat_id_value{catalog_->get_cat_id().value()};
+    logger_->info("load done for {} -> cat_id {}", name_, cat_id_value);
+    cereal_functions_registry::instance().log_all_entries(
+        fmt::format("after load cat_id {}", cat_id_value));
 }
 
 void
@@ -49,7 +53,7 @@ dll_controller::unload()
     if (catalog_)
     {
         logger_->info(
-            "unload {} (id {})", name_, catalog_->get_cat_id().value());
+            "unload {} (cat_id {})", name_, catalog_->get_cat_id().value());
         meta_catalog::instance().remove_catalog(*catalog_);
         catalog_ = nullptr;
     }

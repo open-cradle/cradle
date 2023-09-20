@@ -57,6 +57,7 @@ class seri_catalog
         // Not thread-safe (not needed: see above).
         // TODO add Request::is_proxy and throw here if true
         req.register_uuid(cat_id_);
+        // TODO merge map_ / meta_catalog / cereal_function_registry
         // map_ should not yet have an entry for uuid_str.
         map_.insert_or_assign(
             req.get_uuid().str(), std::make_shared<seri_resolver_impl<Req>>());

@@ -38,7 +38,7 @@ cereal_functions_registry::add(
     std::any function)
 {
     // TODO investigate exception opportunities and consequences.
-    logger_->debug("add uuid {}, cat {}", uuid_str, cat_id.value());
+    logger_->debug("add uuid {}, cat_id {}", uuid_str, cat_id.value());
     std::scoped_lock lock{mutex_};
     auto outer_it = entries_.find(uuid_str);
     if (outer_it == entries_.end())
@@ -71,7 +71,7 @@ cereal_functions_registry::unregister_catalog(catalog_id cat_id)
             if (inner_it->cat_id == cat_id)
             {
                 logger_->debug(
-                    "removing entry for uuid {}, cat {}",
+                    "removing entry for uuid {}, cat_id {}",
                     uuid_str,
                     cat_id.value());
                 inner_it = inner_list.erase(inner_it);
@@ -92,7 +92,7 @@ cereal_functions_registry::unregister_catalog(catalog_id cat_id)
         logger_->debug("removing empty inner list for uuid {}", key);
         entries_.erase(key);
     }
-    log_all_entries();
+    log_all_entries(fmt::format("after unload cat_id {}", cat_id.value()));
 }
 
 // Finds _an_ entry for uuid_str.
@@ -122,29 +122,29 @@ cereal_functions_registry::find_entry(std::string const& uuid_str)
 }
 
 void
-cereal_functions_registry::log_all_entries()
+cereal_functions_registry::log_all_entries(std::string const& when)
 {
     if (!logger_->should_log(spdlog::level::debug))
     {
         return;
     }
     logger_->debug(
-        "cereal_functions_registry has {} entries", entries_.size());
+        "cereal_functions_registry has {} entries {}", entries_.size(), when);
     int outer_ix = 0;
     for (auto const& [uuid_str, inner_list] : entries_)
     {
-        std::string cats;
+        std::string cat_ids;
         int inner_ix = 0;
         for (auto const& inner_it : inner_list)
         {
             if (inner_ix > 0)
             {
-                cats += ",";
+                cat_ids += ",";
             }
-            cats += fmt::format(" {}", inner_it.cat_id.value());
+            cat_ids += fmt::format(" {}", inner_it.cat_id.value());
             ++inner_ix;
         }
-        logger_->debug("({}) uuid {}: cat{}", outer_ix, uuid_str, cats);
+        logger_->debug("({}) uuid {}: cat_id{}", outer_ix, uuid_str, cat_ids);
         ++outer_ix;
     }
 }
@@ -157,6 +157,8 @@ cereal_functions_registry::detect_duplicate(
     catalog_id cat_id,
     std::string const& uuid_str)
 {
+    // TODO caller should know the is_normalizer value:
+    // top-most requests are false, child requests are true.
     bool is_normalizer{uuid_str.starts_with("normalization<")};
     bool is_duplicate{false};
     for (auto& inner_it : inner_list)
@@ -166,14 +168,14 @@ cereal_functions_registry::detect_duplicate(
             if (is_normalizer)
             {
                 logger_->debug(
-                    "duplicate normalizer for uuid {} and cat {}",
+                    "duplicate normalizer for uuid {} and cat_id {}",
                     uuid_str,
                     cat_id.value());
             }
             else
             {
                 logger_->error(
-                    "duplicate entry for uuid {} and cat {}",
+                    "duplicate entry for uuid {} and cat_id {}",
                     uuid_str,
                     cat_id.value());
             }

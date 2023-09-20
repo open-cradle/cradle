@@ -241,6 +241,9 @@ class cereal_functions_registry
             find_entry(uuid_str).function);
     }
 
+    void
+    log_all_entries(std::string const& when);
+
  private:
     struct entry_t
     {
@@ -269,9 +272,6 @@ class cereal_functions_registry
 
     entry_t&
     find_entry(std::string const& uuid_str);
-
-    void
-    log_all_entries();
 
     bool
     detect_duplicate(
