@@ -170,7 +170,8 @@ TEST_CASE("unload/reload two DLLs", tag)
 }
 
 #if 0
-TEST_CASE("unload DLL sharing resolvers", tag)
+// Currently failing since unloading a DLL unregisters _all_ resolvers for its DLLs
+TEST_CASE("unload DLL sharing resolvers", "[B]")
 {
     inner_resources resources;
     init_test_inner_service(resources);
@@ -248,8 +249,9 @@ TEST_CASE("load/unload DLL stress test", "[Z]")
         }
     }
 }
+#endif
 
-TEST_CASE("load/unload DLL stress test1", "[A]")
+TEST_CASE("load/unload DLL stress test1", tag)
 {
     inner_resources resources;
     init_test_inner_service(resources);
@@ -275,7 +277,5 @@ TEST_CASE("load/unload DLL stress test1", "[A]")
         = cppcoro::sync_wait(resolve_request(ctx, add_req, constraints));
     REQUIRE(add_actual == add_expected);
 
-    // This one already crashes the server:
     proxy.unload_shared_library("test_inner_dll_x0");
 }
-#endif
