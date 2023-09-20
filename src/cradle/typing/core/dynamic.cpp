@@ -79,7 +79,7 @@ dynamic::dynamic(std::initializer_list<dynamic> list)
     }
     else
     {
-        *this = dynamic_array{list};
+        *this = dynamic_array(list);
     }
 }
 
