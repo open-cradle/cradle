@@ -1,7 +1,6 @@
 #ifndef CRADLE_INNER_RESOLVE_SERI_CATALOG_H
 #define CRADLE_INNER_RESOLVE_SERI_CATALOG_H
 
-#include <cassert>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -26,20 +25,15 @@ namespace cradle {
  *
  * An object of this class is assumed to be created and populated once, at
  * initialization time, by a single thread, and be immutable thereafter.
+ *
+ * An object of this class is identified by a unique catalog_id value.
+ * Loading, unloading and reloading a DLL gives two different catalogs,
+ * with different catalog_id values.
  */
 class seri_catalog
 {
  public:
-    // TODO add dtor deregistering all in map_
-    // TODO register_resolver() also needed for (de_)serializing a request;
-    // rename? register_uuid() for (de-)serializing and resolving
-
-    seri_catalog() = default;
-
-    seri_catalog(bool is_static);
-
-    void
-    alloc_dll_id();
+    ~seri_catalog();
 
     catalog_id
     get_cat_id()
@@ -54,11 +48,12 @@ class seri_catalog
      * similar to the template one; different arguments are allowed, but
      * otherwise the request should be identical to the template.
      */
+    // TODO register_resolver() also needed for (de_)serializing a request;
+    // rename? register_uuid() for (de-)serializing and resolving
     template<Request Req>
     void
     register_resolver(Req const& req)
     {
-        assert(cat_id_.is_valid());
         // Not thread-safe (not needed: see above).
         // TODO add Request::is_proxy and throw here if true
         req.register_uuid(cat_id_);

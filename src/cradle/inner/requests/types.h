@@ -34,46 +34,21 @@ static constexpr async_id NO_ASYNC_ID{~async_id{}};
 /*
  * Id for a catalog instance.
  *
- * The intention is to have a unique id for the catalog in a newly loaded
- * DLL. When the same DLL is loaded again, a distinct id will be allocated.
- * When a DLL is unloaded, all corresponding cereal_functions_registry::entry_t
- * objects should be removed, but exceptions that are not handled properly
- * could interfere. If so, we could be left with stale pointers inside entries
- * with a stale id. By reallocating a new id when the DLL is reloaded, these
- * stale entries be ignored; overwriting them tends to lead to crashes.
+ * The main reason is to distinguish catalogs resulting from loading (and
+ * unloading) the same DLL more than once.
  */
 class catalog_id
 {
  public:
     using wrapped_t = std::size_t;
 
-    catalog_id() = default;
-
-    // Get an id for a catalog that is not inside a DLL.
-    // TODO temporary catalogs in unit tests should also have a DLL-like id?!
-    static catalog_id
-    get_static_id();
-
-    // Allocate an id for a catalog that is inside a DLL.
-    static catalog_id
-    alloc_dll_id();
+    // Creates a unique id.
+    catalog_id();
 
     wrapped_t
     value() const
     {
         return wrapped_;
-    }
-
-    bool
-    is_valid() const
-    {
-        return wrapped_ >= STATIC_ID;
-    }
-
-    bool
-    is_valid_dll() const
-    {
-        return wrapped_ >= MIN_DLL_ID;
     }
 
     bool
@@ -89,15 +64,7 @@ class catalog_id
     }
 
  private:
-    static constexpr wrapped_t NO_ID{0};
-    static constexpr wrapped_t STATIC_ID{1};
-    static constexpr wrapped_t MIN_DLL_ID{2};
-
-    wrapped_t wrapped_{NO_ID};
-
-    catalog_id(wrapped_t wrapped) : wrapped_{wrapped}
-    {
-    }
+    wrapped_t wrapped_{};
 };
 
 } // namespace cradle

@@ -15,7 +15,9 @@ dll_controller::dll_controller(std::string path, std::string name)
 void
 dll_controller::load()
 {
-    logger_->info("load {} (id {}) from {}", name_, cat_id_.value(), path_);
+    // TODO load() and unload() should happen only once
+    // TODO load, no unload, then reload shouldn't re-init
+    logger_->info("load {} from {}", name_, path_);
     // TODO Consider rtld_lazy if the library is opened only for getting the
     // uuid's, as this might be significantly faster than rtld_now.
     auto mode{
@@ -38,21 +40,21 @@ dll_controller::load()
     auto get_catalog_func
         = lib_->get<get_catalog_func_t>(get_catalog_func_name);
     catalog_ = get_catalog_func();
-    cat_id_ = catalog_->get_cat_id();
     meta_catalog::instance().add_catalog(*catalog_);
-    logger_->info("load done for {}", name_);
+    logger_->info(
+        "load done for {}: id {}", name_, catalog_->get_cat_id().value());
 }
 
 void
 dll_controller::unload()
 {
-    logger_->info("unload {} (id {})", name_, cat_id_.value());
-    if (cat_id_.is_valid())
+    logger_->info("unload {}", name_);
+    if (catalog_)
     {
-        cereal_functions_registry::instance().unregister_catalog(cat_id_);
+        meta_catalog::instance().remove_catalog(*catalog_);
+        catalog_ = nullptr;
     }
-    meta_catalog::instance().remove_catalog(*catalog_);
-    catalog_ = nullptr;
+    // The following calls ~seri_catalog() which unregisters its resolvers
     lib_.reset();
     logger_->info("unload done for {}", name_);
 }

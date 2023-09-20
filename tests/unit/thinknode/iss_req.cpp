@@ -256,7 +256,7 @@ test_post_iss_request(
 
 TEST_CASE("ISS POST serialization - value", tag)
 {
-    seri_catalog cat{true};
+    seri_catalog cat;
     auto req{make_post_iss_request_constant<caching_level_type::full>()};
     cat.register_resolver(req);
     // With this test_request lambda, testing serialization includes testing
@@ -272,7 +272,7 @@ TEST_CASE("ISS POST serialization - value", tag)
 
 TEST_CASE("ISS POST serialization - subreq", tag)
 {
-    seri_catalog cat{true};
+    seri_catalog cat;
     auto req{make_post_iss_request_subreq<caching_level_type::full>()};
     cat.register_resolver(req);
     auto test_request

@@ -1,16 +1,11 @@
+#include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/seri_catalog.h>
 
 namespace cradle {
 
-seri_catalog::seri_catalog(bool is_static)
-    : cat_id_{is_static ? catalog_id::get_static_id() : catalog_id{}}
+seri_catalog::~seri_catalog()
 {
-}
-
-void
-seri_catalog::alloc_dll_id()
-{
-    cat_id_ = catalog_id::alloc_dll_id();
+    cereal_functions_registry::instance().unregister_catalog(cat_id_);
 }
 
 std::vector<std::string>
