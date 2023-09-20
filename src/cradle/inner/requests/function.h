@@ -249,9 +249,10 @@ class cereal_functions_registry
         std::any function; // wrapping function_t
     };
 
-    // inner_list_t contains the entries for some uuid. List length should
-    // normally be 1. Empty lists should not be possible.
-    // TODO normalized_arg entries
+    // inner_list_t contains the entries for some uuid.
+    // - List length should normally be 1.
+    // - Empty lists are not possible (when a list's last entry is removed, the
+    //   list itself is removed as well).
     using inner_list_t = std::list<entry_t>;
     // outer_map_t maps uuid strings to inner_list_t lists.
     using outer_map_t = std::unordered_map<std::string, inner_list_t>;
@@ -268,6 +269,15 @@ class cereal_functions_registry
 
     entry_t&
     find_entry(std::string const& uuid_str);
+
+    void
+    log_all_entries();
+
+    bool
+    detect_duplicate(
+        inner_list_t const& inner_list,
+        catalog_id cat_id,
+        std::string const& uuid_str);
 };
 
 template<typename Head, typename... Tail>

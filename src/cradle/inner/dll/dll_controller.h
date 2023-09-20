@@ -16,9 +16,11 @@ class dll_controller
  public:
     dll_controller(std::string path, std::string name);
 
+    // Client must call load() only once.
     void
     load();
 
+    // Client must call unload() only once.
     void
     unload();
 

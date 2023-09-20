@@ -12,6 +12,12 @@ void
 load_shared_library(std::string const& dir_path, std::string const& dll_name)
 {
     auto logger{ensure_logger("dll")};
+    auto& the_dlls{dll_singleton::instance()};
+    if (the_dlls.find(dll_name))
+    {
+        logger->warn("DLL {} already loaded", dll_name);
+        return;
+    }
 #ifdef _WIN32
     std::string dll_path{fmt::format("{}/{}.dll", dir_path, dll_name)};
 #else
@@ -39,7 +45,7 @@ load_shared_library(std::string const& dir_path, std::string const& dll_name)
         throw dll_load_error{what};
     }
     // TODO what if the following fails?
-    dll_singleton::instance().add(std::move(controller));
+    the_dlls.add(std::move(controller));
 }
 
 void

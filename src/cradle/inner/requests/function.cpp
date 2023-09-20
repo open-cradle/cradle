@@ -46,17 +46,9 @@ cereal_functions_registry::add(
         outer_it = entries_.emplace(uuid_str, inner_list_t{}).first;
     }
     auto& inner_list = outer_it->second;
-    for (auto& inner_it : inner_list)
+    if (detect_duplicate(inner_list, cat_id, uuid_str))
     {
-        if (inner_it.cat_id == cat_id)
-        {
-            // Should not happen; maybe an earlier exception prevented the
-            // unregister() call.
-            logger_->error(
-                "existing entry for uuid {} and cat {}",
-                uuid_str,
-                cat_id.value());
-        }
+        return;
     }
     // Any existing matching entry could contain stale pointers, and attempts
     // to overwrite it could lead to crashes. Push new entry to the front so
@@ -100,6 +92,7 @@ cereal_functions_registry::unregister_catalog(catalog_id cat_id)
         logger_->debug("removing empty inner list for uuid {}", key);
         entries_.erase(key);
     }
+    log_all_entries();
 }
 
 // Finds _an_ entry for uuid_str.
@@ -126,6 +119,68 @@ cereal_functions_registry::find_entry(std::string const& uuid_str)
     }
     // Any entry from inner_list should do.
     return *inner_list.begin();
+}
+
+void
+cereal_functions_registry::log_all_entries()
+{
+    if (!logger_->should_log(spdlog::level::debug))
+    {
+        return;
+    }
+    logger_->debug(
+        "cereal_functions_registry has {} entries", entries_.size());
+    int outer_ix = 0;
+    for (auto const& [uuid_str, inner_list] : entries_)
+    {
+        std::string cats;
+        int inner_ix = 0;
+        for (auto const& inner_it : inner_list)
+        {
+            if (inner_ix > 0)
+            {
+                cats += ",";
+            }
+            cats += fmt::format(" {}", inner_it.cat_id.value());
+            ++inner_ix;
+        }
+        logger_->debug("({}) uuid {}: cat{}", outer_ix, uuid_str, cats);
+        ++outer_ix;
+    }
+}
+
+// Duplicate uuids within a catalog are OK (and common) for normalizers.
+// For other uuids, this should not happen.
+bool
+cereal_functions_registry::detect_duplicate(
+    inner_list_t const& inner_list,
+    catalog_id cat_id,
+    std::string const& uuid_str)
+{
+    bool is_normalizer{uuid_str.starts_with("normalization<")};
+    bool is_duplicate{false};
+    for (auto& inner_it : inner_list)
+    {
+        if (inner_it.cat_id == cat_id)
+        {
+            if (is_normalizer)
+            {
+                logger_->debug(
+                    "duplicate normalizer for uuid {} and cat {}",
+                    uuid_str,
+                    cat_id.value());
+            }
+            else
+            {
+                logger_->error(
+                    "duplicate entry for uuid {} and cat {}",
+                    uuid_str,
+                    cat_id.value());
+            }
+            is_duplicate = true;
+        }
+    }
+    return is_duplicate;
 }
 
 } // namespace cradle
