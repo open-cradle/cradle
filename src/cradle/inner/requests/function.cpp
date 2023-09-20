@@ -1,9 +1,9 @@
 #include <stdexcept>
 
 #include <fmt/format.h>
-#include <spdlog/spdlog.h>
 
 #include <cradle/inner/requests/function.h>
+#include <cradle/inner/utilities/logging.h>
 
 namespace cradle {
 
@@ -16,20 +16,6 @@ check_title_is_valid(std::string const& title)
     }
 }
 
-using entry_t = cereal_functions_registry::entry_t;
-
-static bool
-operator==(entry_t const& lhs, entry_t const& rhs)
-{
-    return lhs.create == rhs.create;
-}
-
-static bool
-operator!=(entry_t const& lhs, entry_t const& rhs)
-{
-    return !(lhs == rhs);
-}
-
 cereal_functions_registry&
 cereal_functions_registry::instance()
 {
@@ -39,85 +25,107 @@ cereal_functions_registry::instance()
     return the_instance;
 }
 
+cereal_functions_registry::cereal_functions_registry()
+    : logger_{ensure_logger("cfr")}
+{
+}
+
 void
-cereal_functions_registry::add_entry(
-    std::string const& cat_name,
+cereal_functions_registry::add(
+    catalog_id cat_id,
     std::string const& uuid_str,
     create_t* create,
-    unregister_t* unregister)
+    std::any function)
 {
-    // This function is called when a function_request_impl object is created,
-    // so can be called multiple times for the same uuid. Especially for
-    // a request like "normalization<blob,coro>", simultaneous calls are even
-    // possible while registering the requests in
-    // seri_catalog::register_resolver().
-    // TODO still need mutex now that seri_catalog objects are better isolated?
-    //
-    // Normally, the create function would be identical for all
-    // add_entry() calls for a given uuid. This changes when request
-    // implementations can be dynamically loaded. Assuming that the ODR holds
-    // across DLLs, it should be OK to (de-)serialize requests implemented in
-    // DLL X, calling the corresponding create/save/load functions implemented
-    // in DLL Y. Until DLL Y is unloaded...
-    //
-    // For the normalization functions, it seems possible to avoid this problem
-    // by registering the requests separately. That suggestion already appeared
-    // in thinknode/seri_catalog.cpp.
+    // TODO investigate exception opportunities and consequences.
+    logger_->debug("add uuid {}, cat {}", uuid_str, cat_id.value());
     std::scoped_lock lock{mutex_};
-    entry_t new_entry{cat_name, create, unregister};
-    auto it = entries_.find(uuid_str);
-    // TODO a (DLL id, uuid) combination must occur only once; except for
-    // "normalize_arg" uuids
-    if (it != entries_.end() && it->second != new_entry)
+    auto outer_it = entries_.find(uuid_str);
+    if (outer_it == entries_.end())
     {
-        auto logger{spdlog::get("cradle")};
-        logger->warn(
-            "cereal_functions_registry: conflicting entries for uuid {}",
-            uuid_str);
+        outer_it = entries_.emplace(uuid_str, inner_list_t{}).first;
     }
-    entries_.insert_or_assign(std::move(uuid_str), std::move(new_entry));
+    auto& inner_list = outer_it->second;
+    for (auto& inner_it : inner_list)
+    {
+        if (inner_it.cat_id == cat_id)
+        {
+            // Should not happen; maybe an earlier exception prevented the
+            // unregister() call.
+            logger_->error(
+                "existing entry for uuid {} and cat {}",
+                uuid_str,
+                cat_id.value());
+        }
+    }
+    // Any existing matching entry could contain stale pointers, and attempts
+    // to overwrite it could lead to crashes. Push new entry to the front so
+    // that find_entry() will find it and not a stale one.
+    // TODO multiple normalized_arg entries possible?
+    inner_list.push_front(entry_t{cat_id, create, std::move(function)});
 }
 
 void
-cereal_functions_registry::unregister_catalog(std::string const& cat_name)
+cereal_functions_registry::unregister_catalog(catalog_id cat_id)
 {
-    auto logger{spdlog::get("cradle")};
-    logger->debug(
-        "cereal_functions_registry: unregister_catalog {}", cat_name);
+    logger_->info(
+        "cereal_functions_registry: unregister_catalog {}", cat_id.value());
     std::scoped_lock lock{mutex_};
-    for (auto it = entries_.begin(); it != entries_.end();)
+    std::vector<std::string> keys_to_remove;
+    for (auto& [uuid_str, inner_list] : entries_)
     {
-        if (it->second.cat_name == cat_name)
+        for (auto inner_it = inner_list.begin(); inner_it != inner_list.end();)
         {
-            if (auto* unregister = it->second.unregister)
+            if (inner_it->cat_id == cat_id)
             {
-                std::string const& uuid_str{it->first};
-                logger->debug(
-                    "cereal_functions_registry: unregister {}", uuid_str);
-                unregister(uuid_str);
+                logger_->debug(
+                    "removing entry for uuid {}, cat {}",
+                    uuid_str,
+                    cat_id.value());
+                inner_it = inner_list.erase(inner_it);
             }
-            it = entries_.erase(it);
+            else
+            {
+                ++inner_it;
+            }
         }
-        else
+        if (inner_list.empty())
         {
-            ++it;
+            // Calling erase() here would invalidate the iterator.
+            keys_to_remove.push_back(uuid_str);
         }
+    }
+    for (auto const& key : keys_to_remove)
+    {
+        logger_->debug("removing empty inner list for uuid {}", key);
+        entries_.erase(key);
     }
 }
 
-entry_t&
-cereal_functions_registry::find_entry(request_uuid const& uuid)
+// Finds _an_ entry for uuid_str.
+// Assuming that the ODR holds across DLLs, `create` and `function` functions
+// implemented in DLL X should be identical to ones implemented in DLL Y.
+// TODO keep track of pointers to DLL code and do not unload if they exist
+cereal_functions_registry::entry_t&
+cereal_functions_registry::find_entry(std::string const& uuid_str)
 {
     std::scoped_lock lock{mutex_};
-    std::string uuid_str{uuid.str()};
     auto it = entries_.find(uuid_str);
     if (it == entries_.end())
     {
-        // This should be an internal error.
-        throw unregistered_uuid_error{fmt::format(
-            "cereal_functions_registry: no entry for {}", uuid_str)};
+        throw unregistered_uuid_error(fmt::format(
+            "cereal_functions_registry: no entry found for uuid {}",
+            uuid_str));
     }
-    return it->second;
+    auto& inner_list = it->second;
+    if (inner_list.empty())
+    {
+        // Violating the invariant that inner_list is not empty.
+        throw unregistered_uuid_error(fmt::format(
+            "cereal_functions_registry: empty list for uuid {}", uuid_str));
+    }
+    // Any entry from inner_list should do.
+    return *inner_list.begin();
 }
 
 } // namespace cradle

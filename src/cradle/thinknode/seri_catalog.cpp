@@ -45,7 +45,7 @@ register_thinknode_seri_resolvers()
             "Ignoring spurious register_thinknode_seri_resolvers() call");
         return;
     }
-    static seri_catalog cat;
+    static seri_catalog cat{true};
     constexpr caching_level_type level = caching_level_type::full;
     auto sample_thinknode_info{
         make_thinknode_type_info_with_nil_type(thinknode_nil_type())};

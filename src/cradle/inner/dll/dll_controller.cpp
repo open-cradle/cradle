@@ -1,20 +1,21 @@
 #include <cradle/inner/dll/dll_controller.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/meta_catalog.h>
+#include <cradle/inner/utilities/logging.h>
 
 namespace cradle {
 
 dll_controller::dll_controller(std::string path, std::string name)
     : path_{std::move(path)},
       name_{std::move(name)},
-      logger_{spdlog::get("cradle")}
+      logger_{ensure_logger("dll")}
 {
 }
 
 void
 dll_controller::load()
 {
-    logger_->info("dll_controller::load() {} from {}", name_, path_);
+    logger_->info("load {} (id {}) from {}", name_, cat_id_.value(), path_);
     // TODO Consider rtld_lazy if the library is opened only for getting the
     // uuid's, as this might be significantly faster than rtld_now.
     auto mode{
@@ -37,19 +38,23 @@ dll_controller::load()
     auto get_catalog_func
         = lib_->get<get_catalog_func_t>(get_catalog_func_name);
     catalog_ = get_catalog_func();
+    cat_id_ = catalog_->get_cat_id();
     meta_catalog::instance().add_catalog(*catalog_);
-    logger_->info("dll_controller::load() done for {}", name_);
+    logger_->info("load done for {}", name_);
 }
 
 void
 dll_controller::unload()
 {
-    logger_->info("dll_controller::unload() {}", name_);
-    cereal_functions_registry::instance().unregister_catalog(name_);
+    logger_->info("unload {} (id {})", name_, cat_id_.value());
+    if (cat_id_.is_valid())
+    {
+        cereal_functions_registry::instance().unregister_catalog(cat_id_);
+    }
     meta_catalog::instance().remove_catalog(*catalog_);
     catalog_ = nullptr;
     lib_.reset();
-    logger_->info("dll_controller::unload() done for {}", name_);
+    logger_->info("unload done for {}", name_);
 }
 
 } // namespace cradle

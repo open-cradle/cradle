@@ -1,17 +1,17 @@
 #ifndef CRADLE_INNER_REQUESTS_FUNCTION_H
 #define CRADLE_INNER_REQUESTS_FUNCTION_H
 
+#include <any>
 #include <cassert>
 #include <concepts>
 #include <functional>
+#include <list>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
-#include <typeindex>
-#include <typeinfo>
 #include <unordered_map>
 #include <utility>
 
@@ -20,6 +20,7 @@
 #include <cppcoro/task.hpp>
 #include <cppcoro/when_all.hpp>
 #include <fmt/format.h>
+#include <spdlog/spdlog.h>
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/hash.h>
@@ -29,6 +30,7 @@
 #include <cradle/inner/encodings/cereal.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/normalization_uuid.h>
+#include <cradle/inner/requests/types.h>
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/resolve/resolve_request.h>
@@ -48,18 +50,6 @@ namespace cradle {
  * (i.e., function_request_impl's template arguments) are known in
  * function_request_erased's constructor only.
  */
-
-class conflicting_functions_uuid_error : public uuid_error
-{
- public:
-    using uuid_error::uuid_error;
-};
-
-class no_function_for_uuid_error : public uuid_error
-{
- public:
-    using uuid_error::uuid_error;
-};
 
 class unregistered_uuid_error : public uuid_error
 {
@@ -99,12 +89,9 @@ visit_args(
  * The interface type exposing the functionality that function_request_erased
  * requires outside its constructor.
  *
- * The references taken by resolve_sync() and resolve_async() are the "minimal"
- * ones needed.
+ * The context references taken by resolve_sync() and resolve_async() are the
+ * "minimal" ones needed.
  */
-typedef void
-unregister_function_t(std::string const& uuid_str);
-
 template<typename Value>
 class function_request_intf : public id_interface
 {
@@ -116,7 +103,7 @@ class function_request_intf : public id_interface
         = 0;
 
     virtual void
-    register_uuid(std::string const& cat_name)
+    register_uuid(catalog_id cat_id)
         = 0;
 
     virtual void
@@ -163,14 +150,23 @@ when_all_wrapper(Tuple&& tasks, std::index_sequence<Ix...>)
     return cppcoro::when_all(std::get<Ix>(std::forward<Tuple>(tasks))...);
 }
 
-/**
- * A registry of functions to serialize or deserialize a function_request_impl
- * object. The functions are identified by a request_uuid value.
+/*
+ * Registry helping the deserialization process create the correct
+ * function_request_impl objects.
  *
- * A uuid identifies two functions:
- * - create() creates a shared_ptr<function_request_impl> object.
- * - unregisters() removes data associated with the uuid, destroying the
- * ability to resolve the uuid.
+ * The registry consists of entries associated with some uuid. An entry
+ * contains:
+ * - A `cat_id` number identifying a catalog of request types.
+ * - A `create` function that creates the correct function_request_impl
+ *   instantiation for the uuid.
+ * - A `function` value, to be copied to function_request_impl::function_.
+ *   A single function_request_impl instantiation can be related to multiple
+ *   functions. All functions have the same signature, but are identified by
+ *   different uuid's.
+ *
+ * When the catalog belongs to a DLL, the `create` and `function`
+ * implementations are code inside that DLL, so when the DLL is unloaded, the
+ * pointers become dangling and the entry has to be removed.
  *
  * This registry forms the basis for an ad-hoc alternative to the cereal
  * polymorphic types implementation, which is not usable here:
@@ -188,6 +184,7 @@ when_all_wrapper(Tuple&& tasks, std::index_sequence<Ix...>)
  *    - We cannot use the uuid because that is unique for a
  *      function_request_impl+function combination, not for just
  *      function_request_impl.
+ * 3. Functions (function values) cannot be serialized.
  * Instead, we need a mechanism where the uuid in the serialization identifies
  * both the function_request_impl _class_ (template instantiation), and the
  * function _value_ in that class.
@@ -198,44 +195,79 @@ class cereal_functions_registry
 {
  public:
     using create_t = std::shared_ptr<void>(request_uuid const& uuid);
-    using unregister_t = void(std::string const& uuid_str);
-
-    struct entry_t
-    {
-        std::string cat_name;
-        create_t* create;
-        unregister_t* unregister;
-    };
+    template<typename Function>
+    using function_t = std::shared_ptr<Function>;
 
     static cereal_functions_registry&
     instance();
 
+    cereal_functions_registry();
+
+    template<typename Function>
     void
-    add_entry(
-        std::string const& cat_name,
+    add(catalog_id cat_id,
         std::string const& uuid_str,
         create_t* create,
-        unregister_t* unregister);
+        function_t<Function> function)
+    {
+        add(cat_id, uuid_str, create, std::any{function});
+    }
 
+    /*
+     * To be called when a DLL is unloaded.
+     *
+     * Removes all entries containing pointers into the DLL's code.
+     * Should something go wrong with the unregister (e.g. an exception that is
+     * not handled properly), the registry is left with stale entries; their
+     * stale cat_id's ensure they will not be accessed.
+     */
     void
-    unregister_catalog(std::string const& cat_name);
+    unregister_catalog(catalog_id cat_id);
 
     // Intf should be a function_request_intf instantiation.
     template<typename Intf>
     std::shared_ptr<Intf>
     create(request_uuid const& uuid)
     {
-        entry_t& entry{find_entry(uuid)};
+        entry_t& entry{find_entry(uuid.str())};
         return std::static_pointer_cast<Intf>(entry.create(uuid));
     }
 
+    template<typename Function>
+    function_t<Function>
+    find(std::string const& uuid_str)
+    {
+        return std::any_cast<function_t<Function>>(
+            find_entry(uuid_str).function);
+    }
+
  private:
-    using entries_t = std::unordered_map<std::string, entry_t>;
-    entries_t entries_;
+    struct entry_t
+    {
+        catalog_id cat_id;
+        create_t* create;
+        std::any function; // wrapping function_t
+    };
+
+    // inner_list_t contains the entries for some uuid. List length should
+    // normally be 1. Empty lists should not be possible.
+    // TODO normalized_arg entries
+    using inner_list_t = std::list<entry_t>;
+    // outer_map_t maps uuid strings to inner_list_t lists.
+    using outer_map_t = std::unordered_map<std::string, inner_list_t>;
+
+    std::shared_ptr<spdlog::logger> logger_;
     std::mutex mutex_;
+    outer_map_t entries_;
+
+    void
+    add(catalog_id cat_id,
+        std::string const& uuid_str,
+        create_t* create,
+        std::any function);
 
     entry_t&
-    find_entry(request_uuid const& uuid);
+    find_entry(std::string const& uuid_str);
 };
 
 template<typename Head, typename... Tail>
@@ -248,69 +280,55 @@ struct first_element
 // normalize_arg() call.
 template<typename Arg>
 void
-register_uuid_for_normalized_arg(std::string const& cat_name, Arg const& arg)
+register_uuid_for_normalized_arg(catalog_id cat_id, Arg const& arg)
 {
 }
 
 template<typename Args, std::size_t... Ix>
 void
 register_uuid_for_normalized_args(
-    std::string const& cat_name, Args const& args, std::index_sequence<Ix...>)
+    catalog_id cat_id, Args const& args, std::index_sequence<Ix...>)
 {
-    (register_uuid_for_normalized_arg(cat_name, std::get<Ix>(args)), ...);
+    // gcc says
+    // error: parameter ‘cat_id’ set but not used
+    // [-Werror=unused-but-set-parameter]
+    // Why?
+    (void) cat_id;
+    (register_uuid_for_normalized_arg(cat_id, std::get<Ix>(args)), ...);
 }
 
 /*
  * The actual type created by function_request_erased, but visible only in its
  * constructor (and erased elsewhere).
  *
- * Intf is a function_request_intf instantiation.
  * Function must be MoveAssignable but may not be CopyAssignable (e.g. if it's
- * a lambda).
+ * a lambda). Its value is stored as std::shared_ptr<Function>, which _is_
+ * CopyAssignable.
  *
- * No part of this class depends on the actual context type used to resolve the
- * request.
- *
- * A function_request_impl object has an associated uuid that should identify
+ * A function_request_impl object has an associated uuid that identifies
  * both the function_request_impl instantiation (type), and function value.
- * It is primarily the caller's responsibility to provide a unique uuid.
- * The implementation will catch attempts to associate different instantiations
- * with a single uuid, but in general cannot catch attempts to associate
- * different function values with a single uuid. This will still happen in case
- * the function is a plain C++ function, but is impossible if it is a capturing
- * lambda.
+ * It is the caller's responsibility to provide a unique uuid.
  *
  * The uuid identifying both function_request_impl class and function value
  * leads to a two-step deserialization process: first a function_request_impl
- * object is created of the specified class, then that object's function member
- * is set to the correct value.
+ * object is created of the specified class, then that object's function_
+ * member is set to the correct value.
  *
- * This class owns two singletons: maching_functions_mutex_ and
- * matching_functions_. In case of DLLs, the dynamic loader will use a single,
- * global, matching_functions_ variable for all identical function_request_impl
- * instantiations (Linux), or one variable per DLL (Windows). In the Linux
- * case, when a DLL is unloaded, the global variable's function pointers would
- * become dangling. In the Windows case, the set of all known uuid's is spread
- * over several variables, but each variable will be consulted only for the
- * uuid's supported by the corresponding DLL.
+ * No part of this class depends on the actual context type used to resolve the
+ * request.
  */
 template<typename Value, bool AsCoro, typename Function, typename... Args>
 class function_request_impl : public function_request_intf<Value>
 {
  public:
     using this_type = function_request_impl;
-    using base_type = function_request_intf<Value>;
     using ArgIndices = std::index_sequence_for<Args...>;
 
     static constexpr bool func_is_coro = AsCoro;
     static constexpr bool func_is_plain
         = std::is_function_v<std::remove_pointer_t<Function>>;
 
-    // function has to be stored in this object so that the request can be
-    // resolved. If this object is created in a "register resolver" context,
-    // function must also be stored in matching_functions_. function should be
-    // moveable but not necessarily copyable; the solution is to put it in a
-    // shared_ptr wrapper.
+    // function is stored in this object so that the request can be resolved.
     function_request_impl(request_uuid uuid, Function function, Args... args)
         : uuid_{std::move(uuid)},
           function_{std::make_shared<Function>(std::move(function))},
@@ -318,30 +336,18 @@ class function_request_impl : public function_request_intf<Value>
     {
     }
 
+    // Registers this instantiation to be identified by its uuid, so that the
+    // deserialization will translate an input containing that same uuid to an
+    // object of the same type, with the same function_ value.
     void
-    register_uuid(std::string const& cat_name) override
+    register_uuid(catalog_id cat_id) override
     {
-        auto uuid_str{uuid_.str()};
-        // TODO add_entry() must throw if an entry already exists for uuid_str.
-        // An alternative would be to associate a DLL id with the entry, making
-        // it possible to have resolvers for one uuid in multiple DLLs.
-        cereal_functions_registry::instance().add_entry(
-            cat_name, uuid_str, create, unregister);
-
-        std::scoped_lock lock{maching_functions_mutex_};
-        if (matching_functions_.find(uuid_str) != matching_functions_.end())
-        {
-            // Should not happen; maybe an earlier exception prevented the
-            // unregister() call.
-            fmt::print("ERR: multiple C++ functions for uuid {}\n", uuid_str);
-        }
-        // matching_functions_ should not yet have an entry for uuid_str; if it
-        // does, the existing entry cannot be trusted, so replace it.
-        matching_functions_.insert_or_assign(uuid_str, function_);
+        cereal_functions_registry::instance().add(
+            cat_id, uuid_.str(), create, function_);
 
         // Register uuids for any args resulting from normalize_arg()
         // TODO how can we unregister these? Do we need to?
-        register_uuid_for_normalized_args(cat_name, args_, ArgIndices{});
+        register_uuid_for_normalized_args(cat_id, args_, ArgIndices{});
     }
 
     // other will be a function_request_impl, but possibly instantiated from
@@ -575,63 +581,15 @@ class function_request_impl : public function_request_intf<Value>
     load(cereal::JSONInputArchive& archive) override
     {
         archive(cereal::make_nvp("args", args_));
-        std::scoped_lock lock{maching_functions_mutex_};
-        auto it = matching_functions_.find(uuid_.str());
-        if (it == matching_functions_.end())
-        {
-            // This cannot happen.
-            throw no_function_for_uuid_error(
-                fmt::format("No function found for uuid {}", uuid_.str()));
-        }
-        function_ = it->second;
-    }
-
- public:
-    // DLL-related
-
-    // Deallocate all resources associated with uuid_str.
-    // Remove all references and pointers related to uuid, in the singletons
-    // associated with this class instantiation. This must be called when the
-    // DLL able to resolve uuid is unloaded, to prevent dangling pointers in
-    // matching_functions_.
-    //
-    // For Windows(-like) dynamic loaders, these singletons are destroyed when
-    // the DLL is unloaded, so calling this function would be redundant.
-    //
-    // For Linux(-like) dynamic loaders, these pointers become dangling on DLL
-    // unload, but as the framework cannot resolve the corresponding uuid
-    // anymore after, they should be unreachable. When a DLL is (re-)loaded
-    // that can resolve the uuid, the pointers get overwritten. So there should
-    // be no real need to call this function, but removing the dangling
-    // pointers is cleaner and safer.
-    static void
-    unregister(std::string const& uuid_str)
-    {
-        std::scoped_lock lock{maching_functions_mutex_};
-        matching_functions_.erase(uuid_str);
+        function_ = cereal_functions_registry::instance().find<Function>(
+            uuid_.str());
     }
 
  private:
-    // Protector of matching_functions_
-    static inline std::mutex maching_functions_mutex_;
-
-    // The functions matching this request's type, indexed by uuid string.
-    // Used only when the uuid is serializable.
-    // If Function is a class, the map size will normally be one (unless
-    // multiple uuid's refer to the same function), and all map values will
-    // be equal.
-    // The function cannot be serialized, but somehow needs to be set when
-    // deserializing, if possible in a type-safe way. This is achieved by
-    // registering an object of this class: its function will be put in this
-    // map.
-    static inline std::unordered_map<std::string, std::shared_ptr<Function>>
-        matching_functions_;
-
     // If serializable, uniquely identifies the function.
     request_uuid uuid_;
 
-    // The function to call when the request is resolved. If the uuid is
-    // serializable, function_ will be one of matching_functions_'s values.
+    // The function to call when the request is resolved.
     std::shared_ptr<Function> function_;
 
     // The arguments to pass to the function.
@@ -733,7 +691,7 @@ class proxy_request_base : public function_request_intf<Value>
 
     // Proxy requests should not be registered.
     void
-    register_uuid(std::string const& cat_name) override
+    register_uuid(catalog_id cat_id) override
     {
         throw not_implemented_error{"proxy_request_base::register_uuid"};
     }
@@ -1073,9 +1031,9 @@ class function_request_erased
     }
 
     void
-    register_uuid(std::string const& cat_name) const
+    register_uuid(catalog_id cat_id) const
     {
-        impl_->register_uuid(cat_name);
+        impl_->register_uuid(cat_id);
     }
 
     // *this and other are the same type; however, their impl_'s types could
@@ -1178,9 +1136,7 @@ class function_request_erased
         auto uuid{request_uuid::load_with_name(archive, "uuid")};
         archive(cereal::make_nvp("title", title_));
         // Create a mostly empty function_request_impl object. uuid defines its
-        // exact type (function_request_impl class instantiation), which could
-        // be different from the one with which this function_request_erased
-        // instantiation was registered.
+        // exact type (function_request_impl class instantiation).
         impl_ = cereal_functions_registry::instance().create<intf_type>(
             std::move(uuid));
         // Deserialize the remainder of the function_request_impl object.
@@ -1214,10 +1170,9 @@ struct arg_type_struct<function_request_erased<Value, Props>>
 template<typename Value, typename Props>
 void
 register_uuid_for_normalized_arg(
-    std::string const& cat_name,
-    function_request_erased<Value, Props> const& arg)
+    catalog_id cat_id, function_request_erased<Value, Props> const& arg)
 {
-    arg.register_uuid(cat_name);
+    arg.register_uuid(cat_id);
 }
 
 // Used for comparing subrequests, where the main requests have the same type;

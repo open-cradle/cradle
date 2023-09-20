@@ -1,11 +1,13 @@
 #ifndef CRADLE_INNER_RESOLVE_SERI_CATALOG_H
 #define CRADLE_INNER_RESOLVE_SERI_CATALOG_H
 
+#include <cassert>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/types.h>
 #include <cradle/inner/resolve/seri_resolver.h>
 
 namespace cradle {
@@ -32,6 +34,19 @@ class seri_catalog
     // TODO register_resolver() also needed for (de_)serializing a request;
     // rename? register_uuid() for (de-)serializing and resolving
 
+    seri_catalog() = default;
+
+    seri_catalog(bool is_static);
+
+    void
+    alloc_dll_id();
+
+    catalog_id
+    get_cat_id()
+    {
+        return cat_id_;
+    }
+
     /**
      * Registers a resolver for a uuid, from a template/sample request object.
      *
@@ -43,11 +58,10 @@ class seri_catalog
     void
     register_resolver(Req const& req)
     {
+        assert(cat_id_.is_valid());
         // Not thread-safe (not needed: see above).
         // TODO add Request::is_proxy and throw here if true
-        // TODO maybe associate DLL id with this catalog and pass to
-        // register_uuid()
-        req.register_uuid("TODO cat name");
+        req.register_uuid(cat_id_);
         // map_ should not yet have an entry for uuid_str.
         map_.insert_or_assign(
             req.get_uuid().str(), std::make_shared<seri_resolver_impl<Req>>());
@@ -66,6 +80,7 @@ class seri_catalog
     }
 
  private:
+    catalog_id cat_id_;
     std::unordered_map<std::string, std::shared_ptr<seri_resolver_intf>> map_;
 };
 

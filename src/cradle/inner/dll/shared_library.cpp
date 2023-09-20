@@ -4,13 +4,14 @@
 #include <cradle/inner/dll/dll_controller.h>
 #include <cradle/inner/dll/dll_singleton.h>
 #include <cradle/inner/dll/shared_library.h>
+#include <cradle/inner/utilities/logging.h>
 
 namespace cradle {
 
 void
 load_shared_library(std::string const& dir_path, std::string const& dll_name)
 {
-    auto logger{spdlog::get("cradle")};
+    auto logger{ensure_logger("dll")};
 #ifdef _WIN32
     std::string dll_path{fmt::format("{}/{}.dll", dir_path, dll_name)};
 #else

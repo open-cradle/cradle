@@ -275,7 +275,7 @@ TEST_CASE(
     "function_request_erased identity: subrequests with different functors",
     tag)
 {
-    seri_catalog cat;
+    seri_catalog cat{true};
     using props0_type = request_props<caching_level_type::memory>;
     props0_type props0a{make_test_uuid("0020")};
     props0_type props0b{make_test_uuid("0021")};
@@ -398,5 +398,5 @@ TEST_CASE("function_request_impl: load unregistered function", tag)
         good_seri, std::regex{good_uuid_str}, bad_uuid_str)};
     std::istringstream is(bad_seri);
     cereal::JSONInputArchive iarchive(is);
-    REQUIRE_THROWS_AS(bad_impl->load(iarchive), no_function_for_uuid_error);
+    REQUIRE_THROWS_AS(bad_impl->load(iarchive), unregistered_uuid_error);
 }

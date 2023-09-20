@@ -81,7 +81,7 @@ TEST_CASE("get_request_key()", tag)
 
 TEST_CASE("store request in storage", tag)
 {
-    seri_catalog cat;
+    seri_catalog cat{true};
     request_props<caching_level_type::full> props{make_test_uuid(200)};
     mock_storage storage;
 
@@ -99,7 +99,7 @@ TEST_CASE("store request in storage", tag)
 
 TEST_CASE("load request from storage (hit)", tag)
 {
-    seri_catalog cat;
+    seri_catalog cat{true};
     request_props<caching_level_type::full> props{make_test_uuid(300)};
     auto req_written{rq_function_erased(props, add2, 1, 2)};
     cat.register_resolver(req_written);
@@ -114,7 +114,7 @@ TEST_CASE("load request from storage (hit)", tag)
 
 TEST_CASE("load request from storage (miss)", tag)
 {
-    seri_catalog cat;
+    seri_catalog cat{true};
     request_props<caching_level_type::full> props{make_test_uuid(400)};
     auto req_written{rq_function_erased(props, add2, 1, 2)};
     cat.register_resolver(req_written);

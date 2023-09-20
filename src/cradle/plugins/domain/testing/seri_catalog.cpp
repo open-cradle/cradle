@@ -21,7 +21,7 @@ register_testing_seri_resolvers()
             "Ignoring spurious register_testing_seri_resolvers() call");
         return;
     }
-    static seri_catalog cat;
+    static seri_catalog cat{true};
     cat.register_resolver(
         rq_make_some_blob<caching_level_type::none>(1, false));
     cat.register_resolver(

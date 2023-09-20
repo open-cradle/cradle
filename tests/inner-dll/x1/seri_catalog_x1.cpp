@@ -17,6 +17,7 @@ extern "C" BOOST_SYMBOL_EXPORT void
 CRADLE_init()
 {
     auto& cat{get_catalog()};
+    cat.alloc_dll_id();
     cat.register_resolver(rq_test_multiplier_x1_impl(2, 3));
 }
 
