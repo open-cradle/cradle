@@ -136,7 +136,7 @@ TEST_CASE("array diffs", "[core][diff]")
             {},
             value_diff_op::UPDATE,
             some(dynamic{dynamic{3.}, dynamic{1.}, dynamic{0.}, dynamic{2.}}),
-            some(dynamic{2.}))});
+            some(dynamic{dynamic{2.}}))});
 
     test_diff(
         dynamic{dynamic{0.}, dynamic{1.}},

@@ -114,7 +114,7 @@ TEST_CASE("dynamic deep_sizeof", "[core][dynamic]")
         boost::gregorian::date(2017, boost::gregorian::Apr, 26),
         boost::posix_time::time_duration(1, 2, 3));
     REQUIRE(deep_sizeof(dynamic{time}) == sizeof(dynamic) + deep_sizeof(time));
-    auto array = dynamic_array{{dynamic{3.}, dynamic{1.}, dynamic{2.}}};
+    auto array = dynamic_array{dynamic{3.}, dynamic{1.}, dynamic{2.}};
     REQUIRE(
         deep_sizeof(dynamic{array}) == sizeof(dynamic) + deep_sizeof(array));
     auto map
@@ -147,7 +147,7 @@ TEST_CASE("empty array/map equivalence", "[core][dynamic]")
                  .empty()));
         INFO("This doesn't work for non-empty arrays.")
         REQUIRE_THROWS((from_dynamic<std::map<double, double>>(
-            dynamic{dynamic_array{{dynamic{1.}}}})));
+            dynamic{dynamic_array{dynamic{1.}}})));
     }
 }
 
