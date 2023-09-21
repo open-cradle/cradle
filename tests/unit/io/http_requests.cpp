@@ -71,7 +71,7 @@ TEST_CASE("GET request", "[io][http]")
     auto body = parse_json_response(response);
     REQUIRE(
         get_field(cast<dynamic_map>(body), "args")
-        == dynamic({dynamic("color"), dynamic("navy")}));
+        == dynamic({{dynamic("color"), dynamic("navy")}}));
 }
 
 TEST_CASE("HTTPS request", "[io][http]")
@@ -82,7 +82,7 @@ TEST_CASE("HTTPS request", "[io][http]")
     auto body = parse_json_response(response);
     REQUIRE(
         get_field(cast<dynamic_map>(body), "args")
-        == dynamic({dynamic("color"), dynamic("navy")}));
+        == dynamic({{dynamic("color"), dynamic("navy")}}));
 }
 
 void
