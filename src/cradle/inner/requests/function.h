@@ -30,6 +30,7 @@
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/resolve/seri_registry.h>
+#include <cradle/inner/resolve/seri_resolver.h>
 
 namespace cradle {
 
@@ -93,7 +94,8 @@ class function_request_intf : public id_interface
         = 0;
 
     virtual void
-    register_uuid(catalog_id cat_id)
+    register_uuid(
+        catalog_id cat_id, std::shared_ptr<seri_resolver_intf> resolver) const
         = 0;
 
     virtual void
@@ -210,12 +212,14 @@ class function_request_impl : public function_request_intf<Value>
     // deserialization will translate an input containing that same uuid to an
     // object of the same type, with the same function_ value.
     void
-    register_uuid(catalog_id cat_id) override
+    register_uuid(
+        catalog_id cat_id,
+        std::shared_ptr<seri_resolver_intf> resolver) const override
     {
-        seri_registry::instance().add(cat_id, uuid_.str(), create, function_);
+        seri_registry::instance().add(
+            cat_id, uuid_.str(), std::move(resolver), create, function_);
 
         // Register uuids for any args resulting from normalize_arg()
-        // TODO how can we unregister these? Do we need to?
         register_uuid_for_normalized_args(cat_id, args_, ArgIndices{});
     }
 
@@ -450,7 +454,8 @@ class function_request_impl : public function_request_intf<Value>
     load(cereal::JSONInputArchive& archive) override
     {
         archive(cereal::make_nvp("args", args_));
-        function_ = seri_registry::instance().find<Function>(uuid_.str());
+        function_
+            = seri_registry::instance().find_function<Function>(uuid_.str());
     }
 
  private:
@@ -559,7 +564,9 @@ class proxy_request_base : public function_request_intf<Value>
 
     // Proxy requests should not be registered.
     void
-    register_uuid(catalog_id cat_id) override
+    register_uuid(
+        catalog_id cat_id,
+        std::shared_ptr<seri_resolver_intf> resolver) const override
     {
         throw not_implemented_error{"proxy_request_base::register_uuid"};
     }
@@ -899,9 +906,10 @@ class function_request_erased
     }
 
     void
-    register_uuid(catalog_id cat_id) const
+    register_uuid(
+        catalog_id cat_id, std::shared_ptr<seri_resolver_intf> resolver) const
     {
-        impl_->register_uuid(cat_id);
+        impl_->register_uuid(cat_id, std::move(resolver));
     }
 
     // *this and other are the same type; however, their impl_'s types could
@@ -1039,7 +1047,8 @@ void
 register_uuid_for_normalized_arg(
     catalog_id cat_id, function_request_erased<Value, Props> const& arg)
 {
-    arg.register_uuid(cat_id);
+    using arg_t = function_request_erased<Value, Props>;
+    arg.register_uuid(cat_id, std::make_shared<seri_resolver_impl<arg_t>>());
 }
 
 // Used for comparing subrequests, where the main requests have the same type;

@@ -1,3 +1,4 @@
+#include <sstream>
 #include <vector>
 
 #include <fmt/format.h>
@@ -24,6 +25,7 @@ void
 seri_registry::add(
     catalog_id cat_id,
     std::string const& uuid_str,
+    resolver_t resolver,
     create_t* create,
     std::any function)
 {
@@ -44,7 +46,8 @@ seri_registry::add(
     // to overwrite it could lead to crashes. Push new entry to the front so
     // that find_entry() will find it and not a stale one.
     // TODO multiple normalized_arg entries possible?
-    inner_list.push_front(entry_t{cat_id, create, std::move(function)});
+    inner_list.push_front(
+        entry_t{cat_id, std::move(resolver), create, std::move(function)});
 }
 
 void
@@ -89,24 +92,41 @@ seri_registry::unregister_catalog(catalog_id cat_id)
 // implemented in DLL X should be identical to ones implemented in DLL Y.
 // TODO keep track of pointers to DLL code and do not unload if they exist
 seri_registry::entry_t&
-seri_registry::find_entry(std::string const& uuid_str)
+seri_registry::find_entry(std::string const& uuid_str, bool verbose)
 {
     std::scoped_lock lock{mutex_};
     auto it = entries_.find(uuid_str);
     if (it == entries_.end())
     {
-        throw unregistered_uuid_error(fmt::format(
-            "seri_registry: no entry found for uuid {}", uuid_str));
+        throw unregistered_uuid_error{
+            make_uuid_error_message(uuid_str, verbose)};
     }
     auto& inner_list = it->second;
     if (inner_list.empty())
     {
         // Violating the invariant that inner_list is not empty.
-        throw unregistered_uuid_error(
-            fmt::format("seri_registry: empty list for uuid {}", uuid_str));
+        throw unregistered_uuid_error{
+            fmt::format("seri_registry: empty list for uuid {}", uuid_str)};
     }
     // Any entry from inner_list should do.
     return *inner_list.begin();
+}
+
+std::string
+seri_registry::make_uuid_error_message(
+    std::string const& missing_uuid_str, bool verbose) const
+{
+    std::ostringstream oss;
+    oss << "seri_registry: no entry found for uuid " << missing_uuid_str;
+    if (verbose)
+    {
+        oss << ". Registered uuids are:";
+        for (auto const& [registered_uuid_str, inner_list] : entries_)
+        {
+            oss << " " << registered_uuid_str;
+        }
+    }
+    return oss.str();
 }
 
 void

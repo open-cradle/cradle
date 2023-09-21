@@ -6,7 +6,6 @@
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/requests/function.h>
-#include <cradle/inner/resolve/meta_catalog.h>
 #include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/service/resources.h>
@@ -58,7 +57,7 @@ TEST_CASE("register seri resolver and call it", tag)
     testing_request_context ctx{resources, nullptr, false, ""};
     std::string seri_req{serialize_request(req)};
     auto seri_resp{
-        cppcoro::sync_wait(cat.get_resolver(arg)->resolve(ctx, seri_req))};
+        cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req))};
     std::string response{deserialize_response<std::string>(seri_resp.value())};
     seri_resp.on_deserialized();
 
@@ -82,12 +81,12 @@ TEST_CASE("call unregistered resolver", tag)
     std::string seri_req{serialize_request(req)};
 
     REQUIRE_THROWS_WITH(
-        cppcoro::sync_wait(meta_catalog::instance().resolve(ctx, seri_req)),
-        Catch::StartsWith("no resolver registered for uuid"));
+        cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req)),
+        Catch::Contains("no entry found for uuid b"));
 #endif
 }
 
-// TODO convert to meta_catalog test (catches missing uuid since refactor)
+// TODO convert to seri_registry(?) test (catches missing uuid since refactor)
 TEST_CASE("serialized request lacking uuid", tag)
 {
     static char const arg[] = "c";
@@ -103,8 +102,8 @@ TEST_CASE("serialized request lacking uuid", tag)
     std::string wrong{std::regex_replace(correct, re, "wrong")};
 
     REQUIRE_THROWS_WITH(
-        cppcoro::sync_wait(cat.get_resolver(arg)->resolve(ctx, wrong)),
-        Catch::Contains("provided NVP (uuid) not found"));
+        cppcoro::sync_wait(resolve_serialized_local(ctx, wrong)),
+        Catch::Contains("no uuid found in JSON"));
 }
 
 TEST_CASE("malformed serialized request", tag)
@@ -121,7 +120,7 @@ TEST_CASE("malformed serialized request", tag)
     seri_req.pop_back();
 
     REQUIRE_THROWS_WITH(
-        cppcoro::sync_wait(cat.get_resolver(arg)->resolve(ctx, seri_req)),
+        cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req)),
         Catch::StartsWith("rapidjson internal assertion failure"));
 }
 
@@ -161,10 +160,10 @@ TEST_CASE("resolve two C++ functions with the same signature", tag)
     init_test_inner_service(resources);
     testing_request_context ctx{resources, nullptr, false, ""};
 
-    auto seri_resp_e{cppcoro::sync_wait(
-        cat.get_resolver(uuid_str_e)->resolve(ctx, seri_req_e))};
-    auto seri_resp_f{cppcoro::sync_wait(
-        cat.get_resolver(uuid_str_f)->resolve(ctx, seri_req_f))};
+    auto seri_resp_e{
+        cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req_e))};
+    auto seri_resp_f{
+        cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req_f))};
     REQUIRE(seri_resp_e.value() != seri_resp_f.value());
 
     std::string resp_e{deserialize_response<std::string>(seri_resp_e.value())};

@@ -12,6 +12,7 @@
 
 #include <cradle/inner/requests/types.h>
 #include <cradle/inner/requests/uuid.h>
+#include <cradle/inner/resolve/seri_resolver.h>
 
 namespace cradle {
 
@@ -68,6 +69,7 @@ class seri_registry
     using create_t = std::shared_ptr<void>(request_uuid const& uuid);
     template<typename Function>
     using function_t = std::shared_ptr<Function>;
+    using resolver_t = std::shared_ptr<seri_resolver_intf>;
 
     static seri_registry&
     instance();
@@ -78,10 +80,11 @@ class seri_registry
     void
     add(catalog_id cat_id,
         std::string const& uuid_str,
+        resolver_t resolver,
         create_t* create,
         function_t<Function> function)
     {
-        add(cat_id, uuid_str, create, std::any{function});
+        add(cat_id, uuid_str, std::move(resolver), create, std::any{function});
     }
 
     /*
@@ -100,16 +103,22 @@ class seri_registry
     std::shared_ptr<Intf>
     create(request_uuid const& uuid)
     {
-        entry_t& entry{find_entry(uuid.str())};
+        entry_t& entry{find_entry(uuid.str(), false)};
         return std::static_pointer_cast<Intf>(entry.create(uuid));
     }
 
     template<typename Function>
     function_t<Function>
-    find(std::string const& uuid_str)
+    find_function(std::string const& uuid_str)
     {
         return std::any_cast<function_t<Function>>(
-            find_entry(uuid_str).function);
+            find_entry(uuid_str, false).function);
+    }
+
+    resolver_t
+    find_resolver(std::string const& uuid_str)
+    {
+        return find_entry(uuid_str, true).resolver;
     }
 
     void
@@ -119,6 +128,7 @@ class seri_registry
     struct entry_t
     {
         catalog_id cat_id;
+        resolver_t resolver;
         create_t* create;
         std::any function; // wrapping function_t
     };
@@ -138,11 +148,15 @@ class seri_registry
     void
     add(catalog_id cat_id,
         std::string const& uuid_str,
+        resolver_t resolver,
         create_t* create,
         std::any function);
 
     entry_t&
-    find_entry(std::string const& uuid_str);
+    find_entry(std::string const& uuid_str, bool verbose);
+
+    std::string
+    make_uuid_error_message(std::string const& uuid_str, bool verbose) const;
 
     bool
     detect_duplicate(

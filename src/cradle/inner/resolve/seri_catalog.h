@@ -2,8 +2,6 @@
 #define CRADLE_INNER_RESOLVE_SERI_CATALOG_H
 
 #include <memory>
-#include <string>
-#include <unordered_map>
 
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/types.h>
@@ -56,28 +54,12 @@ class seri_catalog
     {
         // Not thread-safe (not needed: see above).
         // TODO add Request::is_proxy and throw here if true
-        req.register_uuid(cat_id_);
-        // TODO merge map_ / meta_catalog / cereal_function_registry
-        // map_ should not yet have an entry for uuid_str.
-        map_.insert_or_assign(
-            req.get_uuid().str(), std::make_shared<seri_resolver_impl<Req>>());
-    }
-
-    // Returns all uuids registered in this catalog.
-    std::vector<std::string>
-    get_all_uuid_strs() const;
-
-    // Gets the resolver for the given uuid, which must be one of the
-    // get_all_uuid_strs() return values.
-    std::shared_ptr<seri_resolver_intf>
-    get_resolver(std::string const& uuid_str)
-    {
-        return map_.at(uuid_str);
+        req.register_uuid(
+            cat_id_, std::make_shared<seri_resolver_impl<Req>>());
     }
 
  private:
     catalog_id cat_id_;
-    std::unordered_map<std::string, std::shared_ptr<seri_resolver_intf>> map_;
 };
 
 } // namespace cradle

@@ -3,7 +3,6 @@
 #include <cereal/types/map.hpp>
 #include <spdlog/spdlog.h>
 
-#include <cradle/inner/resolve/meta_catalog.h>
 #include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
@@ -62,7 +61,6 @@ register_thinknode_seri_resolvers()
         "sample context id", "sample object id"));
     cat.register_resolver(rq_resolve_iss_object_to_immutable<level>(
         "sample context id", "sample object id", false));
-    meta_catalog::instance().add_catalog(cat);
 }
 
 } // namespace cradle

@@ -35,7 +35,7 @@ TEST_CASE("evaluate proxy request, plain args", tag)
 
     REQUIRE_THROWS_WITH(
         cppcoro::sync_wait(resolve_request(ctx, req, constraints)),
-        Catch::Contains("no resolver registered for uuid"));
+        Catch::Contains("no entry found for uuid"));
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
 
@@ -60,7 +60,7 @@ TEST_CASE("evaluate proxy request, normalized args", tag)
 
     REQUIRE_THROWS_WITH(
         cppcoro::sync_wait(resolve_request(ctx, req, constraints)),
-        Catch::Contains("no resolver registered for uuid"));
+        Catch::Contains("no entry found for uuid"));
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
 
@@ -126,7 +126,7 @@ TEST_CASE("unload/reload DLL", tag)
 
     REQUIRE_THROWS_WITH(
         cppcoro::sync_wait(resolve_request(ctx, req, constraints)),
-        Catch::Contains("no resolver registered for uuid"));
+        Catch::Contains("no entry found for uuid"));
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
 
@@ -203,7 +203,7 @@ TEST_CASE("unload DLL sharing resolvers", "[B]")
     proxy.unload_shared_library("test_inner_dll_x0x1");
 
     // TODO if we get here, next line fails with
-    // "no resolver registered for uuid test-adder-x0"
+    // "no entry found for uuid test-adder-x0"
     auto add_actual1
         = cppcoro::sync_wait(resolve_request(ctx, add_req, constraints));
     REQUIRE(add_actual1 == add_expected);

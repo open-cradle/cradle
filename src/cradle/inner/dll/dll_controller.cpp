@@ -2,7 +2,6 @@
 
 #include <cradle/inner/dll/dll_controller.h>
 #include <cradle/inner/requests/function.h>
-#include <cradle/inner/resolve/meta_catalog.h>
 #include <cradle/inner/utilities/logging.h>
 
 namespace cradle {
@@ -40,7 +39,6 @@ dll_controller::load()
     auto get_catalog_func
         = lib_->get<get_catalog_func_t>(get_catalog_func_name);
     catalog_ = get_catalog_func();
-    meta_catalog::instance().add_catalog(*catalog_);
     auto cat_id_value{catalog_->get_cat_id().value()};
     logger_->info("load done for {} -> cat_id {}", name_, cat_id_value);
     seri_registry::instance().log_all_entries(
@@ -54,7 +52,6 @@ dll_controller::unload()
     {
         logger_->info(
             "unload {} (cat_id {})", name_, catalog_->get_cat_id().value());
-        meta_catalog::instance().remove_catalog(*catalog_);
         catalog_ = nullptr;
     }
     else

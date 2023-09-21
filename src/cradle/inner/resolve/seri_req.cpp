@@ -1,8 +1,31 @@
+#include <regex>
+
 #include <cradle/inner/requests/generic.h>
-#include <cradle/inner/resolve/meta_catalog.h>
+#include <cradle/inner/requests/uuid.h>
+#include <cradle/inner/resolve/remote.h>
+#include <cradle/inner/resolve/seri_registry.h>
 #include <cradle/inner/resolve/seri_req.h>
 
 namespace cradle {
+
+namespace {
+
+std::string
+extract_uuid_str(std::string const& seri_req)
+{
+    // The uuid appears in the JSON like
+    //   "uuid": "rq_retrieve_immutable_object_func+gb6df901-dirty"
+    // Retrieving the uuid from the JSON text is easier than parsing the JSON.
+    std::regex re("\"uuid\": \"(.+?)\"");
+    std::smatch match;
+    if (!std::regex_search(seri_req, match, re))
+    {
+        throw uuid_error{fmt::format("no uuid found in JSON: {}", seri_req)};
+    }
+    return match[1].str();
+}
+
+} // namespace
 
 cppcoro::task<serialized_result>
 resolve_serialized_remote(remote_context_intf& ctx, std::string seri_req)
@@ -13,7 +36,10 @@ resolve_serialized_remote(remote_context_intf& ctx, std::string seri_req)
 cppcoro::task<serialized_result>
 resolve_serialized_local(local_context_intf& ctx, std::string seri_req)
 {
-    return meta_catalog::instance().resolve(ctx, std::move(seri_req));
+    auto uuid_str{extract_uuid_str(seri_req)};
+    auto resolver{seri_registry::instance().find_resolver(uuid_str)};
+    // TODO ensure resolver isn't unloaded while it's resolving
+    return resolver->resolve(ctx, std::move(seri_req));
 }
 
 // Currently only called from websocket/server.cpp
