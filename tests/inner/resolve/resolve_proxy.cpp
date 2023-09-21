@@ -169,9 +169,7 @@ TEST_CASE("unload/reload two DLLs", tag)
     REQUIRE(mul_actual == mul_expected);
 }
 
-#if 0
-// Currently failing since unloading a DLL unregisters _all_ resolvers for its DLLs
-TEST_CASE("unload DLL sharing resolvers", "[B]")
+TEST_CASE("unload DLL sharing resolvers", tag)
 {
     inner_resources resources;
     init_test_inner_service(resources);
@@ -183,8 +181,6 @@ TEST_CASE("unload DLL sharing resolvers", "[B]")
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0x1");
-    // TODO next line fails with
-    // "Multiple C++ functions for uuid test-adder-x0"
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0");
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x1");
 
@@ -193,6 +189,8 @@ TEST_CASE("unload DLL sharing resolvers", "[B]")
     auto mul_req{rq_test_multiplier_x1(7, 2)};
     int mul_expected{7 * 2};
 
+    // The "add" resolver is in x0 and x0x1.
+    // The "mul" resolver is in x1 and x0x1.
     auto add_actual0
         = cppcoro::sync_wait(resolve_request(ctx, add_req, constraints));
     REQUIRE(add_actual0 == add_expected);
@@ -202,8 +200,10 @@ TEST_CASE("unload DLL sharing resolvers", "[B]")
 
     proxy.unload_shared_library("test_inner_dll_x0x1");
 
-    // TODO if we get here, next line fails with
-    // "no entry found for uuid test-adder-x0"
+    // x0x1 has been unloaded, but:
+    // - The "add" resolver still is in x0.
+    // - The "mul" resolver still is in x1.
+    // So both resolutions still should succeed.
     auto add_actual1
         = cppcoro::sync_wait(resolve_request(ctx, add_req, constraints));
     REQUIRE(add_actual1 == add_expected);
@@ -212,7 +212,9 @@ TEST_CASE("unload DLL sharing resolvers", "[B]")
     REQUIRE(mul_actual1 == mul_expected);
 }
 
-TEST_CASE("load/unload DLL stress test", "[Z]")
+// Manual stress test, disabled by default.
+// This one used to cause crashes.
+TEST_CASE("load/unload DLL stress test", "[.dll-stress]")
 {
     inner_resources resources;
     init_test_inner_service(resources);
@@ -249,7 +251,6 @@ TEST_CASE("load/unload DLL stress test", "[Z]")
         }
     }
 }
-#endif
 
 TEST_CASE("load/unload DLL stress test1", tag)
 {
