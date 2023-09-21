@@ -10,7 +10,6 @@
 
 #include <cppcoro/task.hpp>
 
-#include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/resolve/seri_result.h>

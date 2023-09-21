@@ -43,7 +43,7 @@ dll_controller::load()
     meta_catalog::instance().add_catalog(*catalog_);
     auto cat_id_value{catalog_->get_cat_id().value()};
     logger_->info("load done for {} -> cat_id {}", name_, cat_id_value);
-    cereal_functions_registry::instance().log_all_entries(
+    seri_registry::instance().log_all_entries(
         fmt::format("after load cat_id {}", cat_id_value));
 }
 

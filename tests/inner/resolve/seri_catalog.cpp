@@ -77,7 +77,7 @@ TEST_CASE("call unregistered resolver", tag)
     // Even serialization now fails if the request was not registered:
     REQUIRE_THROWS_WITH(
         serialize_request(req),
-        Catch::Contains("cereal_functions_registry: no entry for"));
+        Catch::Contains("seri_registry: no entry for"));
 #else
     std::string seri_req{serialize_request(req)};
 

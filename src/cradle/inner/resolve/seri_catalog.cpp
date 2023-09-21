@@ -5,7 +5,7 @@ namespace cradle {
 
 seri_catalog::~seri_catalog()
 {
-    cereal_functions_registry::instance().unregister_catalog(cat_id_);
+    seri_registry::instance().unregister_catalog(cat_id_);
 }
 
 std::vector<std::string>
