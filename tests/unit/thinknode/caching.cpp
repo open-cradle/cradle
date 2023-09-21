@@ -157,21 +157,21 @@ TEST_CASE("small value disk caching", tag)
     int execution_count = 0;
     auto counted_task = [&](int answer) -> cppcoro::task<dynamic> {
         ++execution_count;
-        co_return dynamic{answer};
+        co_return dynamic(answer);
     };
 
     {
         auto key = make_captured_id("id_12");
         auto result = secondary_cached<dynamic>(
             core, key, [&] { return counted_task(12); });
-        REQUIRE(cppcoro::sync_wait(result) == dynamic{12});
+        REQUIRE(cppcoro::sync_wait(result) == dynamic(12));
         REQUIRE(execution_count == 1);
     }
     {
         auto key = make_captured_id("id_42");
         auto result = secondary_cached<dynamic>(
             core, key, [&] { return counted_task(42); });
-        REQUIRE(cppcoro::sync_wait(result) == dynamic{42});
+        REQUIRE(cppcoro::sync_wait(result) == dynamic(42));
         REQUIRE(execution_count == 2);
     }
     // Data is written to the disk cache in a background thread, so we need to
@@ -182,7 +182,7 @@ TEST_CASE("small value disk caching", tag)
         auto key = make_captured_id("id_12");
         auto result = secondary_cached<dynamic>(
             core, key, [&] { return counted_task(12); });
-        REQUIRE(cppcoro::sync_wait(result) == dynamic{12});
+        REQUIRE(cppcoro::sync_wait(result) == dynamic(12));
         REQUIRE(execution_count == 2);
     }
 }

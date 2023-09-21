@@ -191,21 +191,21 @@ spawn_provider(
              {"X-Registry-Auth",
               get_environment_variable("CRADLE_THINKNODE_DOCKER_AUTH")}},
             value_to_json_blob(
-                {{dynamic{"Image"},
-                  dynamic{
+                {{dynamic("Image"),
+                  dynamic(
                       "registry-mgh.thinknode.com/" + account + "/" + app + "@"
-                      + extract_tag(image)}},
-                 {dynamic{"Env"},
-                  {dynamic{
+                      + extract_tag(image))},
+                 {dynamic("Env"),
+                  {dynamic(
                        (service_type == docker_service_type::WINDOWS
                         || service_type == docker_service_type::WSL)
                            ? "THINKNODE_HOST=host.docker.internal"
-                           : "THINKNODE_HOST=localhost"},
-                   dynamic{
-                       "THINKNODE_PORT=" + boost::lexical_cast<string>(port)},
-                   dynamic{"THINKNODE_PID=" + pid}}},
-                 {dynamic{"HostConfig"},
-                  {{dynamic{"NetworkMode"}, dynamic{"host"}}}}}));
+                           : "THINKNODE_HOST=localhost"),
+                   dynamic(
+                       "THINKNODE_PORT=" + boost::lexical_cast<string>(port)),
+                   dynamic("THINKNODE_PID=" + pid)}},
+                 {dynamic("HostConfig"),
+                  {{dynamic("NetworkMode"), dynamic("host")}}}}));
         auto response
             = connection.perform_request(check_in, reporter, request);
         id = cast<string>(
@@ -250,11 +250,11 @@ stop_provider(
     }
     catch (...)
     {
-        // If something goes wrong, we may have an orphaned container running
-        // in Docker. Ideally we should do something about this, but this is
-        // pretty low priority at the moment and any effort expended on this
-        // right now might need to be redone anyway as this functionality
-        // matures.
+        // If something goes wrong, we may have an orphaned container
+        // running in Docker. Ideally we should do something about
+        // this, but this is pretty low priority at the moment and any
+        // effort expended on this right now might need to be redone
+        // anyway as this functionality matures.
     }
 
     spdlog::get("cradle")->info("[super] (provider stopped)");
@@ -335,9 +335,9 @@ struct local_supervisor_data
     // valid if state_ is AWAITING_REGISTRATION
     optional<local_function_invocation> active_request;
 
-    // the active Docker provider (limited to one per supervisor for now) -
-    // This MUST be valid if state_ is AWAITING_<anything>, but MAY be valid
-    // in the IDLE state as well.
+    // the active Docker provider (limited to one per supervisor for
+    // now) - This MUST be valid if state_ is AWAITING_<anything>, but
+    // MAY be valid in the IDLE state as well.
     optional<local_provider_info> active_provider;
 
     cv_value<std::optional<dynamic>> result;
@@ -486,8 +486,8 @@ supervise_calculation(
 
     string const image_tag = extract_tag(image);
 
-    // If we have an active provider, but it's not the right one (or it's
-    // not in the right state), stop it.
+    // If we have an active provider, but it's not the right one (or
+    // it's not in the right state), stop it.
     if (supervisor.active_provider
         && (supervisor.state != local_supervisor_state::IDLE
             || supervisor.active_provider->account != account

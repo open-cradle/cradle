@@ -91,7 +91,7 @@ TEST_CASE("ISS immutable retrieval", "[thinknode][iss]")
               {{"Authorization", "Bearer xyz"},
                {"Accept", "application/octet-stream"}}),
           make_http_200_response(
-              value_to_msgpack_string(dynamic{"the-data"}))}});
+              value_to_msgpack_string(dynamic("the-data")))}});
 
     thinknode_session session;
     session.api_url = "https://mgh.thinknode.io/api/v1.0";
@@ -99,7 +99,7 @@ TEST_CASE("ISS immutable retrieval", "[thinknode][iss]")
 
     thinknode_request_context ctx{service, session, nullptr, false, ""};
     auto data = cppcoro::sync_wait(retrieve_immutable(ctx, "123", "abc"));
-    REQUIRE(data == dynamic{"the-data"});
+    REQUIRE(data == dynamic("the-data"));
 
     REQUIRE(mock_http.is_complete());
     REQUIRE(mock_http.is_in_order());
@@ -226,7 +226,7 @@ TEST_CASE("ISS POST", "[thinknode][iss]")
               {{"Authorization", "Bearer xyz"},
                {"Accept", "application/json"},
                {"Content-Type", "application/octet-stream"}},
-              value_to_msgpack_blob(dynamic{"payload"})),
+              value_to_msgpack_blob(dynamic("payload"))),
           make_http_200_response("{ \"id\": \"def\" }")}});
 
     thinknode_session session;
@@ -237,7 +237,7 @@ TEST_CASE("ISS POST", "[thinknode][iss]")
         thinknode_request_context{service, session, nullptr, false, ""},
         "123",
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
-        dynamic{"payload"}));
+        dynamic("payload")));
     REQUIRE(id == "def");
 
     REQUIRE(mock_http.is_complete());

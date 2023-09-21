@@ -127,7 +127,7 @@ TEST_CASE("calc request retrieval", "[thinknode][tn_calc]")
     REQUIRE(
         request
         == make_thinknode_calc_request_with_value(
-            dynamic{dynamic{2.1}, dynamic{4.2}}));
+            dynamic({dynamic(2.1), dynamic(4.2)})));
 
     REQUIRE(mock_http.is_complete());
     REQUIRE(mock_http.is_in_order());
@@ -192,7 +192,7 @@ TEST_CASE("calc status long polling", "[thinknode][tn_calc]")
 TEST_CASE("calc variable substitution", "[thinknode][tn_calc]")
 {
     auto a_substitute = make_thinknode_calc_request_with_reference("abc");
-    auto b_substitute = make_thinknode_calc_request_with_value(dynamic{"def"});
+    auto b_substitute = make_thinknode_calc_request_with_value(dynamic("def"));
 
     std::map<string, thinknode_calc_request> substitutions
         = {{"a", a_substitute}, {"b", b_substitute}};
@@ -204,7 +204,7 @@ TEST_CASE("calc variable substitution", "[thinknode][tn_calc]")
         = make_thinknode_type_info_with_string_type(thinknode_string_type());
 
     // value
-    auto value_calc = make_thinknode_calc_request_with_value(dynamic{"xyz"});
+    auto value_calc = make_thinknode_calc_request_with_value(dynamic("xyz"));
     REQUIRE(substitute_variables(substitutions, value_calc) == value_calc);
 
     // reference
@@ -249,12 +249,12 @@ TEST_CASE("calc variable substitution", "[thinknode][tn_calc]")
     auto original_item
         = make_thinknode_calc_request_with_item(make_thinknode_item_calc(
             original_array,
-            make_thinknode_calc_request_with_value(dynamic{0}),
+            make_thinknode_calc_request_with_value(dynamic(0)),
             item_schema));
     auto substituted_item
         = make_thinknode_calc_request_with_item(make_thinknode_item_calc(
             substituted_array,
-            make_thinknode_calc_request_with_value(dynamic{0}),
+            make_thinknode_calc_request_with_value(dynamic(0)),
             item_schema));
     REQUIRE(
         substitute_variables(substitutions, original_item)
@@ -283,12 +283,12 @@ TEST_CASE("calc variable substitution", "[thinknode][tn_calc]")
     auto original_property = make_thinknode_calc_request_with_property(
         make_thinknode_property_calc(
             original_object,
-            make_thinknode_calc_request_with_value(dynamic{"j"}),
+            make_thinknode_calc_request_with_value(dynamic("j")),
             item_schema));
     auto substituted_property = make_thinknode_calc_request_with_property(
         make_thinknode_property_calc(
             substituted_object,
-            make_thinknode_calc_request_with_value(dynamic{"j"}),
+            make_thinknode_calc_request_with_value(dynamic("j")),
             item_schema));
     REQUIRE(
         substitute_variables(substitutions, original_property)
@@ -337,10 +337,10 @@ TEST_CASE("let calculation submission", "[thinknode][tn_calc]")
 
     auto let_calculation
         = make_thinknode_calc_request_with_let(make_thinknode_let_calc(
-            {{"a", make_thinknode_calc_request_with_value(dynamic{"-a-"})},
-             {"b", make_thinknode_calc_request_with_value(dynamic{"-b-"})}},
+            {{"a", make_thinknode_calc_request_with_value(dynamic("-a-"))},
+             {"b", make_thinknode_calc_request_with_value(dynamic("-b-"))}},
             make_thinknode_calc_request_with_let(make_thinknode_let_calc(
-                {{"c", make_thinknode_calc_request_with_value(dynamic{"-c-"})},
+                {{"c", make_thinknode_calc_request_with_value(dynamic("-c-"))},
                  {"d", function_call}},
                 make_thinknode_calc_request_with_array(
                     make_thinknode_array_calc(
@@ -352,9 +352,9 @@ TEST_CASE("let calculation submission", "[thinknode][tn_calc]")
                             thinknode_string_type())))))));
 
     std::vector<thinknode_calc_request> expected_requests
-        = {make_thinknode_calc_request_with_value(dynamic{"-a-"}),
-           make_thinknode_calc_request_with_value(dynamic{"-b-"}),
-           make_thinknode_calc_request_with_value(dynamic{"-c-"}),
+        = {make_thinknode_calc_request_with_value(dynamic("-a-")),
+           make_thinknode_calc_request_with_value(dynamic("-b-")),
+           make_thinknode_calc_request_with_value(dynamic("-c-")),
            make_thinknode_calc_request_with_function(
                make_thinknode_function_application(
                    "my_account",

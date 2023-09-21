@@ -87,11 +87,11 @@ to_dynamic(dynamic* v, omissible<T> const& x)
     dynamic_map record;
     if (x)
     {
-        to_dynamic(&record[dynamic{"some"}], *x);
+        to_dynamic(&record[dynamic("some")], *x);
     }
     else
     {
-        to_dynamic(&record[dynamic{"none"}], cradle::nil);
+        to_dynamic(&record[dynamic("none")], cradle::nil);
     }
     *v = std::move(record);
 }

@@ -71,7 +71,7 @@ TEST_CASE("GET request", "[io][http]")
     auto body = parse_json_response(response);
     REQUIRE(
         get_field(cast<dynamic_map>(body), "args")
-        == dynamic{{dynamic{"color"}, dynamic{"navy"}}});
+        == dynamic({dynamic("color"), dynamic("navy")}));
 }
 
 TEST_CASE("HTTPS request", "[io][http]")
@@ -82,19 +82,19 @@ TEST_CASE("HTTPS request", "[io][http]")
     auto body = parse_json_response(response);
     REQUIRE(
         get_field(cast<dynamic_map>(body), "args")
-        == dynamic{{dynamic{"color"}, dynamic{"navy"}}});
+        == dynamic({dynamic("color"), dynamic("navy")}));
 }
 
 void
 test_method_with_content(http_request_method method)
 {
-    auto content = dynamic{
-        {dynamic{"numbers"},
-         dynamic{
-             dynamic{integer(4)},
-             dynamic{integer(3)},
-             dynamic{integer(2)},
-             dynamic{integer(1)}}}};
+    auto content = dynamic(
+        {dynamic("numbers"),
+         dynamic(
+             {dynamic(integer(4)),
+              dynamic(integer(3)),
+              dynamic(integer(2)),
+              dynamic(integer(1))})});
     auto response = perform_simple_request(make_http_request(
         method,
         "https://postman-echo.com/" + string(get_value_id(method)),
@@ -137,7 +137,7 @@ TEST_CASE("large HTTP request", "[io][http]")
     {
         numbers.push_back(i);
     }
-    auto content = dynamic{{dynamic{"numbers"}, to_dynamic(numbers)}};
+    auto content = dynamic({dynamic("numbers"), to_dynamic(numbers)});
     auto response = perform_simple_request(make_http_request(
         http_request_method::POST,
         "https://postman-echo.com/post",

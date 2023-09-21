@@ -151,7 +151,7 @@ TEST_CASE("blob too large for MessagePack", "[encodings][msgpack]")
     try
     {
         value_to_msgpack_string(
-            dynamic{make_static_blob(nullptr, 0x1'00'00'00'01)});
+            dynamic(make_static_blob(nullptr, 0x1'00'00'00'01)));
         FAIL("no exception thrown");
     }
     catch (msgpack_blob_size_limit_exceeded& e)
@@ -170,7 +170,7 @@ TEST_CASE("blob too large for MessagePack", "[encodings][msgpack]")
     try
     {
         value_to_msgpack_string(
-            dynamic{make_static_blob(nullptr, 0x1'00'00'00'00)});
+            dynamic(make_static_blob(nullptr, 0x1'00'00'00'00)));
         FAIL("no exception thrown");
     }
     catch (msgpack_blob_size_limit_exceeded& e)

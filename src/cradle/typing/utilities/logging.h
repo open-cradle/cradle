@@ -27,7 +27,7 @@ template<class Value>
 std::ostream&
 operator<<(std::ostream& stream, arg_logger<Value> arg)
 {
-    stream << "\n" << dynamic{{dynamic{arg.name}, to_dynamic(arg.value)}};
+    stream << "\n" << dynamic({{dynamic(arg.name), to_dynamic(arg.value)}});
     return stream;
 }
 

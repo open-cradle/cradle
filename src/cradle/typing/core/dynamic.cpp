@@ -100,7 +100,7 @@ operator<<(std::ostream& os, dynamic const& v)
 std::ostream&
 operator<<(std::ostream& os, std::list<dynamic> const& v)
 {
-    os << dynamic{std::vector<dynamic>{std::begin(v), std::end(v)}};
+    os << dynamic(std::vector<dynamic>{std::begin(v), std::end(v)});
     return os;
 }
 
@@ -181,7 +181,7 @@ get_field(dynamic_map& r, string const& field)
 bool
 get_field(dynamic const** v, dynamic_map const& r, string const& field)
 {
-    auto i = r.find(dynamic{field});
+    auto i = r.find(dynamic(field));
     if (i == r.end())
         return false;
     *v = &i->second;
@@ -191,7 +191,7 @@ get_field(dynamic const** v, dynamic_map const& r, string const& field)
 bool
 get_field(dynamic** v, dynamic_map& r, string const& field)
 {
-    auto i = r.find(dynamic{field});
+    auto i = r.find(dynamic(field));
     if (i == r.end())
         return false;
     *v = &i->second;
@@ -490,7 +490,7 @@ coerce_value_impl(
             {
                 try
                 {
-                    value = dynamic{parse_ptime(cast<string>(value))};
+                    value = dynamic(parse_ptime(cast<string>(value)));
                     break;
                 }
                 catch (...)
@@ -527,7 +527,7 @@ coerce_value_impl(
                 // Check that coercion doesn't change the value.
                 if (boost::numeric_cast<double>(i) == d)
                 {
-                    value = dynamic{i};
+                    value = dynamic(i);
                     break;
                 }
             }

@@ -164,7 +164,7 @@ resolve_calc_to_value(
                     array.item_schema,
                     co_await recursive_call(std::move(item))));
             }
-            co_return dynamic{values};
+            co_return dynamic(values);
         }
         case calculation_request_tag::ITEM: {
             auto item = as_item(std::move(request));
@@ -180,11 +180,11 @@ resolve_calc_to_value(
             dynamic_map result;
             for (auto& property : object.properties)
             {
-                result[dynamic{property.first}]
+                result[dynamic(property.first)]
                     = co_await recursive_call(property.second);
             }
             co_return co_await coercive_call(
-                object.schema, dynamic{std::move(result)});
+                object.schema, dynamic(std::move(result)));
         }
         case calculation_request_tag::PROPERTY: {
             auto property = as_property(std::move(request));
@@ -192,8 +192,8 @@ resolve_calc_to_value(
                 property.schema,
                 cast<dynamic_map>(
                     co_await recursive_call(std::move(property.object)))
-                    .at(dynamic{cast<string>(
-                        co_await recursive_call(std::move(property.field)))}));
+                    .at(dynamic(cast<string>(
+                        co_await recursive_call(std::move(property.field))))));
         }
         case calculation_request_tag::LET: {
             auto let = as_let(std::move(request));
