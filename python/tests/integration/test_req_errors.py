@@ -27,4 +27,4 @@ def test_req_unknown_uuid_in_json(session, remote):
     with pytest.raises(cradle.exceptions.ErrorResponseError) as excinfo:
         session.resolve_request(req_data, remote)
     msg = excinfo.value.response['content']['error']['unknown']
-    assert 'no resolver registered for uuid unknown_uuid' in msg
+    assert 'no entry found for uuid unknown_uuid' in msg
