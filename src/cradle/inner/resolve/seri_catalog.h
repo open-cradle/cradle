@@ -58,6 +58,9 @@ class seri_catalog
             cat_id_, std::make_shared<seri_resolver_impl<Req>>());
     }
 
+    void
+    unregister_all() noexcept;
+
  private:
     catalog_id cat_id_;
 };

@@ -56,12 +56,12 @@ rq_post_iss_object(
 template<typename ObjectData>
     requires TypedArg<ObjectData, blob>
 auto
-rq_post_iss_object_v1(
+rq_post_iss_object_v2(
     std::string context_id, thinknode_type_info schema, ObjectData object_data)
 {
     using props_type = thinknode_proxy_props;
     // Note server must register exact same uuid, so no level
-    request_uuid uuid{"rq_post_iss_object_v1"};
+    request_uuid uuid{"rq_post_iss_object_v2"};
     std::string title{"post_iss_object"};
     std::string url_type_template{get_url_type_template(schema)};
     return rq_function_erased<std::string>(
@@ -74,12 +74,12 @@ rq_post_iss_object_v1(
 template<typename ObjectData>
     requires TypedArg<ObjectData, blob>
 auto
-rq_post_iss_object_v1_impl(
+rq_post_iss_object_v2_impl(
     std::string context_id, thinknode_type_info schema, ObjectData object_data)
 {
     using props_type = thinknode_server_props;
     // Note server must register exact same uuid, so no level
-    request_uuid uuid{"rq_post_iss_object_v1"};
+    request_uuid uuid{"rq_post_iss_object_v2"};
     std::string title{"post_iss_object"};
     std::string url_type_template{get_url_type_template(schema)};
     return rq_function_erased(

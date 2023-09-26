@@ -15,6 +15,11 @@ dll_singleton::instance()
     return the_instance;
 }
 
+dll_singleton::dll_singleton()
+    : inactive_controllers_{new std::vector<std::unique_ptr<dll_controller>>}
+{
+}
+
 void
 dll_singleton::add(std::unique_ptr<dll_controller> controller)
 {
@@ -36,7 +41,7 @@ dll_singleton::find(std::string const& dll_name)
     return &*it->second;
 }
 
-std::vector<std::unique_ptr<dll_controller>>
+std::vector<dll_controller*>
 dll_singleton::remove(std::string const& dll_name)
 {
     std::scoped_lock lock{mutex_};
@@ -50,31 +55,33 @@ dll_singleton::remove(std::string const& dll_name)
     }
 }
 
-std::vector<std::unique_ptr<dll_controller>>
+std::vector<dll_controller*>
 dll_singleton::remove_one(std::string const& dll_name)
 {
-    std::vector<std::unique_ptr<dll_controller>> res;
+    std::vector<dll_controller*> res;
     auto it{controllers_.find(dll_name)};
     if (it == controllers_.end())
     {
         throw std::out_of_range{
             fmt::format("no DLL loaded named {}", dll_name)};
     }
-    res.push_back(std::move(it->second));
+    res.push_back(&*it->second);
+    inactive_controllers_->push_back(std::move(it->second));
     controllers_.erase(it);
     return res;
 }
 
-std::vector<std::unique_ptr<dll_controller>>
+std::vector<dll_controller*>
 dll_singleton::remove_matching(std::string const& dll_name_regex)
 {
-    std::vector<std::unique_ptr<dll_controller>> res;
+    std::vector<dll_controller*> res;
     std::regex re{dll_name_regex};
     for (auto it = controllers_.begin(); it != controllers_.end();)
     {
         if (std::regex_match(it->first, re))
         {
-            res.push_back(std::move(it->second));
+            res.push_back(&*it->second);
+            inactive_controllers_->push_back(std::move(it->second));
             it = controllers_.erase(it);
         }
         else

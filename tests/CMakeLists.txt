@@ -18,6 +18,8 @@ set_source_files_properties(
 file(GLOB_RECURSE test_srcs_unit CONFIGURE_DEPENDS
     "unit/*.cpp")
 add_library(test_lib_unit OBJECT ${test_srcs_unit})
+add_dependencies(test_lib_unit
+    thinknode_dlls_dir_target)
 target_link_libraries(test_lib_unit PUBLIC
     cradle_websocket
     cradle_plugins_typing
@@ -37,6 +39,8 @@ target_link_libraries(unit_test_runner PRIVATE
     test_lib_unit
     cradle_inner
     cradle_plugins_thinknode)
+add_dependencies(unit_test_runner
+    copy_thinknode_dlls)
 
 # Add the unit testing target.
 add_custom_target(
@@ -215,6 +219,8 @@ target_link_libraries(all_unit_tests_runner
     test_lib_external
     test_lib_inner
     test_lib_plugins)
+add_dependencies(all_unit_tests_runner
+    copy_thinknode_dlls)
 
 # Define an object library covering the source files in manual/.
 file(GLOB_RECURSE test_srcs_manual CONFIGURE_DEPENDS

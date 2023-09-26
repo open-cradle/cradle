@@ -26,6 +26,7 @@
 #include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
+#include <cradle/thinknode/seri_catalog.h>
 #include <cradle/thinknode/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
@@ -166,7 +167,6 @@ test_post_iss_requests_parallel(
     init_test_service(service);
     if (remotely)
     {
-        ensure_thinknode_seri_resolvers();
         register_loopback_service(make_inner_tests_config(), service);
     }
 
@@ -333,9 +333,12 @@ TEST_CASE("ISS POST resolution - subreq, fully cached, parallel", tag)
     test_post_iss_requests_parallel(requests, payloads, results);
 }
 
+// Test remote via loopback
 TEST_CASE("ISS POST resolution - remote", tag)
 {
+    // Still need domain to create context object
     ensure_all_domains_registered();
+    thinknode_seri_catalog cat{true};
     test_post_iss_request(
         make_post_iss_request_constant<caching_level_type::full>(),
         false,
@@ -344,6 +347,7 @@ TEST_CASE("ISS POST resolution - remote", tag)
 
 TEST_CASE("RESOLVE ISS OBJECT TO IMMUTABLE serialization", tag)
 {
+    thinknode_seri_catalog cat{true};
     auto req{rq_resolve_iss_object_to_immutable<caching_level_type::full>(
         "123", "abc", true)};
     auto test_request = [](auto const& req1) {};
@@ -483,6 +487,7 @@ TEST_CASE(
 
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", tag)
 {
+    thinknode_seri_catalog cat{true};
     constexpr caching_level_type level = caching_level_type::full;
     auto req{rq_retrieve_immutable_object<level>("123", "abc")};
     test_serialize_thinknode_request(
@@ -494,6 +499,7 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", tag)
 
 TEST_CASE("Composite request serialization", tag)
 {
+    thinknode_seri_catalog cat{true};
     constexpr auto level = caching_level_type::full;
     std::string const context_id{"123"};
     auto req0{rq_post_iss_object<level>(

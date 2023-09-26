@@ -53,13 +53,15 @@ BENCHMARK(BM_create_post_iss_request<caching_level_type::memory>)
 BENCHMARK(BM_create_post_iss_request<caching_level_type::full>)
     ->Name("BM_create_post_iss_request_fully_cached");
 
-static void
+// Returns pointer to rpclib_client object for rpclib, nullptr for loopback.
+// TODO make this less ugly.
+static rpclib_client*
 register_remote_services(
     inner_resources& resources,
     std::string const& proxy_name,
     http_response const& response)
 {
-    ensure_thinknode_seri_resolvers();
+    rpclib_client* rpc_proxy{nullptr};
     ensure_all_domains_registered();
     if (proxy_name == "loopback")
     {
@@ -67,19 +69,20 @@ register_remote_services(
     }
     else if (proxy_name == "rpclib")
     {
-        auto& rpclib_client
-            = register_rpclib_client(make_outer_tests_config(), resources);
+        rpc_proxy
+            = &register_rpclib_client(make_outer_tests_config(), resources);
 
         // TODO should body be blob or string?
         auto const& body{response.body};
         std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
-        rpclib_client.mock_http(s);
+        rpc_proxy->mock_http(s);
     }
     else
     {
         throw std::invalid_argument(
             fmt::format("Unknown proxy name {}", proxy_name));
     }
+    return rpc_proxy;
 }
 
 static char const s_loopback[] = "loopback";
@@ -102,9 +105,12 @@ BM_try_resolve_thinknode_request(
     session.api_url = api_url;
     session.access_token = "xyz";
     bool remotely = proxy_name != nullptr;
+    std::unique_ptr<thinknode_catalog_scope> cat_scope;
     if (remotely)
     {
-        register_remote_services(service, proxy_name, response);
+        auto* rpc_proxy
+            = register_remote_services(service, proxy_name, response);
+        cat_scope.reset(new thinknode_catalog_scope(rpc_proxy));
     }
     std::string proxy_name_string{proxy_name ? proxy_name : ""};
     thinknode_request_context ctx{

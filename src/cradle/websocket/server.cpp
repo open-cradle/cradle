@@ -59,7 +59,9 @@
 #include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/thinknode/secondary_cache_serialization.h>
+#include <cradle/thinknode/seri_catalog.h>
 #include <cradle/thinknode/utilities.h>
+#include <cradle/thinknode_dlls_dir.h>
 #include <cradle/typing/core/fmt_format.h>
 #include <cradle/typing/core/unique_hash.h>
 #include <cradle/typing/encodings/json.h>
@@ -1917,6 +1919,11 @@ initialize(websocket_server_impl& server, service_config const& config)
 
     register_and_initialize_thinknode_domain();
     register_rpclib_client(config, server.core);
+
+    // TODO maybe delay loading Thinknode DLL until really needed
+    auto& proxy{server.core.get_proxy("rpclib")};
+    proxy.load_shared_library(get_thinknode_dlls_dir(), "cradle_thinknode_v1");
+    static thinknode_seri_catalog the_catalog{true};
 }
 
 websocket_server::websocket_server(service_config const& config)

@@ -13,6 +13,14 @@ dll_controller::dll_controller(std::string path, std::string name)
 {
 }
 
+dll_controller::~dll_controller()
+{
+    // Calling this destructor unloads the DLL, crashing the application if
+    // references to the DLL code still exist, and we currently do not try
+    // to delete all of them.
+    logger_->error("~dll_controller() must not be called");
+}
+
 void
 dll_controller::load()
 {
@@ -38,6 +46,8 @@ dll_controller::load()
 
     auto get_catalog_func
         = lib_->get<get_catalog_func_t>(get_catalog_func_name);
+    // TODO the only thing done with the catalog is to retrieve its cat_id.
+    // Consider changing the interface to the DLL.
     catalog_ = get_catalog_func();
     auto cat_id_value{catalog_->get_cat_id().value()};
     logger_->info("load done for {} -> cat_id {}", name_, cat_id_value);
@@ -52,14 +62,18 @@ dll_controller::unload()
     {
         logger_->info(
             "unload {} (cat_id {})", name_, catalog_->get_cat_id().value());
+        catalog_->unregister_all();
         catalog_ = nullptr;
     }
     else
     {
         logger_->warn("unload {} - no catalog", name_);
     }
-    // The following calls ~seri_catalog() which unregisters its resolvers
-    lib_.reset();
+    // The following would unload the DLL, causing a ~seri_catalog() call
+    // unregistering the catalog's resolvers if that wasn't done yet.
+    // As we (currently) have no guarantee that no other references to the
+    // DLL's code remain, we do not really unload the DLL.
+    // lib_.reset();
     logger_->info("unload done for {}", name_);
 }
 

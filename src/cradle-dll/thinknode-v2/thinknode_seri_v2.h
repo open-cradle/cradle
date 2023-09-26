@@ -13,13 +13,13 @@ namespace cradle {
 // A DLL will hold a global static instance of this object. The constructor
 // runs when the DLL is loaded, the destructor runs on unload. Neither must
 // throw an exception.
-class thinknode_seri_catalog
+class thinknode_seri_catalog_v2
 {
  public:
     // If auto_register is true, the constructor calls register_all().
     // Thus, auto_register must be false in a DLL, otherwise the exception
     // can/will cause the program to terminate.
-    thinknode_seri_catalog(bool auto_register);
+    thinknode_seri_catalog_v2(bool auto_register);
 
     // Registers all Thinknode seri resolvers.
     // Throws on error.

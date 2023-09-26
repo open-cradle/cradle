@@ -1,0 +1,16 @@
+#ifndef CRADLE_THINKNODE_DLLS_DIR_H
+#define CRADLE_THINKNODE_DLLS_DIR_H
+
+#include <string>
+
+namespace cradle {
+
+inline std::string
+get_thinknode_dlls_dir()
+{
+    return "@thinknode_dlls_dir@";
+}
+
+} // namespace cradle
+
+#endif

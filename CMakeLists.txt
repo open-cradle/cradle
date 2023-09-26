@@ -559,6 +559,8 @@ if(IS_MSVC)
         APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4996 /wd4127 /wd4267 /wd4244")
 endif()
 target_sources(cradle_websocket PRIVATE ${generated_headers} ${generated_srcs})
+add_dependencies(cradle_websocket
+    thinknode_dlls_dir_target)
 # Boost::random required by websocketpp even though not advertised
 target_link_libraries(cradle_websocket PUBLIC
     cradle_thinknode
@@ -604,7 +606,7 @@ target_link_libraries(rpclib_server PRIVATE
 add_custom_target(servers)
 add_dependencies(servers websocket_server rpclib_server)
 
-# Create DLLs
+# Create dynamic-loadable DLLs
 add_subdirectory(src/cradle-dll)
 
 if (CRADLE_ENABLE_TESTING)

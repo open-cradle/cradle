@@ -221,7 +221,7 @@ TEST_CASE("load/unload DLL stress test", "[.dll-stress]")
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_x.*");
 
-    std::srand(std::time(nullptr));
+    std::srand(static_cast<unsigned>(std::time(nullptr)));
     std::vector<std::string> dll_names{
         "test_inner_dll_x0",
         "test_inner_dll_x1",
@@ -229,7 +229,7 @@ TEST_CASE("load/unload DLL stress test", "[.dll-stress]")
     };
     for ( ; ; )
     {
-        int i = random() % 6;
+        int i = std::rand() % 6;
         auto const& dll_name{dll_names[i / 2]};
         std::string action;
         try

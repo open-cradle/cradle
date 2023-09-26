@@ -3,16 +3,9 @@
 #include <cradle/inner/core/exception.h>
 #include <cradle/thinknode/context.h>
 #include <cradle/thinknode/domain.h>
-#include <cradle/thinknode/seri_catalog.h>
 #include <cradle/thinknode/service/core.h>
 
 namespace cradle {
-
-void
-thinknode_domain::initialize()
-{
-    register_thinknode_seri_resolvers();
-}
 
 std::string
 thinknode_domain::name() const
@@ -42,7 +35,6 @@ register_and_initialize_thinknode_domain()
 {
     auto the_domain{std::make_shared<thinknode_domain>()};
     register_domain(the_domain);
-    the_domain->initialize();
 }
 
 } // namespace cradle

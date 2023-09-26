@@ -14,6 +14,7 @@ get_catalog()
 }
 
 // To be called when the DLL is loaded
+// TODO undo everything when an exception occurs
 extern "C" BOOST_SYMBOL_EXPORT void
 CRADLE_init()
 {

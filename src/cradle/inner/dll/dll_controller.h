@@ -16,6 +16,8 @@ class dll_controller
  public:
     dll_controller(std::string path, std::string name);
 
+    ~dll_controller();
+
     // Client must call load() only once.
     void
     load();
