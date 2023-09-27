@@ -1,6 +1,14 @@
+#include <stdexcept>
+
+#include <fmt/format.h>
+
+#include "inner_service.h"
+#include "outer_service.h"
 #include "thinknode.h"
 #include <cradle/inner/dll/shared_library.h>
+#include <cradle/inner/remote/loopback.h>
 #include <cradle/plugins/domain/all/all_domains.h>
+#include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode_dlls_dir.h>
 
 namespace cradle {
@@ -11,36 +19,72 @@ ensure_all_domains_registered()
     static bool registered{false};
     if (!registered)
     {
+        // TODO unregister when done; part of resources?
         register_and_initialize_all_domains();
         registered = true;
     }
 }
 
-thinknode_catalog_scope::thinknode_catalog_scope(remote_proxy* proxy)
-    : proxy_{proxy}
+thinknode_test_scope::thinknode_test_scope(std::string const& proxy_name)
+    : proxy_name_{proxy_name}
 {
-    if (proxy_ && proxy_->name() == "rpclib")
+    init_test_service(resources_);
+    register_remote();
+    if (proxy_name_ == "rpclib")
     {
         // Maybe cleaner to do this for loopback too.
-        proxy_->load_shared_library(
-            get_thinknode_dlls_dir(), "cradle_thinknode_v1");
+        proxy_->load_shared_library(get_thinknode_dlls_dir(), dll_name_);
     }
     else
     {
-        load_shared_library(get_thinknode_dlls_dir(), "cradle_thinknode_v1");
+        load_shared_library(get_thinknode_dlls_dir(), dll_name_);
     }
 }
 
-thinknode_catalog_scope::~thinknode_catalog_scope()
+thinknode_test_scope::~thinknode_test_scope()
 {
-    if (proxy_ && proxy_->name() == "rpclib")
+    if (proxy_name_ == "rpclib")
     {
-        proxy_->unload_shared_library("cradle_thinknode_v1");
+        proxy_->unload_shared_library(dll_name_);
     }
     else
     {
-        unload_shared_library("cradle_thinknode_v1");
+        unload_shared_library(dll_name_);
     }
+}
+
+void
+thinknode_test_scope::register_remote()
+{
+    if (!proxy_name_.empty())
+    {
+        if (proxy_name_ == "loopback")
+        {
+            // TODO unregister remote service in dtor
+            register_loopback_service(make_inner_tests_config(), resources_);
+        }
+        else if (proxy_name_ == "rpclib")
+        {
+            register_rpclib_client(make_outer_tests_config(), resources_);
+        }
+        else
+        {
+            throw std::invalid_argument(
+                fmt::format("Unknown proxy name {}", proxy_name_));
+        }
+        proxy_ = &resources_.get_proxy(proxy_name_);
+    }
+}
+
+rpclib_client&
+thinknode_test_scope::get_rpclib_client() const
+{
+    if (proxy_name_ != "rpclib")
+    {
+        throw std::logic_error(
+            fmt::format("No rpc client for proxy {}", proxy_name_));
+    }
+    return static_cast<rpclib_client&>(*proxy_);
 }
 
 } // namespace cradle

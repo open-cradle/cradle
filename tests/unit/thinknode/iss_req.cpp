@@ -166,40 +166,23 @@ make_post_iss_request_subreq(std::string payload = "payload")
 template<typename Request>
 void
 test_post_iss_requests_parallel(
+    thinknode_test_scope& scope,
     std::vector<Request> const& requests,
     std::vector<blob> const& payloads,
     std::vector<std::string> const& results,
-    std::string const& proxy_name, // empty for local
     bool introspective)
 {
+    auto& resources{scope.get_resources()};
+    auto config{make_outer_tests_config()};
+    resources.reset_memory_cache(config);
+    resources.clear_secondary_cache();
     // Still need domain to create context object
     ensure_all_domains_registered();
     constexpr caching_level_type level = Request::caching_level;
     clean_tasklet_admin_fixture fixture;
-    service_core service;
-    init_test_service(service);
-    remote_proxy* proxy{nullptr};
-    if (!proxy_name.empty())
-    {
-        if (proxy_name == "loopback")
-        {
-            register_loopback_service(make_inner_tests_config(), service);
-        }
-        else if (proxy_name == "rpclib")
-        {
-            register_rpclib_client(make_outer_tests_config(), service);
-        }
-        else
-        {
-            throw std::invalid_argument(
-                fmt::format("Unknown proxy name {}", proxy_name));
-        }
-        proxy = &service.get_proxy(proxy_name);
-    }
-    auto cat_scope{std::make_unique<thinknode_catalog_scope>(proxy)};
 
     mock_http_session* mock_http{nullptr};
-    if (proxy_name != "rpclib")
+    if (scope.get_proxy_name() != "rpclib")
     {
         mock_http_script script;
         for (unsigned i = 0; i < payloads.size(); ++i)
@@ -215,19 +198,18 @@ test_post_iss_requests_parallel(
                 make_http_200_response("{ \"id\": \"" + results[i] + "\" }")};
             script.push_back(exchange);
         }
-        mock_http = &enable_http_mocking(service);
+        mock_http = &enable_http_mocking(resources);
         mock_http->set_script(script);
     }
     else
     {
-        rpclib_client* rpc_proxy{static_cast<rpclib_client*>(proxy)};
         // Assumes a single request/response
         auto response{
             make_http_200_response("{ \"id\": \"" + results[0] + "\" }")};
         // TODO should body be blob or string?
         auto const& body{response.body};
         std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
-        rpc_proxy->mock_http(s);
+        scope.get_rpclib_client().mock_http(s);
     }
 
     thinknode_session session;
@@ -239,14 +221,18 @@ test_post_iss_requests_parallel(
         tasklet = create_tasklet_tracker("my_pool", "my_title");
     }
     thinknode_request_context ctx{
-        service, session, tasklet, !proxy_name.empty(), proxy_name};
+        resources,
+        session,
+        tasklet,
+        scope.get_proxy() != nullptr,
+        scope.get_proxy_name()};
 
     auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
 
     REQUIRE(res == results);
     if (mock_http)
     {
-        REQUIRE(mock_http->is_complete());
+        CHECK(mock_http->is_complete());
     }
     // Order unspecified so don't check mock_http.is_in_order()
     if (introspective)
@@ -274,8 +260,8 @@ test_post_iss_requests_parallel(
 
     if constexpr (level >= caching_level_type::full)
     {
-        sync_wait_write_disk_cache(service);
-        service.reset_memory_cache();
+        sync_wait_write_disk_cache(resources);
+        resources.reset_memory_cache();
 
         // Resolve using disk cache
         auto res2 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
@@ -287,7 +273,7 @@ test_post_iss_requests_parallel(
 template<typename Request>
 void
 test_post_iss_request(
-    Request const& req, std::string const& proxy_name, bool introspective)
+    thinknode_test_scope& scope, Request const& req, bool introspective)
 {
     std::vector<Request> requests = {req};
     auto payload = make_blob("payload");
@@ -295,34 +281,39 @@ test_post_iss_request(
     std::vector<std::string> results = {"def"};
 
     test_post_iss_requests_parallel(
-        requests, payloads, results, proxy_name, introspective);
+        scope, requests, payloads, results, introspective);
 }
 
 } // namespace
 
-TEST_CASE("ISS POST serialization - value", tag)
+TEST_CASE("ISS POST serialization - value", "[A]")
 {
-    seri_catalog cat;
+    thinknode_test_scope scope{""};
+    // seri_catalog cat;
     auto req{make_post_iss_request_constant()};
-    cat.register_resolver(req);
-    // With this test_request lambda, testing serialization includes testing
-    // that the deserialized request can be resolved.
-    auto test_request
-        = [](auto const& req1) { test_post_iss_request(req1, "", false); };
+    // cat.register_resolver(req);
+    //  With this validate_request lambda, testing serialization includes
+    //  verifying that the deserialized request can be locally resolved.
+    //  TODO resolves the original request, and the deserialized one. Both
+    //  times expect an HTTP request but the second one comes from the cache.
+    //  Perhaps clear the caches at the start of test_post_iss_request()?
+    auto validate_request
+        = [&](auto const& req1) { test_post_iss_request(scope, req1, false); };
     test_serialize_thinknode_request(
         req,
         deserialize_function<decltype(req)>,
-        test_request,
+        validate_request,
         "iss_post_value.json");
 }
 
 TEST_CASE("ISS POST serialization - subreq", tag)
 {
+    thinknode_test_scope scope{""};
     seri_catalog cat;
     auto req{make_post_iss_request_subreq<caching_level_type::full>()};
     cat.register_resolver(req);
     auto test_request
-        = [](auto const& req1) { test_post_iss_request(req1, "", false); };
+        = [&](auto const& req1) { test_post_iss_request(scope, req1, false); };
     test_serialize_thinknode_request(
         req,
         deserialize_function<decltype(req)>,
@@ -332,24 +323,34 @@ TEST_CASE("ISS POST serialization - subreq", tag)
 
 TEST_CASE("ISS POST resolution - value, uncached", tag)
 {
+    thinknode_test_scope scope{""};
     test_post_iss_request(
-        make_post_iss_request_constant<caching_level_type::none>(), "", false);
+        scope,
+        make_post_iss_request_constant<caching_level_type::none>(),
+        false);
 }
 
 TEST_CASE("ISS POST resolution - value, memory cached", tag)
 {
+    thinknode_test_scope scope{""};
     test_post_iss_request(
-        make_post_iss_request_subreq<caching_level_type::memory>(), "", false);
+        scope,
+        make_post_iss_request_subreq<caching_level_type::memory>(),
+        false);
 }
 
 TEST_CASE("ISS POST resolution - value, fully cached", tag)
 {
+    thinknode_test_scope scope{""};
     test_post_iss_request(
-        make_post_iss_request_subreq<caching_level_type::full>(), "", false);
+        scope,
+        make_post_iss_request_subreq<caching_level_type::full>(),
+        false);
 }
 
 TEST_CASE("ISS POST resolution - subreq, fully cached, parallel", tag)
 {
+    thinknode_test_scope scope{""};
     constexpr caching_level_type level = caching_level_type::full;
     using Req = decltype(make_post_iss_request_subreq<level>());
     std::vector<blob> payloads;
@@ -376,29 +377,33 @@ TEST_CASE("ISS POST resolution - subreq, fully cached, parallel", tag)
         results.emplace_back(result);
     }
 
-    test_post_iss_requests_parallel(requests, payloads, results, "", false);
+    test_post_iss_requests_parallel(scope, requests, payloads, results, false);
 }
 
 TEST_CASE("ISS POST resolution - loopback", tag)
 {
-    test_post_iss_request(make_post_iss_request_constant(), "loopback", false);
+    thinknode_test_scope scope{"loopback"};
+    test_post_iss_request(scope, make_post_iss_request_constant(), false);
 }
 
 TEST_CASE("ISS POST resolution - proxy, loopback", tag)
 {
+    thinknode_test_scope scope{"loopback"};
     test_post_iss_request(
-        make_post_iss_proxy_request_constant(), "loopback", false);
+        scope, make_post_iss_proxy_request_constant(), false);
 }
 
 TEST_CASE("ISS POST resolution - rpclib", tag)
 {
-    test_post_iss_request(make_post_iss_request_constant(), "rpclib", false);
+    thinknode_test_scope scope{"rpclib"};
+    test_post_iss_request(scope, make_post_iss_request_constant(), false);
 }
 
 TEST_CASE("ISS POST resolution - proxy, rpclib", tag)
 {
+    thinknode_test_scope scope{"rpclib"};
     test_post_iss_request(
-        make_post_iss_proxy_request_constant(), "rpclib", false);
+        scope, make_post_iss_proxy_request_constant(), false);
 }
 
 TEST_CASE("RESOLVE ISS OBJECT TO IMMUTABLE serialization", tag)
@@ -424,6 +429,7 @@ test_retrieve_immutable_object_parallel(
     std::vector<std::string> const& responses)
 {
     constexpr caching_level_type level = Request::caching_level;
+    // TODO thinknode_test_scope
     service_core service;
     init_test_service(service);
 

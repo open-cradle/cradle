@@ -2,25 +2,61 @@
 #define CRADLE_TESTS_SUPPORT_THINKNODE_H
 
 #include <memory>
+#include <string>
 
 #include <cradle/inner/remote/proxy.h>
+#include <cradle/rpclib/client/proxy.h>
+#include <cradle/thinknode/service/core.h>
 
 namespace cradle {
 
 void
 ensure_all_domains_registered();
 
-// As long as this object exists, the Thinknode seri resolvers are available
-// on the given proxy. proxy is nullptr for local operation.
-// Currently limited to thinknode_v1.
-class thinknode_catalog_scope
+// Existence of an object of this class makes it possible to create,
+// deserialize and resolve Thinknode requests via the local or remote
+// service identified by proxy_name.
+// Proxy request objects can still be created if no scope object exists.
+// TODO make it impossible to create Thinknode requests outside scope
+class thinknode_test_scope
 {
  public:
-    thinknode_catalog_scope(remote_proxy* proxy);
-    ~thinknode_catalog_scope();
+    // proxy_name should be "" (local), "loopback" or "rpclib"
+    thinknode_test_scope(std::string const& proxy_name);
+
+    ~thinknode_test_scope();
+
+    service_core&
+    get_resources()
+    {
+        return resources_;
+    }
+
+    std::string
+    get_proxy_name() const
+    {
+        return proxy_name_;
+    }
+
+    // Returns nullptr for local operation
+    remote_proxy*
+    get_proxy() const
+    {
+        return proxy_;
+    }
+
+    rpclib_client&
+    get_rpclib_client() const;
 
  private:
-    remote_proxy* proxy_;
+    static inline const std::string dll_name_{"cradle_thinknode_v1"};
+
+    std::string proxy_name_;
+    service_core resources_;
+    remote_proxy* proxy_{nullptr};
+
+    void
+    register_remote();
 };
 
 } // namespace cradle

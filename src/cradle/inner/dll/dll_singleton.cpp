@@ -5,6 +5,7 @@
 
 #include <cradle/inner/dll/dll_controller.h>
 #include <cradle/inner/dll/dll_singleton.h>
+#include <cradle/inner/utilities/logging.h>
 
 namespace cradle {
 
@@ -16,7 +17,7 @@ dll_singleton::instance()
 }
 
 dll_singleton::dll_singleton()
-    : inactive_controllers_{new std::vector<std::unique_ptr<dll_controller>>}
+    : inactive_controllers_{new inactive_dll_controllers()}
 {
 }
 
@@ -66,7 +67,7 @@ dll_singleton::remove_one(std::string const& dll_name)
             fmt::format("no DLL loaded named {}", dll_name)};
     }
     res.push_back(&*it->second);
-    inactive_controllers_->push_back(std::move(it->second));
+    inactive_controllers_->add(std::move(it->second));
     controllers_.erase(it);
     return res;
 }
@@ -81,7 +82,7 @@ dll_singleton::remove_matching(std::string const& dll_name_regex)
         if (std::regex_match(it->first, re))
         {
             res.push_back(&*it->second);
-            inactive_controllers_->push_back(std::move(it->second));
+            inactive_controllers_->add(std::move(it->second));
             it = controllers_.erase(it);
         }
         else
@@ -90,6 +91,14 @@ dll_singleton::remove_matching(std::string const& dll_name_regex)
         }
     }
     return res;
+}
+
+void
+inactive_dll_controllers::add(std::unique_ptr<dll_controller> controller)
+{
+    controllers_.push_back(std::move(controller));
+    auto logger{ensure_logger("dll")};
+    logger->info("Now have {} inactive DLL controllers", controllers_.size());
 }
 
 } // namespace cradle

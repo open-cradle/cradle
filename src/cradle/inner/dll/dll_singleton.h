@@ -11,6 +11,18 @@
 
 namespace cradle {
 
+// Controllers that have been unloaded. They can no longer be accessed,
+// but for safety reasons the DLL is not unloaded.
+class inactive_dll_controllers
+{
+ public:
+    void
+    add(std::unique_ptr<dll_controller> controller);
+
+ private:
+    std::vector<std::unique_ptr<dll_controller>> controllers_;
+};
+
 // Singleton representing the set of all loaded DLLs
 //
 // Currently, a DLL is deactivated rather than unloaded. Its resolvers become
@@ -50,12 +62,10 @@ class dll_singleton
     std::mutex mutex_;
     std::unordered_map<std::string, std::unique_ptr<dll_controller>>
         controllers_;
-    // Controllers that have been unloaded. They can no longer be accessed,
-    // but for safety reasons the DLL is not unloaded.
     // There is a deliberate memory leak here. ~dll_controller() unloads
     // the DLL, and if any other objects exist referring to code in the DLL,
     // then calling those objects' destructors would crash the application.
-    std::vector<std::unique_ptr<dll_controller>>* inactive_controllers_;
+    inactive_dll_controllers* inactive_controllers_;
 
     dll_singleton();
 
