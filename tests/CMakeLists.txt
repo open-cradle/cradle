@@ -306,6 +306,8 @@ target_link_libraries(benchmark_test_runner PRIVATE
     cradle_plugins_typing
     cradle_plugins_thinknode
     cradle_plugins_inner)
+add_dependencies(benchmark_test_runner
+    copy_thinknode_dlls)
 
 add_custom_target(
     benchmark_tests

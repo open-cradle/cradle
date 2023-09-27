@@ -31,7 +31,7 @@ namespace cradle {
 class seri_catalog
 {
  public:
-    ~seri_catalog();
+    virtual ~seri_catalog();
 
     catalog_id
     get_cat_id()
@@ -58,7 +58,7 @@ class seri_catalog
             cat_id_, std::make_shared<seri_resolver_impl<Req>>());
     }
 
-    void
+    virtual void
     unregister_all() noexcept;
 
  private:

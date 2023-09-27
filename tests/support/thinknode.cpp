@@ -1,4 +1,5 @@
 #include "thinknode.h"
+#include <cradle/inner/dll/shared_library.h>
 #include <cradle/plugins/domain/all/all_domains.h>
 #include <cradle/thinknode_dlls_dir.h>
 
@@ -15,25 +16,30 @@ ensure_all_domains_registered()
     }
 }
 
-thinknode_catalog_scope::thinknode_catalog_scope(rpclib_client* rpc_proxy)
-    : rpc_proxy_{rpc_proxy}
+thinknode_catalog_scope::thinknode_catalog_scope(remote_proxy* proxy)
+    : proxy_{proxy}
 {
-    if (rpc_proxy_)
+    if (proxy_ && proxy_->name() == "rpclib")
     {
-        rpc_proxy_->load_shared_library(
+        // Maybe cleaner to do this for loopback too.
+        proxy_->load_shared_library(
             get_thinknode_dlls_dir(), "cradle_thinknode_v1");
     }
     else
     {
-        local_cat_.reset(new thinknode_seri_catalog{true});
+        load_shared_library(get_thinknode_dlls_dir(), "cradle_thinknode_v1");
     }
 }
 
 thinknode_catalog_scope::~thinknode_catalog_scope()
 {
-    if (rpc_proxy_)
+    if (proxy_ && proxy_->name() == "rpclib")
     {
-        rpc_proxy_->unload_shared_library("cradle_thinknode_v1");
+        proxy_->unload_shared_library("cradle_thinknode_v1");
+    }
+    else
+    {
+        unload_shared_library("cradle_thinknode_v1");
     }
 }
 

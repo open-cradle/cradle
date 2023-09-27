@@ -3,9 +3,9 @@
 #include <cereal/types/map.hpp>
 #include <spdlog/spdlog.h>
 
+#include "thinknode_seri_v1.h"
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
-#include <cradle/thinknode/seri_catalog.h>
 
 namespace cradle {
 
@@ -34,7 +34,8 @@ namespace cradle {
  * seri_catalog::register_resolver() calls.
  */
 
-thinknode_seri_catalog::thinknode_seri_catalog(bool auto_register)
+thinknode_seri_catalog_v1::thinknode_seri_catalog_v1(bool auto_register)
+    : seri_catalog()
 {
     if (auto_register)
     {
@@ -43,7 +44,7 @@ thinknode_seri_catalog::thinknode_seri_catalog(bool auto_register)
 }
 
 void
-thinknode_seri_catalog::register_all()
+thinknode_seri_catalog_v1::register_all()
 {
     // TODO really need to be thread-safe?
     if (registered_.exchange(true, std::memory_order_relaxed))
@@ -58,14 +59,14 @@ thinknode_seri_catalog::register_all()
     }
     catch (...)
     {
-        inner_.unregister_all();
+        unregister_all();
         throw;
     }
     registered_ = true;
 }
 
 void
-thinknode_seri_catalog::try_register_all()
+thinknode_seri_catalog_v1::try_register_all()
 {
     constexpr caching_level_type level = caching_level_type::full;
     auto sample_thinknode_info{
@@ -75,20 +76,20 @@ thinknode_seri_catalog::try_register_all()
     // the "normalizing" subrequests also get registered.
     // A (maybe better) alternative would be to register these subrequests
     // independently.
-    inner_.register_resolver(rq_retrieve_immutable_object<level>(
+    register_resolver(rq_retrieve_immutable_object<level>(
         "sample context id", "sample immutable id"));
-    inner_.register_resolver(rq_post_iss_object<level>(
+    register_resolver(rq_post_iss_object<level>(
         "sample context id", sample_thinknode_info, blob()));
-    inner_.register_resolver(rq_get_iss_object_metadata<level>(
+    register_resolver(rq_get_iss_object_metadata<level>(
         "sample context id", "sample object id"));
-    inner_.register_resolver(rq_resolve_iss_object_to_immutable<level>(
+    register_resolver(rq_resolve_iss_object_to_immutable<level>(
         "sample context id", "sample object id", false));
 }
 
 void
-thinknode_seri_catalog::unregister_all()
+thinknode_seri_catalog_v1::unregister_all() noexcept
 {
-    inner_.unregister_all();
+    seri_catalog::unregister_all();
     registered_ = false;
 }
 

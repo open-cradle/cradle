@@ -34,6 +34,7 @@
 #include <cppcoro/when_all.hpp>
 
 #include <cradle/inner/core/sha256_hash_id.h>
+#include <cradle/inner/dll/shared_library.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/file_io.h>
@@ -59,7 +60,6 @@
 #include <cradle/thinknode/iss.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/thinknode/secondary_cache_serialization.h>
-#include <cradle/thinknode/seri_catalog.h>
 #include <cradle/thinknode/utilities.h>
 #include <cradle/thinknode_dlls_dir.h>
 #include <cradle/typing/core/fmt_format.h>
@@ -1921,9 +1921,11 @@ initialize(websocket_server_impl& server, service_config const& config)
     register_rpclib_client(config, server.core);
 
     // TODO maybe delay loading Thinknode DLL until really needed
+    // Load Thinknode DLL locally
+    load_shared_library(get_thinknode_dlls_dir(), "cradle_thinknode_v1");
+    // Load Thinknode DLL in the rpclib server
     auto& proxy{server.core.get_proxy("rpclib")};
     proxy.load_shared_library(get_thinknode_dlls_dir(), "cradle_thinknode_v1");
-    static thinknode_seri_catalog the_catalog{true};
 }
 
 websocket_server::websocket_server(service_config const& config)

@@ -1,5 +1,5 @@
-#ifndef CRADLE_THINKNODE_SERI_CATALOG_H
-#define CRADLE_THINKNODE_SERI_CATALOG_H
+#ifndef CRADLE_THINKNODE_SERI_V1_H
+#define CRADLE_THINKNODE_SERI_V1_H
 
 #include <atomic>
 
@@ -13,13 +13,13 @@ namespace cradle {
 // A DLL will hold a global static instance of this object. The constructor
 // runs when the DLL is loaded, the destructor runs on unload. Neither must
 // throw an exception.
-class thinknode_seri_catalog
+class thinknode_seri_catalog_v1 : public seri_catalog
 {
  public:
     // If auto_register is true, the constructor calls register_all().
     // Thus, auto_register must be false in a DLL, otherwise the exception
     // can/will cause the program to terminate.
-    thinknode_seri_catalog(bool auto_register);
+    thinknode_seri_catalog_v1(bool auto_register);
 
     // Registers all Thinknode seri resolvers.
     // Throws on error.
@@ -27,17 +27,10 @@ class thinknode_seri_catalog
     register_all();
 
     void
-    unregister_all();
-
-    seri_catalog&
-    get_inner()
-    {
-        return inner_;
-    }
+    unregister_all() noexcept override;
 
  private:
     std::atomic<bool> registered_{false};
-    seri_catalog inner_;
 
     void
     try_register_all();
