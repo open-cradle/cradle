@@ -23,7 +23,7 @@ class mock_storage : public secondary_storage_intf
 {
  public:
     void
-    reset(service_config const& config) override;
+    clear() override;
 
     cppcoro::task<blob>
     read(std::string key) override;
@@ -42,7 +42,7 @@ class mock_storage : public secondary_storage_intf
 };
 
 void
-mock_storage::reset(service_config const& config)
+mock_storage::clear()
 {
     throw not_implemented_error();
 }

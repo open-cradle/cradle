@@ -34,7 +34,7 @@ class http_cache : public secondary_storage_intf
 
     // Not (yet?) implemented
     void
-    reset(service_config const& config) override;
+    clear() override;
 
     // Returns blob{} if the value is not in the cache.
     // Throws on other errors.

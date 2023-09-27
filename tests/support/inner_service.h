@@ -15,7 +15,7 @@ void
 init_test_inner_service(inner_resources& resources);
 
 void
-reset_disk_cache(inner_resources& resources);
+clear_disk_cache(inner_resources& resources);
 
 struct non_caching_request_resolution_context final
     : public local_context_intf,

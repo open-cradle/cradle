@@ -55,7 +55,7 @@ http_requests_storage::http_requests_storage(
 }
 
 void
-http_requests_storage::reset(service_config const& config)
+http_requests_storage::clear()
 {
     throw not_implemented_error();
 }

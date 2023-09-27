@@ -40,7 +40,7 @@ class local_disk_cache : public secondary_storage_intf
     local_disk_cache(service_config const& config);
 
     void
-    reset(service_config const& config) override;
+    clear() override;
 
     cppcoro::task<blob>
     read(std::string key) override;

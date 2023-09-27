@@ -29,7 +29,7 @@ class http_requests_storage : public secondary_storage_intf
 
     // Not (yet?) implemented
     void
-    reset(service_config const& config) override;
+    clear() override;
 
     // Returns blob{} if the value is not in the storage.
     // Throws on other errors.

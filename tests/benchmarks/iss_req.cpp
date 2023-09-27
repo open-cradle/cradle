@@ -167,7 +167,7 @@ BM_try_resolve_thinknode_request(
                     }
                     if constexpr (need_empty_disk_cache)
                     {
-                        reset_disk_cache(service);
+                        clear_disk_cache(service);
                     }
                     if constexpr (pause_timing)
                     {

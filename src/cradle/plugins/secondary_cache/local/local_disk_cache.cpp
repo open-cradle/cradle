@@ -66,9 +66,9 @@ local_disk_cache::local_disk_cache(service_config const& config)
 }
 
 void
-local_disk_cache::reset(service_config const& config)
+local_disk_cache::clear()
 {
-    ll_cache_.reset(make_ll_disk_cache_config(config));
+    ll_cache_.clear();
 }
 
 // This is a coroutine so takes key by value.

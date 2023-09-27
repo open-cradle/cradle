@@ -59,9 +59,9 @@ inner_resources::reset_memory_cache(service_config const& config)
 }
 
 void
-inner_resources::reset_secondary_cache(service_config const& config)
+inner_resources::clear_secondary_cache()
 {
-    impl_->reset_secondary_cache(config);
+    impl_->clear_secondary_cache();
 }
 
 cradle::immutable_cache&
@@ -159,9 +159,9 @@ inner_resources_impl::reset_memory_cache(service_config const& config)
 }
 
 void
-inner_resources_impl::reset_secondary_cache(service_config const& config)
+inner_resources_impl::clear_secondary_cache()
 {
-    secondary_cache_->reset(config);
+    secondary_cache_->clear();
 }
 
 std::shared_ptr<blob_file_writer>

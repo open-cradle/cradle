@@ -39,12 +39,13 @@ init_test_inner_service(inner_resources& resources)
     activate_local_disk_cache_plugin();
     reset_directory(file_path(tests_cache_dir));
     resources.inner_initialize(make_inner_tests_config());
+    clear_disk_cache(resources);
 }
 
 void
-reset_disk_cache(inner_resources& resources)
+clear_disk_cache(inner_resources& resources)
 {
-    resources.reset_secondary_cache(make_inner_tests_config());
+    resources.clear_secondary_cache();
 }
 
 caching_request_resolution_context::caching_request_resolution_context()

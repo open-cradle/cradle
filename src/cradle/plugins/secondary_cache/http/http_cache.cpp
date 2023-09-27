@@ -55,7 +55,7 @@ http_cache::http_cache(
 }
 
 void
-http_cache::reset(service_config const& config)
+http_cache::clear()
 {
     throw not_implemented_error();
 }

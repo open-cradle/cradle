@@ -110,7 +110,7 @@ BM_try_resolve_testing_request(
                     }
                     if constexpr (need_empty_disk_cache)
                     {
-                        reset_disk_cache(resources);
+                        clear_disk_cache(resources);
                     }
                     if constexpr (pause_timing)
                     {
@@ -218,8 +218,8 @@ BENCHMARK(BM_resolve_make_some_blob<caching_level_type::full, false, oneM>)
     ->Apply(thousand_loops);
 #if 0
 /*
-Current problems with benchmarking disk caching:
-(a) The disk cache should be cleared between runs, but reset_disk_cache() does not do that.
+Current/previous problems with benchmarking disk caching:
+(a) The disk cache wasn't be cleared between runs; this has been fixed.
 (b) A race condition: issue #231.
 */
 BENCHMARK(BM_resolve_make_some_blob<caching_level_type::full, true>)

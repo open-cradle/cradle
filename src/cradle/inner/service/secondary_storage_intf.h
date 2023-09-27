@@ -18,10 +18,9 @@ class secondary_storage_intf
  public:
     virtual ~secondary_storage_intf() = default;
 
-    // Currently called from benchmark tests only, where it is expected to
-    // empty the cache, but that's not what's happening.
+    // Clear the cache, removing all entries.
     virtual void
-    reset(service_config const& config)
+    clear()
         = 0;
 
     // Reads the value for key.
