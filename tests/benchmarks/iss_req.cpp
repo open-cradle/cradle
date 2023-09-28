@@ -60,7 +60,6 @@ void
 BM_try_resolve_thinknode_request(
     benchmark::State& state,
     Req const& req,
-    string const& api_url,
     http_response const& response,
     char const* proxy_name_ptr = nullptr)
 {
@@ -83,15 +82,7 @@ BM_try_resolve_thinknode_request(
         std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
         scope.get_rpclib_client().mock_http(s);
     }
-    thinknode_session session;
-    session.api_url = api_url;
-    session.access_token = "xyz";
-    thinknode_request_context ctx{
-        resources,
-        session,
-        nullptr,
-        scope.get_proxy() != nullptr,
-        scope.get_proxy_name()};
+    auto ctx{scope.make_context()};
 
     // Fill the appropriate cache if any
     auto init = [&]() -> cppcoro::task<void> {
@@ -167,14 +158,13 @@ void
 BM_resolve_thinknode_request(
     benchmark::State& state,
     Req const& req,
-    string const& api_url,
     http_response const& response,
     char const* proxy_name = nullptr)
 {
     try
     {
         BM_try_resolve_thinknode_request<caching_level, storing, Req>(
-            state, req, api_url, response, proxy_name);
+            state, req, response, proxy_name);
     }
     catch (std::exception& e)
     {
@@ -193,7 +183,6 @@ template<
 void
 BM_resolve_post_iss_request(benchmark::State& state)
 {
-    string api_url{"https://mgh.thinknode.io/api/v1.0"};
     string context_id{"123"};
     auto schema{
         make_thinknode_type_info_with_string_type(thinknode_string_type())};
@@ -202,7 +191,7 @@ BM_resolve_post_iss_request(benchmark::State& state)
         rq_post_iss_object<caching_level>(context_id, schema, object_data)};
     auto response{make_http_200_response("{ \"id\": \"def\" }")};
     BM_resolve_thinknode_request<caching_level, storing>(
-        state, req, api_url, response, proxy_name);
+        state, req, response, proxy_name);
 }
 
 BENCHMARK(BM_resolve_post_iss_request<caching_level_type::none>)
@@ -236,14 +225,13 @@ template<
 void
 BM_resolve_retrieve_immutable_request(benchmark::State& state)
 {
-    string api_url{"https://mgh.thinknode.io/api/v1.0"};
     string context_id{"123"};
     string immutable_id{"abc"};
     auto req{
         rq_retrieve_immutable_object<caching_level>(context_id, immutable_id)};
     auto response{make_http_200_response("payload")};
     BM_resolve_thinknode_request<caching_level, storing>(
-        state, req, api_url, response, proxy_name);
+        state, req, response, proxy_name);
 }
 
 BENCHMARK(

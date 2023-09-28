@@ -1,5 +1,7 @@
 /*build*
+/out/
 .cache
+.vs
 .vscode
 .gcovr.txt
 .lcov.info

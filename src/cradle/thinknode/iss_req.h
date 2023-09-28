@@ -88,6 +88,23 @@ rq_retrieve_immutable_object(std::string context_id, ImmutableId immutable_id)
         normalize_arg<std::string, props_type>(std::move(immutable_id)));
 }
 
+// Creates a proxy "retrieve immutable object" request.
+template<typename ImmutableId>
+    requires TypedArg<ImmutableId, std::string>
+auto
+rq_proxy_retrieve_immutable_object(
+    std::string context_id, ImmutableId immutable_id)
+{
+    using props_type = thinknode_proxy_props;
+    request_uuid uuid{"rq_retrieve_immutable_object"};
+    uuid.set_level(caching_level_type::full);
+    std::string title{"retrieve_immutable_object"};
+    return rq_function_erased<blob>(
+        props_type{std::move(uuid), std::move(title)},
+        std::move(context_id),
+        normalize_arg<std::string, props_type>(std::move(immutable_id)));
+}
+
 // Creates a function_request_erased object representing a
 // "get ISS object metadata" request,
 // where object_id is either a plain string, or a subrequest yielding a string.

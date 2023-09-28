@@ -4,8 +4,10 @@
 #include <memory>
 #include <string>
 
+#include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/rpclib/client/proxy.h>
+#include <cradle/thinknode/context.h>
 #include <cradle/thinknode/service/core.h>
 
 namespace cradle {
@@ -47,6 +49,9 @@ class thinknode_test_scope
 
     rpclib_client&
     get_rpclib_client() const;
+
+    thinknode_request_context
+    make_context(tasklet_tracker* tasklet = nullptr);
 
  private:
     static inline const std::string dll_name_{"cradle_thinknode_v1"};

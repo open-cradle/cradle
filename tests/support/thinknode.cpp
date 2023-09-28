@@ -87,4 +87,14 @@ thinknode_test_scope::get_rpclib_client() const
     return static_cast<rpclib_client&>(*proxy_);
 }
 
+thinknode_request_context
+thinknode_test_scope::make_context(tasklet_tracker* tasklet)
+{
+    thinknode_session session;
+    session.api_url = "https://mgh.thinknode.io/api/v1.0";
+    session.access_token = "xyz";
+    return thinknode_request_context{
+        resources_, session, tasklet, proxy_ != nullptr, proxy_name_};
+}
+
 } // namespace cradle
