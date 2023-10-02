@@ -8,7 +8,6 @@
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/requests.h>
-#include <cradle/plugins/domain/testing/seri_catalog.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/client/registry.h>
 
@@ -54,7 +53,6 @@ test_make_some_blob(bool use_shared_memory)
     constexpr auto caching_level{caching_level_type::full};
     constexpr auto remotely{true};
     std::string proxy_name{"rpclib"};
-    register_testing_seri_resolvers();
     inner_resources service;
     init_test_inner_service(service);
     register_rpclib_client(make_inner_tests_config(), service);

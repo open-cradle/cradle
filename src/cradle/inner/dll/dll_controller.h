@@ -43,7 +43,7 @@ class dll_controller
     std::string name_;
     std::shared_ptr<spdlog::logger> logger_;
     std::unique_ptr<boost::dll::shared_library> lib_;
-    seri_catalog* catalog_{};
+    std::unique_ptr<selfreg_seri_catalog> catalog_;
 };
 
 } // namespace cradle

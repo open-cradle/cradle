@@ -6,7 +6,6 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/domain.h>
 #include <cradle/plugins/domain/testing/requests.h>
-#include <cradle/plugins/domain/testing/seri_catalog.h>
 #include <cradle/plugins/serialization/request/cereal_json.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 
@@ -20,7 +19,6 @@ static void
 test_resolve(bool remotely)
 {
     register_and_initialize_testing_domain();
-    register_testing_seri_resolvers();
     inner_resources resources;
     init_test_inner_service(resources);
     if (remotely)

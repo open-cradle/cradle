@@ -43,7 +43,7 @@ class catalog_id
     using wrapped_t = std::size_t;
 
     // Creates a unique id.
-    catalog_id();
+    catalog_id() noexcept;
 
     wrapped_t
     value() const

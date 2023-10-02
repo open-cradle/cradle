@@ -9,7 +9,6 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/domain.h>
 #include <cradle/plugins/domain/testing/requests.h>
-#include <cradle/plugins/domain/testing/seri_catalog.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/client/registry.h>
 
@@ -23,12 +22,11 @@ static void
 register_remote_services(
     inner_resources& resources, std::string const& proxy_name)
 {
-    static bool registered_resolvers = false;
-    if (!registered_resolvers)
+    static bool registered_domain = false;
+    if (!registered_domain)
     {
         register_and_initialize_testing_domain();
-        register_testing_seri_resolvers();
-        registered_resolvers = true;
+        registered_domain = true;
     }
     if (proxy_name == "loopback")
     {

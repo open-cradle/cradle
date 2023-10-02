@@ -87,7 +87,7 @@ target_link_libraries(test_inner_dll_x1 PUBLIC
 set(srcs_inner_dll_x0x1
     "inner-dll/x0/adder_x0_impl.cpp"
     "inner-dll/x1/multiplier_x1_impl.cpp"
-    "inner-dll/x0x1/seri_catalog_x0x1.cpp")
+    "inner-dll/x0x1/test_seri_catalog_x0x1.cpp")
 add_library(test_inner_dll_x0x1 MODULE ${srcs_inner_dll_x0x1})
 target_link_libraries(test_inner_dll_x0x1 PUBLIC
     cradle_inner)

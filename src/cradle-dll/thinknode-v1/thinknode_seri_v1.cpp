@@ -1,7 +1,4 @@
-#include <atomic>
-
 #include <cereal/types/map.hpp>
-#include <spdlog/spdlog.h>
 
 #include "thinknode_seri_v1.h"
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
@@ -33,38 +30,6 @@ namespace cradle {
  * objects must also be registered, hence the
  * seri_catalog::register_resolver() calls.
  */
-
-thinknode_seri_catalog_v1::thinknode_seri_catalog_v1(bool auto_register)
-    : seri_catalog()
-{
-    if (auto_register)
-    {
-        register_all();
-    }
-}
-
-void
-thinknode_seri_catalog_v1::register_all()
-{
-    // TODO really need to be thread-safe?
-    if (registered_.exchange(true, std::memory_order_relaxed))
-    {
-        auto logger{spdlog::get("cradle")};
-        logger->warn("Ignoring spurious register_all() call");
-        return;
-    }
-    try
-    {
-        try_register_all();
-    }
-    catch (...)
-    {
-        unregister_all();
-        throw;
-    }
-    registered_ = true;
-}
-
 void
 thinknode_seri_catalog_v1::try_register_all()
 {
@@ -84,13 +49,6 @@ thinknode_seri_catalog_v1::try_register_all()
         "sample context id", "sample object id"));
     register_resolver(rq_resolve_iss_object_to_immutable<level>(
         "sample context id", "sample object id", false));
-}
-
-void
-thinknode_seri_catalog_v1::unregister_all() noexcept
-{
-    seri_catalog::unregister_all();
-    registered_ = false;
 }
 
 } // namespace cradle

@@ -9,7 +9,7 @@
 #include <cradle/inner/service/request_store.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/requests.h>
-#include <cradle/plugins/domain/testing/seri_catalog.h>
+#include <cradle/plugins/domain/testing/testing_seri_catalog.h>
 #include <cradle/plugins/requests_storage/http/http_requests_storage_factory.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 
@@ -62,7 +62,8 @@ static std::string const the_key
 
 TEST_CASE("store request", tag_store)
 {
-    register_testing_seri_resolvers();
+    testing_seri_catalog cat;
+    cat.register_all();
 
     http_requests_storage_factory factory;
     inner_resources resources;
@@ -77,7 +78,8 @@ TEST_CASE("store request", tag_store)
 
 TEST_CASE("load stored request", tag_load)
 {
-    register_testing_seri_resolvers();
+    testing_seri_catalog cat;
+    cat.register_all();
 
     http_requests_storage_factory factory;
     inner_resources resources;
@@ -94,7 +96,8 @@ TEST_CASE("load stored request", tag_load)
 
 TEST_CASE("load and resolve stored request", tag_load)
 {
-    register_testing_seri_resolvers();
+    testing_seri_catalog cat;
+    cat.register_all();
 
     http_requests_storage_factory factory;
     inner_resources resources;

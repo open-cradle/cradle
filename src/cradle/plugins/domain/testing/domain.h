@@ -2,6 +2,7 @@
 #define CRADLE_PLUGINS_DOMAIN_TESTING_DOMAIN_H
 
 #include <cradle/inner/requests/domain.h>
+#include <cradle/plugins/domain/testing/testing_seri_catalog.h>
 
 namespace cradle {
 
@@ -25,6 +26,9 @@ class testing_domain : public domain
     make_local_async_context(
         inner_resources& resources,
         service_config const& config) const override;
+
+ private:
+    testing_seri_catalog cat_;
 };
 
 /*

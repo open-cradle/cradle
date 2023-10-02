@@ -1,6 +1,7 @@
 #include <fmt/format.h>
 
 #include <cradle/inner/dll/dll_controller.h>
+#include <cradle/inner/dll/dll_exceptions.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/utilities/logging.h>
 
@@ -32,25 +33,19 @@ dll_controller::load()
         | boost::dll::load_mode::rtld_deepbind};
     lib_ = std::make_unique<boost::dll::shared_library>(path_, mode);
 
-    typedef void init_func_t();
-    std::string const init_func_name{"CRADLE_init"};
-    typedef seri_catalog* get_catalog_func_t();
-    std::string const get_catalog_func_name{"CRADLE_get_catalog"};
+    typedef selfreg_seri_catalog* create_catalog_func_t();
+    std::string const create_catalog_func_name{"CRADLE_create_seri_catalog"};
 
-    auto init_func = lib_->get<init_func_t>(init_func_name);
-    init_func();
-
-    // TODO if init_func fails, data specific for this DLL may have been stored
-    // in the singletons, and would/should be accessible through catalog_ but
-    // we don't have retrieved that yet
-
-    auto get_catalog_func
-        = lib_->get<get_catalog_func_t>(get_catalog_func_name);
-    // TODO the only thing done with the catalog is to retrieve its cat_id.
-    // Consider changing the interface to the DLL.
-    catalog_ = get_catalog_func();
+    auto create_catalog_func
+        = lib_->get<create_catalog_func_t>(create_catalog_func_name);
+    catalog_.reset(create_catalog_func());
+    if (!catalog_)
+    {
+        throw dll_load_error("create_catalog_func() failed");
+    }
     auto cat_id_value{catalog_->get_cat_id().value()};
     logger_->info("load done for {} -> cat_id {}", name_, cat_id_value);
+    catalog_->register_all();
     seri_registry::instance().log_all_entries(
         fmt::format("after load cat_id {}", cat_id_value));
 }
@@ -62,15 +57,14 @@ dll_controller::unload()
     {
         logger_->info(
             "unload {} (cat_id {})", name_, catalog_->get_cat_id().value());
-        catalog_->unregister_all();
-        catalog_ = nullptr;
+        catalog_.reset();
     }
     else
     {
         logger_->warn("unload {} - no catalog", name_);
     }
-    // The following would unload the DLL, causing a ~seri_catalog() call
-    // unregistering the catalog's resolvers if that wasn't done yet.
+    // The following would unload the DLL, causing a ~selfreg_seri_catalog()
+    // call unregistering the catalog's resolvers if that wasn't done yet.
     // As we (currently) have no guarantee that no other references to the
     // DLL's code remain, we do not really unload the DLL.
     // lib_.reset();

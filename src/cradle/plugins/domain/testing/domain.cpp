@@ -1,13 +1,12 @@
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/domain.h>
-#include <cradle/plugins/domain/testing/seri_catalog.h>
 
 namespace cradle {
 
 void
 testing_domain::initialize()
 {
-    register_testing_seri_resolvers();
+    cat_.register_all();
 }
 
 std::string

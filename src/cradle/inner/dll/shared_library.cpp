@@ -2,6 +2,7 @@
 #include <spdlog/spdlog.h>
 
 #include <cradle/inner/dll/dll_controller.h>
+#include <cradle/inner/dll/dll_exceptions.h>
 #include <cradle/inner/dll/dll_singleton.h>
 #include <cradle/inner/dll/shared_library.h>
 #include <cradle/inner/utilities/logging.h>
@@ -31,20 +32,18 @@ load_shared_library(std::string const& dir_path, std::string const& dll_name)
     }
     catch (std::exception& e)
     {
-        // e's actual type may be defined in the DLL; if so, its code will
-        // disappear in controller's destructor.
-        // TODO what if any of the following lines throws?
+        // e's actual type may be defined in the DLL. If so, its code may
+        // disappear in controller's destructor, so throw a fresh exception
+        // from here, containing a copy of e.what().
         std::string what{e.what()};
         logger->error(
             "load_shared_library({}, {}) failed: {}",
             dir_path,
             dll_name,
             what);
-        // TODO unload() may also fail
         controller->unload();
         throw dll_load_error{what};
     }
-    // TODO what if the following fails?
     the_dlls.add(std::move(controller));
 }
 
