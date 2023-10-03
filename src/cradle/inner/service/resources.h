@@ -16,6 +16,7 @@
 #include <cradle/inner/io/http_requests.h>
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/remote/proxy.h>
+#include <cradle/inner/requests/domain.h>
 #include <cradle/inner/service/config.h>
 #include <cradle/inner/service/secondary_storage_intf.h>
 
@@ -109,6 +110,12 @@ class inner_resources
 
     cppcoro::static_thread_pool&
     get_async_thread_pool();
+
+    void
+    register_domain(std::unique_ptr<domain> dom);
+
+    domain&
+    find_domain(std::string const& name);
 
     void
     register_proxy(std::unique_ptr<remote_proxy> proxy);

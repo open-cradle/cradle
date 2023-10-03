@@ -7,23 +7,11 @@
 #include "thinknode.h"
 #include <cradle/inner/dll/shared_library.h>
 #include <cradle/inner/remote/loopback.h>
-#include <cradle/plugins/domain/all/all_domains.h>
 #include <cradle/rpclib/client/registry.h>
+#include <cradle/thinknode/domain_factory.h>
 #include <cradle/thinknode_dlls_dir.h>
 
 namespace cradle {
-
-void
-ensure_all_domains_registered()
-{
-    static bool registered{false};
-    if (!registered)
-    {
-        // TODO unregister when done; part of resources?
-        register_and_initialize_all_domains();
-        registered = true;
-    }
-}
 
 thinknode_test_scope::thinknode_test_scope(std::string const& proxy_name)
     : proxy_name_{proxy_name}
@@ -60,8 +48,10 @@ thinknode_test_scope::register_remote()
     {
         if (proxy_name_ == "loopback")
         {
-            // TODO unregister remote service in dtor
-            register_loopback_service(make_inner_tests_config(), resources_);
+            auto loopback{std::make_unique<loopback_service>(
+                make_inner_tests_config(), resources_)};
+            resources_.register_domain(create_thinknode_domain(resources_));
+            resources_.register_proxy(std::move(loopback));
         }
         else if (proxy_name_ == "rpclib")
         {

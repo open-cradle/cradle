@@ -63,7 +63,6 @@ BM_try_resolve_thinknode_request(
     http_response const& response,
     char const* proxy_name_ptr = nullptr)
 {
-    ensure_all_domains_registered();
     std::string proxy_name;
     if (proxy_name_ptr)
     {

@@ -1917,7 +1917,6 @@ initialize(websocket_server_impl& server, service_config const& config)
             on_message(server, hdl, message);
         });
 
-    register_and_initialize_thinknode_domain();
     register_rpclib_client(config, server.core);
 
     // TODO maybe delay loading Thinknode DLL until really needed

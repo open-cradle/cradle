@@ -68,6 +68,8 @@ class seri_catalog
  protected:
     std::shared_ptr<spdlog::logger> logger_;
 
+    // Unregisters all resolvers that were successfully registered
+    // Not thread-safe
     void
     unregister_all() noexcept;
 
@@ -94,8 +96,6 @@ class selfreg_seri_catalog : public seri_catalog
 {
  public:
     selfreg_seri_catalog() noexcept = default;
-
-    virtual ~selfreg_seri_catalog();
 
     // Registers all the catalog's seri resolvers.
     // Throws on error.

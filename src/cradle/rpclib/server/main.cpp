@@ -20,12 +20,13 @@
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/utilities/git.h>
 #include <cradle/inner/utilities/logging.h>
-#include <cradle/plugins/domain/all/all_domains.h>
+#include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/secondary_cache/all_plugins.h>
 #include <cradle/plugins/secondary_cache/http/http_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/rpclib/common/common.h>
 #include <cradle/rpclib/server/handlers.h>
+#include <cradle/thinknode/domain_factory.h>
 #include <cradle/thinknode/service/core.h>
 #include <cradle/version_info.h>
 
@@ -144,9 +145,9 @@ run_server(cli_options const& options)
     service_config config{create_config_map(options)};
     service.initialize(config);
     service.ensure_async_db();
+    service.register_domain(create_testing_domain(service));
+    service.register_domain(create_thinknode_domain(service));
     rpclib_handler_context hctx{config, service, *my_logger};
-
-    register_and_initialize_all_domains();
 
     rpc::server srv("127.0.0.1", options.port);
     my_logger->info("listening on port {}", srv.port());

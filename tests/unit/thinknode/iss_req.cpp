@@ -207,8 +207,6 @@ test_post_iss_requests_parallel(
     auto config{make_outer_tests_config()};
     resources.reset_memory_cache(config);
     resources.clear_secondary_cache();
-    // Still need domain to create context object
-    ensure_all_domains_registered();
     constexpr caching_level_type level = Request::caching_level;
     clean_tasklet_admin_fixture fixture;
 
@@ -443,8 +441,6 @@ test_retrieve_immutable_object_parallel(
     // TODO clear remote cache for rpclib?
     resources.reset_memory_cache(config);
     resources.clear_secondary_cache();
-    // Still need domain to create context object
-    ensure_all_domains_registered();
     constexpr caching_level_type level = Request::caching_level;
 
     mock_http_session* mock_http{nullptr};

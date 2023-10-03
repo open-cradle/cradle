@@ -70,6 +70,12 @@ class inner_resources_impl
     get_async_db();
 
     void
+    register_domain(std::unique_ptr<domain> dom);
+
+    domain&
+    find_domain(std::string const& name);
+
+    void
     register_proxy(std::unique_ptr<remote_proxy> proxy);
 
     remote_proxy&
@@ -81,6 +87,7 @@ class inner_resources_impl
     std::unique_ptr<secondary_storage_intf> secondary_cache_;
     std::unique_ptr<blob_file_directory> blob_dir_;
     std::unique_ptr<async_db> async_db_instance_;
+    std::unordered_map<std::string, std::unique_ptr<domain>> domains_;
     std::unordered_map<std::string, std::unique_ptr<remote_proxy>> proxies_;
 
     cppcoro::static_thread_pool http_pool_;

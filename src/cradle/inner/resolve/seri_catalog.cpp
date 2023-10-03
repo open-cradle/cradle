@@ -42,14 +42,6 @@ seri_catalog::ensure_my_logger()
     }
 }
 
-selfreg_seri_catalog::~selfreg_seri_catalog()
-{
-    // Not thread-safe
-    // Unregisters all resolvers that were successfully registered
-    unregister_all();
-    registered_ = false;
-}
-
 void
 selfreg_seri_catalog::register_all()
 {

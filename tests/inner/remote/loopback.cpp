@@ -2,9 +2,9 @@
 #include <cppcoro/sync_wait.hpp>
 
 #include <cradle/inner/remote/loopback.h>
-#include <cradle/inner/requests/domain.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/domain.h>
+#include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
 
 #include "../../support/inner_service.h"
@@ -18,14 +18,15 @@ static char const tag[] = "[inner][remote][loopback]";
 void
 test_make_some_blob(bool async, bool shared)
 {
-    register_and_initialize_testing_domain();
     constexpr auto caching_level{caching_level_type::full};
     constexpr auto remotely{true};
-    auto dom{find_domain("testing")};
     std::string proxy_name{"loopback"};
     inner_resources resources;
     init_test_inner_service(resources);
-    register_loopback_service(make_inner_tests_config(), resources);
+    auto loopback{std::make_unique<loopback_service>(
+        make_inner_tests_config(), resources)};
+    resources.register_domain(create_testing_domain(resources));
+    resources.register_proxy(std::move(loopback));
 
     auto req{rq_make_some_blob<caching_level>(10000, shared)};
     blob response;

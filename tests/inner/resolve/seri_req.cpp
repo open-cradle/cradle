@@ -4,8 +4,9 @@
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/domain/testing/domain.h>
+#include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
+#include <cradle/plugins/domain/testing/testing_seri_catalog.h>
 #include <cradle/plugins/serialization/request/cereal_json.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 
@@ -18,12 +19,19 @@ static char const tag[] = "[inner][resolve][seri_req]";
 static void
 test_resolve(bool remotely)
 {
-    register_and_initialize_testing_domain();
+    // TODO separate resources local/loopback
     inner_resources resources;
     init_test_inner_service(resources);
     if (remotely)
     {
-        register_loopback_service(make_inner_tests_config(), resources);
+        auto loopback{std::make_unique<loopback_service>(
+            make_inner_tests_config(), resources)};
+        resources.register_domain(create_testing_domain(resources));
+        resources.register_proxy(std::move(loopback));
+    }
+    else
+    {
+        // TODO register testing domain locally with resources
     }
     testing_request_context ctx{resources, nullptr, remotely, "loopback"};
 
@@ -41,6 +49,8 @@ test_resolve(bool remotely)
 
 TEST_CASE("resolve serialized request, locally", tag)
 {
+    testing_seri_catalog cat; // TODO move to test_resolve()
+    cat.register_all();
     test_resolve(false);
 }
 

@@ -15,7 +15,7 @@
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/domain/testing/context.h>
-#include <cradle/plugins/domain/testing/domain.h>
+#include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/rpclib/client/registry.h>
 
@@ -31,14 +31,16 @@ make_test_uuid(int ext)
     return request_uuid{fmt::format("{}-{:04d}", tag, ext)};
 }
 
-// TODO? have two inner_resources instances; one for test, one for loopback
+// TODO have two inner_resources instances; one for test, one for loopback
 void
-setup_loopback_test(inner_resources& inner)
+setup_loopback_test(inner_resources& resources)
 {
-    init_test_inner_service(inner);
-    inner.ensure_async_db();
-    register_loopback_service(make_inner_tests_config(), inner);
-    register_and_initialize_testing_domain();
+    init_test_inner_service(resources);
+    resources.ensure_async_db();
+    auto loopback{std::make_unique<loopback_service>(
+        make_inner_tests_config(), resources)};
+    resources.register_domain(create_testing_domain(resources));
+    resources.register_proxy(std::move(loopback));
 }
 
 void

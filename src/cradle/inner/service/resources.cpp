@@ -101,6 +101,18 @@ inner_resources::get_async_thread_pool()
 }
 
 void
+inner_resources::register_domain(std::unique_ptr<domain> dom)
+{
+    impl_->register_domain(std::move(dom));
+}
+
+domain&
+inner_resources::find_domain(std::string const& name)
+{
+    return impl_->find_domain(name);
+}
+
+void
 inner_resources::register_proxy(std::unique_ptr<remote_proxy> proxy)
 {
     impl_->register_proxy(std::move(proxy));
@@ -238,6 +250,24 @@ async_db*
 inner_resources_impl::get_async_db()
 {
     return async_db_instance_ ? &*async_db_instance_ : nullptr;
+}
+
+void
+inner_resources_impl::register_domain(std::unique_ptr<domain> dom)
+{
+    std::string dom_name{dom->name()};
+    domains_.insert(std::make_pair(dom_name, std::move(dom)));
+}
+
+domain&
+inner_resources_impl::find_domain(std::string const& name)
+{
+    auto it = domains_.find(name);
+    if (it == domains_.end())
+    {
+        throw std::domain_error(fmt::format("unknown domain {}", name));
+    }
+    return *it->second;
 }
 
 void

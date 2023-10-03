@@ -66,14 +66,13 @@ resolve_sync(
     std::string config_json,
     std::string seri_req)
 {
-    auto& service{hctx.service()};
     auto& logger{hctx.logger()};
     service_config config{read_config_map_from_json(config_json)};
     auto domain_name
         = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
     logger.info("resolve_sync {}: {}", domain_name, seri_req);
-    auto dom = find_domain(domain_name);
-    auto ctx{dom->make_local_sync_context(service, config)};
+    auto& dom = hctx.service().find_domain(domain_name);
+    auto ctx{dom.make_local_sync_context(config)};
     cppcoro::task<serialized_result> task;
     auto optional_client_tasklet_id
         = config.get_optional_number(remote_config_keys::TASKLET_ID);
@@ -196,15 +195,14 @@ handle_submit_async(
     std::string seri_req)
 try
 {
-    auto& service{hctx.service()};
     auto& logger{hctx.logger()};
     service_config config{read_config_map_from_json(config_json)};
     auto domain_name
         = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
     logger.info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
-    auto dom = find_domain(domain_name);
-    auto ctx{dom->make_local_async_context(service, config)};
+    auto& dom = hctx.service().find_domain(domain_name);
+    auto ctx{dom.make_local_async_context(config)};
     if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*ctx))
     {
         atst_ctx->apply_fail_submit_async();

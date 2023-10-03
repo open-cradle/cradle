@@ -536,14 +536,6 @@ target_link_libraries(cradle_thinknode PUBLIC
     cppcoro
     spdlog::spdlog)
 
-# A library of plugins depending on the thinknode library
-file(GLOB_RECURSE srcs_plugins_thinknode CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/all/*.cpp")
-add_library(cradle_plugins_thinknode SHARED ${srcs_plugins_thinknode})
-target_link_libraries(cradle_plugins_thinknode PUBLIC
-    cradle_thinknode
-    cradle_plugins_inner)
-
 # The websocket library adds more Thinknode requests, and a WebSocket interface
 file(GLOB_RECURSE srcs_websocket CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/websocket/*.cpp")
@@ -592,7 +584,6 @@ file(GLOB_RECURSE srcs_rpclib_server CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/server/*.cpp")
 add_executable(rpclib_server ${srcs_rpclib_server})
 target_link_libraries(rpclib_server PRIVATE
-    cradle_plugins_thinknode
     cradle_thinknode
     cradle_plugins_inner
     Boost::headers
@@ -641,7 +632,7 @@ if(CRADLE_INSTALL)
     install(
         TARGETS
             cradle_inner cradle_typing lib_third_party cradle_plugins_inner
-            cradle_plugins_typing cradle_thinknode cradle_plugins_thinknode
+            cradle_plugins_typing cradle_thinknode
             cradle_rpclib_client cradle_websocket cradle_external cppcoro
         EXPORT CradleTargets
         LIBRARY DESTINATION lib

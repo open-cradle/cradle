@@ -6,7 +6,6 @@
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/remote/loopback.h>
-#include <cradle/inner/remote/loopback_impl.h>
 #include <cradle/inner/requests/domain.h>
 #include <cradle/inner/requests/test_context.h>
 #include <cradle/inner/resolve/seri_req.h>
@@ -46,8 +45,8 @@ loopback_service::resolve_sync(service_config config, std::string seri_req)
     auto domain_name{
         config.get_mandatory_string(remote_config_keys::DOMAIN_NAME)};
     logger_->debug("resolve_sync({}): request {}", domain_name, seri_req);
-    auto dom = find_domain(domain_name);
-    auto ctx{dom->make_local_sync_context(resources_, config)};
+    auto& dom = resources_.find_domain(domain_name);
+    auto ctx{dom.make_local_sync_context(config)};
     auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(*ctx)};
     auto result = cppcoro::sync_wait(
         resolve_serialized_local(loc_ctx, std::move(seri_req)));
@@ -95,8 +94,8 @@ loopback_service::submit_async(service_config config, std::string seri_req)
         = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
     logger_->info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
-    auto dom = find_domain(domain_name);
-    auto ctx{dom->make_local_async_context(resources_, config)};
+    auto& dom = resources_.find_domain(domain_name);
+    auto ctx{dom.make_local_async_context(config)};
     if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*ctx))
     {
         test_ctx->apply_fail_submit_async();

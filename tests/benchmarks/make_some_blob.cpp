@@ -7,7 +7,7 @@
 
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/domain/testing/domain.h>
+#include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/client/registry.h>
@@ -25,12 +25,15 @@ register_remote_services(
     static bool registered_domain = false;
     if (!registered_domain)
     {
-        register_and_initialize_testing_domain();
+        // TODO register_and_initialize_testing_domain();
         registered_domain = true;
     }
     if (proxy_name == "loopback")
     {
-        register_loopback_service(make_inner_tests_config(), resources);
+        auto loopback{std::make_unique<loopback_service>(
+            make_inner_tests_config(), resources)};
+        resources.register_domain(create_testing_domain(resources));
+        resources.register_proxy(std::move(loopback));
     }
     else if (proxy_name == "rpclib")
     {

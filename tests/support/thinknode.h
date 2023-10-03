@@ -12,9 +12,6 @@
 
 namespace cradle {
 
-void
-ensure_all_domains_registered();
-
 // Existence of an object of this class makes it possible to create,
 // deserialize and resolve Thinknode requests via the local or remote
 // service identified by proxy_name.
