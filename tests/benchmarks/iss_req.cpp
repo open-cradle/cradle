@@ -70,16 +70,16 @@ BM_try_resolve_thinknode_request(
     }
     thinknode_test_scope scope{proxy_name};
     auto& resources{scope.get_resources()};
-    if (scope.get_proxy_name() != "rpclib")
-    {
-        auto& mock_http = enable_http_mocking(resources);
-        mock_http.set_canned_response(response);
-    }
-    else
+    if (auto proxy = scope.get_proxy())
     {
         auto const& body{response.body};
         std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
-        scope.get_rpclib_client().mock_http(s);
+        proxy->mock_http(s);
+    }
+    else
+    {
+        auto& mock_http = enable_http_mocking(resources);
+        mock_http.set_canned_response(response);
     }
     auto ctx{scope.make_context()};
 

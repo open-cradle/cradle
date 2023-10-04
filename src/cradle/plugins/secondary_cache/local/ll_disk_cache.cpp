@@ -10,6 +10,7 @@
 #include <sqlite3.h>
 
 #include <cradle/inner/fs/app_dirs.h>
+#include <cradle/inner/fs/utilities.h>
 #include <cradle/inner/utilities/errors.h>
 #include <cradle/inner/utilities/text.h>
 
@@ -470,6 +471,21 @@ remove_entry(ll_disk_cache_impl& cache, int64_t id, bool remove_file = true)
 }
 
 static void
+remove_all_entries(ll_disk_cache_impl& cache)
+{
+    for (auto const& entry : get_lru_entries(cache))
+    {
+        try
+        {
+            remove_entry(cache, entry.id, !entry.in_db);
+        }
+        catch (...)
+        {
+        }
+    }
+}
+
+static void
 enforce_cache_size_limit(ll_disk_cache_impl& cache)
 {
     try
@@ -609,9 +625,14 @@ initialize(ll_disk_cache_impl& cache, ll_disk_cache_config const& config)
 {
     cache.dir = config.directory ? file_path(*config.directory)
                                  : get_shared_cache_dir(none, "cradle");
-    // Create the directory if it doesn't exist.
-    if (!exists(cache.dir))
+    if (config.start_empty)
+    {
+        reset_directory(cache.dir);
+    }
+    else if (!exists(cache.dir))
+    {
         create_directory(cache.dir);
+    }
 
     cache.size_limit = config.size_limit.value_or(0x40'00'00'00);
 
@@ -626,8 +647,7 @@ initialize(ll_disk_cache_impl& cache, ll_disk_cache_config const& config)
         // database, so shut everything down, clear out the directory, and try
         // again.
         shut_down(cache);
-        for (auto& p : std::filesystem::directory_iterator(cache.dir))
-            remove_all(p.path());
+        reset_directory(cache.dir);
         open_and_check_db(cache);
     }
 
@@ -679,6 +699,10 @@ initialize(ll_disk_cache_impl& cache, ll_disk_cache_config const& config)
         "select id, size, in_db from entries"
         " order by valid, last_accessed;");
 
+    if (config.start_empty)
+    {
+        remove_all_entries(cache);
+    }
     // Do initial housekeeping.
     record_activity(cache);
     enforce_cache_size_limit(cache);
@@ -761,17 +785,7 @@ ll_disk_cache::clear()
 {
     auto& cache = *this->impl_;
     std::scoped_lock<std::mutex> lock(cache.mutex);
-
-    for (auto const& entry : get_lru_entries(cache))
-    {
-        try
-        {
-            cradle::remove_entry(cache, entry.id, !entry.in_db);
-        }
-        catch (...)
-        {
-        }
-    }
+    remove_all_entries(cache);
 }
 
 optional<ll_disk_cache_entry>

@@ -44,9 +44,6 @@ class thinknode_test_scope
         return proxy_;
     }
 
-    rpclib_client&
-    get_rpclib_client() const;
-
     thinknode_request_context
     make_context(tasklet_tracker* tasklet = nullptr);
 
@@ -59,6 +56,9 @@ class thinknode_test_scope
 
     void
     register_remote();
+
+    void
+    init_loopback_service();
 };
 
 } // namespace cradle

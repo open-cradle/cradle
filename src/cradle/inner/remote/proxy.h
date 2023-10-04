@@ -161,6 +161,12 @@ class remote_proxy
     virtual void
     unload_shared_library(std::string dll_name)
         = 0;
+
+    // Instructs the server to mock all HTTP requests, returning a 200
+    // response with response_body for each.
+    virtual void
+    mock_http(std::string const& response_body)
+        = 0;
 };
 
 } // namespace cradle

@@ -31,23 +31,21 @@ make_test_uuid(int ext)
     return request_uuid{fmt::format("{}-{:04d}", tag, ext)};
 }
 
-// TODO have two inner_resources instances; one for test, one for loopback
 void
 setup_loopback_test(inner_resources& resources)
 {
     init_test_inner_service(resources);
+    init_test_loopback_service(resources);
+    // TODO following line should be in loopback?
     resources.ensure_async_db();
-    auto loopback{std::make_unique<loopback_service>(
-        make_inner_tests_config(), resources)};
-    resources.register_domain(create_testing_domain(resources));
-    resources.register_proxy(std::move(loopback));
 }
 
 void
-setup_rpclib_test(inner_resources& inner)
+setup_rpclib_test(inner_resources& resources)
 {
-    init_test_inner_service(inner);
-    register_rpclib_client(make_inner_tests_config(), inner);
+    init_test_inner_service(resources);
+    // TODO revise register_rpclib_client()
+    register_rpclib_client(make_inner_tests_config(), resources);
 }
 
 template<typename Ctx, typename Req, typename Constraints>

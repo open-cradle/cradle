@@ -97,6 +97,12 @@ class test_proxy : public remote_proxy
         throw not_implemented_error("test_proxy::unload_shared_library()");
     }
 
+    void
+    mock_http(std::string const& response_body) override
+    {
+        throw not_implemented_error("test_proxy::mock_http()");
+    }
+
  private:
     std::string name_;
 };

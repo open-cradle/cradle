@@ -26,6 +26,7 @@ target_link_libraries(test_lib_unit PUBLIC
     cradle_plugins_inner)
 
 # Add the unit test runner.
+# TODO try not to build support/inner_service.cpp (etc.) for each test runner
 add_executable(unit_test_runner)
 target_sources(unit_test_runner PRIVATE
     support/inner_service.cpp

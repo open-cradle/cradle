@@ -21,7 +21,6 @@ class domain
     name() const
         = 0;
 
-    // TODO can these be unique_ptr?
     virtual std::shared_ptr<sync_context_intf>
     make_local_sync_context(service_config const& config) const = 0;
 

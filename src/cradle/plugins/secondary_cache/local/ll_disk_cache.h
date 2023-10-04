@@ -35,6 +35,7 @@ struct ll_disk_cache_config
 {
     std::optional<std::string> directory;
     std::optional<size_t> size_limit;
+    bool start_empty;
 };
 
 struct ll_disk_cache_info
@@ -86,8 +87,9 @@ CRADLE_DEFINE_ERROR_INFO(file_path, ll_disk_cache_path)
 
 struct ll_disk_cache_impl;
 
-struct ll_disk_cache
+class ll_disk_cache
 {
+ public:
     // The default constructor creates an invalid disk cache that must be
     // initialized via reset().
     ll_disk_cache();

@@ -29,7 +29,9 @@ struct loopback_config_keys
 class loopback_service : public remote_proxy
 {
  public:
-    loopback_service(service_config const& config, inner_resources& resources);
+    loopback_service(
+        service_config const& config,
+        std::unique_ptr<inner_resources> resources);
 
     std::string
     name() const override;
@@ -70,10 +72,13 @@ class loopback_service : public remote_proxy
     void
     unload_shared_library(std::string dll_name) override;
 
+    void
+    mock_http(std::string const& response_body) override;
+
  private:
-    inner_resources& resources_;
+    std::unique_ptr<inner_resources> resources_;
     bool testing_;
-    inline static std::shared_ptr<spdlog::logger> logger_;
+    std::shared_ptr<spdlog::logger> logger_;
     BS::thread_pool async_pool_;
 
     async_db&

@@ -30,10 +30,7 @@ register_remote_services(
     }
     if (proxy_name == "loopback")
     {
-        auto loopback{std::make_unique<loopback_service>(
-            make_inner_tests_config(), resources)};
-        resources.register_domain(create_testing_domain(resources));
-        resources.register_proxy(std::move(loopback));
+        init_test_loopback_service(resources);
     }
     else if (proxy_name == "rpclib")
     {

@@ -211,7 +211,17 @@ test_post_iss_requests_parallel(
     clean_tasklet_admin_fixture fixture;
 
     mock_http_session* mock_http{nullptr};
-    if (scope.get_proxy_name() != "rpclib")
+    if (auto proxy = scope.get_proxy())
+    {
+        // Assumes a single request/response
+        auto response{
+            make_http_200_response("{ \"id\": \"" + results[0] + "\" }")};
+        // TODO should body be blob or string?
+        auto const& body{response.body};
+        std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
+        proxy->mock_http(s);
+    }
+    else
     {
         mock_http_script script;
         for (unsigned i = 0; i < payloads.size(); ++i)
@@ -229,16 +239,6 @@ test_post_iss_requests_parallel(
         }
         mock_http = &enable_http_mocking(resources);
         mock_http->set_script(script);
-    }
-    else
-    {
-        // Assumes a single request/response
-        auto response{
-            make_http_200_response("{ \"id\": \"" + results[0] + "\" }")};
-        // TODO should body be blob or string?
-        auto const& body{response.body};
-        std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
-        scope.get_rpclib_client().mock_http(s);
     }
 
     tasklet_tracker* tasklet = nullptr;
@@ -444,7 +444,16 @@ test_retrieve_immutable_object_parallel(
     constexpr caching_level_type level = Request::caching_level;
 
     mock_http_session* mock_http{nullptr};
-    if (scope.get_proxy_name() != "rpclib")
+    if (auto proxy = scope.get_proxy())
+    {
+        // Assumes a single request/response
+        auto response{make_http_200_response(responses[0])};
+        // TODO should body be blob or string?
+        auto const& body{response.body};
+        std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
+        proxy->mock_http(s);
+    }
+    else
     {
         mock_http_script script;
         for (unsigned i = 0; i < object_ids.size(); ++i)
@@ -461,15 +470,6 @@ test_retrieve_immutable_object_parallel(
         }
         mock_http = &enable_http_mocking(resources);
         mock_http->set_script(script);
-    }
-    else
-    {
-        // Assumes a single request/response
-        auto response{make_http_200_response(responses[0])};
-        // TODO should body be blob or string?
-        auto const& body{response.body};
-        std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
-        scope.get_rpclib_client().mock_http(s);
     }
 
     auto ctx{scope.make_context()};

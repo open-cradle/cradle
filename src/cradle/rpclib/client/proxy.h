@@ -67,10 +67,8 @@ class rpclib_client : public remote_proxy
     void
     unload_shared_library(std::string dll_name) override;
 
-    // Instructs the RPC server to mock all HTTP requests, returning a 200
-    // response with response_body for each.
     void
-    mock_http(std::string const& response_body);
+    mock_http(std::string const& response_body) override;
 
     // Tests if the rpclib server is running, throws rpc::system_error if not.
     // Returns a compatibility identifier.

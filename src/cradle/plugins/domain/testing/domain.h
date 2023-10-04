@@ -7,12 +7,12 @@
 
 namespace cradle {
 
+// Factory of contexts needed for resolving a testing request, plus a catalog
+// of resolvers for serialized testing requests.
 class testing_domain : public domain
 {
  public:
     testing_domain(inner_resources& resources);
-
-    ~testing_domain() = default;
 
     std::string
     name() const override;

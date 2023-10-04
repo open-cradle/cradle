@@ -19,19 +19,17 @@ static char const tag[] = "[inner][resolve][seri_req]";
 static void
 test_resolve(bool remotely)
 {
-    // TODO separate resources local/loopback
     inner_resources resources;
     init_test_inner_service(resources);
     if (remotely)
     {
-        auto loopback{std::make_unique<loopback_service>(
-            make_inner_tests_config(), resources)};
-        resources.register_domain(create_testing_domain(resources));
-        resources.register_proxy(std::move(loopback));
+        // Loopback service registers testing domain by default
+        // resources.register_domain(create_testing_domain(resources));
+        init_test_loopback_service(resources);
     }
     else
     {
-        // TODO register testing domain locally with resources
+        resources.register_domain(create_testing_domain(resources));
     }
     testing_request_context ctx{resources, nullptr, remotely, "loopback"};
 
@@ -49,8 +47,6 @@ test_resolve(bool remotely)
 
 TEST_CASE("resolve serialized request, locally", tag)
 {
-    testing_seri_catalog cat; // TODO move to test_resolve()
-    cat.register_all();
     test_resolve(false);
 }
 

@@ -2,6 +2,7 @@
 #define CRADLE_TESTS_SUPPORT_INNER_SERVICE_H
 
 #include <cradle/inner/core/exception.h>
+#include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/rpclib/client/proxy.h>
@@ -13,6 +14,12 @@ make_inner_tests_config();
 
 void
 init_test_inner_service(inner_resources& resources);
+
+service_config
+make_inner_loopback_config();
+
+void
+init_test_loopback_service(inner_resources& test_resources);
 
 void
 clear_disk_cache(inner_resources& resources);

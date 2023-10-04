@@ -13,8 +13,6 @@ class thinknode_domain : public domain
  public:
     thinknode_domain(service_core& resources);
 
-    ~thinknode_domain() = default;
-
     std::string
     name() const override;
 

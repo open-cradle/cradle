@@ -7,6 +7,7 @@
 #include "thinknode.h"
 #include <cradle/inner/dll/shared_library.h>
 #include <cradle/inner/remote/loopback.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache_plugin.h>
 #include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/domain_factory.h>
 #include <cradle/thinknode_dlls_dir.h>
@@ -16,6 +17,8 @@ namespace cradle {
 thinknode_test_scope::thinknode_test_scope(std::string const& proxy_name)
     : proxy_name_{proxy_name}
 {
+    // TODO should activate_local_disk_cache_plugin() be here?
+    activate_local_disk_cache_plugin();
     init_test_service(resources_);
     register_remote();
     if (proxy_name_ == "rpclib")
@@ -48,10 +51,7 @@ thinknode_test_scope::register_remote()
     {
         if (proxy_name_ == "loopback")
         {
-            auto loopback{std::make_unique<loopback_service>(
-                make_inner_tests_config(), resources_)};
-            resources_.register_domain(create_thinknode_domain(resources_));
-            resources_.register_proxy(std::move(loopback));
+            init_loopback_service();
         }
         else if (proxy_name_ == "rpclib")
         {
@@ -66,15 +66,17 @@ thinknode_test_scope::register_remote()
     }
 }
 
-rpclib_client&
-thinknode_test_scope::get_rpclib_client() const
+void
+thinknode_test_scope::init_loopback_service()
 {
-    if (proxy_name_ != "rpclib")
-    {
-        throw std::logic_error(
-            fmt::format("No rpc client for proxy {}", proxy_name_));
-    }
-    return static_cast<rpclib_client&>(*proxy_);
+    // TODO outer config?
+    service_config loopback_config{make_inner_loopback_config()};
+    auto loopback_resources{std::make_unique<service_core>()};
+    loopback_resources->initialize(loopback_config);
+    loopback_resources->register_domain(
+        create_thinknode_domain(*loopback_resources));
+    resources_.register_proxy(std::make_unique<loopback_service>(
+        loopback_config, std::move(loopback_resources)));
 }
 
 thinknode_request_context
