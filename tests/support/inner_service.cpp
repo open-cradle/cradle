@@ -65,15 +65,18 @@ make_inner_loopback_config()
 }
 
 void
-init_test_loopback_service(inner_resources& test_resources)
+init_test_loopback_service(
+    inner_resources& test_resources, bool with_testing_domain)
 {
     activate_local_disk_cache_plugin();
     service_config loopback_config{make_inner_loopback_config()};
     auto loopback_resources{std::make_unique<inner_resources>()};
     loopback_resources->inner_initialize(loopback_config);
-    // TODO optional testing_domain?
-    loopback_resources->register_domain(
-        create_testing_domain(*loopback_resources));
+    if (with_testing_domain)
+    {
+        loopback_resources->register_domain(
+            create_testing_domain(*loopback_resources));
+    }
     test_resources.register_proxy(std::make_unique<loopback_service>(
         loopback_config, std::move(loopback_resources)));
 }

@@ -23,7 +23,7 @@ test_make_some_blob(bool async, bool shared)
     std::string proxy_name{"loopback"};
     inner_resources resources;
     init_test_inner_service(resources);
-    init_test_loopback_service(resources);
+    init_test_loopback_service(resources, true);
 
     auto req{rq_make_some_blob<caching_level>(10000, shared)};
     blob response;

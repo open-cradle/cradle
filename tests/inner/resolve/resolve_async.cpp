@@ -32,10 +32,10 @@ make_test_uuid(int ext)
 }
 
 void
-setup_loopback_test(inner_resources& resources)
+setup_loopback_test(inner_resources& resources, bool with_testing_domain)
 {
     init_test_inner_service(resources);
-    init_test_loopback_service(resources);
+    init_test_loopback_service(resources, with_testing_domain);
     // TODO following line should be in loopback?
     resources.ensure_async_db();
 }
@@ -219,7 +219,7 @@ TEST_CASE("resolve async locally - normalized args", tag)
 TEST_CASE("resolve async on loopback", tag)
 {
     inner_resources inner;
-    setup_loopback_test(inner);
+    setup_loopback_test(inner, true);
 
     test_resolve_async_across_rpc(inner, "loopback");
 }
@@ -313,7 +313,7 @@ TEST_CASE("error async request locally", tag)
 TEST_CASE("error async request on loopback", tag)
 {
     inner_resources inner;
-    setup_loopback_test(inner);
+    setup_loopback_test(inner, true);
 
     test_error_async_across_rpc(inner, "loopback");
 }
@@ -424,7 +424,7 @@ TEST_CASE("cancel async request locally", tag)
 TEST_CASE("cancel async request on loopback", tag)
 {
     inner_resources inner;
-    setup_loopback_test(inner);
+    setup_loopback_test(inner, true);
 
     test_cancel_async_across_rpc(inner, "loopback");
 }
@@ -489,7 +489,7 @@ test_failing_get_num_subs(
 TEST_CASE("get_num_subs failure on loopback", tag)
 {
     inner_resources inner;
-    setup_loopback_test(inner);
+    setup_loopback_test(inner, false);
 
     test_failing_get_num_subs(inner, "loopback");
 }
@@ -561,7 +561,7 @@ test_delayed_get_num_subs(
 TEST_CASE("delayed get_num_subs on loopback", tag)
 {
     inner_resources inner;
-    setup_loopback_test(inner);
+    setup_loopback_test(inner, true);
 
     test_delayed_get_num_subs(inner, "loopback");
 }
@@ -636,7 +636,7 @@ test_delayed_set_result(inner_resources& inner, std::string const& proxy_name)
 TEST_CASE("delayed set_result on loopback", tag)
 {
     inner_resources inner;
-    setup_loopback_test(inner);
+    setup_loopback_test(inner, true);
 
     test_delayed_set_result(inner, "loopback");
 }

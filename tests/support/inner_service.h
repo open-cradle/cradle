@@ -19,7 +19,8 @@ service_config
 make_inner_loopback_config();
 
 void
-init_test_loopback_service(inner_resources& test_resources);
+init_test_loopback_service(
+    inner_resources& test_resources, bool with_testing_domain);
 
 void
 clear_disk_cache(inner_resources& resources);

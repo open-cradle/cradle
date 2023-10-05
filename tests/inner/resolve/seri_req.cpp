@@ -23,9 +23,7 @@ test_resolve(bool remotely)
     init_test_inner_service(resources);
     if (remotely)
     {
-        // Loopback service registers testing domain by default
-        // resources.register_domain(create_testing_domain(resources));
-        init_test_loopback_service(resources);
+        init_test_loopback_service(resources, true);
     }
     else
     {

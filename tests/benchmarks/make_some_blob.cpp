@@ -22,15 +22,9 @@ static void
 register_remote_services(
     inner_resources& resources, std::string const& proxy_name)
 {
-    static bool registered_domain = false;
-    if (!registered_domain)
-    {
-        // TODO register_and_initialize_testing_domain();
-        registered_domain = true;
-    }
     if (proxy_name == "loopback")
     {
-        init_test_loopback_service(resources);
+        init_test_loopback_service(resources, true);
     }
     else if (proxy_name == "rpclib")
     {
