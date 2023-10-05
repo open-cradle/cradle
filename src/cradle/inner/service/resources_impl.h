@@ -17,7 +17,8 @@ class inner_resources_impl
 {
  public:
     inner_resources_impl(
-        inner_resources& resources, service_config const& config);
+        secondary_storage_factory_registry& secondary_storage_factories_,
+        service_config const& config);
 
     void
     reset_memory_cache();
@@ -100,13 +101,6 @@ class inner_resources_impl
     // thread. This should happen only for mock HTTP in benchmark tests, where
     // it tends to give more reliable and consistent timings.
     bool http_is_synchronous_{false};
-
-    void
-    create_memory_cache(service_config const& config);
-
-    void
-    create_secondary_cache(
-        inner_resources& resources, service_config const& config);
 };
 
 } // namespace cradle

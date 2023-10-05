@@ -17,8 +17,6 @@ namespace cradle {
 thinknode_test_scope::thinknode_test_scope(std::string const& proxy_name)
     : proxy_name_{proxy_name}
 {
-    // TODO should activate_local_disk_cache_plugin() be here?
-    activate_local_disk_cache_plugin();
     init_test_service(resources_);
     register_remote();
     if (proxy_name_ == "rpclib")
@@ -72,6 +70,7 @@ thinknode_test_scope::init_loopback_service()
     // TODO outer config?
     service_config loopback_config{make_inner_loopback_config()};
     auto loopback_resources{std::make_unique<service_core>()};
+    activate_local_disk_cache_plugin(*loopback_resources);
     loopback_resources->initialize(loopback_config);
     loopback_resources->register_domain(
         create_thinknode_domain(*loopback_resources));

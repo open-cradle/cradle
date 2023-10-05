@@ -3,14 +3,12 @@
 #include "test_session.h"
 #include <cradle/external/external_api_testing.h>
 #include <cradle/external_api.h>
-#include <cradle/plugins/secondary_cache/local/local_disk_cache_plugin.h>
 
 using namespace cradle;
 
 external_test_session
 make_external_test_session()
 {
-    activate_local_disk_cache_plugin();
     std::string json_config{"{}"};
     cradle::external::api_service service{
         cradle::external::start_service(std::move(json_config))};

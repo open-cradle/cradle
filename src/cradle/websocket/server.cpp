@@ -48,6 +48,7 @@
 #include <cradle/inner/utilities/functional.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/inner/utilities/text.h>
+#include <cradle/plugins/secondary_cache/all_plugins.h>
 #include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/rpclib/client/proxy.h>
@@ -1902,6 +1903,7 @@ initialize(websocket_server_impl& server, service_config const& config)
     server.config = config;
     server.logger = create_logger("ws_server");
 
+    activate_all_secondary_storage_plugins(server.core);
     server.core.initialize(config);
 
     server.ws.clear_access_channels(websocketpp::log::alevel::all);

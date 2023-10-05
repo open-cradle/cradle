@@ -19,6 +19,7 @@ static service_config_map const outer_config_map{
      local_disk_cache_config_values::PLUGIN_NAME},
     {local_disk_cache_config_keys::DIRECTORY, tests_cache_dir},
     {local_disk_cache_config_keys::SIZE_LIMIT, 0x40'00'00'00U},
+    {local_disk_cache_config_keys::START_EMPTY, true},
     {inner_config_keys::HTTP_CONCURRENCY, 2U}};
 
 service_config
@@ -30,8 +31,7 @@ make_outer_tests_config()
 void
 init_test_service(service_core& core)
 {
-    activate_local_disk_cache_plugin();
-    reset_directory(file_path(tests_cache_dir));
+    activate_local_disk_cache_plugin(core);
     core.initialize(make_outer_tests_config());
 }
 

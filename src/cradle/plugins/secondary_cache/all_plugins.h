@@ -4,13 +4,15 @@
 #include <string>
 #include <vector>
 
+#include <cradle/inner/service/resources.h>
+
 namespace cradle {
 
 std::vector<std::string>
 get_secondary_storage_plugin_names();
 
 void
-activate_all_secondary_storage_plugins();
+activate_all_secondary_storage_plugins(inner_resources& resources);
 
 } // namespace cradle
 

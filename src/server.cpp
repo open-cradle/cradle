@@ -8,7 +8,6 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/utilities/git.h>
 #include <cradle/inner/utilities/logging.h>
-#include <cradle/plugins/secondary_cache/all_plugins.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/version_info.h>
 
@@ -59,8 +58,6 @@ try
     if (config_path)
         config_map = read_config_map_from_file(*config_path);
     initialize_logging();
-
-    activate_all_secondary_storage_plugins();
 
     // Default values for mandatory options
     config_map.try_emplace(

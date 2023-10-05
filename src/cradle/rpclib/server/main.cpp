@@ -139,9 +139,9 @@ run_server(cli_options const& options)
     initialize_logging(options.log_level, options.ignore_env_log_level);
     auto my_logger = create_logger("rpclib_server");
 
-    activate_all_secondary_storage_plugins();
-
     service_core service;
+    activate_all_secondary_storage_plugins(service);
+
     service_config config{create_config_map(options)};
     service.initialize(config);
     service.ensure_async_db();

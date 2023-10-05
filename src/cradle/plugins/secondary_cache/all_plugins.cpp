@@ -16,10 +16,10 @@ get_secondary_storage_plugin_names()
 }
 
 void
-activate_all_secondary_storage_plugins()
+activate_all_secondary_storage_plugins(inner_resources& resources)
 {
-    activate_http_cache_plugin();
-    activate_local_disk_cache_plugin();
+    activate_http_cache_plugin(resources);
+    activate_local_disk_cache_plugin(resources);
 }
 
 } // namespace cradle

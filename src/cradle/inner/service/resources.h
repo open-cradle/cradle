@@ -1,8 +1,7 @@
 #ifndef CRADLE_INNER_SERVICE_RESOURCES_H
 #define CRADLE_INNER_SERVICE_RESOURCES_H
 
-// Resources available for resolving requests: the memory cache, and optionally
-// some secondary cache (e.g., a disk cache).
+// Resources available for resolving requests, e.g. memory and secondary cache
 
 #include <memory>
 #include <optional>
@@ -62,12 +61,25 @@ class secondary_storage_factory
     create(inner_resources& resources, service_config const& config) = 0;
 };
 
-// Registers a secondary cache factory, identified by a key.
-// A plugin would call this function in its initialization.
-void
-register_secondary_storage_factory(
-    std::string const& key,
-    std::unique_ptr<secondary_storage_factory> factory);
+// The secondary storage factories registered for an inner_resources instance.
+class secondary_storage_factory_registry
+{
+ public:
+    secondary_storage_factory_registry(inner_resources& resources);
+
+    void
+    register_factory(
+        std::string const& key,
+        std::unique_ptr<secondary_storage_factory> factory);
+
+    std::unique_ptr<secondary_storage_intf>
+    create(service_config const& config);
+
+ private:
+    inner_resources& resources_;
+    std::unordered_map<std::string, std::unique_ptr<secondary_storage_factory>>
+        factories_;
+};
 
 class inner_resources
 {
@@ -76,6 +88,13 @@ class inner_resources
     inner_resources();
 
     virtual ~inner_resources();
+
+    // Registers a secondary cache factory, identified by a key.
+    // Must happen before inner_initialize().
+    void
+    register_secondary_storage_factory(
+        std::string const& key,
+        std::unique_ptr<secondary_storage_factory> factory);
 
     void
     inner_initialize(service_config const& config);
@@ -130,6 +149,7 @@ class inner_resources
     }
 
  private:
+    secondary_storage_factory_registry secondary_storage_factories_;
     std::unique_ptr<inner_resources_impl> impl_;
 };
 

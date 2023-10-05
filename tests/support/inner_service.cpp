@@ -38,7 +38,7 @@ make_inner_tests_config()
 void
 init_test_inner_service(inner_resources& resources)
 {
-    activate_local_disk_cache_plugin();
+    activate_local_disk_cache_plugin(resources);
     resources.inner_initialize(make_inner_tests_config());
 }
 
@@ -68,9 +68,9 @@ void
 init_test_loopback_service(
     inner_resources& test_resources, bool with_testing_domain)
 {
-    activate_local_disk_cache_plugin();
     service_config loopback_config{make_inner_loopback_config()};
     auto loopback_resources{std::make_unique<inner_resources>()};
+    activate_local_disk_cache_plugin(*loopback_resources);
     loopback_resources->inner_initialize(loopback_config);
     if (with_testing_domain)
     {

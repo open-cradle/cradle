@@ -18,14 +18,31 @@
 
 namespace cradle {
 
-static std::map<std::string, std::unique_ptr<secondary_storage_factory>>
-    secondary_cache_factories;
+secondary_storage_factory_registry::secondary_storage_factory_registry(
+    inner_resources& resources)
+    : resources_{resources}
+{
+}
 
 void
-register_secondary_storage_factory(
+secondary_storage_factory_registry::register_factory(
     std::string const& key, std::unique_ptr<secondary_storage_factory> factory)
 {
-    secondary_cache_factories.emplace(key, std::move(factory));
+    factories_.emplace(key, std::move(factory));
+}
+
+std::unique_ptr<secondary_storage_intf>
+secondary_storage_factory_registry::create(service_config const& config)
+{
+    auto key = config.get_mandatory_string(
+        inner_config_keys::SECONDARY_CACHE_FACTORY);
+    auto factory = factories_.find(key);
+    if (factory == factories_.end())
+    {
+        throw config_error{
+            fmt::format("No secondary cache factory \"{}\"", key)};
+    }
+    return factory->second->create(resources_, config);
 }
 
 static immutable_cache_config
@@ -36,14 +53,31 @@ make_immutable_cache_config(service_config const& config)
             inner_config_keys::MEMORY_CACHE_UNUSED_SIZE_LIMIT, 0x40'00'00'00)};
 }
 
-inner_resources::inner_resources() = default;
+static std::unique_ptr<cradle::immutable_cache>
+create_memory_cache(service_config const& config)
+{
+    return std::make_unique<immutable_cache>(
+        make_immutable_cache_config(config));
+}
+
+inner_resources::inner_resources() : secondary_storage_factories_{*this}
+{
+}
 
 inner_resources::~inner_resources() = default;
 
 void
+inner_resources::register_secondary_storage_factory(
+    std::string const& key, std::unique_ptr<secondary_storage_factory> factory)
+{
+    secondary_storage_factories_.register_factory(key, std::move(factory));
+}
+
+void
 inner_resources::inner_initialize(service_config const& config)
 {
-    impl_ = std::make_unique<inner_resources_impl>(*this, config);
+    impl_ = std::make_unique<inner_resources_impl>(
+        secondary_storage_factories_, config);
 }
 
 void
@@ -144,8 +178,11 @@ enable_http_mocking(inner_resources& resources, bool http_is_synchronous)
 }
 
 inner_resources_impl::inner_resources_impl(
-    inner_resources& resources, service_config const& config)
-    : blob_dir_{std::make_unique<blob_file_directory>(config)},
+    secondary_storage_factory_registry& secondary_storage_factories_,
+    service_config const& config)
+    : memory_cache_{create_memory_cache(config)},
+      secondary_cache_{secondary_storage_factories_.create(config)},
+      blob_dir_{std::make_unique<blob_file_directory>(config)},
       http_pool_{cppcoro::static_thread_pool(
           static_cast<uint32_t>(config.get_number_or_default(
               inner_config_keys::HTTP_CONCURRENCY, 36)))},
@@ -153,8 +190,6 @@ inner_resources_impl::inner_resources_impl(
           static_cast<uint32_t>(config.get_number_or_default(
               inner_config_keys::ASYNC_CONCURRENCY, 20)))}
 {
-    create_memory_cache(config);
-    create_secondary_cache(resources, config);
 }
 
 void
@@ -291,28 +326,6 @@ inner_resources_impl::get_proxy(std::string const& name)
         throw std::logic_error{fmt::format("Proxy {} not registered", name)};
     }
     return *it->second;
-}
-
-void
-inner_resources_impl::create_memory_cache(service_config const& config)
-{
-    memory_cache_ = std::make_unique<immutable_cache>(
-        make_immutable_cache_config(config));
-}
-
-void
-inner_resources_impl::create_secondary_cache(
-    inner_resources& resources, service_config const& config)
-{
-    auto key = config.get_mandatory_string(
-        inner_config_keys::SECONDARY_CACHE_FACTORY);
-    auto factory = secondary_cache_factories.find(key);
-    if (factory == secondary_cache_factories.end())
-    {
-        throw config_error{
-            fmt::format("No secondary cache factory \"{}\"", key)};
-    }
-    secondary_cache_ = factory->second->create(resources, config);
 }
 
 } // namespace cradle
