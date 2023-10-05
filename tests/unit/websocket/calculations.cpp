@@ -1,16 +1,13 @@
-#include <cradle/websocket/calculations.h>
-
-#include <thread>
-
 #include <cppcoro/sync_wait.hpp>
 
-#include <cradle/typing/utilities/testing.h>
-
+#include "../../support/thinknode.h"
 #include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/utilities/environment.h>
 #include <cradle/typing/core/unique_hash.h>
+#include <cradle/typing/utilities/testing.h>
+#include <cradle/websocket/calculations.h>
 #include <cradle/websocket/messages.hpp>
 
 using namespace cradle;
@@ -105,18 +102,12 @@ dynamic_subtract(dynamic_array args, tasklet_tracker*)
 
 TEST_CASE("individual calcs", "[calcs][ws]")
 {
-    service_core core;
-    init_test_service(core);
+    thinknode_test_scope scope{"", true};
 
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token
-        = get_environment_variable("CRADLE_THINKNODE_API_TOKEN");
-
-    thinknode_request_context trc{core, session, nullptr, false, ""};
+    auto ctx{scope.make_context()};
     auto eval = [&](calculation_request const& request) {
         return cppcoro::sync_wait(resolve_calc_to_value(
-            trc, "5dadeb4a004073e81b5e096255e83652", request));
+            ctx, "5dadeb4a004073e81b5e096255e83652", request));
     };
 
     // value
@@ -269,10 +260,7 @@ TEST_CASE("individual calcs", "[calcs][ws]")
 
 TEST_CASE("lambda calc caching", "[calcs][ws]")
 {
-    service_core core;
-    init_test_service(core);
-
-    thinknode_session session;
+    thinknode_test_scope scope;
 
     int call_count = 0;
 
@@ -281,10 +269,10 @@ TEST_CASE("lambda calc caching", "[calcs][ws]")
         return cast<double>(args.at(0)) + cast<double>(args.at(1));
     });
 
-    thinknode_request_context trc{core, session, nullptr, false, ""};
+    auto ctx{scope.make_context()};
     auto eval = [&](calculation_request const& request) {
         return cppcoro::sync_wait(resolve_calc_to_value(
-            trc, "5dadeb4a004073e81b5e096255e83652", request));
+            ctx, "5dadeb4a004073e81b5e096255e83652", request));
     };
 
     REQUIRE(
@@ -314,18 +302,12 @@ TEST_CASE("lambda calc caching", "[calcs][ws]")
 
 TEST_CASE("mixed calcs", "[calcs][ws]")
 {
-    service_core core;
-    init_test_service(core);
+    thinknode_test_scope scope{"", true};
 
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token
-        = get_environment_variable("CRADLE_THINKNODE_API_TOKEN");
-
-    thinknode_request_context trc{core, session, nullptr, false, ""};
+    auto ctx{scope.make_context()};
     auto eval = [&](calculation_request const& request) {
         return cppcoro::sync_wait(resolve_calc_to_value(
-            trc, "5dadeb4a004073e81b5e096255e83652", request));
+            ctx, "5dadeb4a004073e81b5e096255e83652", request));
     };
 
 #ifdef CRADLE_LOCAL_DOCKER_TESTING

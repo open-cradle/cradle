@@ -37,10 +37,6 @@ class service_core : public inner_resources
     std::unique_ptr<service_core_impl> impl_;
 };
 
-// Initialize a service for unit testing purposes.
-void
-init_test_service(service_core& core);
-
 } // namespace cradle
 
 #endif

@@ -1,5 +1,6 @@
 #include <utility>
 
+#include "../support/thinknode.h"
 #include "test_session.h"
 #include <cradle/external/external_api_testing.h>
 #include <cradle/external_api.h>

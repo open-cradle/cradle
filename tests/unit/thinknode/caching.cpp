@@ -5,10 +5,10 @@
 #include "../../support/concurrency_testing.h"
 #include "../../support/inner_service.h"
 #include "../../support/tasklet_testing.h"
+#include "../../support/thinknode.h"
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/thinknode/caching.h>
-#include <cradle/thinknode/service/core.h>
 
 using namespace cradle;
 

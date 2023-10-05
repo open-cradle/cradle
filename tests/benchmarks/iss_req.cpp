@@ -22,7 +22,6 @@
 #include <cradle/typing/utilities/testing.h>
 
 #include "../support/inner_service.h"
-#include "../support/outer_service.h"
 #include "../support/thinknode.h"
 #include "benchmark_support.h"
 

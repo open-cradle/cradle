@@ -2,6 +2,7 @@
 
 #include <cppcoro/sync_wait.hpp>
 
+#include "../../support/thinknode.h"
 #include <cradle/typing/io/http_requests.hpp>
 #include <cradle/typing/utilities/testing.h>
 

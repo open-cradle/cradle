@@ -20,8 +20,9 @@ namespace cradle {
 class thinknode_test_scope
 {
  public:
-    // proxy_name should be "" (local), "loopback" or "rpclib"
-    thinknode_test_scope(std::string const& proxy_name);
+    // proxy_name should be "" (local, default), "loopback" or "rpclib"
+    thinknode_test_scope(
+        std::string const& proxy_name = {}, bool use_real_api_token = false);
 
     ~thinknode_test_scope();
 
@@ -47,10 +48,17 @@ class thinknode_test_scope
     thinknode_request_context
     make_context(tasklet_tracker* tasklet = nullptr);
 
+    mock_http_session&
+    enable_http_mocking();
+
+    void
+    clear_caches();
+
  private:
     static inline const std::string dll_name_{"cradle_thinknode_v1"};
 
     std::string proxy_name_;
+    bool use_real_api_token_;
     service_core resources_;
     remote_proxy* proxy_{nullptr};
 
@@ -60,6 +68,10 @@ class thinknode_test_scope
     void
     init_loopback_service();
 };
+
+// Initialize a service for Thinknode testing purposes.
+void
+init_test_service(service_core& core);
 
 } // namespace cradle
 

@@ -12,7 +12,6 @@
 
 #include "../../support/concurrency_testing.h"
 #include "../../support/inner_service.h"
-#include "../../support/outer_service.h"
 #include "../../support/request.h"
 #include "../../support/tasklet_testing.h"
 #include "../../support/thinknode.h"
@@ -28,7 +27,6 @@
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/iss_req.h>
-#include <cradle/thinknode/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
 using namespace cradle;
@@ -203,11 +201,9 @@ test_post_iss_requests_parallel(
     std::vector<std::string> const& results,
     bool introspective)
 {
-    auto& resources{scope.get_resources()};
-    auto config{make_outer_tests_config()};
-    resources.reset_memory_cache(config);
-    resources.clear_secondary_cache();
     constexpr caching_level_type level = Request::caching_level;
+    scope.clear_caches();
+    auto& resources{scope.get_resources()};
     clean_tasklet_admin_fixture fixture;
 
     mock_http_session* mock_http{nullptr};
@@ -309,7 +305,7 @@ test_post_iss_request(thinknode_test_scope& scope, Request const& req)
 
 TEST_CASE("ISS POST serialization - value", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     auto req{make_post_iss_request_constant()};
     //  With this validate_request lambda, testing serialization includes
     //  verifying that the deserialized request can be locally resolved.
@@ -323,7 +319,7 @@ TEST_CASE("ISS POST serialization - value", tag)
 
 TEST_CASE("ISS POST serialization - subreq", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     make_test_blob_catalog test_cat;
     auto req{make_post_iss_request_subreq<caching_level_type::full>()};
     test_serialize_thinknode_request(
@@ -336,28 +332,28 @@ TEST_CASE("ISS POST serialization - subreq", tag)
 
 TEST_CASE("ISS POST resolution - value, uncached", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     test_post_iss_request(
         scope, make_post_iss_request_constant<caching_level_type::none>());
 }
 
 TEST_CASE("ISS POST resolution - subreq, memory cached", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     test_post_iss_request(
         scope, make_post_iss_request_subreq<caching_level_type::memory>());
 }
 
 TEST_CASE("ISS POST resolution - value, fully cached", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     test_post_iss_request(
         scope, make_post_iss_request_subreq<caching_level_type::full>());
 }
 
 TEST_CASE("ISS POST resolution - subreq, fully cached, parallel", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     constexpr caching_level_type level = caching_level_type::full;
     using Req = decltype(make_post_iss_request_subreq<level>());
     std::vector<blob> payloads;
@@ -413,7 +409,7 @@ TEST_CASE("ISS POST resolution - proxy, rpclib", tag)
 
 TEST_CASE("RESOLVE ISS OBJECT TO IMMUTABLE serialization", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     constexpr caching_level_type level = caching_level_type::full;
     auto req{rq_resolve_iss_object_to_immutable<level>("123", "abc", true)};
     auto validate_request = [](thinknode_test_scope&, auto const& req1) {};
@@ -436,13 +432,9 @@ test_retrieve_immutable_object_parallel(
     std::vector<std::string> const& object_ids,
     std::vector<std::string> const& responses)
 {
-    auto& resources{scope.get_resources()};
-    auto config{make_outer_tests_config()};
-    // TODO clear remote cache for rpclib?
-    resources.reset_memory_cache(config);
-    resources.clear_secondary_cache();
     constexpr caching_level_type level = Request::caching_level;
-
+    scope.clear_caches();
+    auto& resources{scope.get_resources()};
     mock_http_session* mock_http{nullptr};
     if (auto proxy = scope.get_proxy())
     {
@@ -523,7 +515,7 @@ test_retrieve_immutable_object(thinknode_test_scope& scope, Request const& req)
 
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT creation - template arg", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     constexpr caching_level_type level = caching_level_type::full;
     std::string const context_id{"123"};
     std::string const object_id{"abc"}; // same as above
@@ -555,7 +547,7 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT creation - template arg", tag)
 
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     constexpr caching_level_type level = caching_level_type::full;
     auto req{rq_retrieve_immutable_object<level>("123", "abc")};
     test_serialize_thinknode_request(
@@ -568,7 +560,7 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization", tag)
 
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - value, local", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     constexpr caching_level_type level = caching_level_type::full;
     test_retrieve_immutable_object(
         scope, rq_retrieve_immutable_object<level>("123", "abc"));
@@ -576,7 +568,7 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - value, local", tag)
 
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - subreq, local", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     constexpr caching_level_type level = caching_level_type::full;
     test_retrieve_immutable_object(
         scope,
@@ -586,7 +578,7 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - subreq, local", tag)
 
 TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - value, local, parallel", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     constexpr caching_level_type level = caching_level_type::full;
     using Req = decltype(rq_retrieve_immutable_object<level>("", ""));
     std::vector<std::string> object_ids;
@@ -647,7 +639,7 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT - proxy, rpclib", tag)
 
 TEST_CASE("Composite request serialization", tag)
 {
-    thinknode_test_scope scope{""};
+    thinknode_test_scope scope;
     constexpr auto level = caching_level_type::full;
     std::string const context_id{"123"};
     auto req0{rq_post_iss_object<level>(

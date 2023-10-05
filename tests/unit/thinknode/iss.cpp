@@ -1,26 +1,19 @@
-#include <cradle/thinknode/iss.h>
-
-#include <cstring>
-
-#include <boost/format.hpp>
-
+#include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 
-#include <cradle/inner/core/monitoring.h>
+#include "../../support/thinknode.h"
 #include <cradle/inner/io/http_requests.h>
 #include <cradle/inner/io/mock_http.h>
-#include <cradle/thinknode/service/core.h>
+#include <cradle/thinknode/iss.h>
 #include <cradle/typing/encodings/msgpack.h>
-#include <cradle/typing/utilities/testing.h>
 
 using namespace cradle;
 
 TEST_CASE("ISS object resolution", "[thinknode][iss]")
 {
-    service_core service;
-    init_test_service(service);
+    thinknode_test_scope scope;
 
-    auto& mock_http = enable_http_mocking(service);
+    auto& mock_http = scope.enable_http_mocking();
     mock_http.set_script(
         {{make_get_request(
               "https://mgh.thinknode.io/api/v1.0/iss/abc/"
@@ -30,11 +23,7 @@ TEST_CASE("ISS object resolution", "[thinknode][iss]")
                {"Accept", "application/json"}}),
           make_http_200_response("{ \"id\": \"def\" }")}});
 
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token = "xyz";
-
-    thinknode_request_context ctx{service, session, nullptr, false, ""};
+    auto ctx{scope.make_context()};
     auto id = cppcoro::sync_wait(
         resolve_iss_object_to_immutable(ctx, "123", "abc", false));
     REQUIRE(id == "def");
@@ -45,10 +34,9 @@ TEST_CASE("ISS object resolution", "[thinknode][iss]")
 
 TEST_CASE("ISS object metadata", "[thinknode][iss]")
 {
-    service_core service;
-    init_test_service(service);
+    thinknode_test_scope scope;
 
-    auto& mock_http = enable_http_mocking(service);
+    auto& mock_http = scope.enable_http_mocking();
     mock_http.set_script(
         {{make_http_request(
               http_request_method::HEAD,
@@ -61,11 +49,7 @@ TEST_CASE("ISS object metadata", "[thinknode][iss]")
                {"Cache-Control", "max-age=60"}},
               blob())}});
 
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token = "xyz";
-
-    thinknode_request_context ctx{service, session, nullptr, false, ""};
+    auto ctx{scope.make_context()};
     auto metadata
         = cppcoro::sync_wait(get_iss_object_metadata(ctx, "123", "abc"));
     REQUIRE(
@@ -80,10 +64,9 @@ TEST_CASE("ISS object metadata", "[thinknode][iss]")
 
 TEST_CASE("ISS immutable retrieval", "[thinknode][iss]")
 {
-    service_core service;
-    init_test_service(service);
+    thinknode_test_scope scope;
 
-    auto& mock_http = enable_http_mocking(service);
+    auto& mock_http = scope.enable_http_mocking();
     mock_http.set_script(
         {{make_get_request(
               "https://mgh.thinknode.io/api/v1.0/iss/immutable/"
@@ -93,11 +76,7 @@ TEST_CASE("ISS immutable retrieval", "[thinknode][iss]")
           make_http_200_response(
               value_to_msgpack_string(dynamic("the-data")))}});
 
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token = "xyz";
-
-    thinknode_request_context ctx{service, session, nullptr, false, ""};
+    auto ctx{scope.make_context()};
     auto data = cppcoro::sync_wait(retrieve_immutable(ctx, "123", "abc"));
     REQUIRE(data == dynamic("the-data"));
 
@@ -215,10 +194,9 @@ TEST_CASE("URL type string", "[thinknode][iss]")
 
 TEST_CASE("ISS POST", "[thinknode][iss]")
 {
-    service_core service;
-    init_test_service(service);
+    thinknode_test_scope scope;
 
-    auto& mock_http = enable_http_mocking(service);
+    auto& mock_http = scope.enable_http_mocking();
     mock_http.set_script(
         {{make_http_request(
               http_request_method::POST,
@@ -229,12 +207,9 @@ TEST_CASE("ISS POST", "[thinknode][iss]")
               value_to_msgpack_blob(dynamic("payload"))),
           make_http_200_response("{ \"id\": \"def\" }")}});
 
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token = "xyz";
-
+    auto ctx{scope.make_context()};
     auto id = cppcoro::sync_wait(post_iss_object(
-        thinknode_request_context{service, session, nullptr, false, ""},
+        ctx,
         "123",
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
         dynamic("payload")));
@@ -246,10 +221,9 @@ TEST_CASE("ISS POST", "[thinknode][iss]")
 
 TEST_CASE("ISS object copy", "[thinknode][iss]")
 {
-    service_core service;
-    init_test_service(service);
+    thinknode_test_scope scope;
 
-    auto& mock_http = enable_http_mocking(service);
+    auto& mock_http = scope.enable_http_mocking();
     mock_http.set_script(
         {{make_http_request(
               http_request_method::POST,
@@ -259,11 +233,7 @@ TEST_CASE("ISS object copy", "[thinknode][iss]")
               blob()),
           make_http_200_response("")}});
 
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token = "xyz";
-
-    thinknode_request_context ctx{service, session, nullptr, false, ""};
+    auto ctx{scope.make_context()};
     cppcoro::sync_wait(shallowly_copy_iss_object(ctx, "abc", "123", "def"));
 
     REQUIRE(mock_http.is_complete());

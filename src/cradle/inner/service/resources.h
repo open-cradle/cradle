@@ -162,10 +162,6 @@ async_http_request(
     http_request request,
     tasklet_tracker* client = nullptr);
 
-// Initialize a service for unit testing purposes.
-void
-init_test_service(inner_resources& resources);
-
 // Set up HTTP mocking for a service.
 // This returns the mock_http_session that's been associated with the service.
 struct mock_http_session;

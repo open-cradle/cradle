@@ -1,38 +1,26 @@
-#include <cradle/websocket/local_calcs.h>
-
-#include <thread>
-
+#include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 
-#include <cradle/typing/utilities/testing.h>
-
-#include <cradle/inner/encodings/base64.h>
-#include <cradle/inner/utilities/environment.h>
+#include "../../support/thinknode.h"
 #include <cradle/websocket/calculations.h>
-#include <cradle/websocket/messages.hpp>
+#include <cradle/websocket/local_calcs.h>
 
 using namespace cradle;
 
 #ifdef CRADLE_LOCAL_DOCKER_TESTING
 TEST_CASE("local calcs", "[local_calcs][ws]")
 {
-    service_core core;
-    init_test_service(core);
-
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token
-        = get_environment_variable("CRADLE_THINKNODE_API_TOKEN");
+    thinknode_test_scope scope{"", true};
 
     // These tests were originally written to test local resolution of
     // Thinknode calculations, which has been replaced by
     // resolve_calc_to_value. However, it's still a useful test to see if those
     // Thinknode calculations can be dynamically converted to the new generic
     // calculations and resolved to the same value.
-    thinknode_request_context trc{core, session, nullptr, false, ""};
+    auto ctx{scope.make_context()};
     auto eval = [&](thinknode_calc_request const& request) {
         return cppcoro::sync_wait(resolve_calc_to_value(
-            trc,
+            ctx,
             "5dadeb4a004073e81b5e096255e83652",
             from_dynamic<calculation_request>(to_dynamic(request))));
     };

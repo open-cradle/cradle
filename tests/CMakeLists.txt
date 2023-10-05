@@ -30,7 +30,6 @@ target_link_libraries(test_lib_unit PUBLIC
 add_executable(unit_test_runner)
 target_sources(unit_test_runner PRIVATE
     support/inner_service.cpp
-    support/outer_service.cpp
     support/thinknode.cpp)
 target_include_directories(unit_test_runner PUBLIC
     ${generated_src_dir}
@@ -156,7 +155,8 @@ target_link_libraries(test_lib_external PUBLIC
 # Add the external test runner.
 add_executable(external_test_runner)
 target_sources(external_test_runner PRIVATE
-    support/outer_service.cpp)
+    support/inner_service.cpp
+    support/thinknode.cpp)
 target_include_directories(external_test_runner PUBLIC
     ${generated_src_dir}
     src)
@@ -207,7 +207,6 @@ add_test(
 add_executable(all_unit_tests_runner)
 target_sources(all_unit_tests_runner PRIVATE
     support/inner_service.cpp
-    support/outer_service.cpp
     support/thinknode.cpp)
 target_include_directories(all_unit_tests_runner PUBLIC
     ${generated_src_dir}
@@ -298,7 +297,6 @@ target_link_libraries(test_lib_benchmark PUBLIC
 add_executable(benchmark_test_runner)
 target_sources(benchmark_test_runner PRIVATE
     support/inner_service.cpp
-    support/outer_service.cpp
     support/thinknode.cpp)
 target_link_libraries(benchmark_test_runner PRIVATE
     test_lib_benchmark
