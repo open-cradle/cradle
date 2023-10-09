@@ -103,9 +103,6 @@ class inner_resources
     reset_memory_cache();
 
     void
-    reset_memory_cache(service_config const& config);
-
-    void
     clear_secondary_cache();
 
     cradle::immutable_cache&

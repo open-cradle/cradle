@@ -89,7 +89,7 @@ caching_request_resolution_context::caching_request_resolution_context()
 void
 caching_request_resolution_context::reset_memory_cache()
 {
-    resources.reset_memory_cache(make_inner_tests_config());
+    resources.reset_memory_cache();
 }
 
 } // namespace cradle

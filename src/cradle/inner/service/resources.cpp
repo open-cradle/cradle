@@ -64,6 +64,8 @@ inner_resources::inner_resources() : secondary_storage_factories_{*this}
 {
 }
 
+// The destructor needs the inner_resources_impl definition, which is not
+// available in resources.h.
 inner_resources::~inner_resources() = default;
 
 void
@@ -73,9 +75,15 @@ inner_resources::register_secondary_storage_factory(
     secondary_storage_factories_.register_factory(key, std::move(factory));
 }
 
+// TODO pass config by value
 void
 inner_resources::inner_initialize(service_config const& config)
 {
+    if (impl_)
+    {
+        throw std::logic_error(
+            "attempt to re-initialize an inner_resources object");
+    }
     impl_ = std::make_unique<inner_resources_impl>(
         secondary_storage_factories_, config);
 }
@@ -84,12 +92,6 @@ void
 inner_resources::reset_memory_cache()
 {
     impl_->reset_memory_cache();
-}
-
-void
-inner_resources::reset_memory_cache(service_config const& config)
-{
-    impl_->reset_memory_cache(config);
 }
 
 void
@@ -178,10 +180,11 @@ enable_http_mocking(inner_resources& resources, bool http_is_synchronous)
 }
 
 inner_resources_impl::inner_resources_impl(
-    secondary_storage_factory_registry& secondary_storage_factories_,
+    secondary_storage_factory_registry& secondary_storage_factories,
     service_config const& config)
-    : memory_cache_{create_memory_cache(config)},
-      secondary_cache_{secondary_storage_factories_.create(config)},
+    : config_{config},
+      memory_cache_{create_memory_cache(config)},
+      secondary_cache_{secondary_storage_factories.create(config)},
       blob_dir_{std::make_unique<blob_file_directory>(config)},
       http_pool_{cppcoro::static_thread_pool(
           static_cast<uint32_t>(config.get_number_or_default(
@@ -195,14 +198,7 @@ inner_resources_impl::inner_resources_impl(
 void
 inner_resources_impl::reset_memory_cache()
 {
-    service_config_map config_map;
-    reset_memory_cache(service_config(config_map));
-}
-
-void
-inner_resources_impl::reset_memory_cache(service_config const& config)
-{
-    memory_cache_->reset(make_immutable_cache_config(config));
+    memory_cache_->reset(make_immutable_cache_config(config_));
 }
 
 void

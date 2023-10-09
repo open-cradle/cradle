@@ -17,14 +17,11 @@ class inner_resources_impl
 {
  public:
     inner_resources_impl(
-        secondary_storage_factory_registry& secondary_storage_factories_,
+        secondary_storage_factory_registry& secondary_storage_factories,
         service_config const& config);
 
     void
     reset_memory_cache();
-
-    void
-    reset_memory_cache(service_config const& config);
 
     void
     clear_secondary_cache();
@@ -84,6 +81,7 @@ class inner_resources_impl
 
  private:
     std::mutex mutex_;
+    service_config config_;
     std::unique_ptr<cradle::immutable_cache> memory_cache_;
     std::unique_ptr<secondary_storage_intf> secondary_cache_;
     std::unique_ptr<blob_file_directory> blob_dir_;

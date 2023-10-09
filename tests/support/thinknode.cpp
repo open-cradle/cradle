@@ -121,9 +121,8 @@ thinknode_test_scope::enable_http_mocking()
 void
 thinknode_test_scope::clear_caches()
 {
-    auto config{make_thinknode_tests_config()};
     // TODO clear remote cache for rpclib?
-    resources_.reset_memory_cache(config);
+    resources_.reset_memory_cache();
     resources_.clear_secondary_cache();
 }
 

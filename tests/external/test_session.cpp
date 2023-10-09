@@ -10,7 +10,7 @@ using namespace cradle;
 external_test_session
 make_external_test_session()
 {
-    std::string json_config{"{}"};
+    std::string json_config{R"({ "disk_cache/start_empty": true })"};
     cradle::external::api_service service{
         cradle::external::start_service(std::move(json_config))};
     cradle::external::api_thinknode_session_config session_config{
@@ -32,6 +32,5 @@ mock_http_session&
 external_test_session::enable_http_mocking()
 {
     auto& inner_service = cradle::external::get_service_core(session_);
-    init_test_service(inner_service);
     return cradle::enable_http_mocking(inner_service);
 }

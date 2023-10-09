@@ -36,8 +36,6 @@ setup_loopback_test(inner_resources& resources, bool with_testing_domain)
 {
     init_test_inner_service(resources);
     init_test_loopback_service(resources, with_testing_domain);
-    // TODO following line should be in loopback?
-    resources.ensure_async_db();
 }
 
 void
