@@ -111,8 +111,7 @@ class test_proxy : public remote_proxy
 
 TEST_CASE("register and find proxy", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
 
     auto a_proxy = std::make_unique<test_proxy>("a");
     auto b_proxy = std::make_unique<test_proxy>("b");
@@ -128,8 +127,7 @@ TEST_CASE("register and find proxy", tag)
 
 TEST_CASE("re-register proxy", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
 
     auto a0_proxy = std::make_unique<test_proxy>("a");
     auto a1_proxy = std::make_unique<test_proxy>("a");
@@ -142,8 +140,7 @@ TEST_CASE("re-register proxy", tag)
 
 TEST_CASE("get unregistered proxy", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto a_proxy = std::make_unique<test_proxy>("a");
     resources.register_proxy(std::move(a_proxy));
 

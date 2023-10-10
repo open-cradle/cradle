@@ -9,7 +9,6 @@
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/utilities/environment.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
-#include <cradle/plugins/secondary_cache/local/local_disk_cache_plugin.h>
 #include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/domain_factory.h>
 #include <cradle/thinknode_dlls_dir.h>
@@ -36,9 +35,10 @@ make_thinknode_tests_config()
 
 thinknode_test_scope::thinknode_test_scope(
     std::string const& proxy_name, bool use_real_api_token)
-    : proxy_name_{proxy_name}, use_real_api_token_{use_real_api_token}
+    : proxy_name_{proxy_name},
+      use_real_api_token_{use_real_api_token},
+      resources_{make_thinknode_test_resources()}
 {
-    init_test_service(resources_);
     register_remote();
     if (proxy_name_ == "rpclib")
     {
@@ -90,9 +90,9 @@ thinknode_test_scope::init_loopback_service()
 {
     // TODO thinknode config?
     service_config loopback_config{make_inner_loopback_config()};
-    auto loopback_resources{std::make_unique<service_core>()};
-    activate_local_disk_cache_plugin(*loopback_resources);
-    loopback_resources->initialize(loopback_config);
+    auto loopback_resources{std::make_unique<service_core>(loopback_config)};
+    loopback_resources->set_secondary_cache(
+        std::make_unique<local_disk_cache>(loopback_config));
     loopback_resources->register_domain(
         create_thinknode_domain(*loopback_resources));
     resources_.register_proxy(std::make_unique<loopback_service>(
@@ -126,11 +126,13 @@ thinknode_test_scope::clear_caches()
     resources_.clear_secondary_cache();
 }
 
-void
-init_test_service(service_core& core)
+service_core
+make_thinknode_test_resources()
 {
-    activate_local_disk_cache_plugin(core);
-    core.initialize(make_thinknode_tests_config());
+    auto config{make_thinknode_tests_config()};
+    service_core resources{config};
+    resources.set_secondary_cache(std::make_unique<local_disk_cache>(config));
+    return resources;
 }
 
 } // namespace cradle

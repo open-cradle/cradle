@@ -4,7 +4,6 @@
 #include <cradle/external_api.h>
 #include <cradle/inner/service/config_map_from_json.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
-#include <cradle/plugins/secondary_cache/local/local_disk_cache_plugin.h>
 #include <cradle/thinknode/calc.h>
 #include <cradle/thinknode/iam.h>
 #include <cradle/thinknode/iss.h>
@@ -15,6 +14,15 @@
 namespace cradle {
 
 namespace external {
+
+static service_config
+make_config_from_json(std::string json_text)
+{
+    auto config_map{read_config_map_from_json(std::move(json_text))};
+    config_map[inner_config_keys::SECONDARY_CACHE_FACTORY]
+        = local_disk_cache_config_values::PLUGIN_NAME;
+    return service_config{config_map};
+}
 
 static thinknode_request_context
 make_thinknode_request_context(api_session& session, char const* title)
@@ -49,14 +57,10 @@ start_service(std::string json_text)
 }
 
 api_service_impl::api_service_impl(std::string json_text)
+    : service_core_{make_config_from_json(std::move(json_text))}
 {
-    service_config_map config_map{
-        read_config_map_from_json(std::move(json_text))};
-    config_map[inner_config_keys::SECONDARY_CACHE_FACTORY]
-        = local_disk_cache_config_values::PLUGIN_NAME;
-    service_config config{config_map};
-    activate_local_disk_cache_plugin(service_core_);
-    service_core_.initialize(config);
+    service_core_.set_secondary_cache(
+        std::make_unique<local_disk_cache>(service_core_.config()));
 }
 
 api_session::api_session(

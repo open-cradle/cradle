@@ -20,8 +20,7 @@ static char const tag[] = "[inner][resolve][proxy]";
 
 TEST_CASE("evaluate proxy request, plain args", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_v1.*");
 
@@ -45,8 +44,7 @@ TEST_CASE("evaluate proxy request, plain args", tag)
 
 TEST_CASE("evaluate proxy request, normalized args", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_v1.*");
 
@@ -76,8 +74,7 @@ TEST_CASE("evaluate proxy request, normalized args", tag)
 // one (Windows). Both should work correctly.
 TEST_CASE("two DLLs defining same-typed requests", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};
@@ -103,8 +100,7 @@ TEST_CASE("two DLLs defining same-typed requests", tag)
 
 TEST_CASE("unload/reload DLL", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto config{make_inner_tests_config()};
     auto& proxy = register_rpclib_client(config, resources);
     proxy.unload_shared_library("test_inner_dll_v1.*");
@@ -136,8 +132,7 @@ TEST_CASE("unload/reload DLL", tag)
 
 TEST_CASE("unload/reload two DLLs", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};
@@ -171,8 +166,7 @@ TEST_CASE("unload/reload two DLLs", tag)
 
 TEST_CASE("unload DLL sharing resolvers", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};
@@ -216,8 +210,7 @@ TEST_CASE("unload DLL sharing resolvers", tag)
 // This one used to cause crashes.
 TEST_CASE("load/unload DLL stress test", "[.dll-stress]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_x.*");
 
@@ -254,8 +247,7 @@ TEST_CASE("load/unload DLL stress test", "[.dll-stress]")
 
 TEST_CASE("load/unload DLL stress test1", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};

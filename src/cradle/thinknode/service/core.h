@@ -20,14 +20,17 @@ class service_core_impl;
 class service_core : public inner_resources
 {
  public:
-    service_core();
-
     service_core(service_config const& config);
 
     ~service_core();
 
-    void
-    initialize(service_config const& config);
+    service_core(service_core const&) = delete;
+    service_core&
+    operator=(service_core const&)
+        = delete;
+    service_core(service_core&& other);
+    service_core&
+    operator=(service_core&& other);
 
     cppcoro::static_thread_pool&
     get_local_compute_pool_for_image(

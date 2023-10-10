@@ -1,7 +1,6 @@
 #ifndef CRADLE_TESTS_SUPPORT_THINKNODE_H
 #define CRADLE_TESTS_SUPPORT_THINKNODE_H
 
-#include <memory>
 #include <string>
 
 #include <cradle/inner/introspection/tasklet.h>
@@ -69,9 +68,9 @@ class thinknode_test_scope
     init_loopback_service();
 };
 
-// Initialize a service for Thinknode testing purposes.
-void
-init_test_service(service_core& core);
+// Create resources for Thinknode testing purposes.
+service_core
+make_thinknode_test_resources();
 
 } // namespace cradle
 

@@ -98,8 +98,7 @@ eval_tasks(
 void
 do_the_test(bool clear_key0, bool test_snapshots)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
 
     auto create_task01
         = []() -> cppcoro::task<blob> { co_return make_blob("42"); };
@@ -151,8 +150,7 @@ TEST_CASE("Consistent total_size when purging eviction list", tag)
 
 TEST_CASE("small value disk caching", tag)
 {
-    service_core core;
-    init_test_service(core);
+    auto resources{make_thinknode_test_resources()};
 
     int execution_count = 0;
     auto counted_task = [&](int answer) -> cppcoro::task<dynamic> {
@@ -163,25 +161,25 @@ TEST_CASE("small value disk caching", tag)
     {
         auto key = make_captured_id("id_12");
         auto result = secondary_cached<dynamic>(
-            core, key, [&] { return counted_task(12); });
+            resources, key, [&] { return counted_task(12); });
         REQUIRE(cppcoro::sync_wait(result) == dynamic(integer(12)));
         REQUIRE(execution_count == 1);
     }
     {
         auto key = make_captured_id("id_42");
         auto result = secondary_cached<dynamic>(
-            core, key, [&] { return counted_task(42); });
+            resources, key, [&] { return counted_task(42); });
         REQUIRE(cppcoro::sync_wait(result) == dynamic(integer(42)));
         REQUIRE(execution_count == 2);
     }
     // Data is written to the disk cache in a background thread, so we need to
     // wait for that to finish.
-    sync_wait_write_disk_cache(core);
+    sync_wait_write_disk_cache(resources);
     // Now redo the 'id_12' task to see that it's not actually rerun.
     {
         auto key = make_captured_id("id_12");
         auto result = secondary_cached<dynamic>(
-            core, key, [&] { return counted_task(12); });
+            resources, key, [&] { return counted_task(12); });
         REQUIRE(cppcoro::sync_wait(result) == dynamic(integer(12)));
         REQUIRE(execution_count == 2);
     }
@@ -189,8 +187,7 @@ TEST_CASE("small value disk caching", tag)
 
 TEST_CASE("large value disk caching", tag)
 {
-    service_core core;
-    init_test_service(core);
+    auto resources{make_thinknode_test_resources()};
 
     auto generate_random_data = [](uint32_t seed) {
         std::vector<integer> result;
@@ -210,7 +207,7 @@ TEST_CASE("large value disk caching", tag)
     {
         auto key = make_captured_id("id_12");
         auto result = secondary_cached<dynamic>(
-            core, key, [&] { return counted_task(12); });
+            resources, key, [&] { return counted_task(12); });
         REQUIRE(
             cppcoro::sync_wait(result)
             == to_dynamic(generate_random_data(12)));
@@ -219,7 +216,7 @@ TEST_CASE("large value disk caching", tag)
     {
         auto key = make_captured_id("id_42");
         auto result = secondary_cached<dynamic>(
-            core, key, [&] { return counted_task(42); });
+            resources, key, [&] { return counted_task(42); });
         REQUIRE(
             cppcoro::sync_wait(result)
             == to_dynamic(generate_random_data(42)));
@@ -227,12 +224,12 @@ TEST_CASE("large value disk caching", tag)
     }
     // Data is written to the disk cache in a background thread, so we need to
     // wait for that to finish.
-    sync_wait_write_disk_cache(core);
+    sync_wait_write_disk_cache(resources);
     // Now redo the 'id_12' task to see that it's not actually rerun.
     {
         auto key = make_captured_id("id_12");
         auto result = secondary_cached<dynamic>(
-            core, key, [&] { return counted_task(12); });
+            resources, key, [&] { return counted_task(12); });
         REQUIRE(
             cppcoro::sync_wait(result)
             == to_dynamic(generate_random_data(12)));
@@ -242,8 +239,7 @@ TEST_CASE("large value disk caching", tag)
 
 TEST_CASE("lazily generated cached tasks", tag)
 {
-    service_core core;
-    init_test_service(core);
+    auto resources{make_thinknode_test_resources()};
 
     int execution_count = 0;
     auto counted_task = [&](int answer) -> cppcoro::task<integer> {
@@ -253,7 +249,7 @@ TEST_CASE("lazily generated cached tasks", tag)
 
     {
         auto result = cached<integer>(
-            core,
+            resources,
             make_captured_id(12),
             [&](captured_id const&) -> cppcoro::task<integer> {
                 return counted_task(12);
@@ -263,7 +259,7 @@ TEST_CASE("lazily generated cached tasks", tag)
     }
     {
         auto result = cached<integer>(
-            core,
+            resources,
             make_captured_id(42),
             [&](captured_id const&) -> cppcoro::task<integer> {
                 return counted_task(42);
@@ -274,7 +270,7 @@ TEST_CASE("lazily generated cached tasks", tag)
     // Now redo the '12' task to see that it's not actually rerun.
     {
         auto result = cached<integer>(
-            core,
+            resources,
             make_captured_id(12),
             [&](captured_id const&) -> cppcoro::task<integer> {
                 return counted_task(12);
@@ -287,8 +283,7 @@ TEST_CASE("lazily generated cached tasks", tag)
 TEST_CASE("shared_task_for_cacheable", tag)
 {
     clean_tasklet_admin_fixture fixture;
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
 
     captured_id cache_key{make_captured_id(87)};
     auto task_creator = []() -> cppcoro::task<blob> {

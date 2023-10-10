@@ -72,8 +72,7 @@ TEST_CASE("msgpack converting plain blob (rpclib)", "[encodings][msgpack]")
 
 TEST_CASE("msgpack converting file blob (rpclib)", "[encodings][msgpack]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto shared_writer{resources.make_blob_file_writer(3)};
     auto& writer{*shared_writer};
     std::memcpy(writer.data(), "fgh", 3);

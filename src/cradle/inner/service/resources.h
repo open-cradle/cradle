@@ -50,66 +50,46 @@ struct inner_config_keys
     inline static std::string const ASYNC_CONCURRENCY{"async_concurrency"};
 };
 
-// Factory of secondary_storage_intf objects.
-// A "disk cache" type of plugin would implement one such factory.
-class secondary_storage_factory
-{
- public:
-    virtual ~secondary_storage_factory() = default;
-
-    virtual std::unique_ptr<secondary_storage_intf>
-    create(inner_resources& resources, service_config const& config) = 0;
-};
-
-// The secondary storage factories registered for an inner_resources instance.
-class secondary_storage_factory_registry
-{
- public:
-    secondary_storage_factory_registry(inner_resources& resources);
-
-    void
-    register_factory(
-        std::string const& key,
-        std::unique_ptr<secondary_storage_factory> factory);
-
-    std::unique_ptr<secondary_storage_intf>
-    create(service_config const& config);
-
- private:
-    inner_resources& resources_;
-    std::unordered_map<std::string, std::unique_ptr<secondary_storage_factory>>
-        factories_;
-};
-
 class inner_resources
 {
  public:
-    // Creates an object that needs an inner_initialize() call
-    inner_resources();
+    // Initially, there is no secondary cache:
+    // - Secondary caches are implemented in plugins, that are not accessible
+    //   from here.
+    // - A plugin may need an inner_resources reference in its constructor
+    //   arguments, and creating a plugin from this constructor would mean
+    //   passing a reference to an object under construction. It seems better
+    //   to solve these (inter-)dependencies outside this class.
+    inner_resources(service_config const& config);
 
     virtual ~inner_resources();
 
-    // Registers a secondary cache factory, identified by a key.
-    // Must happen before inner_initialize().
-    void
-    register_secondary_storage_factory(
-        std::string const& key,
-        std::unique_ptr<secondary_storage_factory> factory);
+    inner_resources(inner_resources const&) = delete;
+    inner_resources&
+    operator=(inner_resources const&)
+        = delete;
+    inner_resources(inner_resources&& other);
+    inner_resources&
+    operator=(inner_resources&& other);
 
-    void
-    inner_initialize(service_config const& config);
+    service_config const&
+    config() const;
+
+    cradle::immutable_cache&
+    memory_cache();
 
     void
     reset_memory_cache();
 
     void
-    clear_secondary_cache();
-
-    cradle::immutable_cache&
-    memory_cache();
+    set_secondary_cache(
+        std::unique_ptr<secondary_storage_intf> secondary_cache);
 
     secondary_storage_intf&
     secondary_cache();
+
+    void
+    clear_secondary_cache();
 
     std::shared_ptr<blob_file_writer>
     make_blob_file_writer(std::size_t size);
@@ -146,7 +126,6 @@ class inner_resources
     }
 
  private:
-    secondary_storage_factory_registry secondary_storage_factories_;
     std::unique_ptr<inner_resources_impl> impl_;
 };
 

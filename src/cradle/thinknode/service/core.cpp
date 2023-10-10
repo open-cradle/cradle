@@ -3,22 +3,24 @@
 
 namespace cradle {
 
-service_core::service_core() : inner_resources()
+service_core::service_core(service_config const& config)
+    : inner_resources(config), impl_{std::make_unique<service_core_impl>()}
 {
-}
-
-service_core::service_core(service_config const& config) : inner_resources()
-{
-    initialize(config);
 }
 
 service_core::~service_core() = default;
 
-void
-service_core::initialize(service_config const& config)
+service_core::service_core(service_core&& other)
+    : inner_resources{std::move(other)}, impl_{std::move(other.impl_)}
 {
-    inner_initialize(config);
-    impl_.reset(new service_core_impl());
+}
+
+service_core&
+service_core::operator=(service_core&& other)
+{
+    inner_resources::operator=(std::move(other));
+    impl_ = std::move(other.impl_);
+    return *this;
 }
 
 cppcoro::static_thread_pool&

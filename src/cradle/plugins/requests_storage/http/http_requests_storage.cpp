@@ -46,10 +46,9 @@ make_http_put_request(int port, std::string const& key, blob value)
 
 } // namespace
 
-http_requests_storage::http_requests_storage(
-    inner_resources& resources, service_config const& config)
+http_requests_storage::http_requests_storage(inner_resources& resources)
     : resources_{resources},
-      port_{static_cast<int>(config.get_mandatory_number(
+      port_{static_cast<int>(resources.config().get_mandatory_number(
           http_requests_storage_config_keys::PORT))}
 {
 }

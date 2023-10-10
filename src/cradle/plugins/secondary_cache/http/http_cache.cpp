@@ -46,11 +46,10 @@ make_cache_put_request(int port, std::string const& key, blob value)
 
 } // namespace
 
-http_cache::http_cache(
-    inner_resources& resources, service_config const& config)
+http_cache::http_cache(inner_resources& resources)
     : resources_{resources},
-      port_{static_cast<int>(
-          config.get_mandatory_number(http_cache_config_keys::PORT))}
+      port_{static_cast<int>(resources.config().get_mandatory_number(
+          http_cache_config_keys::PORT))}
 {
 }
 

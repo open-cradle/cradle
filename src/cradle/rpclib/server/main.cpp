@@ -139,11 +139,9 @@ run_server(cli_options const& options)
     initialize_logging(options.log_level, options.ignore_env_log_level);
     auto my_logger = create_logger("rpclib_server");
 
-    service_core service;
-    activate_all_secondary_storage_plugins(service);
-
     service_config config{create_config_map(options)};
-    service.initialize(config);
+    service_core service{config};
+    service.set_secondary_cache(create_secondary_storage(service));
     service.ensure_async_db();
     service.register_domain(create_testing_domain(service));
     service.register_domain(create_thinknode_domain(service));

@@ -42,8 +42,7 @@ void
 BM_try_resolve_testing_request(
     benchmark::State& state, Req const& req, std::string const& proxy_name)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     bool remotely = proxy_name.size() > 0;
     if (remotely)
     {

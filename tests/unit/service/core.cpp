@@ -10,11 +10,10 @@ using namespace cradle;
 
 TEST_CASE("HTTP requests", "[service][core]")
 {
-    service_core core;
-    init_test_service(core);
+    auto resources{make_thinknode_test_resources()};
 
     auto async_response = async_http_request(
-        core,
+        resources,
         make_get_request(
             "https://postman-echo.com/get?color=navy", http_header_list()));
 

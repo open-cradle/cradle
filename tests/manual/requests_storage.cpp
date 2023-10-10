@@ -10,7 +10,7 @@
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/plugins/domain/testing/testing_seri_catalog.h>
-#include <cradle/plugins/requests_storage/http/http_requests_storage_factory.h>
+#include <cradle/plugins/requests_storage/http/http_requests_storage.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 
 /*
@@ -65,13 +65,11 @@ TEST_CASE("store request", tag_store)
     testing_seri_catalog cat;
     cat.register_all();
 
-    http_requests_storage_factory factory;
-    inner_resources resources;
-    init_test_inner_service(resources);
-    auto storage{factory.create(resources, make_inner_tests_config())};
+    auto resources{make_inner_test_resources()};
+    http_requests_storage storage{resources};
 
     auto req0{rq_make_some_blob<caching_level_type::full>(5, false)};
-    cppcoro::sync_wait(store_request(req0, *storage));
+    cppcoro::sync_wait(store_request(req0, storage));
 
     REQUIRE(get_request_key(req0) == the_key);
 }
@@ -81,16 +79,14 @@ TEST_CASE("load stored request", tag_load)
     testing_seri_catalog cat;
     cat.register_all();
 
-    http_requests_storage_factory factory;
-    inner_resources resources;
-    init_test_inner_service(resources);
-    auto storage{factory.create(resources, make_inner_tests_config())};
+    auto resources{make_inner_test_resources()};
+    http_requests_storage storage{resources};
 
     auto req_written{rq_make_some_blob<caching_level_type::full>(5, false)};
     using Req = decltype(req_written);
 
     std::string key{the_key};
-    auto req_read = cppcoro::sync_wait(load_request<Req>(key, *storage));
+    auto req_read = cppcoro::sync_wait(load_request<Req>(key, storage));
     REQUIRE(req_read == req_written);
 }
 
@@ -99,13 +95,11 @@ TEST_CASE("load and resolve stored request", tag_load)
     testing_seri_catalog cat;
     cat.register_all();
 
-    http_requests_storage_factory factory;
-    inner_resources resources;
-    init_test_inner_service(resources);
-    auto storage{factory.create(resources, make_inner_tests_config())};
+    auto resources{make_inner_test_resources()};
+    http_requests_storage storage{resources};
 
     std::string key{the_key};
-    blob req_blob{cppcoro::sync_wait(storage->read(key))};
+    blob req_blob{cppcoro::sync_wait(storage.read(key))};
     if (!req_blob.data())
     {
         throw not_found_error(

@@ -19,8 +19,7 @@ static char const tag[] = "[inner][resolve][seri_req]";
 static void
 test_resolve(bool remotely)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     if (remotely)
     {
         init_test_loopback_service(resources, true);

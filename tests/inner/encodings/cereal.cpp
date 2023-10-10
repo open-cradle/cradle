@@ -134,8 +134,7 @@ TEST_CASE("cereal converting plain blob", "[encodings][cereal]")
 
 TEST_CASE("cereal converting file blob", "[encodings][cereal]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto shared_writer{resources.make_blob_file_writer(3)};
     auto& writer{*shared_writer};
     std::memcpy(writer.data(), "fgh", 3);

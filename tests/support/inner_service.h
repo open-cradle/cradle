@@ -12,8 +12,8 @@ namespace cradle {
 service_config
 make_inner_tests_config();
 
-void
-init_test_inner_service(inner_resources& resources);
+inner_resources
+make_inner_test_resources();
 
 service_config
 make_inner_loopback_config();

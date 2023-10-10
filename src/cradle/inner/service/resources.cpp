@@ -18,33 +18,6 @@
 
 namespace cradle {
 
-secondary_storage_factory_registry::secondary_storage_factory_registry(
-    inner_resources& resources)
-    : resources_{resources}
-{
-}
-
-void
-secondary_storage_factory_registry::register_factory(
-    std::string const& key, std::unique_ptr<secondary_storage_factory> factory)
-{
-    factories_.emplace(key, std::move(factory));
-}
-
-std::unique_ptr<secondary_storage_intf>
-secondary_storage_factory_registry::create(service_config const& config)
-{
-    auto key = config.get_mandatory_string(
-        inner_config_keys::SECONDARY_CACHE_FACTORY);
-    auto factory = factories_.find(key);
-    if (factory == factories_.end())
-    {
-        throw config_error{
-            fmt::format("No secondary cache factory \"{}\"", key)};
-    }
-    return factory->second->create(resources_, config);
-}
-
 static immutable_cache_config
 make_immutable_cache_config(service_config const& config)
 {
@@ -60,7 +33,9 @@ create_memory_cache(service_config const& config)
         make_immutable_cache_config(config));
 }
 
-inner_resources::inner_resources() : secondary_storage_factories_{*this}
+// TODO pass config by value
+inner_resources::inner_resources(service_config const& config)
+    : impl_{std::make_unique<inner_resources_impl>(config)}
 {
 }
 
@@ -68,24 +43,28 @@ inner_resources::inner_resources() : secondary_storage_factories_{*this}
 // available in resources.h.
 inner_resources::~inner_resources() = default;
 
-void
-inner_resources::register_secondary_storage_factory(
-    std::string const& key, std::unique_ptr<secondary_storage_factory> factory)
+inner_resources::inner_resources(inner_resources&& other)
+    : impl_{std::move(other.impl_)}
 {
-    secondary_storage_factories_.register_factory(key, std::move(factory));
 }
 
-// TODO pass config by value
-void
-inner_resources::inner_initialize(service_config const& config)
+inner_resources&
+inner_resources::operator=(inner_resources&& other)
 {
-    if (impl_)
-    {
-        throw std::logic_error(
-            "attempt to re-initialize an inner_resources object");
-    }
-    impl_ = std::make_unique<inner_resources_impl>(
-        secondary_storage_factories_, config);
+    impl_ = std::move(other.impl_);
+    return *this;
+}
+
+service_config const&
+inner_resources::config() const
+{
+    return impl_->config();
+}
+
+cradle::immutable_cache&
+inner_resources::memory_cache()
+{
+    return impl_->memory_cache();
 }
 
 void
@@ -95,21 +74,22 @@ inner_resources::reset_memory_cache()
 }
 
 void
-inner_resources::clear_secondary_cache()
+inner_resources::set_secondary_cache(
+    std::unique_ptr<secondary_storage_intf> secondary_cache)
 {
-    impl_->clear_secondary_cache();
-}
-
-cradle::immutable_cache&
-inner_resources::memory_cache()
-{
-    return impl_->memory_cache();
+    impl_->set_secondary_cache(std::move(secondary_cache));
 }
 
 secondary_storage_intf&
 inner_resources::secondary_cache()
 {
     return impl_->secondary_cache();
+}
+
+void
+inner_resources::clear_secondary_cache()
+{
+    impl_->clear_secondary_cache();
 }
 
 std::shared_ptr<blob_file_writer>
@@ -179,12 +159,9 @@ enable_http_mocking(inner_resources& resources, bool http_is_synchronous)
     return resources.impl().enable_http_mocking(http_is_synchronous);
 }
 
-inner_resources_impl::inner_resources_impl(
-    secondary_storage_factory_registry& secondary_storage_factories,
-    service_config const& config)
+inner_resources_impl::inner_resources_impl(service_config const& config)
     : config_{config},
       memory_cache_{create_memory_cache(config)},
-      secondary_cache_{secondary_storage_factories.create(config)},
       blob_dir_{std::make_unique<blob_file_directory>(config)},
       http_pool_{cppcoro::static_thread_pool(
           static_cast<uint32_t>(config.get_number_or_default(
@@ -202,9 +179,31 @@ inner_resources_impl::reset_memory_cache()
 }
 
 void
+inner_resources_impl::set_secondary_cache(
+    std::unique_ptr<secondary_storage_intf> secondary_cache)
+{
+    if (secondary_cache_)
+    {
+        throw std::logic_error(
+            "attempt to change secondary cache in inner_resources");
+    }
+    secondary_cache_ = std::move(secondary_cache);
+}
+
+secondary_storage_intf&
+inner_resources_impl::secondary_cache()
+{
+    if (!secondary_cache_)
+    {
+        throw std::logic_error("inner_resources has no secondary cache");
+    }
+    return *secondary_cache_;
+}
+
+void
 inner_resources_impl::clear_secondary_cache()
 {
-    secondary_cache_->clear();
+    secondary_cache().clear();
 }
 
 std::shared_ptr<blob_file_writer>

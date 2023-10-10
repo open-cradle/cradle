@@ -30,7 +30,7 @@ struct http_cache_config_values
 class http_cache : public secondary_storage_intf
 {
  public:
-    http_cache(inner_resources& resources, service_config const& config);
+    http_cache(inner_resources& resources);
 
     // Not (yet?) implemented
     void

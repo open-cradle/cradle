@@ -190,8 +190,11 @@ struct client_request
     tasklet_tracker* tasklet;
 };
 
-struct websocket_server_impl
+class websocket_server_impl
 {
+ public:
+    websocket_server_impl(service_config const& config);
+
     service_config config;
     std::shared_ptr<spdlog::logger> logger;
     // TODO another http_request_system singleton in typing/service/core.cpp
@@ -1897,51 +1900,40 @@ on_message(
     // tasklet_run. Force-finish here?
 }
 
-static void
-initialize(websocket_server_impl& server, service_config const& config)
+websocket_server_impl::websocket_server_impl(service_config const& in_config)
+    : config{in_config}, logger{create_logger("ws_server")}, core{in_config}
 {
-    server.config = config;
-    server.logger = create_logger("ws_server");
+    core.set_secondary_cache(create_secondary_storage(core));
 
-    activate_all_secondary_storage_plugins(server.core);
-    server.core.initialize(config);
-
-    server.ws.clear_access_channels(websocketpp::log::alevel::all);
-    server.ws.init_asio();
+    ws.clear_access_channels(websocketpp::log::alevel::all);
+    ws.init_asio();
     // TODO following line under evaluation, for development only
-    server.ws.set_reuse_addr(true);
-    server.ws.set_open_handler(
-        [&](connection_hdl hdl) { on_open(server, hdl); });
-    server.ws.set_close_handler(
-        [&](connection_hdl hdl) { on_close(server, hdl); });
-    server.ws.set_message_handler(
+    ws.set_reuse_addr(true);
+    ws.set_open_handler([&](connection_hdl hdl) { on_open(*this, hdl); });
+    ws.set_close_handler([&](connection_hdl hdl) { on_close(*this, hdl); });
+    ws.set_message_handler(
         [&](connection_hdl hdl, ws_server_type::message_ptr message) {
-            on_message(server, hdl, message);
+            on_message(*this, hdl, message);
         });
 
-    register_rpclib_client(config, server.core);
+    register_rpclib_client(config, core);
 
     // TODO maybe delay loading Thinknode DLL until really needed
     // Load Thinknode DLL locally
     load_shared_library(get_thinknode_dlls_dir(), "cradle_thinknode_v1");
     // Load Thinknode DLL in the rpclib server
-    auto& proxy{server.core.get_proxy("rpclib")};
+    auto& proxy{core.get_proxy("rpclib")};
     proxy.load_shared_library(get_thinknode_dlls_dir(), "cradle_thinknode_v1");
 }
 
 websocket_server::websocket_server(service_config const& config)
+    : impl_{std::make_unique<websocket_server_impl>(config)}
 {
-    impl_ = new websocket_server_impl;
-    initialize(*impl_, config);
 }
 
 websocket_server::~websocket_server()
 {
-    if (impl_)
-    {
-        cppcoro::sync_wait(impl_->async_scope.join());
-        delete impl_;
-    }
+    cppcoro::sync_wait(impl_->async_scope.join());
 }
 
 void

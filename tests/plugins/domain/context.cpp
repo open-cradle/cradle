@@ -10,8 +10,7 @@ using namespace cradle;
 
 TEST_CASE("get_resources()", "[testing][context]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, false, ""};
 
     REQUIRE(&ctx.get_resources() == &resources);
@@ -20,8 +19,7 @@ TEST_CASE("get_resources()", "[testing][context]")
 
 TEST_CASE("remotely(), default", "[testing][context]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, false, ""};
 
     REQUIRE(!ctx.remotely());
@@ -29,8 +27,7 @@ TEST_CASE("remotely(), default", "[testing][context]")
 
 TEST_CASE("remotely(), set", "[testing][context]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, true, "some_proxy"};
 
     REQUIRE(ctx.remotely());
@@ -38,8 +35,7 @@ TEST_CASE("remotely(), set", "[testing][context]")
 
 TEST_CASE("no initial tasklet", "[testing][context]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, false, ""};
 
     REQUIRE(ctx.get_tasklet() == nullptr);
@@ -47,8 +43,7 @@ TEST_CASE("no initial tasklet", "[testing][context]")
 
 TEST_CASE("with initial tasklet", "[testing][context]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto t0 = create_tasklet_tracker("pool", "t0");
     testing_request_context ctx{resources, t0, false, ""};
 
@@ -57,8 +52,7 @@ TEST_CASE("with initial tasklet", "[testing][context]")
 
 TEST_CASE("push/pop tasklet", "[testing][context]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto t0 = create_tasklet_tracker("pool", "t0");
     auto t1 = create_tasklet_tracker("pool", "t1");
     testing_request_context ctx{resources, nullptr, false, ""};
@@ -76,8 +70,7 @@ TEST_CASE("push/pop tasklet", "[testing][context]")
 
 TEST_CASE("get proxy name", "[testing][context]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, false, "the name"};
 
     REQUIRE(ctx.proxy_name() == "the name");
@@ -85,8 +78,7 @@ TEST_CASE("get proxy name", "[testing][context]")
 
 TEST_CASE("domain_name()", "[testing][context]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, false, ""};
 
     REQUIRE(ctx.domain_name() == "testing");

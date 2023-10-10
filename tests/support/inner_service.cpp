@@ -7,7 +7,6 @@
 #include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/requests_storage/http/http_requests_storage.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
-#include <cradle/plugins/secondary_cache/local/local_disk_cache_plugin.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/client/registry.h>
 
@@ -35,11 +34,13 @@ make_inner_tests_config()
     return service_config{inner_config_map};
 }
 
-void
-init_test_inner_service(inner_resources& resources)
+inner_resources
+make_inner_test_resources()
 {
-    activate_local_disk_cache_plugin(resources);
-    resources.inner_initialize(make_inner_tests_config());
+    auto config{make_inner_tests_config()};
+    inner_resources resources{config};
+    resources.set_secondary_cache(std::make_unique<local_disk_cache>(config));
+    return resources;
 }
 
 static std::string loopback_cache_dir{"loopback_cache"};
@@ -69,9 +70,10 @@ init_test_loopback_service(
     inner_resources& test_resources, bool with_testing_domain)
 {
     service_config loopback_config{make_inner_loopback_config()};
-    auto loopback_resources{std::make_unique<inner_resources>()};
-    activate_local_disk_cache_plugin(*loopback_resources);
-    loopback_resources->inner_initialize(loopback_config);
+    auto loopback_resources{
+        std::make_unique<inner_resources>(loopback_config)};
+    loopback_resources->set_secondary_cache(
+        std::make_unique<local_disk_cache>(loopback_config));
     if (with_testing_domain)
     {
         loopback_resources->register_domain(
@@ -82,8 +84,8 @@ init_test_loopback_service(
 }
 
 caching_request_resolution_context::caching_request_resolution_context()
+    : resources{make_inner_test_resources()}
 {
-    init_test_inner_service(resources);
 }
 
 void

@@ -16,15 +16,13 @@ namespace cradle {
 class inner_resources_impl
 {
  public:
-    inner_resources_impl(
-        secondary_storage_factory_registry& secondary_storage_factories,
-        service_config const& config);
+    inner_resources_impl(service_config const& config);
 
-    void
-    reset_memory_cache();
-
-    void
-    clear_secondary_cache();
+    service_config const&
+    config() const
+    {
+        return config_;
+    }
 
     cradle::immutable_cache&
     memory_cache()
@@ -32,11 +30,18 @@ class inner_resources_impl
         return *memory_cache_;
     }
 
+    void
+    reset_memory_cache();
+
+    void
+    set_secondary_cache(
+        std::unique_ptr<secondary_storage_intf> secondary_cache);
+
     secondary_storage_intf&
-    secondary_cache()
-    {
-        return *secondary_cache_;
-    }
+    secondary_cache();
+
+    void
+    clear_secondary_cache();
 
     std::shared_ptr<blob_file_writer>
     make_blob_file_writer(std::size_t size);

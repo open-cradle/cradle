@@ -52,8 +52,7 @@ TEST_CASE("register seri resolver and call it", tag)
 
     REQUIRE_NOTHROW(cat.register_resolver(req));
 
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, false, ""};
     std::string seri_req{serialize_request(req)};
     auto seri_resp{
@@ -68,8 +67,7 @@ TEST_CASE("call unregistered resolver", tag)
 {
     static char const arg[] = "b";
     auto req{rq_local(make_string<arg>{}, arg)};
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, false, ""};
 
 #if 0
@@ -93,8 +91,7 @@ TEST_CASE("serialized request lacking uuid", tag)
     auto req{rq_local(make_string<arg>{}, arg)};
     seri_catalog cat;
     cat.register_resolver(req);
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, false, ""};
     std::string correct{serialize_request(req)};
 
@@ -112,8 +109,7 @@ TEST_CASE("malformed serialized request", tag)
     auto req{rq_local(make_string<arg>{}, arg)};
     seri_catalog cat;
     cat.register_resolver(req);
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, false, ""};
     std::string seri_req{serialize_request(req)};
 
@@ -156,8 +152,7 @@ TEST_CASE("resolve two C++ functions with the same signature", tag)
 
     REQUIRE(seri_req_e != seri_req_f);
 
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, false, ""};
 
     auto seri_resp_e{
