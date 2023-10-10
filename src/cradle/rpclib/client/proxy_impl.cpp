@@ -5,6 +5,11 @@
 #include <rpc/client.h>
 #include <rpc/rpc_error.h>
 
+// for the boost::process::windows::hide flag
+#ifdef _WIN32
+#include <boost/process/windows.hpp>
+#endif
+
 #include <cradle/deploy_dir.h>
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/encodings/msgpack_adaptors_rpclib.h>
@@ -271,9 +276,22 @@ rpclib_client_impl::start_server()
     {
         cmd += fmt::format(" {}", arg);
     }
+// When spawning the server process from a Window's GUI application, the
+// default behavior is to create a separate console window for it, which is not
+// the behavior we want for end-user applications.
+// TODO: Should there be a config option to control this?
+#ifdef _WIN32
+#define OTHER_CHILD_PROCESS_OPTIONS boost::process::windows::hide,
+#else
+#define OTHER_CHILD_PROCESS_OPTIONS
+#endif
     logger_->info("starting {}", cmd);
-    auto child = bp::child(bp::exe = path, bp::args = child_args, group_);
+    auto child = bp::child(
+        bp::exe = path,
+        bp::args = child_args,
+        OTHER_CHILD_PROCESS_OPTIONS group_);
     logger_->info("started child process");
+#undef OTHER_CHILD_PROCESS_OPTIONS
     wait_until_server_running();
     child_ = std::move(child);
 }
