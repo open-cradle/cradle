@@ -22,7 +22,6 @@ struct thinknode_request_context final : public sync_context_base
         service_core& service,
         thinknode_session session,
         tasklet_tracker* tasklet,
-        bool remotely,
         std::string proxy_name);
 
     ~thinknode_request_context();

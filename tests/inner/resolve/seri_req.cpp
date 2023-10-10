@@ -17,18 +17,11 @@ using namespace cradle;
 static char const tag[] = "[inner][resolve][seri_req]";
 
 static void
-test_resolve(bool remotely)
+test_resolve(std::string const& proxy_name)
 {
-    auto resources{make_inner_test_resources()};
-    if (remotely)
-    {
-        init_test_loopback_service(resources, true);
-    }
-    else
-    {
-        resources.register_domain(create_testing_domain(resources));
-    }
-    testing_request_context ctx{resources, nullptr, remotely, "loopback"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
+    testing_request_context ctx{resources, nullptr, proxy_name};
 
     constexpr auto caching_level{caching_level_type::full};
     auto req{rq_make_some_blob<caching_level>(256, false)};
@@ -44,10 +37,10 @@ test_resolve(bool remotely)
 
 TEST_CASE("resolve serialized request, locally", tag)
 {
-    test_resolve(false);
+    test_resolve("");
 }
 
-TEST_CASE("resolve serialized request, remotely", tag)
+TEST_CASE("resolve serialized request, loopback", tag)
 {
-    test_resolve(true);
+    test_resolve("loopback");
 }

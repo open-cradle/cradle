@@ -19,16 +19,15 @@ void
 test_make_some_blob(bool async, bool shared)
 {
     constexpr auto caching_level{caching_level_type::full};
-    constexpr auto remotely{true};
     std::string proxy_name{"loopback"};
-    auto resources{make_inner_test_resources()};
-    init_test_loopback_service(resources, true);
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
     auto req{rq_make_some_blob<caching_level>(10000, shared)};
     blob response;
     if (!async)
     {
-        testing_request_context ctx{resources, nullptr, remotely, proxy_name};
+        testing_request_context ctx{resources, nullptr, proxy_name};
         ResolutionConstraintsRemoteSync constraints;
         response = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
     }

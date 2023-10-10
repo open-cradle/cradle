@@ -45,14 +45,14 @@ class sync_context_base : public local_context_intf,
     sync_context_base(
         inner_resources& resources,
         tasklet_tracker* tasklet,
-        bool remotely,
         std::string proxy_name);
 
     // context_intf
     bool
     remotely() const override
     {
-        return remotely_;
+        // TODO wrap proxy_name in a class
+        return !proxy_name_.empty();
     }
 
     bool
@@ -109,7 +109,6 @@ class sync_context_base : public local_context_intf,
 
  protected:
     inner_resources& resources_;
-    bool remotely_;
     std::string proxy_name_;
     std::vector<tasklet_tracker*> tasklets_;
     // The blob_file_writer objects allocated during the resolution of requests

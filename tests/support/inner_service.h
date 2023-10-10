@@ -1,8 +1,8 @@
 #ifndef CRADLE_TESTS_SUPPORT_INNER_SERVICE_H
 #define CRADLE_TESTS_SUPPORT_INNER_SERVICE_H
 
+#include "common.h"
 #include <cradle/inner/core/exception.h>
-#include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/rpclib/client/proxy.h>
@@ -13,14 +13,9 @@ service_config
 make_inner_tests_config();
 
 inner_resources
-make_inner_test_resources();
-
-service_config
-make_inner_loopback_config();
-
-void
-init_test_loopback_service(
-    inner_resources& test_resources, bool with_testing_domain);
+make_inner_test_resources(
+    std::string const& proxy_name = {},
+    domain_option const& domain = no_domain_option());
 
 void
 clear_disk_cache(inner_resources& resources);

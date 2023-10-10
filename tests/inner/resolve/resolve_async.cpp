@@ -31,19 +31,6 @@ make_test_uuid(int ext)
     return request_uuid{fmt::format("{}-{:04d}", tag, ext)};
 }
 
-void
-setup_loopback_test(inner_resources& resources, bool with_testing_domain)
-{
-    init_test_loopback_service(resources, with_testing_domain);
-}
-
-void
-setup_rpclib_test(inner_resources& resources)
-{
-    // TODO revise register_rpclib_client()
-    register_rpclib_client(make_inner_tests_config(), resources);
-}
-
 template<typename Ctx, typename Req, typename Constraints>
 cppcoro::task<void>
 test_resolve_async_coro(
@@ -212,18 +199,20 @@ TEST_CASE("resolve async locally - normalized args", tag)
 
 TEST_CASE("resolve async on loopback", tag)
 {
-    auto resources{make_inner_test_resources()};
-    setup_loopback_test(resources, true);
+    std::string proxy_name{"loopback"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_resolve_async_across_rpc(resources, "loopback");
+    test_resolve_async_across_rpc(resources, proxy_name);
 }
 
 TEST_CASE("resolve async on rpclib", tag)
 {
-    auto resources{make_inner_test_resources()};
-    setup_rpclib_test(resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_resolve_async_across_rpc(resources, "rpclib");
+    test_resolve_async_across_rpc(resources, proxy_name);
 }
 
 TEST_CASE("resolve async with value_request locally", tag)
@@ -304,18 +293,20 @@ TEST_CASE("error async request locally", tag)
 
 TEST_CASE("error async request on loopback", tag)
 {
-    auto resources{make_inner_test_resources()};
-    setup_loopback_test(resources, true);
+    std::string proxy_name{"loopback"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_error_async_across_rpc(resources, "loopback");
+    test_error_async_across_rpc(resources, proxy_name);
 }
 
 TEST_CASE("error async request on rpclib", tag)
 {
-    auto resources{make_inner_test_resources()};
-    setup_rpclib_test(resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_error_async_across_rpc(resources, "rpclib");
+    test_error_async_across_rpc(resources, proxy_name);
 }
 
 namespace {
@@ -414,18 +405,20 @@ TEST_CASE("cancel async request locally", tag)
 
 TEST_CASE("cancel async request on loopback", tag)
 {
-    auto resources{make_inner_test_resources()};
-    setup_loopback_test(resources, true);
+    std::string proxy_name{"loopback"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_cancel_async_across_rpc(resources, "loopback");
+    test_cancel_async_across_rpc(resources, proxy_name);
 }
 
 TEST_CASE("cancel async request on rpclib", tag)
 {
-    auto resources{make_inner_test_resources()};
-    setup_rpclib_test(resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_cancel_async_across_rpc(resources, "rpclib");
+    test_cancel_async_across_rpc(resources, proxy_name);
 }
 
 namespace {
@@ -479,18 +472,18 @@ test_failing_get_num_subs(
 
 TEST_CASE("get_num_subs failure on loopback", tag)
 {
-    auto resources{make_inner_test_resources()};
-    setup_loopback_test(resources, false);
+    std::string proxy_name{"loopback"};
+    auto resources{make_inner_test_resources(proxy_name, no_domain_option())};
 
-    test_failing_get_num_subs(resources, "loopback");
+    test_failing_get_num_subs(resources, proxy_name);
 }
 
 TEST_CASE("get_num_subs failure on rpclib", tag)
 {
-    auto resources{make_inner_test_resources()};
-    setup_rpclib_test(resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{make_inner_test_resources(proxy_name, no_domain_option())};
 
-    test_failing_get_num_subs(resources, "rpclib");
+    test_failing_get_num_subs(resources, proxy_name);
 }
 
 namespace {
@@ -551,18 +544,20 @@ test_delayed_get_num_subs(
 // resolve_async has started, so get_num_subs needs to wait.
 TEST_CASE("delayed get_num_subs on loopback", tag)
 {
-    auto resources{make_inner_test_resources()};
-    setup_loopback_test(resources, true);
+    std::string proxy_name{"loopback"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_delayed_get_num_subs(resources, "loopback");
+    test_delayed_get_num_subs(resources, proxy_name);
 }
 
 TEST_CASE("delayed get_num_subs on rpclib", tag)
 {
-    auto resources{make_inner_test_resources()};
-    setup_rpclib_test(resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_delayed_get_num_subs(resources, "rpclib");
+    test_delayed_get_num_subs(resources, proxy_name);
 }
 
 namespace {
@@ -627,18 +622,20 @@ test_delayed_set_result(
 // FINISHED
 TEST_CASE("delayed set_result on loopback", tag)
 {
-    auto resources{make_inner_test_resources()};
-    setup_loopback_test(resources, true);
+    std::string proxy_name{"loopback"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_delayed_set_result(resources, "loopback");
+    test_delayed_set_result(resources, proxy_name);
 }
 
 TEST_CASE("delayed set_result on rpclib", tag)
 {
-    auto resources{make_inner_test_resources()};
-    setup_rpclib_test(resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_delayed_set_result(resources, "rpclib");
+    test_delayed_set_result(resources, proxy_name);
 }
 
 TEST_CASE("create rq_cancellable_coro with different caching levels", tag)

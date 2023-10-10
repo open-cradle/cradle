@@ -15,8 +15,10 @@
 
 namespace cradle {
 
-static std::string tests_cache_dir{"tests_cache"};
-static service_config_map const thinknode_config_map{
+namespace {
+
+std::string tests_cache_dir{"tests_cache"};
+service_config_map const thinknode_config_map{
     {generic_config_keys::TESTING, true},
     {generic_config_keys::DEPLOY_DIR, get_deploy_dir()},
     {inner_config_keys::MEMORY_CACHE_UNUSED_SIZE_LIMIT, 0x40'00'00'00U},
@@ -27,19 +29,36 @@ static service_config_map const thinknode_config_map{
     {local_disk_cache_config_keys::START_EMPTY, true},
     {inner_config_keys::HTTP_CONCURRENCY, 2U}};
 
-static service_config
+service_config
 make_thinknode_tests_config()
 {
     return service_config{thinknode_config_map};
 }
 
+class thinknode_domain_option : public domain_option
+{
+ public:
+    void
+    register_domain(inner_resources& resources) const override
+    {
+        resources.register_domain(
+            create_thinknode_domain(static_cast<service_core&>(resources)));
+    }
+};
+
+} // namespace
+
 thinknode_test_scope::thinknode_test_scope(
     std::string const& proxy_name, bool use_real_api_token)
     : proxy_name_{proxy_name},
       use_real_api_token_{use_real_api_token},
-      resources_{make_thinknode_test_resources()}
+      resources_{
+          make_thinknode_test_resources(proxy_name, thinknode_domain_option{})}
 {
-    register_remote();
+    if (!proxy_name_.empty())
+    {
+        proxy_ = &resources_.get_proxy(proxy_name_);
+    }
     if (proxy_name_ == "rpclib")
     {
         // Maybe cleaner to do this for loopback too.
@@ -63,42 +82,6 @@ thinknode_test_scope::~thinknode_test_scope()
     }
 }
 
-void
-thinknode_test_scope::register_remote()
-{
-    if (!proxy_name_.empty())
-    {
-        if (proxy_name_ == "loopback")
-        {
-            init_loopback_service();
-        }
-        else if (proxy_name_ == "rpclib")
-        {
-            register_rpclib_client(make_thinknode_tests_config(), resources_);
-        }
-        else
-        {
-            throw std::invalid_argument(
-                fmt::format("Unknown proxy name {}", proxy_name_));
-        }
-        proxy_ = &resources_.get_proxy(proxy_name_);
-    }
-}
-
-void
-thinknode_test_scope::init_loopback_service()
-{
-    // TODO thinknode config?
-    service_config loopback_config{make_inner_loopback_config()};
-    auto loopback_resources{std::make_unique<service_core>(loopback_config)};
-    loopback_resources->set_secondary_cache(
-        std::make_unique<local_disk_cache>(loopback_config));
-    loopback_resources->register_domain(
-        create_thinknode_domain(*loopback_resources));
-    resources_.register_proxy(std::make_unique<loopback_service>(
-        loopback_config, std::move(loopback_resources)));
-}
-
 thinknode_request_context
 thinknode_test_scope::make_context(tasklet_tracker* tasklet)
 {
@@ -108,8 +91,8 @@ thinknode_test_scope::make_context(tasklet_tracker* tasklet)
         = use_real_api_token_
               ? get_environment_variable("CRADLE_THINKNODE_API_TOKEN")
               : "xyz";
-    return thinknode_request_context{
-        resources_, session, tasklet, proxy_ != nullptr, proxy_name_};
+    auto proxy_name{get_proxy_name()};
+    return thinknode_request_context{resources_, session, tasklet, proxy_name};
 }
 
 mock_http_session&
@@ -127,11 +110,13 @@ thinknode_test_scope::clear_caches()
 }
 
 service_core
-make_thinknode_test_resources()
+make_thinknode_test_resources(
+    std::string const& proxy_name, domain_option const& domain)
 {
     auto config{make_thinknode_tests_config()};
     service_core resources{config};
     resources.set_secondary_cache(std::make_unique<local_disk_cache>(config));
+    init_and_register_proxy(resources, proxy_name, domain);
     return resources;
 }
 

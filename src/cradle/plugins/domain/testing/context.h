@@ -24,7 +24,6 @@ class testing_request_context final : public sync_context_base
     testing_request_context(
         inner_resources& resources,
         tasklet_tracker* tasklet,
-        bool remotely,
         std::string proxy_name);
 
     // remote_context_intf

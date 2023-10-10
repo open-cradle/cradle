@@ -18,37 +18,14 @@
 using namespace cradle;
 using namespace std;
 
-static void
-register_remote_services(
-    inner_resources& resources, std::string const& proxy_name)
-{
-    if (proxy_name == "loopback")
-    {
-        init_test_loopback_service(resources, true);
-    }
-    else if (proxy_name == "rpclib")
-    {
-        register_rpclib_client(make_inner_tests_config(), resources);
-    }
-    else
-    {
-        throw std::invalid_argument(
-            fmt::format("Unknown proxy name {}", proxy_name));
-    }
-}
-
 template<caching_level_type caching_level, bool storing, typename Req>
 void
 BM_try_resolve_testing_request(
     benchmark::State& state, Req const& req, std::string const& proxy_name)
 {
-    auto resources{make_inner_test_resources()};
-    bool remotely = proxy_name.size() > 0;
-    if (remotely)
-    {
-        register_remote_services(resources, proxy_name);
-    }
-    testing_request_context ctx{resources, nullptr, remotely, proxy_name};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option{})};
+    testing_request_context ctx{resources, nullptr, proxy_name};
 
     // Fill the appropriate cache if any
     auto init = [&]() -> cppcoro::task<void> {

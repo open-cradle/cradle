@@ -29,6 +29,7 @@ target_link_libraries(test_lib_unit PUBLIC
 # TODO try not to build support/inner_service.cpp (etc.) for each test runner
 add_executable(unit_test_runner)
 target_sources(unit_test_runner PRIVATE
+    support/common.cpp
     support/inner_service.cpp
     support/thinknode.cpp)
 target_include_directories(unit_test_runner PUBLIC
@@ -121,6 +122,7 @@ add_dependencies(test_lib_inner
 # Add the inner test runner.
 add_executable(inner_test_runner)
 target_sources(inner_test_runner PRIVATE
+    support/common.cpp
     support/inner_service.cpp)
 target_link_libraries(inner_test_runner PRIVATE
     test_lib_runner
@@ -155,6 +157,7 @@ target_link_libraries(test_lib_external PUBLIC
 # Add the external test runner.
 add_executable(external_test_runner)
 target_sources(external_test_runner PRIVATE
+    support/common.cpp
     support/inner_service.cpp
     support/thinknode.cpp)
 target_include_directories(external_test_runner PUBLIC
@@ -187,6 +190,7 @@ target_link_libraries(test_lib_plugins PUBLIC
 # Add the plugins test runner.
 add_executable(plugins_test_runner)
 target_sources(plugins_test_runner PRIVATE
+    support/common.cpp
     support/inner_service.cpp)
 target_link_libraries(plugins_test_runner PRIVATE
     test_lib_runner
@@ -206,6 +210,7 @@ add_test(
 # Add a runner covering all unit tests (including external and inner).
 add_executable(all_unit_tests_runner)
 target_sources(all_unit_tests_runner PRIVATE
+    support/common.cpp
     support/inner_service.cpp
     support/thinknode.cpp)
 target_include_directories(all_unit_tests_runner PUBLIC
@@ -232,6 +237,7 @@ target_link_libraries(test_lib_manual PUBLIC
 # The runner should be invoked directly, not via CMake.
 add_executable(manual_test_runner)
 target_sources(manual_test_runner PRIVATE
+    support/common.cpp
     support/inner_service.cpp)
 target_include_directories(manual_test_runner PUBLIC
     ${generated_src_dir}
@@ -241,6 +247,7 @@ add_dependencies(manual_test_runner
     deploy_dir_file_target
     copy_cradle_dlls)
 target_link_libraries(manual_test_runner PRIVATE
+    cradle_rpclib_client
     test_lib_manual
     test_lib_runner)
 
@@ -296,6 +303,7 @@ target_link_libraries(test_lib_benchmark PUBLIC
 
 add_executable(benchmark_test_runner)
 target_sources(benchmark_test_runner PRIVATE
+    support/common.cpp
     support/inner_service.cpp
     support/thinknode.cpp)
 target_link_libraries(benchmark_test_runner PRIVATE

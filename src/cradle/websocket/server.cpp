@@ -1446,12 +1446,12 @@ make_thinknode_request_context(
     client_request& request,
     bool remotely = false)
 {
+    std::string proxy_name{remotely ? "rpclib" : ""};
     thinknode_request_context ctx{
         server.core,
         get_client(server.clients, request.client).session,
         request.tasklet,
-        remotely,
-        "rpclib"};
+        proxy_name};
     return ctx;
 }
 

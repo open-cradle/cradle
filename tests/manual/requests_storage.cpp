@@ -107,7 +107,7 @@ TEST_CASE("load and resolve stored request", tag_load)
     }
     std::string req_serialized{to_string(req_blob)};
 
-    testing_request_context ctx{resources, nullptr, false, ""};
+    testing_request_context ctx{resources, nullptr, ""};
     serialized_result seri_result{
         cppcoro::sync_wait(resolve_serialized_local(ctx, req_serialized))};
     blob result = deserialize_response<blob>(seri_result.value());

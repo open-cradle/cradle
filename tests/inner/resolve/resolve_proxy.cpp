@@ -28,8 +28,7 @@ TEST_CASE("evaluate proxy request, plain args", tag)
     int expected{7 + 2};
 
     tasklet_tracker* tasklet{nullptr};
-    bool remotely{true};
-    testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
+    testing_request_context ctx{resources, tasklet, "rpclib"};
     ResolutionConstraintsRemoteSync constraints;
 
     REQUIRE_THROWS_WITH(
@@ -52,8 +51,7 @@ TEST_CASE("evaluate proxy request, normalized args", tag)
     int expected{7 + 2};
 
     tasklet_tracker* tasklet{nullptr};
-    bool remotely{true};
-    testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
+    testing_request_context ctx{resources, tasklet, "rpclib"};
     ResolutionConstraintsRemoteSync constraints;
 
     REQUIRE_THROWS_WITH(
@@ -78,8 +76,7 @@ TEST_CASE("two DLLs defining same-typed requests", tag)
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};
-    bool remotely{true};
-    testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
+    testing_request_context ctx{resources, tasklet, "rpclib"};
     ResolutionConstraintsRemoteSync constraints;
 
     auto add_req{rq_test_adder_x0(7, 2)};
@@ -109,8 +106,7 @@ TEST_CASE("unload/reload DLL", tag)
     int expected{7 + 2};
 
     tasklet_tracker* tasklet{nullptr};
-    bool remotely{true};
-    testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
+    testing_request_context ctx{resources, tasklet, "rpclib"};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
@@ -136,8 +132,7 @@ TEST_CASE("unload/reload two DLLs", tag)
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};
-    bool remotely{true};
-    testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
+    testing_request_context ctx{resources, tasklet, "rpclib"};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0");
@@ -170,8 +165,7 @@ TEST_CASE("unload DLL sharing resolvers", tag)
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};
-    bool remotely{true};
-    testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
+    testing_request_context ctx{resources, tasklet, "rpclib"};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0x1");
@@ -251,8 +245,7 @@ TEST_CASE("load/unload DLL stress test1", tag)
     auto& proxy = register_rpclib_client(make_inner_tests_config(), resources);
     proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};
-    bool remotely{true};
-    testing_request_context ctx{resources, tasklet, remotely, "rpclib"};
+    testing_request_context ctx{resources, tasklet, "rpclib"};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0");

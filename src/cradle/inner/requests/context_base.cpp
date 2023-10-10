@@ -13,11 +13,8 @@ namespace cradle {
 sync_context_base::sync_context_base(
     inner_resources& resources,
     tasklet_tracker* tasklet,
-    bool remotely,
     std::string proxy_name)
-    : resources_{resources},
-      remotely_{remotely},
-      proxy_name_{std::move(proxy_name)}
+    : resources_{resources}, proxy_name_{std::move(proxy_name)}
 {
     if (tasklet)
     {

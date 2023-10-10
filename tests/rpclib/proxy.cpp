@@ -48,12 +48,11 @@ static void
 test_make_some_blob(bool use_shared_memory)
 {
     constexpr auto caching_level{caching_level_type::full};
-    constexpr auto remotely{true};
     std::string proxy_name{"rpclib"};
     auto resources{make_inner_test_resources()};
     register_rpclib_client(make_inner_tests_config(), resources);
     auto* tasklet{create_tasklet_tracker("test", "make_some_blob")};
-    testing_request_context ctx{resources, tasklet, remotely, proxy_name};
+    testing_request_context ctx{resources, tasklet, proxy_name};
 
     auto req{rq_make_some_blob<caching_level>(10000, use_shared_memory)};
     auto response = cppcoro::sync_wait(resolve_request(ctx, req));

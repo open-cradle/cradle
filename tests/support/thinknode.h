@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include "common.h"
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/rpclib/client/proxy.h>
@@ -60,17 +61,16 @@ class thinknode_test_scope
     bool use_real_api_token_;
     service_core resources_;
     remote_proxy* proxy_{nullptr};
-
-    void
-    register_remote();
-
-    void
-    init_loopback_service();
 };
 
-// Create resources for Thinknode testing purposes.
+// Create resources for Thinknode testing purposes;
+// - optionally registering a single remote proxy; and
+// - optionally adding a single domain.
+// proxy_name should be "" (local, default), "loopback" or "rpclib"
 service_core
-make_thinknode_test_resources();
+make_thinknode_test_resources(
+    std::string const& proxy_name = {},
+    domain_option const& domain = no_domain_option());
 
 } // namespace cradle
 

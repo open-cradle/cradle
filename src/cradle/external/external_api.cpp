@@ -33,7 +33,6 @@ make_thinknode_request_context(api_session& session, char const* title)
         session.impl().get_service_core(),
         session.impl().get_thinknode_session(),
         tasklet,
-        false,
         ""};
 }
 
