@@ -9,7 +9,6 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/rpclib/client/proxy.h>
-#include <cradle/rpclib/client/registry.h>
 
 #include "../support/inner_service.h"
 
@@ -17,27 +16,27 @@ using namespace cradle;
 
 TEST_CASE("client name", "[rpclib]")
 {
-    auto resources{make_inner_test_resources()};
-    auto& client
-        = register_rpclib_client(make_inner_tests_config(), resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{make_inner_test_resources(proxy_name)};
+    auto& client{resources.get_proxy(proxy_name)};
 
     REQUIRE(client.name() == "rpclib");
 }
 
 TEST_CASE("send mock_http message", "[rpclib]")
 {
-    auto resources{make_inner_test_resources()};
-    auto& client
-        = register_rpclib_client(make_inner_tests_config(), resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{make_inner_test_resources(proxy_name)};
+    auto& client{resources.get_proxy(proxy_name)};
 
     REQUIRE_NOTHROW(client.mock_http("mock response"));
 }
 
 TEST_CASE("ping message", "[rpclib]")
 {
-    auto resources{make_inner_test_resources()};
-    auto& client
-        = register_rpclib_client(make_inner_tests_config(), resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{make_inner_test_resources(proxy_name)};
+    auto& client{static_cast<rpclib_client&>(resources.get_proxy(proxy_name))};
 
     auto git_version = client.ping();
 
@@ -49,8 +48,8 @@ test_make_some_blob(bool use_shared_memory)
 {
     constexpr auto caching_level{caching_level_type::full};
     std::string proxy_name{"rpclib"};
-    auto resources{make_inner_test_resources()};
-    register_rpclib_client(make_inner_tests_config(), resources);
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
     auto* tasklet{create_tasklet_tracker("test", "make_some_blob")};
     testing_request_context ctx{resources, tasklet, proxy_name};
 
@@ -75,9 +74,10 @@ TEST_CASE("resolve to a blob file", "[rpclib]")
 
 TEST_CASE("sending bad request", "[rpclib]")
 {
-    auto resources{make_inner_test_resources()};
-    auto& client
-        = register_rpclib_client(make_inner_tests_config(), resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
+    auto& client{resources.get_proxy(proxy_name)};
     service_config_map config_map{
         {remote_config_keys::DOMAIN_NAME, "bad domain"},
     };

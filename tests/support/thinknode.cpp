@@ -9,7 +9,6 @@
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/utilities/environment.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
-#include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/domain_factory.h>
 #include <cradle/thinknode_dlls_dir.h>
 

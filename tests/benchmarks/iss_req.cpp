@@ -14,7 +14,6 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/rpclib/client/proxy.h>
-#include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/thinknode/service/core.h>

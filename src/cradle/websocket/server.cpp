@@ -52,7 +52,6 @@
 #include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/rpclib/client/proxy.h>
-#include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/apm.h>
 #include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/calc.h>
@@ -1916,7 +1915,7 @@ websocket_server_impl::websocket_server_impl(service_config const& in_config)
             on_message(*this, hdl, message);
         });
 
-    register_rpclib_client(config, core);
+    core.register_proxy(std::make_unique<rpclib_client>(config));
 
     // TODO maybe delay loading Thinknode DLL until really needed
     // Load Thinknode DLL locally

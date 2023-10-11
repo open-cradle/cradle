@@ -10,7 +10,6 @@
 #include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/rpclib/client/proxy.h>
-#include <cradle/rpclib/client/registry.h>
 
 #include "../support/inner_service.h"
 #include "benchmark_support.h"

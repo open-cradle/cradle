@@ -1,8 +1,8 @@
-# Define an object library for the test runner.
+# Define an object library containg the test runner for the Catch2-based tests.
 # (An object library is a CMake artifact. The linker will see the object files, not a library.)
-add_library(test_lib_runner OBJECT
+add_library(catch2_runner OBJECT
     runner.cpp)
-target_link_libraries(test_lib_runner PUBLIC
+target_link_libraries(catch2_runner PUBLIC
     cradle_inner
     Catch2::Catch2
     spdlog::spdlog)
@@ -13,6 +13,25 @@ set_source_files_properties(
     runner.cpp
     PROPERTIES
         SKIP_PRECOMPILE_HEADERS ON)
+
+# Define a library containing basic test support.
+add_library(basic_test_support
+    support/common.cpp
+    support/inner_service.cpp)
+target_link_libraries(basic_test_support PUBLIC
+    cradle_inner
+    cradle_plugins_inner
+    Catch2::Catch2
+    spdlog::spdlog)
+
+# Define a library containing Thinknode test support.
+add_library(thinknode_test_support
+    support/thinknode.cpp)
+target_include_directories(thinknode_test_support PRIVATE
+    ${generated_src_dir})
+target_link_libraries(thinknode_test_support PUBLIC
+    basic_test_support
+    cradle_thinknode)
 
 # Define an object library covering the source files in unit/.
 file(GLOB_RECURSE test_srcs_unit CONFIGURE_DEPENDS
@@ -26,17 +45,13 @@ target_link_libraries(test_lib_unit PUBLIC
     cradle_plugins_inner)
 
 # Add the unit test runner.
-# TODO try not to build support/inner_service.cpp (etc.) for each test runner
 add_executable(unit_test_runner)
-target_sources(unit_test_runner PRIVATE
-    support/common.cpp
-    support/inner_service.cpp
-    support/thinknode.cpp)
 target_include_directories(unit_test_runner PUBLIC
     ${generated_src_dir}
     src)
 target_link_libraries(unit_test_runner PRIVATE
-    test_lib_runner
+    catch2_runner
+    thinknode_test_support
     test_lib_unit
     cradle_inner)
 add_dependencies(unit_test_runner
@@ -121,11 +136,9 @@ add_dependencies(test_lib_inner
 
 # Add the inner test runner.
 add_executable(inner_test_runner)
-target_sources(inner_test_runner PRIVATE
-    support/common.cpp
-    support/inner_service.cpp)
 target_link_libraries(inner_test_runner PRIVATE
-    test_lib_runner
+    catch2_runner
+    basic_test_support
     test_lib_inner)
 
 # Add the inner testing target.
@@ -156,16 +169,13 @@ target_link_libraries(test_lib_external PUBLIC
 
 # Add the external test runner.
 add_executable(external_test_runner)
-target_sources(external_test_runner PRIVATE
-    support/common.cpp
-    support/inner_service.cpp
-    support/thinknode.cpp)
 target_include_directories(external_test_runner PUBLIC
     ${generated_src_dir}
     src)
 target_link_libraries(external_test_runner PRIVATE
-    test_lib_external
-    test_lib_runner)
+    catch2_runner
+    thinknode_test_support
+    test_lib_external)
 
 # Add the external testing target.
 add_custom_target(
@@ -189,11 +199,9 @@ target_link_libraries(test_lib_plugins PUBLIC
 
 # Add the plugins test runner.
 add_executable(plugins_test_runner)
-target_sources(plugins_test_runner PRIVATE
-    support/common.cpp
-    support/inner_service.cpp)
 target_link_libraries(plugins_test_runner PRIVATE
-    test_lib_runner
+    catch2_runner
+    basic_test_support
     test_lib_plugins)
 
 # Add the plugins testing target.
@@ -209,15 +217,12 @@ add_test(
 
 # Add a runner covering all unit tests (including external and inner).
 add_executable(all_unit_tests_runner)
-target_sources(all_unit_tests_runner PRIVATE
-    support/common.cpp
-    support/inner_service.cpp
-    support/thinknode.cpp)
 target_include_directories(all_unit_tests_runner PUBLIC
     ${generated_src_dir}
     src)
 target_link_libraries(all_unit_tests_runner
-    test_lib_runner
+    catch2_runner
+    thinknode_test_support
     test_lib_unit
     test_lib_external
     test_lib_inner
@@ -236,9 +241,6 @@ target_link_libraries(test_lib_manual PUBLIC
 # Add the manual test runner.
 # The runner should be invoked directly, not via CMake.
 add_executable(manual_test_runner)
-target_sources(manual_test_runner PRIVATE
-    support/common.cpp
-    support/inner_service.cpp)
 target_include_directories(manual_test_runner PUBLIC
     ${generated_src_dir}
     ${int_gen_src_dir}
@@ -247,9 +249,10 @@ add_dependencies(manual_test_runner
     deploy_dir_file_target
     copy_cradle_dlls)
 target_link_libraries(manual_test_runner PRIVATE
+    catch2_runner
+    basic_test_support
     cradle_rpclib_client
-    test_lib_manual
-    test_lib_runner)
+    test_lib_manual)
 
 # Add a target running all unit tests (including external and inner).
 add_custom_target(
@@ -301,12 +304,10 @@ target_link_libraries(test_lib_benchmark PUBLIC
     cradle_external
     benchmark::benchmark)
 
+# The benchmark library has its own test runner.
 add_executable(benchmark_test_runner)
-target_sources(benchmark_test_runner PRIVATE
-    support/common.cpp
-    support/inner_service.cpp
-    support/thinknode.cpp)
 target_link_libraries(benchmark_test_runner PRIVATE
+    thinknode_test_support
     test_lib_benchmark
     cradle_plugins_typing
     cradle_plugins_inner)

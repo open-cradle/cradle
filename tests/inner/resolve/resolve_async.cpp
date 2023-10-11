@@ -17,7 +17,6 @@
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
-#include <cradle/rpclib/client/registry.h>
 
 using namespace cradle;
 

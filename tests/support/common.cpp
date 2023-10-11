@@ -9,7 +9,7 @@
 #include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/requests_storage/http/http_requests_storage.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
-#include <cradle/rpclib/client/registry.h>
+#include <cradle/rpclib/client/proxy.h>
 
 namespace cradle {
 
@@ -62,7 +62,8 @@ void
 init_and_register_rpclib(
     inner_resources& resources, domain_option const& domain)
 {
-    register_rpclib_client(resources.config(), resources);
+    resources.register_proxy(
+        std::make_unique<rpclib_client>(resources.config()));
 }
 
 } // namespace
