@@ -255,13 +255,19 @@ endif()
 if((IS_GCC OR IS_CLANG) AND CRADLE_GPROF_PROFILING)
     message(STATUS "Enabling CPU profiling using gprof")
     add_compile_options(-pg)
+    # TODO also shared libs? add_link_options?
     string(APPEND CMAKE_EXE_LINKER_FLAGS " -pg")
 elseif(IS_CLANG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     # Set build options for instrumenting test coverage.
     message(STATUS "Enabling gcov support")
     add_compile_options(-DLLVM_USE_LINKER=gold -fprofile-instr-generate
                         -fcoverage-mapping)
+    # TODO replace with
+    #   add_link_options(-fprofile-instr-generate -fcoverage-mapping)
+    # and make it work.
     string(APPEND CMAKE_EXE_LINKER_FLAGS
+           " -fprofile-instr-generate -fcoverage-mapping")
+    string(APPEND CMAKE_SHARED_LINKER_FLAGS
            " -fprofile-instr-generate -fcoverage-mapping")
 endif()
 
@@ -269,6 +275,7 @@ if(CRADLE_THREAD_SANITIZER)
     message(STATUS "Enabling ThreadSanitizer")
     if(IS_GCC OR IS_CLANG)
         add_compile_options(-fsanitize=thread -g)
+        # TODO also shared libs? add_link_options?
         string(APPEND CMAKE_EXE_LINKER_FLAGS " -fsanitize=thread")
     elseif(IS_MSVC)
        add_compile_options(/fsanitize=address /Zi)
@@ -281,6 +288,7 @@ if(CRADLE_UNDEFINED_BEHAVIOR_SANITIZER)
         # Make sure to use clang++ (not ld) as a linker; e.g.
         # CMAKE_LINKER:FILEPATH=/usr/bin/clang++-15
         add_compile_options(-fsanitize=undefined)
+        # TODO also shared libs? add_link_options?
         string(APPEND CMAKE_EXE_LINKER_FLAGS " -fsanitize=undefined")
     else()
         message(FATAL_ERROR "UBSan supported for Clang only")

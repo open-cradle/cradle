@@ -10,5 +10,5 @@
 cradle.egg-info/
 python/config.yml
 .token
-coverage.txt
+coverage*.txt
 .docker-auth

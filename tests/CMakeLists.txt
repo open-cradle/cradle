@@ -281,13 +281,27 @@ add_test(
 if(IS_CLANG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     string(REGEX REPLACE "clang(\\+\\+)?" llvm-profdata LLVM_PROFDATA ${CMAKE_CXX_COMPILER})
     string(REGEX REPLACE "clang(\\+\\+)?" llvm-cov LLVM_COV ${CMAKE_CXX_COMPILER})
+    # Set the shared libraries whose coverage is to be measured.
+    # These should be the ones that all_unit_tests_runner is linked against, plus
+    # those explicitly loaded by the unit tests, into the local test runner process.
+    # Code executed in the rpclib server is not measured.
+    set(coverage_objects
+        cradle_inner cradle_plugins_inner cradle_rpclib_client
+        cradle_typing cradle_plugins_typing cradle_thinknode cradle_websocket cradle_external)
+    string(REGEX REPLACE "([a-z_]+)" "--object=$<TARGET_FILE:\\1>"
+        coverage_object_options "${coverage_objects}")
     add_custom_target(
         unit_test_coverage
         COMMAND ${LLVM_PROFDATA} merge -sparse all-unit-testing/default.profraw
                 -o default.profdata
         COMMAND ${LLVM_COV} show -instr-profile=default.profdata
                 $<TARGET_FILE:all_unit_tests_runner>
+                ${coverage_object_options}
                 >${PROJECT_SOURCE_DIR}/coverage.txt
+        COMMAND ${LLVM_COV} report -instr-profile=default.profdata
+                $<TARGET_FILE:all_unit_tests_runner>
+                ${coverage_object_options}
+                >${PROJECT_SOURCE_DIR}/coverage-summary.txt
         WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
         DEPENDS all_unit_tests)
     add_test(
