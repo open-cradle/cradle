@@ -18,6 +18,8 @@ set_source_files_properties(
 add_library(basic_test_support
     support/common.cpp
     support/inner_service.cpp)
+add_dependencies(basic_test_support
+    deploy_dir_file_target)
 target_link_libraries(basic_test_support PUBLIC
     cradle_inner
     cradle_plugins_inner
@@ -246,7 +248,6 @@ target_include_directories(manual_test_runner PUBLIC
     ${int_gen_src_dir}
     src)
 add_dependencies(manual_test_runner
-    deploy_dir_file_target
     copy_cradle_dlls)
 target_link_libraries(manual_test_runner PRIVATE
     catch2_runner
