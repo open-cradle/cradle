@@ -29,9 +29,7 @@ struct loopback_config_keys
 class loopback_service : public remote_proxy
 {
  public:
-    loopback_service(
-        service_config const& config,
-        std::unique_ptr<inner_resources> resources);
+    loopback_service(std::unique_ptr<inner_resources> resources);
 
     std::string
     name() const override;

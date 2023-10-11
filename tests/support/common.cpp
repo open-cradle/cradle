@@ -54,8 +54,8 @@ init_and_register_loopback(
     loopback_resources->set_secondary_cache(
         std::make_unique<local_disk_cache>(loopback_config));
     domain.register_domain(*loopback_resources);
-    test_resources.register_proxy(std::make_unique<loopback_service>(
-        loopback_config, std::move(loopback_resources)));
+    test_resources.register_proxy(
+        std::make_unique<loopback_service>(std::move(loopback_resources)));
 }
 
 void

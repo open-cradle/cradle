@@ -33,7 +33,6 @@ create_memory_cache(service_config const& config)
         make_immutable_cache_config(config));
 }
 
-// TODO pass config by value
 inner_resources::inner_resources(service_config const& config)
     : impl_{std::make_unique<inner_resources_impl>(config)}
 {

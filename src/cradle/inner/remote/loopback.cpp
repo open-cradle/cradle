@@ -14,14 +14,14 @@
 
 namespace cradle {
 
-loopback_service::loopback_service(
-    service_config const& config, std::unique_ptr<inner_resources> resources)
+loopback_service::loopback_service(std::unique_ptr<inner_resources> resources)
     : resources_{std::move(resources)},
-      testing_{
-          config.get_bool_or_default(generic_config_keys::TESTING, false)},
+      testing_{resources_->config().get_bool_or_default(
+          generic_config_keys::TESTING, false)},
       logger_{ensure_logger("loopback")},
-      async_pool_{static_cast<BS::concurrency_t>(config.get_number_or_default(
-          loopback_config_keys::ASYNC_CONCURRENCY, 16))}
+      async_pool_{static_cast<BS::concurrency_t>(
+          resources_->config().get_number_or_default(
+              loopback_config_keys::ASYNC_CONCURRENCY, 16))}
 {
 }
 
