@@ -288,8 +288,7 @@ if(CRADLE_UNDEFINED_BEHAVIOR_SANITIZER)
         # Make sure to use clang++ (not ld) as a linker; e.g.
         # CMAKE_LINKER:FILEPATH=/usr/bin/clang++-15
         add_compile_options(-fsanitize=undefined)
-        # TODO also shared libs? add_link_options?
-        string(APPEND CMAKE_EXE_LINKER_FLAGS " -fsanitize=undefined")
+        # No need to pass this option to the linker, it seems
     else()
         message(FATAL_ERROR "UBSan supported for Clang only")
     endif()

@@ -1,3 +1,4 @@
+#include <cassert>
 #include <stdexcept>
 
 #include <fmt/format.h>
@@ -39,8 +40,17 @@ class thinknode_domain_option : public domain_option
     void
     register_domain(inner_resources& resources) const override
     {
+        assert(dynamic_cast<service_core*>(&resources));
         resources.register_domain(
             create_thinknode_domain(static_cast<service_core&>(resources)));
+    }
+
+    std::unique_ptr<inner_resources>
+    create_resources_with_domain(service_config const& config) const override
+    {
+        auto resources{std::make_unique<service_core>(config)};
+        resources->register_domain(create_thinknode_domain(*resources));
+        return resources;
     }
 };
 

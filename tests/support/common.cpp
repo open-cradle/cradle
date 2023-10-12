@@ -51,10 +51,9 @@ init_and_register_loopback(
 {
     service_config loopback_config{make_inner_loopback_config()};
     auto loopback_resources{
-        std::make_unique<inner_resources>(loopback_config)};
+        domain.create_resources_with_domain(loopback_config)};
     loopback_resources->set_secondary_cache(
         std::make_unique<local_disk_cache>(loopback_config));
-    domain.register_domain(*loopback_resources);
     test_resources.register_proxy(
         std::make_unique<loopback_service>(std::move(loopback_resources)));
 }
@@ -74,10 +73,26 @@ no_domain_option::register_domain(inner_resources& resources) const
 {
 }
 
+std::unique_ptr<inner_resources>
+no_domain_option::create_resources_with_domain(
+    service_config const& config) const
+{
+    return std::make_unique<inner_resources>(config);
+}
+
 void
 testing_domain_option::register_domain(inner_resources& resources) const
 {
     resources.register_domain(create_testing_domain(resources));
+}
+
+std::unique_ptr<inner_resources>
+testing_domain_option::create_resources_with_domain(
+    service_config const& config) const
+{
+    auto resources{std::make_unique<inner_resources>(config)};
+    register_domain(*resources);
+    return resources;
 }
 
 void

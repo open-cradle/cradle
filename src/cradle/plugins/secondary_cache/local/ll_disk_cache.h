@@ -35,7 +35,7 @@ struct ll_disk_cache_config
 {
     std::optional<std::string> directory;
     std::optional<size_t> size_limit;
-    bool start_empty;
+    bool start_empty{};
 };
 
 struct ll_disk_cache_info
