@@ -3,23 +3,30 @@
 #include <cradle/inner/dll/dll_controller.h>
 #include <cradle/inner/dll/dll_exceptions.h>
 #include <cradle/inner/requests/function.h>
+#include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/inner/utilities/logging.h>
 
 namespace cradle {
 
-dll_controller::dll_controller(std::string path, std::string name)
-    : path_{std::move(path)},
+dll_controller::dll_controller(
+    dll_trash& trash, std::string path, std::string name)
+    : trash_{trash},
+      path_{std::move(path)},
       name_{std::move(name)},
       logger_{ensure_logger("dll")}
 {
+    load();
 }
 
 dll_controller::~dll_controller()
 {
-    // Calling this destructor unloads the DLL, crashing the application if
-    // references to the DLL code still exist, and we currently do not try
-    // to delete all of them.
-    logger_->error("~dll_controller() must not be called");
+    try
+    {
+        unload();
+    }
+    catch (...)
+    {
+    }
 }
 
 void
@@ -31,7 +38,7 @@ dll_controller::load()
     auto mode{
         boost::dll::load_mode::rtld_now | boost::dll::load_mode::rtld_local
         | boost::dll::load_mode::rtld_deepbind};
-    lib_ = std::make_unique<boost::dll::shared_library>(path_, mode);
+    lib_ = new boost::dll::shared_library(path_, mode);
 
     typedef selfreg_seri_catalog* create_catalog_func_t();
     std::string const create_catalog_func_name{"CRADLE_create_seri_catalog"};
@@ -63,11 +70,11 @@ dll_controller::unload()
     {
         logger_->warn("unload {} - no catalog", name_);
     }
-    // The following would unload the DLL, causing a ~selfreg_seri_catalog()
-    // call unregistering the catalog's resolvers if that wasn't done yet.
-    // As we (currently) have no guarantee that no other references to the
-    // DLL's code remain, we do not really unload the DLL.
-    // lib_.reset();
+    if (lib_)
+    {
+        trash_.add(lib_);
+        logger_->info("Now have {} inactive DLLs", trash_.size());
+    }
     logger_->info("unload done for {}", name_);
 }
 

@@ -6,12 +6,19 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
+#include <cradle/inner/blob_file/blob_file.h>
+#include <cradle/inner/blob_file/blob_file_dir.h>
+#include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/core/monitoring.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/fs/types.h>
 #include <cradle/inner/fs/utilities.h>
+#include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/io/mock_http.h>
+#include <cradle/inner/remote/async_db.h>
+#include <cradle/inner/remote/proxy.h>
+#include <cradle/inner/requests/domain.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/service/resources_impl.h>
 #include <cradle/inner/service/secondary_storage_intf.h>
@@ -137,6 +144,12 @@ remote_proxy&
 inner_resources::get_proxy(std::string const& name)
 {
     return impl_->get_proxy(name);
+}
+
+dll_collection&
+inner_resources::the_dlls()
+{
+    return impl_->the_dlls();
 }
 
 http_connection_interface&

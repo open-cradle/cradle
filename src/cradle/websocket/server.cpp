@@ -34,7 +34,7 @@
 #include <cppcoro/when_all.hpp>
 
 #include <cradle/inner/core/sha256_hash_id.h>
-#include <cradle/inner/dll/shared_library.h>
+#include <cradle/inner/dll/dll_collection.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/file_io.h>
@@ -1919,7 +1919,7 @@ websocket_server_impl::websocket_server_impl(service_config const& in_config)
 
     // TODO maybe delay loading Thinknode DLL until really needed
     // Load Thinknode DLL locally
-    load_shared_library(get_thinknode_dlls_dir(), "cradle_thinknode_v1");
+    core.the_dlls().load(get_thinknode_dlls_dir(), "cradle_thinknode_v1");
     // Load Thinknode DLL in the rpclib server
     auto& proxy{core.get_proxy("rpclib")};
     proxy.load_shared_library(get_thinknode_dlls_dir(), "cradle_thinknode_v1");

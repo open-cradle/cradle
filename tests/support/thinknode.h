@@ -4,6 +4,7 @@
 #include <string>
 
 #include "common.h"
+#include <cradle/inner/dll/dll_collection.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/rpclib/client/proxy.h>

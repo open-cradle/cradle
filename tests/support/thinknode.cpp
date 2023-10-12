@@ -5,7 +5,6 @@
 #include "inner_service.h"
 #include "thinknode.h"
 #include <cradle/deploy_dir.h>
-#include <cradle/inner/dll/shared_library.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/utilities/environment.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
@@ -65,7 +64,7 @@ thinknode_test_scope::thinknode_test_scope(
     }
     else
     {
-        load_shared_library(get_thinknode_dlls_dir(), dll_name_);
+        resources_.the_dlls().load(get_thinknode_dlls_dir(), dll_name_);
     }
 }
 
@@ -77,7 +76,7 @@ thinknode_test_scope::~thinknode_test_scope()
     }
     else
     {
-        unload_shared_library(dll_name_);
+        resources_.the_dlls().unload(dll_name_);
     }
 }
 

@@ -7,6 +7,7 @@
 
 #include <cppcoro/static_thread_pool.hpp>
 
+#include <cradle/inner/dll/dll_collection.h>
 #include <cradle/inner/io/http_requests.h>
 #include <cradle/inner/service/config.h>
 #include <cradle/inner/service/resources.h>
@@ -84,6 +85,12 @@ class inner_resources_impl
     remote_proxy&
     get_proxy(std::string const& name);
 
+    dll_collection&
+    the_dlls()
+    {
+        return the_dlls_;
+    }
+
  private:
     std::mutex mutex_;
     service_config config_;
@@ -93,6 +100,7 @@ class inner_resources_impl
     std::unique_ptr<async_db> async_db_instance_;
     std::unordered_map<std::string, std::unique_ptr<domain>> domains_;
     std::unordered_map<std::string, std::unique_ptr<remote_proxy>> proxies_;
+    dll_collection the_dlls_;
 
     cppcoro::static_thread_pool http_pool_;
     cppcoro::static_thread_pool async_pool_;

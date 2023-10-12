@@ -10,7 +10,7 @@
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/fmt_format.h>
-#include <cradle/inner/dll/shared_library.h>
+#include <cradle/inner/dll/dll_collection.h>
 #include <cradle/inner/introspection/tasklet_impl.h>
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/config.h>
@@ -418,7 +418,8 @@ try
     auto& logger{hctx.logger()};
     logger.info("handle_load_shared_library({}, {})", dir_path, dll_name);
 
-    load_shared_library(dir_path, dll_name);
+    auto& the_dlls{hctx.service().the_dlls()};
+    the_dlls.load(dir_path, dll_name);
 }
 catch (std::exception& e)
 {
@@ -433,7 +434,8 @@ try
     auto& logger{hctx.logger()};
     logger.info("handle_unload_shared_library({})", dll_name);
 
-    unload_shared_library(dll_name);
+    auto& the_dlls{hctx.service().the_dlls()};
+    the_dlls.unload(dll_name);
 }
 catch (std::exception& e)
 {

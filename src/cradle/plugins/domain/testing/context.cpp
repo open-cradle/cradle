@@ -1,6 +1,7 @@
 #include <chrono>
 #include <thread>
 
+#include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/remote/config.h>
 #include <cradle/plugins/domain/testing/config.h>
 #include <cradle/plugins/domain/testing/context.h>

@@ -1,28 +1,26 @@
 #ifndef CRADLE_INNER_SERVICE_RESOURCES_H
 #define CRADLE_INNER_SERVICE_RESOURCES_H
 
-// Resources available for resolving requests, e.g. memory and secondary cache
-
 #include <memory>
 #include <optional>
 
 #include <cppcoro/static_thread_pool.hpp>
+#include <cppcoro/task.hpp>
 
-#include <cradle/inner/blob_file/blob_file.h>
-#include <cradle/inner/blob_file/blob_file_dir.h>
-#include <cradle/inner/caching/immutable/cache.h>
-#include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/io/http_requests.h>
-#include <cradle/inner/remote/async_db.h>
-#include <cradle/inner/remote/proxy.h>
-#include <cradle/inner/requests/domain.h>
 #include <cradle/inner/service/config.h>
-#include <cradle/inner/service/secondary_storage_intf.h>
 
 namespace cradle {
 
-class inner_resources;
+class async_db;
+class blob_file_writer;
+class dll_collection;
+class domain;
+struct immutable_cache;
 class inner_resources_impl;
+class remote_proxy;
+class secondary_storage_intf;
+class tasklet_tracker;
 
 // Configuration keys for the inner resources
 struct inner_config_keys
@@ -50,6 +48,18 @@ struct inner_config_keys
     inline static std::string const ASYNC_CONCURRENCY{"async_concurrency"};
 };
 
+/*
+ * A bunch of resources helping to resolve requests:
+ * - A memory (immutable) cache
+ * - A secondary cache
+ * - A blob_file_writer writing blobs in shared memory
+ * - An optional async_db instance
+ * - A collection of domains
+ * - A collection of remote proxies
+ * - A collection of loaded DLLs
+ * - Thread pools
+ * - An optional mock_http_session object
+ */
 class inner_resources
 {
  public:
@@ -75,7 +85,7 @@ class inner_resources
     service_config const&
     config() const;
 
-    cradle::immutable_cache&
+    immutable_cache&
     memory_cache();
 
     void
@@ -119,6 +129,10 @@ class inner_resources
     remote_proxy&
     get_proxy(std::string const& name);
 
+    dll_collection&
+    the_dlls();
+
+    // For testing purposes only!?
     inner_resources_impl&
     impl()
     {

@@ -1,5 +1,6 @@
 #include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/service/secondary_cached_blob.h>
+#include <cradle/inner/service/secondary_storage_intf.h>
 
 namespace cradle {
 

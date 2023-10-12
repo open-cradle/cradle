@@ -1,5 +1,6 @@
 #include "inner_service.h"
 #include <cradle/deploy_dir.h>
+#include <cradle/inner/blob_file/blob_file_dir.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/requests_storage/http/http_requests_storage.h>

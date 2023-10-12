@@ -4,6 +4,7 @@
 
 #include "common.h"
 #include <cradle/deploy_dir.h>
+#include <cradle/inner/blob_file/blob_file_dir.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/domain_factory.h>

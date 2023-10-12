@@ -15,6 +15,7 @@
 #include <spdlog/spdlog.h>
 
 // Ensure to #include only from the msgpack inside rpclib
+#include <cradle/inner/blob_file/blob_file_dir.h>
 #include <cradle/inner/encodings/msgpack_adaptors_rpclib.h>
 #include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/requests/uuid.h>
