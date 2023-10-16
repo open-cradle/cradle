@@ -109,6 +109,20 @@ add_library(test_inner_dll_x0x1 MODULE ${srcs_inner_dll_x0x1})
 target_link_libraries(test_inner_dll_x0x1 PUBLIC
     cradle_inner)
 
+# Create an invalid DLL, that does not export the mandatory CRADLE_create_seri_catalog function.
+file(GLOB_RECURSE srcs_inner_dll_missing_export CONFIGURE_DEPENDS
+    "inner-dll/missing_export/*.cpp")
+add_library(test_inner_dll_missing_export MODULE ${srcs_inner_dll_missing_export})
+target_link_libraries(test_inner_dll_missing_export PUBLIC
+    cradle_inner)
+
+# Create a DLL exporting a CRADLE_create_seri_catalog function returning nullptr.
+file(GLOB_RECURSE srcs_inner_dll_failing_create_catalog CONFIGURE_DEPENDS
+    "inner-dll/failing_create_catalog/*.cpp")
+add_library(test_inner_dll_failing_create_catalog MODULE ${srcs_inner_dll_failing_create_catalog})
+target_link_libraries(test_inner_dll_failing_create_catalog PUBLIC
+    cradle_inner)
+
 # Create a C++ header file defining the location of the dynamically-loaded test DLLs.
 set(test_dlls_dir_file "${intgen_src_dir}/cradle/test_dlls_dir.h")
 add_custom_command(

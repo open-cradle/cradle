@@ -71,27 +71,19 @@ class dll_controller
 {
  public:
     // trash must outlive this dll_controller object
-    dll_controller(dll_trash& trash, std::string path, std::string name);
+    dll_controller(
+        dll_trash& trash,
+        spdlog::logger& logger,
+        std::string path,
+        std::string name);
 
     ~dll_controller();
 
-    std::string const&
-    path() const
-    {
-        return path_;
-    }
-
-    std::string const&
-    name() const
-    {
-        return name_;
-    }
-
  private:
     dll_trash& trash_;
+    spdlog::logger& logger_;
     std::string path_;
     std::string name_;
-    std::shared_ptr<spdlog::logger> logger_;
     // The following is a raw pointer as the destructor must not be called.
     boost::dll::shared_library* lib_{nullptr};
     std::unique_ptr<selfreg_seri_catalog> catalog_;

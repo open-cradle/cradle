@@ -1,3 +1,4 @@
+#include <numeric>
 #include <sstream>
 #include <vector>
 
@@ -127,6 +128,17 @@ seri_registry::make_uuid_error_message(
         }
     }
     return oss.str();
+}
+
+std::size_t
+seri_registry::size() const
+{
+    return std::transform_reduce(
+        entries_.cbegin(),
+        entries_.cend(),
+        std::size_t{},
+        std::plus{},
+        [](auto const& entry) { return entry.second.size(); });
 }
 
 void

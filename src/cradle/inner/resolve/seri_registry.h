@@ -121,6 +121,9 @@ class seri_registry
         return find_entry(uuid_str, true).resolver;
     }
 
+    std::size_t
+    size() const;
+
     void
     log_all_entries(std::string const& when);
 

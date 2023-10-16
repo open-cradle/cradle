@@ -36,6 +36,18 @@ class dll_collection
     void
     unload(std::string const& dll_name);
 
+    auto
+    size() const
+    {
+        return std::ssize(controllers_);
+    }
+
+    auto
+    trash_size() const
+    {
+        return trash_.size();
+    }
+
  private:
     std::shared_ptr<spdlog::logger> logger_;
     std::mutex mutex_;
