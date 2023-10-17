@@ -147,7 +147,7 @@ void
 handle_mock_http(rpclib_handler_context& hctx, std::string body)
 try
 {
-    auto& session = enable_http_mocking(hctx.service());
+    auto& session = hctx.service().enable_http_mocking();
     session.set_canned_response(make_http_200_response(body));
 }
 catch (std::exception& e)

@@ -32,5 +32,5 @@ mock_http_session&
 external_test_session::enable_http_mocking()
 {
     auto& inner_service = cradle::external::get_service_core(session_);
-    return cradle::enable_http_mocking(inner_service);
+    return inner_service.enable_http_mocking();
 }

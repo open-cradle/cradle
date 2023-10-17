@@ -203,7 +203,7 @@ loopback_service::unload_shared_library(std::string dll_name)
 void
 loopback_service::mock_http(std::string const& response_body)
 {
-    auto& session = enable_http_mocking(*resources_);
+    auto& session = resources_->enable_http_mocking();
     session.set_canned_response(make_http_200_response(response_body));
 }
 

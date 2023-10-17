@@ -348,7 +348,7 @@ struct local_supervisor_data
     {
         static local_calculation_service local_service;
         docker_type = local_service.get_docker_type(
-            http_connection_for_thread(service));
+            service.http_connection_for_thread());
     }
 };
 
@@ -463,7 +463,7 @@ stop_provider(local_supervisor_data& supervisor)
     {
         cradle::stop_provider(
             supervisor.docker_type,
-            http_connection_for_thread(supervisor.service),
+            supervisor.service.http_connection_for_thread(),
             supervisor.active_provider->docker_id);
         supervisor.active_provider.reset();
     }
@@ -537,14 +537,14 @@ supervise_calculation(
 
         pull_image(
             supervisor.docker_type,
-            http_connection_for_thread(supervisor.service),
+            supervisor.service.http_connection_for_thread(),
             account,
             app,
             image);
 
         supervisor.active_provider->docker_id = spawn_provider(
             supervisor.docker_type,
-            http_connection_for_thread(supervisor.service),
+            supervisor.service.http_connection_for_thread(),
             account,
             app,
             image,

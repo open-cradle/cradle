@@ -12,10 +12,8 @@ TEST_CASE("HTTP requests", "[service][core]")
 {
     auto resources{make_thinknode_test_resources()};
 
-    auto async_response = async_http_request(
-        resources,
-        make_get_request(
-            "https://postman-echo.com/get?color=navy", http_header_list()));
+    auto async_response = resources.async_http_request(make_get_request(
+        "https://postman-echo.com/get?color=navy", http_header_list()));
 
     auto response = cppcoro::sync_wait(async_response);
     REQUIRE(response.status_code == 200);

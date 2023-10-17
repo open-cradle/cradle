@@ -106,7 +106,7 @@ thinknode_test_scope::make_context(tasklet_tracker* tasklet)
 mock_http_session&
 thinknode_test_scope::enable_http_mocking()
 {
-    return ::cradle::enable_http_mocking(resources_);
+    return resources_.enable_http_mocking();
 }
 
 void

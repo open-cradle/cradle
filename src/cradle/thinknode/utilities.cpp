@@ -112,6 +112,13 @@ get_thinknode_service_id(string const& thinknode_id)
     }
 }
 
+cppcoro::task<http_response>
+async_http_request(thinknode_request_context ctx, http_request request)
+{
+    return ctx.service.async_http_request(
+        std::move(request), ctx.get_tasklet());
+}
+
 void
 log_info(thinknode_request_context& ctx, const char* msg)
 {

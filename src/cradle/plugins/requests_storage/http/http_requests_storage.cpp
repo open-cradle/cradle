@@ -67,7 +67,7 @@ http_requests_storage::read(std::string key)
     try
     {
         // Throws if status code is not 2xx
-        response = co_await async_http_request(resources_, std::move(query));
+        response = co_await resources_.async_http_request(std::move(query));
     }
     catch (bad_http_status_code& e)
     {
@@ -87,7 +87,7 @@ http_requests_storage::write(std::string key, blob value)
 {
     auto query = make_http_put_request(port_, key, std::move(value));
     // Throws if status_code is not 2xx
-    co_await async_http_request(resources_, std::move(query));
+    co_await resources_.async_http_request(std::move(query));
     co_return;
 }
 

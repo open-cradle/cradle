@@ -76,7 +76,7 @@ BM_try_resolve_thinknode_request(
     }
     else
     {
-        auto& mock_http = enable_http_mocking(resources);
+        auto& mock_http = resources.enable_http_mocking();
         mock_http.set_canned_response(response);
     }
     auto ctx{scope.make_context()};

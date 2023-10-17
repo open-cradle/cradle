@@ -232,7 +232,7 @@ test_post_iss_requests_parallel(
                 make_http_200_response("{ \"id\": \"" + results[i] + "\" }")};
             script.push_back(exchange);
         }
-        mock_http = &enable_http_mocking(resources);
+        mock_http = &resources.enable_http_mocking();
         mock_http->set_script(script);
     }
 
@@ -459,7 +459,7 @@ test_retrieve_immutable_object_parallel(
                 make_http_200_response(responses[i])};
             script.push_back(exchange);
         }
-        mock_http = &enable_http_mocking(resources);
+        mock_http = &resources.enable_http_mocking();
         mock_http->set_script(script);
     }
 

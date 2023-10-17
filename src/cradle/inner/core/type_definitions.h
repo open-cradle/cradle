@@ -113,7 +113,7 @@ class blob
     data_owner const*
     owner() const
     {
-        return owner_ ? &*owner_ : nullptr;
+        return owner_.get();
     }
 
     data_owner const*

@@ -17,7 +17,8 @@ class blob_file_writer;
 class dll_collection;
 class domain;
 struct immutable_cache;
-class inner_resources_impl;
+struct inner_resources_impl;
+struct mock_http_session;
 class remote_proxy;
 class secondary_storage_intf;
 class tasklet_tracker;
@@ -101,6 +102,19 @@ class inner_resources
     void
     clear_secondary_cache();
 
+    http_connection_interface&
+    http_connection_for_thread();
+
+    cppcoro::task<http_response>
+    async_http_request(
+        http_request request, tasklet_tracker* client = nullptr);
+
+    // Set up HTTP mocking.
+    // This returns the mock_http_session that's been associated with these
+    // resources.
+    mock_http_session&
+    enable_http_mocking(bool http_is_synchronous = false);
+
     std::shared_ptr<blob_file_writer>
     make_blob_file_writer(std::size_t size);
 
@@ -132,32 +146,9 @@ class inner_resources
     dll_collection&
     the_dlls();
 
-    // For testing purposes only!?
-    inner_resources_impl&
-    impl()
-    {
-        return *impl_;
-    }
-
  private:
     std::unique_ptr<inner_resources_impl> impl_;
 };
-
-http_connection_interface&
-http_connection_for_thread(inner_resources& resources);
-
-cppcoro::task<http_response>
-async_http_request(
-    inner_resources& resources,
-    http_request request,
-    tasklet_tracker* client = nullptr);
-
-// Set up HTTP mocking for a service.
-// This returns the mock_http_session that's been associated with the service.
-struct mock_http_session;
-mock_http_session&
-enable_http_mocking(
-    inner_resources& resources, bool http_is_synchronous = false);
 
 } // namespace cradle
 
