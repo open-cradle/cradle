@@ -1,5 +1,6 @@
 #include <fmt/format.h>
 
+#include <cradle/inner/dll/dll_capabilities.h>
 #include <cradle/inner/dll/dll_controller.h>
 #include <cradle/inner/dll/dll_exceptions.h>
 #include <cradle/inner/requests/function.h>
@@ -46,23 +47,56 @@ dll_controller::load()
         | boost::dll::load_mode::rtld_deepbind};
     lib_ = new boost::dll::shared_library(path_, mode);
 
-    using create_catalog_func_t = selfreg_seri_catalog*();
-    std::string const create_catalog_func_name{"CRADLE_create_seri_catalog"};
+    using get_capabilities_func_t = dll_capabilities const*();
+    std::string const get_capabilities_func_name{"CRADLE_get_capabilities"};
 
-    // Throws if the DLL does not export the mandatory symbol.
-    auto create_catalog_func
-        = lib_->get<create_catalog_func_t>(create_catalog_func_name);
+    get_capabilities_func_t* get_caps_func{nullptr};
+    try
+    {
+        // Throws if the DLL does not export the mandatory symbol.
+        get_caps_func
+            = lib_->get<get_capabilities_func_t>(get_capabilities_func_name);
+    }
+    catch (std::exception const&)
+    {
+        throw dll_load_error{fmt::format(
+            "Error loading {}: DLL does not export {}",
+            path_,
+            get_capabilities_func_name)};
+    }
     // Should the DLL export a symbol with the correct name but the wrong type,
     // then the application will most likely crash.
-    catalog_.reset(create_catalog_func());
+    auto const* caps = get_caps_func();
+    if (!caps)
+    {
+        throw dll_load_error{fmt::format(
+            "Error loading {}: get_caps_func() returned nullptr", path_)};
+    }
+    create_seri_catalog(*caps);
+    logger_.info("load done for {}", name_);
+}
+
+void
+dll_controller::create_seri_catalog(dll_capabilities const& caps)
+{
+    auto* create_catalog_func{caps.create_seri_catalog};
+    if (!create_catalog_func)
+    {
+        return;
+    }
+    auto& registry{resources_.get_seri_registry()};
+    catalog_ = create_catalog_func(registry);
     if (!catalog_)
     {
-        throw dll_load_error("create_catalog_func() failed");
+        throw dll_load_error{fmt::format(
+            "Error loading {}: create_catalog_func() returned nullptr",
+            path_)};
     }
     auto cat_id_value{catalog_->get_cat_id().value()};
-    logger_.info("load done for {} -> cat_id {}", name_, cat_id_value);
+    logger_.info("loaded catalog #{}", cat_id_value);
+    // TODO move register_call to catalog's ctor
     catalog_->register_all();
-    resources_.get_seri_registry().log_all_entries(
+    registry.log_all_entries(
         fmt::format("after load cat_id {}", cat_id_value));
 }
 
@@ -71,8 +105,11 @@ dll_controller::load()
 void
 dll_controller::unload()
 {
-    logger_.info(
-        "unload {} (cat_id {})", name_, catalog_->get_cat_id().value());
+    if (catalog_)
+    {
+        logger_.info(
+            "unload {} (cat_id {})", name_, catalog_->get_cat_id().value());
+    }
     trash_.add(lib_);
     logger_.info("Now have {} inactive DLLs", trash_.size());
     logger_.info("unload done for {}", name_);

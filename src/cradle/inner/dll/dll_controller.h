@@ -10,6 +10,7 @@
 
 namespace cradle {
 
+class dll_capabilities;
 class inner_resources;
 class selfreg_seri_catalog;
 
@@ -60,13 +61,9 @@ class dll_trash
  * relatively cheap.
  *
  * A DLL must export (at least) this function:
- * - selfreg_seri_catalog* CRADLE_create_seri_catalog()
- *   Returns a pointer to a dynamically allocated selfreg_seri_catalog
- *   instance, transferring ownership of this object.
- *   Returns nullptr on error. As the selfreg_seri_catalog constructor is
- *   noexcept, this should be possible in an out-of-memory condition only.
- *
- * TODO support other types of DLL?
+ * - dll_capabilities const* CRADLE_get_capabilities()
+ *   Returns a pointer to a static dll_capabilities object, describing the
+ *   DLL's capabilities. Must not return nullptr.
  */
 class dll_controller
 {
@@ -93,6 +90,9 @@ class dll_controller
 
     void
     load();
+
+    void
+    create_seri_catalog(dll_capabilities const& caps);
 
     void
     unload();

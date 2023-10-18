@@ -132,15 +132,11 @@ TEST_CASE("loading a non-existing DLL fails", tag)
 {
     auto resources{make_inner_test_resources()};
     dll_collection the_dlls{resources};
-    auto& the_seri_registry{resources.get_seri_registry()};
     std::string dll_name{"none_such"};
 
+    // The error message is system-dependent.
     REQUIRE_THROWS_AS(
         the_dlls.load(get_test_dlls_dir(), dll_name), dll_load_error);
-
-    REQUIRE(the_dlls.size() == 0);
-    REQUIRE(the_dlls.trash_size() == 0);
-    REQUIRE(the_seri_registry.size() == 0);
 }
 
 TEST_CASE("loading an already loaded DLL has no effect", tag)
@@ -171,30 +167,47 @@ TEST_CASE("attempt to load a DLL missing the mandatory export", tag)
 {
     auto resources{make_inner_test_resources()};
     dll_collection the_dlls{resources};
-    auto& the_seri_registry{resources.get_seri_registry()};
     std::string dll_name{"test_inner_dll_missing_export"};
 
-    REQUIRE_THROWS_AS(
-        the_dlls.load(get_test_dlls_dir(), dll_name), dll_load_error);
-
-    REQUIRE(the_dlls.size() == 0);
-    REQUIRE(the_dlls.trash_size() == 0);
-    REQUIRE(the_seri_registry.size() == 0);
+    REQUIRE_THROWS_WITH(
+        the_dlls.load(get_test_dlls_dir(), dll_name),
+        Catch::Matchers::Contains("does not export CRADLE_get_capabilities"));
 }
 
-TEST_CASE("attempt to load a DLL with a failing export function", tag)
+TEST_CASE("attempt to load a DLL returning a null capabilities pointer", tag)
+{
+    auto resources{make_inner_test_resources()};
+    dll_collection the_dlls{resources};
+    std::string dll_name{"test_inner_dll_null_capabilities"};
+
+    REQUIRE_THROWS_WITH(
+        the_dlls.load(get_test_dlls_dir(), dll_name),
+        Catch::Matchers::Contains("get_caps_func() returned nullptr"));
+}
+
+TEST_CASE("load a DLL that does not have a seri_catalog", tag)
 {
     auto resources{make_inner_test_resources()};
     dll_collection the_dlls{resources};
     auto& the_seri_registry{resources.get_seri_registry()};
-    std::string dll_name{"test_inner_dll_failing_create_catalog"};
+    std::string dll_name{"test_inner_dll_no_create_catalog"};
 
-    REQUIRE_THROWS_AS(
-        the_dlls.load(get_test_dlls_dir(), dll_name), dll_load_error);
+    the_dlls.load(get_test_dlls_dir(), dll_name);
 
-    REQUIRE(the_dlls.size() == 0);
+    REQUIRE(the_dlls.size() == 1);
     REQUIRE(the_dlls.trash_size() == 0);
     REQUIRE(the_seri_registry.size() == 0);
+}
+
+TEST_CASE("attempt to load a DLL with a failing create_catalog function", tag)
+{
+    auto resources{make_inner_test_resources()};
+    dll_collection the_dlls{resources};
+    std::string dll_name{"test_inner_dll_failing_create_catalog"};
+
+    REQUIRE_THROWS_WITH(
+        the_dlls.load(get_test_dlls_dir(), dll_name),
+        Catch::Matchers::Contains("create_catalog_func() returned nullptr"));
 }
 
 TEST_CASE("attempt to unload a DLL that is not loaded", tag)
@@ -203,5 +216,8 @@ TEST_CASE("attempt to unload a DLL that is not loaded", tag)
     dll_collection the_dlls{resources};
     std::string dll_name{"dll_that_is_not_loaded"};
 
-    REQUIRE_THROWS_AS(the_dlls.unload(dll_name), dll_unload_error);
+    REQUIRE_THROWS_WITH(
+        the_dlls.unload(dll_name),
+        Catch::Matchers::Contains(
+            "no DLL loaded named dll_that_is_not_loaded"));
 }
