@@ -45,15 +45,21 @@ make_inner_test_resources(
     return resources;
 }
 
+non_caching_request_resolution_context::
+    non_caching_request_resolution_context()
+    : resources_{make_inner_test_resources()}
+{
+}
+
 caching_request_resolution_context::caching_request_resolution_context()
-    : resources{make_inner_test_resources()}
+    : resources_{make_inner_test_resources()}
 {
 }
 
 void
 caching_request_resolution_context::reset_memory_cache()
 {
-    resources.reset_memory_cache();
+    resources_.reset_memory_cache();
 }
 
 } // namespace cradle

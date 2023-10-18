@@ -5,6 +5,7 @@
 #include <cradle/inner/resolve/remote.h>
 #include <cradle/inner/resolve/seri_registry.h>
 #include <cradle/inner/resolve/seri_req.h>
+#include <cradle/inner/service/resources.h>
 
 namespace cradle {
 
@@ -37,7 +38,8 @@ cppcoro::task<serialized_result>
 resolve_serialized_local(local_context_intf& ctx, std::string seri_req)
 {
     auto uuid_str{extract_uuid_str(seri_req)};
-    auto resolver{seri_registry::instance().find_resolver(uuid_str)};
+    auto& resources{ctx.get_resources()};
+    auto resolver{resources.get_seri_registry().find_resolver(uuid_str)};
     // TODO ensure resolver isn't unloaded while it's resolving
     return resolver->resolve(ctx, std::move(seri_req));
 }

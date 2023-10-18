@@ -10,6 +10,7 @@
 
 #include <cradle/inner/dll/dll_collection.h>
 #include <cradle/inner/io/http_requests.h>
+#include <cradle/inner/resolve/seri_registry.h>
 #include <cradle/inner/service/config.h>
 
 class async_db;
@@ -42,6 +43,7 @@ struct inner_resources_impl
     std::unordered_map<std::string, std::unique_ptr<domain>> domains_;
     std::unordered_map<std::string, std::unique_ptr<remote_proxy>> proxies_;
     dll_collection the_dlls_;
+    // TODO use this one: seri_registry the_seri_registry_;
 
     cppcoro::static_thread_pool http_pool_;
     cppcoro::static_thread_pool async_pool_;

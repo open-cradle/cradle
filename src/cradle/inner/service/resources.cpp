@@ -227,6 +227,13 @@ inner_resources::the_dlls()
     return impl_->the_dlls_;
 }
 
+seri_registry&
+inner_resources::get_seri_registry()
+{
+    return seri_registry::instance();
+    // TODO return impl_->the_seri_registry_;
+}
+
 inner_resources_impl::inner_resources_impl(service_config const& config)
     : config_{config},
       memory_cache_{create_memory_cache(config)},

@@ -20,15 +20,17 @@ make_inner_test_resources(
 void
 clear_disk_cache(inner_resources& resources);
 
-struct non_caching_request_resolution_context final
-    : public local_context_intf,
-      public sync_context_intf
+class non_caching_request_resolution_context final : public local_context_intf,
+                                                     public sync_context_intf
 {
+ public:
+    non_caching_request_resolution_context();
+
     // context_intf
     inner_resources&
     get_resources() override
     {
-        throw not_implemented_error();
+        return resources_;
     }
 
     bool
@@ -55,23 +57,26 @@ struct non_caching_request_resolution_context final
     {
         throw not_implemented_error();
     }
+
+ private:
+    // TODO these resources should not have caches
+    inner_resources resources_;
 };
 
 static_assert(ValidContext<non_caching_request_resolution_context>);
 
-struct caching_request_resolution_context final : public local_context_intf,
-                                                  public sync_context_intf,
-                                                  public caching_context_intf
+class caching_request_resolution_context final : public local_context_intf,
+                                                 public sync_context_intf,
+                                                 public caching_context_intf
 {
-    inner_resources resources;
-
+ public:
     caching_request_resolution_context();
 
     // context_intf
     inner_resources&
     get_resources() override
     {
-        return resources;
+        return resources_;
     }
 
     bool
@@ -102,6 +107,9 @@ struct caching_request_resolution_context final : public local_context_intf,
     // other
     void
     reset_memory_cache();
+
+ private:
+    inner_resources resources_;
 };
 
 static_assert(ValidContext<caching_request_resolution_context>);
