@@ -9,7 +9,6 @@
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/core/type_definitions.h>
-#include <cradle/inner/service/config.h>
 
 namespace cradle {
 

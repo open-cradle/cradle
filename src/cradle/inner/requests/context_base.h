@@ -48,6 +48,12 @@ class sync_context_base : public local_context_intf,
         std::string proxy_name);
 
     // context_intf
+    inner_resources&
+    get_resources() override
+    {
+        return resources_;
+    }
+
     bool
     remotely() const override
     {
@@ -85,13 +91,6 @@ class sync_context_base : public local_context_intf,
     virtual service_config
     make_config() const override
         = 0;
-
-    // caching_context_intf
-    inner_resources&
-    get_resources() override
-    {
-        return resources_;
-    }
 
     // introspective_context_intf
     tasklet_tracker*
@@ -202,6 +201,12 @@ class local_async_context_base : public local_async_context_intf,
         = delete;
 
     // context_intf
+    inner_resources&
+    get_resources() override
+    {
+        return tree_ctx_->get_resources();
+    }
+
     bool
     remotely() const override
     {
@@ -309,13 +314,6 @@ class local_async_context_base : public local_async_context_intf,
 
     void
     throw_async_cancelled() const override;
-
-    // caching_context_intf
-    inner_resources&
-    get_resources() override
-    {
-        return tree_ctx_->get_resources();
-    }
 
     // introspective_context_intf
     tasklet_tracker*
@@ -494,6 +492,12 @@ class proxy_async_context_base : public remote_async_context_intf
         = delete;
 
     // context_intf
+    inner_resources&
+    get_resources() override
+    {
+        return tree_ctx_->get_resources();
+    }
+
     bool
     remotely() const override
     {

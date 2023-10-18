@@ -60,6 +60,9 @@ struct inner_config_keys
  * - A collection of loaded DLLs
  * - Thread pools
  * - An optional mock_http_session object
+ *
+ * TODO make resources optional? E.g. cacheless resolving doesn't need much.
+ * service_config could indicate what to provide.
  */
 class inner_resources
 {

@@ -114,14 +114,20 @@ class my_local_only_context final : public local_context_mixin,
                                     public sync_context_mixin
 {
  public:
+    inner_resources&
+    get_resources() override
+    {
+        throw not_implemented_error("my_local_only_context::get_resources()");
+    }
+
     bool
-    remotely() const
+    remotely() const override
     {
         throw not_implemented_error("my_local_only_context::remotely()");
     }
 
     bool
-    is_async() const
+    is_async() const override
     {
         throw not_implemented_error();
     }
@@ -132,14 +138,20 @@ class my_remote_only_context final : public remote_context_mixin,
                                      public sync_context_mixin
 {
  public:
+    inner_resources&
+    get_resources() override
+    {
+        throw not_implemented_error("my_remote_only_context::get_resources()");
+    }
+
     bool
-    remotely() const
+    remotely() const override
     {
         throw not_implemented_error("my_remote_only_context::remotely()");
     }
 
     bool
-    is_async() const
+    is_async() const override
     {
         throw not_implemented_error();
     }
@@ -150,14 +162,20 @@ class my_sync_only_context final : public sync_context_mixin,
                                    public local_context_mixin
 {
  public:
+    inner_resources&
+    get_resources() override
+    {
+        throw not_implemented_error("my_sync_only_context::get_resources()");
+    }
+
     bool
-    remotely() const
+    remotely() const override
     {
         throw not_implemented_error();
     }
 
     bool
-    is_async() const
+    is_async() const override
     {
         throw not_implemented_error("my_sync_only_context::is_async()");
     }
@@ -168,14 +186,20 @@ class my_async_only_context final : public async_context_mixin,
                                     public local_context_mixin
 {
  public:
-    bool
-    remotely() const
+    inner_resources&
+    get_resources() override
     {
-        throw not_implemented_error();
+        throw not_implemented_error("my_async_only_context::get_resources()");
     }
 
     bool
-    is_async() const
+    remotely() const override
+    {
+        throw not_implemented_error("my_async_only_context::remotely()");
+    }
+
+    bool
+    is_async() const override
     {
         throw not_implemented_error("my_async_only_context::is_async()");
     }
@@ -195,8 +219,14 @@ class my_generic_context : public local_context_mixin,
     {
     }
 
+    inner_resources&
+    get_resources() override
+    {
+        throw not_implemented_error("my_generic_context::get_resources()");
+    }
+
     bool
-    remotely() const
+    remotely() const override
     {
         if (remotely_ != static_cast<int>(false)
             && remotely_ != static_cast<int>(true))
@@ -207,7 +237,7 @@ class my_generic_context : public local_context_mixin,
     }
 
     bool
-    is_async() const
+    is_async() const override
     {
         if (is_async_ != static_cast<int>(false)
             && is_async_ != static_cast<int>(true))

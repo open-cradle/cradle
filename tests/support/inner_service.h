@@ -25,6 +25,12 @@ struct non_caching_request_resolution_context final
       public sync_context_intf
 {
     // context_intf
+    inner_resources&
+    get_resources() override
+    {
+        throw not_implemented_error();
+    }
+
     bool
     remotely() const override
     {
@@ -62,6 +68,12 @@ struct caching_request_resolution_context final : public local_context_intf,
     caching_request_resolution_context();
 
     // context_intf
+    inner_resources&
+    get_resources() override
+    {
+        return resources;
+    }
+
     bool
     remotely() const override
     {
@@ -85,13 +97,6 @@ struct caching_request_resolution_context final : public local_context_intf,
     on_value_complete() override
     {
         throw not_implemented_error();
-    }
-
-    // caching_context_intf
-    inner_resources&
-    get_resources() override
-    {
-        return resources;
     }
 
     // other

@@ -46,6 +46,7 @@ dll_controller::load()
     using create_catalog_func_t = selfreg_seri_catalog*();
     std::string const create_catalog_func_name{"CRADLE_create_seri_catalog"};
 
+    // Throws if the DLL does not export the mandatory symbol.
     auto create_catalog_func
         = lib_->get<create_catalog_func_t>(create_catalog_func_name);
     // Should the DLL export a symbol with the correct name but the wrong type,
