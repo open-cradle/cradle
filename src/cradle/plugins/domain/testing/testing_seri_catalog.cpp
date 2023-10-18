@@ -5,8 +5,8 @@
 
 namespace cradle {
 
-void
-testing_seri_catalog::try_register_all()
+testing_seri_catalog::testing_seri_catalog(seri_registry& registry)
+    : selfreg_seri_catalog{registry}
 {
     register_resolver(rq_make_some_blob<caching_level_type::none>(1, false));
     register_resolver(rq_make_some_blob<caching_level_type::memory>(1, false));

@@ -6,12 +6,11 @@
 namespace cradle {
 
 // The Thinknode seri resolvers are available as long as an instance of this
-// object exists, on which a register_all() call has been done.
+// object exists.
 class thinknode_seri_catalog_v1 : public selfreg_seri_catalog
 {
- private:
-    void
-    try_register_all() override;
+ public:
+    thinknode_seri_catalog_v1(seri_registry& registry);
 };
 
 } // namespace cradle

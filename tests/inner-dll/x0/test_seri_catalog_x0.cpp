@@ -8,16 +8,16 @@
 
 namespace cradle {
 
-void
-test_seri_catalog_x0::try_register_all()
+test_seri_catalog_x0::test_seri_catalog_x0(seri_registry& registry)
+    : selfreg_seri_catalog{registry}
 {
     register_resolver(rq_test_adder_x0_impl(2, 3));
 }
 
 static std::unique_ptr<selfreg_seri_catalog>
-create_my_catalog(seri_registry const& registry)
+create_my_catalog(seri_registry& registry)
 {
-    return std::make_unique<test_seri_catalog_x0>();
+    return std::make_unique<test_seri_catalog_x0>(registry);
 }
 
 static constexpr dll_capabilities my_capabilities{

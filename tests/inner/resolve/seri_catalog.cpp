@@ -48,11 +48,11 @@ TEST_CASE("register seri resolver and call it", tag)
 {
     static char const arg[] = "a";
     auto req{rq_local(make_string<arg>{}, arg)};
-    seri_catalog cat;
+    auto resources{make_inner_test_resources()};
+    seri_catalog cat{resources.get_seri_registry()};
 
     REQUIRE_NOTHROW(cat.register_resolver(req));
 
-    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, ""};
     std::string seri_req{serialize_request(req)};
     auto seri_resp{
@@ -89,9 +89,9 @@ TEST_CASE("serialized request lacking uuid", tag)
 {
     static char const arg[] = "c";
     auto req{rq_local(make_string<arg>{}, arg)};
-    seri_catalog cat;
-    cat.register_resolver(req);
     auto resources{make_inner_test_resources()};
+    seri_catalog cat{resources.get_seri_registry()};
+    cat.register_resolver(req);
     testing_request_context ctx{resources, nullptr, ""};
     std::string correct{serialize_request(req)};
 
@@ -107,9 +107,9 @@ TEST_CASE("malformed serialized request", tag)
 {
     static char const arg[] = "d";
     auto req{rq_local(make_string<arg>{}, arg)};
-    seri_catalog cat;
-    cat.register_resolver(req);
     auto resources{make_inner_test_resources()};
+    seri_catalog cat{resources.get_seri_registry()};
+    cat.register_resolver(req);
     testing_request_context ctx{resources, nullptr, ""};
     std::string seri_req{serialize_request(req)};
 
@@ -142,7 +142,8 @@ TEST_CASE("resolve two C++ functions with the same signature", tag)
     std::string uuid_str_f{"test_seri_catalog_f"};
     auto req_e{rq_local(make_e_string, uuid_str_e)};
     auto req_f{rq_local(make_f_string, uuid_str_f)};
-    seri_catalog cat;
+    auto resources{make_inner_test_resources()};
+    seri_catalog cat{resources.get_seri_registry()};
 
     REQUIRE_NOTHROW(cat.register_resolver(req_e));
     REQUIRE_NOTHROW(cat.register_resolver(req_f));
@@ -152,7 +153,6 @@ TEST_CASE("resolve two C++ functions with the same signature", tag)
 
     REQUIRE(seri_req_e != seri_req_f);
 
-    auto resources{make_inner_test_resources()};
     testing_request_context ctx{resources, nullptr, ""};
 
     auto seri_resp_e{

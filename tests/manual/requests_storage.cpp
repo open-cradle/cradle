@@ -62,10 +62,8 @@ static std::string const the_key
 
 TEST_CASE("store request", tag_store)
 {
-    testing_seri_catalog cat;
-    cat.register_all();
-
     auto resources{make_inner_test_resources()};
+    testing_seri_catalog cat{resources.get_seri_registry()};
     http_requests_storage storage{resources};
 
     auto req0{rq_make_some_blob<caching_level_type::full>(5, false)};
@@ -76,10 +74,8 @@ TEST_CASE("store request", tag_store)
 
 TEST_CASE("load stored request", tag_load)
 {
-    testing_seri_catalog cat;
-    cat.register_all();
-
     auto resources{make_inner_test_resources()};
+    testing_seri_catalog cat{resources.get_seri_registry()};
     http_requests_storage storage{resources};
 
     auto req_written{rq_make_some_blob<caching_level_type::full>(5, false)};
@@ -92,10 +88,8 @@ TEST_CASE("load stored request", tag_load)
 
 TEST_CASE("load and resolve stored request", tag_load)
 {
-    testing_seri_catalog cat;
-    cat.register_all();
-
     auto resources{make_inner_test_resources()};
+    testing_seri_catalog cat{resources.get_seri_registry()};
     http_requests_storage storage{resources};
 
     std::string key{the_key};

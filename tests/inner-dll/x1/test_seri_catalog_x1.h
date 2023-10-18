@@ -4,9 +4,8 @@ namespace cradle {
 
 class test_seri_catalog_x1 : public selfreg_seri_catalog
 {
- private:
-    void
-    try_register_all() override;
+ public:
+    test_seri_catalog_x1(seri_registry& registry);
 };
 
 } // namespace cradle

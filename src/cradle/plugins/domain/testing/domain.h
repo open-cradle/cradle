@@ -2,10 +2,11 @@
 #define CRADLE_PLUGINS_DOMAIN_TESTING_DOMAIN_H
 
 #include <cradle/inner/requests/domain.h>
-#include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/testing_seri_catalog.h>
 
 namespace cradle {
+
+class inner_resources;
 
 // Factory of contexts needed for resolving a testing request, plus a catalog
 // of resolvers for serialized testing requests.

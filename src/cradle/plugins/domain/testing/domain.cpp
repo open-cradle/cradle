@@ -1,12 +1,12 @@
+#include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/domain.h>
 
 namespace cradle {
 
 testing_domain::testing_domain(inner_resources& resources)
-    : resources_{resources}
+    : resources_{resources}, cat_{resources.get_seri_registry()}
 {
-    cat_.register_all();
 }
 
 std::string

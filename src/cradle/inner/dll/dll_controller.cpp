@@ -94,8 +94,6 @@ dll_controller::create_seri_catalog(dll_capabilities const& caps)
     }
     auto cat_id_value{catalog_->get_cat_id().value()};
     logger_.info("loaded catalog #{}", cat_id_value);
-    // TODO move register_call to catalog's ctor
-    catalog_->register_all();
     registry.log_all_entries(
         fmt::format("after load cat_id {}", cat_id_value));
 }

@@ -5,21 +5,20 @@
 #include "adder_v1_impl.h"
 #include "test_seri_catalog_v1.h"
 #include <cradle/inner/dll/dll_capabilities.h>
-#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 
 namespace cradle {
 
-void
-test_seri_catalog_v1::try_register_all()
+test_seri_catalog_v1::test_seri_catalog_v1(seri_registry& registry)
+    : selfreg_seri_catalog{registry}
 {
     register_resolver(rq_test_adder_v1p_impl(2, 3));
     register_resolver(rq_test_adder_v1n_impl(2, 3));
 }
 
 static std::unique_ptr<selfreg_seri_catalog>
-create_my_catalog(seri_registry const& registry)
+create_my_catalog(seri_registry& registry)
 {
-    return std::make_unique<test_seri_catalog_v1>();
+    return std::make_unique<test_seri_catalog_v1>(registry);
 }
 
 static constexpr dll_capabilities my_capabilities{

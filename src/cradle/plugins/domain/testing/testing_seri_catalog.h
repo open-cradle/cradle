@@ -7,9 +7,8 @@ namespace cradle {
 
 class testing_seri_catalog : public selfreg_seri_catalog
 {
- private:
-    void
-    try_register_all() override;
+ public:
+    testing_seri_catalog(seri_registry& registry);
 };
 
 } // namespace cradle

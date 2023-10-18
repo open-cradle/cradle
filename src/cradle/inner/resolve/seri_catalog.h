@@ -1,16 +1,15 @@
 #ifndef CRADLE_INNER_RESOLVE_SERI_CATALOG_H
 #define CRADLE_INNER_RESOLVE_SERI_CATALOG_H
 
-#include <atomic>
 #include <memory>
-
-#include <spdlog/spdlog.h>
 
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/types.h>
 #include <cradle/inner/resolve/seri_resolver.h>
 
 namespace cradle {
+
+class seri_registry;
 
 /**
  * Catalog of resolvers that can locally resolve a serialized request
@@ -35,7 +34,8 @@ namespace cradle {
 class seri_catalog
 {
  public:
-    seri_catalog() noexcept = default;
+    // The registry object must outlive this one.
+    seri_catalog(seri_registry& registry);
 
     virtual ~seri_catalog();
 
@@ -58,62 +58,38 @@ class seri_catalog
     void
     register_resolver(Req const& req)
     {
-        // Not thread-safe; but for production code,
-        // selfreg_seri_catalog::register_all() takes care of this.
         // TODO add Request::is_proxy and throw here if true
         req.register_uuid(
             cat_id_, std::make_shared<seri_resolver_impl<Req>>());
     }
 
  protected:
-    std::shared_ptr<spdlog::logger> logger_;
-
     // Unregisters all resolvers that were successfully registered
     // Not thread-safe
     void
     unregister_all() noexcept;
 
-    void
-    ensure_my_logger();
-
  private:
+    seri_registry& registry_;
     catalog_id cat_id_;
 };
 
 /*
  * A self-registering seri_catalog variant: the object registers all resolvers,
  * rather than the client performing the register_resolver() calls.
- * The catalog's seri resolvers become available after a register_all() call,
+ * The catalog's seri resolvers become available in the constructor,
  * and stay available until the object is destroyed.
- *
- * The code for this class may be in a DLL; if so, the constructor is
- * called from a function marked extern "C". Throwing exceptions from that
- * function seems to be undefined behavior, even if both sides only contain C++
- * code. For this reason, the constructor's functionality is minimized, and
- * an explicit register_all() call must be done to register the resolvers.
+ * If a register_resolver() call from the constructor throws, the seri_catalog
+ * destructor will unregister any preceding successfully registered entries.
  */
 class selfreg_seri_catalog : public seri_catalog
 {
  public:
-    selfreg_seri_catalog() noexcept = default;
-
-    // Registers all the catalog's seri resolvers.
-    // Throws on error.
-    void
-    register_all();
+    selfreg_seri_catalog(seri_registry& registry);
 
  protected:
-    // register_resolver() to be called from try_register_all() only
+    // register_resolver() to be called from a derived class's constructor only
     using seri_catalog::register_resolver;
-
- private:
-    std::atomic<bool> registered_{false};
-
-    // Registers all the catalog's seri resolvers, by a series of
-    // register_resolver() calls. Throws on error.
-    virtual void
-    try_register_all()
-        = 0;
 };
 
 } // namespace cradle

@@ -275,7 +275,8 @@ TEST_CASE(
     "function_request_erased identity: subrequests with different functors",
     tag)
 {
-    seri_catalog cat;
+    seri_registry registry;
+    seri_catalog cat{registry};
     using props0_type = request_props<caching_level_type::memory>;
     props0_type props0a{make_test_uuid("0020")};
     props0_type props0b{make_test_uuid("0021")};

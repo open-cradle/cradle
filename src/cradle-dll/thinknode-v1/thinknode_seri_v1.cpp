@@ -30,8 +30,8 @@ namespace cradle {
  * objects must also be registered, hence the
  * seri_catalog::register_resolver() calls.
  */
-void
-thinknode_seri_catalog_v1::try_register_all()
+thinknode_seri_catalog_v1::thinknode_seri_catalog_v1(seri_registry& registry)
+    : selfreg_seri_catalog{registry}
 {
     constexpr caching_level_type level = caching_level_type::full;
     auto sample_thinknode_info{

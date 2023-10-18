@@ -43,7 +43,8 @@ TEST_CASE("resolve serialized requests with normalized args", tag)
 {
     auto func_props{func_props_t{make_test_uuid("plus_two_func")}};
     auto coro_props{coro_props_t{make_test_uuid("plus_two_coro")}};
-    seri_catalog cat;
+    seri_registry registry;
+    seri_catalog cat{registry};
     // The framework should generate different uuid's for the requests created
     // by the two following normalize_arg calls, otherwise the second
     // register_resolver call will fail with a message like
