@@ -12,13 +12,16 @@
 
 namespace cradle {
 
+class inner_resources;
+
 /*
  * The set of all loaded DLLs
  */
 class dll_collection
 {
  public:
-    dll_collection();
+    // The inner_resources object may be the one owning this dll_collection.
+    dll_collection(inner_resources& resources);
 
     // Loads a shared library and registers its seri resolvers.
     //
@@ -49,6 +52,7 @@ class dll_collection
     }
 
  private:
+    inner_resources& resources_;
     std::shared_ptr<spdlog::logger> logger_;
     std::mutex mutex_;
     // trash_ must outlive dll_controller objects so must appear before

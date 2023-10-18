@@ -9,7 +9,8 @@
 
 namespace cradle {
 
-dll_collection::dll_collection() : logger_{ensure_logger("dll")}
+dll_collection::dll_collection(inner_resources& resources)
+    : resources_{resources}, logger_{ensure_logger("dll")}
 {
 }
 
@@ -30,8 +31,8 @@ dll_collection::load(std::string const& dir_path, std::string const& dll_name)
     std::unique_ptr<dll_controller> controller;
     try
     {
-        controller.reset(
-            new dll_controller(trash_, *logger_, dll_path, dll_name));
+        controller.reset(new dll_controller(
+            resources_, trash_, *logger_, dll_path, dll_name));
     }
     catch (std::exception& e)
     {

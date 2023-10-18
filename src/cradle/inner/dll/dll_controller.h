@@ -10,6 +10,7 @@
 
 namespace cradle {
 
+class inner_resources;
 class selfreg_seri_catalog;
 
 /*
@@ -70,8 +71,9 @@ class dll_trash
 class dll_controller
 {
  public:
-    // trash must outlive this dll_controller object
+    // resources and trash must outlive this dll_controller object
     dll_controller(
+        inner_resources& resources,
         dll_trash& trash,
         spdlog::logger& logger,
         std::string path,
@@ -80,6 +82,7 @@ class dll_controller
     ~dll_controller();
 
  private:
+    inner_resources& resources_;
     dll_trash& trash_;
     spdlog::logger& logger_;
     std::string path_;

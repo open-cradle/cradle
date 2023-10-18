@@ -17,6 +17,7 @@ class async_db;
 class blob_file_directory;
 class domain;
 struct immutable_cache;
+class inner_resources;
 struct mock_http_session;
 class remote_proxy;
 class secondary_storage_intf;
@@ -26,7 +27,8 @@ namespace cradle {
 // Should be accessed from class inner_resources only.
 struct inner_resources_impl
 {
-    inner_resources_impl(service_config const& config);
+    inner_resources_impl(
+        inner_resources& wrapper, service_config const& config);
 
     // Passing request will cause it to be mocked only if mocking is enabled,
     // and the request is not of a "do not mock" class.

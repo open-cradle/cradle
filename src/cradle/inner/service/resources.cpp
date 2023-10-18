@@ -41,7 +41,7 @@ create_memory_cache(service_config const& config)
 }
 
 inner_resources::inner_resources(service_config const& config)
-    : impl_{std::make_unique<inner_resources_impl>(config)}
+    : impl_{std::make_unique<inner_resources_impl>(*this, config)}
 {
 }
 
@@ -234,10 +234,12 @@ inner_resources::get_seri_registry()
     // TODO return impl_->the_seri_registry_;
 }
 
-inner_resources_impl::inner_resources_impl(service_config const& config)
+inner_resources_impl::inner_resources_impl(
+    inner_resources& wrapper, service_config const& config)
     : config_{config},
       memory_cache_{create_memory_cache(config)},
       blob_dir_{std::make_unique<blob_file_directory>(config)},
+      the_dlls_{wrapper},
       http_pool_{cppcoro::static_thread_pool(
           static_cast<uint32_t>(config.get_number_or_default(
               inner_config_keys::HTTP_CONCURRENCY, 36)))},

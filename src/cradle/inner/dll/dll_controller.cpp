@@ -4,16 +4,19 @@
 #include <cradle/inner/dll/dll_exceptions.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/seri_catalog.h>
+#include <cradle/inner/service/resources.h>
 #include <cradle/inner/utilities/logging.h>
 
 namespace cradle {
 
 dll_controller::dll_controller(
+    inner_resources& resources,
     dll_trash& trash,
     spdlog::logger& logger,
     std::string path,
     std::string name)
-    : trash_{trash},
+    : resources_{resources},
+      trash_{trash},
       logger_{logger},
       path_{std::move(path)},
       name_{std::move(name)}
@@ -59,7 +62,7 @@ dll_controller::load()
     auto cat_id_value{catalog_->get_cat_id().value()};
     logger_.info("load done for {} -> cat_id {}", name_, cat_id_value);
     catalog_->register_all();
-    seri_registry::instance().log_all_entries(
+    resources_.get_seri_registry().log_all_entries(
         fmt::format("after load cat_id {}", cat_id_value));
 }
 
