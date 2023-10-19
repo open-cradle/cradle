@@ -71,9 +71,6 @@ class seri_registry
     using function_t = std::shared_ptr<Function>;
     using resolver_t = std::shared_ptr<seri_resolver_intf>;
 
-    static seri_registry&
-    instance();
-
     seri_registry();
 
     template<typename Function>

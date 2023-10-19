@@ -7,8 +7,8 @@
 #include <string>
 
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/resolve/seri_result.h>
-#include <cradle/plugins/serialization/request/cereal_json.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 
 namespace cradle {

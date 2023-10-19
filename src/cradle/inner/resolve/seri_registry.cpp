@@ -9,15 +9,6 @@
 
 namespace cradle {
 
-seri_registry&
-seri_registry::instance()
-{
-    // The singleton is part of the main program, and any dynamically loaded
-    // library will see this instance.
-    static seri_registry the_instance;
-    return the_instance;
-}
-
 seri_registry::seri_registry() : logger_{ensure_logger("cfr")}
 {
 }

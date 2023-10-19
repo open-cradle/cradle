@@ -11,6 +11,7 @@
 #include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/seri_catalog.h>
+#include <cradle/inner/resolve/seri_registry.h>
 
 using namespace cradle;
 
@@ -92,7 +93,7 @@ to_json(function_request_erased<Value, Props> const& req)
 {
     std::stringstream os;
     {
-        cereal::JSONOutputArchive oarchive(os);
+        JSONRequestOutputArchive oarchive(os);
         req.save(oarchive);
     }
     return os.str();
@@ -385,7 +386,7 @@ TEST_CASE("function_request_impl: load unregistered function", tag)
     auto good_impl{std::make_shared<impl_type>(good_uuid, func_a)};
     std::stringstream os;
     {
-        cereal::JSONOutputArchive oarchive(os);
+        JSONRequestOutputArchive oarchive(os);
         // Cannot do oarchive(good_impl) due to ambiguity between
         //   function_request_impl::save()
         // and the global
@@ -398,6 +399,7 @@ TEST_CASE("function_request_impl: load unregistered function", tag)
     auto bad_seri{std::regex_replace(
         good_seri, std::regex{good_uuid_str}, bad_uuid_str)};
     std::istringstream is(bad_seri);
-    cereal::JSONInputArchive iarchive(is);
+    auto resources{make_inner_test_resources()};
+    JSONRequestInputArchive iarchive(is, resources);
     REQUIRE_THROWS_AS(bad_impl->load(iarchive), unregistered_uuid_error);
 }

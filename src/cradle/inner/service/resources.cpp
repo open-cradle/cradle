@@ -230,8 +230,7 @@ inner_resources::the_dlls()
 seri_registry&
 inner_resources::get_seri_registry()
 {
-    return seri_registry::instance();
-    // TODO return impl_->the_seri_registry_;
+    return impl_->the_seri_registry_;
 }
 
 inner_resources_impl::inner_resources_impl(

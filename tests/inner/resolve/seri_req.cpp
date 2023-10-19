@@ -5,12 +5,12 @@
 #include "../../support/inner_service.h"
 #include <cradle/inner/dll/dll_collection.h>
 #include <cradle/inner/remote/loopback.h>
+#include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/plugins/domain/testing/testing_seri_catalog.h>
-#include <cradle/plugins/serialization/request/cereal_json.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 #include <cradle/test_dlls_dir.h>
 

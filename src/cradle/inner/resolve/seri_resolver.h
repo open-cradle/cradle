@@ -11,9 +11,9 @@
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/resolve/seri_result.h>
-#include <cradle/plugins/serialization/request/cereal_json.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 
 namespace cradle {
@@ -50,7 +50,8 @@ class seri_resolver_impl : public seri_resolver_intf
     resolve(local_context_intf& ctx, std::string seri_req) override
     {
         assert(!ctx.remotely());
-        auto req{deserialize_request<Req>(std::move(seri_req))};
+        auto req{deserialize_request<Req>(
+            ctx.get_resources(), std::move(seri_req))};
         // The intention of the "if constexpr" is to:
         // - Prevent build errors should Req not be visitable
         // - Generate less object code should Req not need async resolving

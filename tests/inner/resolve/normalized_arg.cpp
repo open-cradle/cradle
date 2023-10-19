@@ -6,6 +6,7 @@
 
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/seri_catalog.h>
+#include <cradle/inner/resolve/seri_registry.h>
 #include <cradle/inner/resolve/seri_req.h>
 
 #include "../../support/inner_service.h"
@@ -41,10 +42,11 @@ plus_two_coro(context_intf& ctx, int x)
 
 TEST_CASE("resolve serialized requests with normalized args", tag)
 {
+    non_caching_request_resolution_context ctx;
+    seri_catalog cat{ctx.get_resources().get_seri_registry()};
+
     auto func_props{func_props_t{make_test_uuid("plus_two_func")}};
     auto coro_props{coro_props_t{make_test_uuid("plus_two_coro")}};
-    seri_registry registry;
-    seri_catalog cat{registry};
     // The framework should generate different uuid's for the requests created
     // by the two following normalize_arg calls, otherwise the second
     // register_resolver call will fail with a message like
@@ -53,8 +55,6 @@ TEST_CASE("resolve serialized requests with normalized args", tag)
         func_props, plus_two_func, normalize_arg<int, func_props_t>(0)));
     cat.register_resolver(rq_function_erased(
         coro_props, plus_two_coro, normalize_arg<int, coro_props_t>(0)));
-
-    non_caching_request_resolution_context ctx;
 
     // Function is "normal" (no coroutine); main request's arg is normalized
     auto req_a{rq_function_erased(

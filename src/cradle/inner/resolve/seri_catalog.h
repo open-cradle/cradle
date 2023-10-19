@@ -60,7 +60,7 @@ class seri_catalog
     {
         // TODO add Request::is_proxy and throw here if true
         req.register_uuid(
-            cat_id_, std::make_shared<seri_resolver_impl<Req>>());
+            registry_, cat_id_, std::make_shared<seri_resolver_impl<Req>>());
     }
 
  protected:

@@ -4,6 +4,7 @@
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/fmt_format.h>
+#include <cradle/inner/dll/dll_collection.h>
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/remote/loopback.h>
@@ -190,14 +191,14 @@ loopback_service::load_shared_library(
     std::string dir_path, std::string dll_name)
 {
     logger_->info("load_shared_library {} {}", dir_path, dll_name);
-    throw not_implemented_error("loopback_service::load_shared_library()");
+    resources_->the_dlls().load(dir_path, dll_name);
 }
 
 void
 loopback_service::unload_shared_library(std::string dll_name)
 {
     logger_->info("unload_shared_library {}", dll_name);
-    throw not_implemented_error("loopback_service::unload_shared_library()");
+    resources_->the_dlls().unload(dll_name);
 }
 
 void

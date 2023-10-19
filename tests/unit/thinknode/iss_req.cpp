@@ -21,6 +21,7 @@
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/function.h>
+#include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/resolve/seri_catalog.h>
@@ -36,7 +37,7 @@ static char const tag[] = "[thinknode][iss_req]";
 
 template<typename Request>
 auto
-deserialize_function(cereal::JSONInputArchive& iarchive)
+deserialize_function(JSONRequestInputArchive& iarchive)
 {
     using value_type = typename Request::value_type;
     using props_type = typename Request::props_type;
@@ -128,7 +129,7 @@ test_serialize_thinknode_request(
     // Serialize the original request
     {
         std::ofstream ofs(filename);
-        cereal::JSONOutputArchive oarchive(ofs);
+        JSONRequestOutputArchive oarchive(ofs);
         // Not
         //   oarchive(req);
         // which adds an undesired outer element.
@@ -137,7 +138,7 @@ test_serialize_thinknode_request(
 
     // Deserialize and verify the resulting request equals the original
     std::ifstream ifs(filename);
-    cereal::JSONInputArchive iarchive(ifs);
+    JSONRequestInputArchive iarchive{ifs, scope.get_resources()};
     Request req1{deserialize_request(iarchive)};
     REQUIRE(req1.hash() == req.hash());
     REQUIRE(

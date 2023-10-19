@@ -62,35 +62,39 @@ static std::string const the_key
 
 TEST_CASE("store request", tag_store)
 {
-    auto resources{make_inner_test_resources()};
+    inner_resources resources{make_inner_tests_config()};
+    auto owned_storage{std::make_unique<http_requests_storage>(resources)};
+    resources.set_secondary_cache(std::move(owned_storage));
     testing_seri_catalog cat{resources.get_seri_registry()};
-    http_requests_storage storage{resources};
 
     auto req0{rq_make_some_blob<caching_level_type::full>(5, false)};
-    cppcoro::sync_wait(store_request(req0, storage));
+    cppcoro::sync_wait(store_request(req0, resources));
 
     REQUIRE(get_request_key(req0) == the_key);
 }
 
 TEST_CASE("load stored request", tag_load)
 {
-    auto resources{make_inner_test_resources()};
+    inner_resources resources{make_inner_tests_config()};
+    auto owned_storage{std::make_unique<http_requests_storage>(resources)};
+    resources.set_secondary_cache(std::move(owned_storage));
     testing_seri_catalog cat{resources.get_seri_registry()};
-    http_requests_storage storage{resources};
 
     auto req_written{rq_make_some_blob<caching_level_type::full>(5, false)};
     using Req = decltype(req_written);
 
     std::string key{the_key};
-    auto req_read = cppcoro::sync_wait(load_request<Req>(key, storage));
+    auto req_read = cppcoro::sync_wait(load_request<Req>(key, resources));
     REQUIRE(req_read == req_written);
 }
 
 TEST_CASE("load and resolve stored request", tag_load)
 {
-    auto resources{make_inner_test_resources()};
+    inner_resources resources{make_inner_tests_config()};
+    auto owned_storage{std::make_unique<http_requests_storage>(resources)};
+    auto& storage{*owned_storage};
+    resources.set_secondary_cache(std::move(owned_storage));
     testing_seri_catalog cat{resources.get_seri_registry()};
-    http_requests_storage storage{resources};
 
     std::string key{the_key};
     blob req_blob{cppcoro::sync_wait(storage.read(key))};

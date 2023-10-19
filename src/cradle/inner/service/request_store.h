@@ -11,8 +11,9 @@
 #include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/serialization.h>
+#include <cradle/inner/service/resources.h>
 #include <cradle/inner/service/secondary_storage_intf.h>
-#include <cradle/plugins/serialization/request/cereal_json.h>
 
 namespace cradle {
 
@@ -37,8 +38,9 @@ get_request_key(Req const& req)
 // This is not a coroutine.
 template<Request Req>
 cppcoro::task<void>
-store_request(Req const& req, secondary_storage_intf& storage)
+store_request(Req const& req, inner_resources& resources)
 {
+    auto& storage{resources.secondary_cache()};
     return storage.write(
         get_request_key(req), make_blob(serialize_request(req)));
 }
@@ -50,15 +52,16 @@ store_request(Req const& req, secondary_storage_intf& storage)
 // reference live long enough.
 template<Request Req>
 cppcoro::task<Req>
-load_request(std::string key, secondary_storage_intf& storage)
+load_request(std::string key, inner_resources& resources)
 {
+    auto& storage{resources.secondary_cache()};
     blob req_blob{co_await storage.read(key)};
     if (!req_blob.data())
     {
         throw not_found_error(
             fmt::format("Storage has no entry with key {}", key));
     }
-    co_return deserialize_request<Req>(to_string(req_blob));
+    co_return deserialize_request<Req>(resources, to_string(req_blob));
 }
 
 } // namespace cradle

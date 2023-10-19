@@ -95,15 +95,17 @@ class function_request_intf : public id_interface
 
     virtual void
     register_uuid(
-        catalog_id cat_id, std::shared_ptr<seri_resolver_intf> resolver) const
+        seri_registry& registry,
+        catalog_id cat_id,
+        std::shared_ptr<seri_resolver_intf> resolver) const
         = 0;
 
     virtual void
-    save(cereal::JSONOutputArchive& archive) const
+    save(JSONRequestOutputArchive& archive) const
         = 0;
 
     virtual void
-    load(cereal::JSONInputArchive& archive)
+    load(JSONRequestInputArchive& archive)
         = 0;
 
     virtual void
@@ -152,21 +154,26 @@ struct first_element
 // normalize_arg() call.
 template<typename Arg>
 void
-register_uuid_for_normalized_arg(catalog_id cat_id, Arg const& arg)
+register_uuid_for_normalized_arg(
+    seri_registry& registry, catalog_id cat_id, Arg const& arg)
 {
 }
 
 template<typename Args, std::size_t... Ix>
 void
 register_uuid_for_normalized_args(
-    catalog_id cat_id, Args const& args, std::index_sequence<Ix...>)
+    seri_registry& registry,
+    catalog_id cat_id,
+    Args const& args,
+    std::index_sequence<Ix...>)
 {
     // gcc says
     // error: parameter ‘cat_id’ set but not used
     // [-Werror=unused-but-set-parameter]
     // Why?
     (void) cat_id;
-    (register_uuid_for_normalized_arg(cat_id, std::get<Ix>(args)), ...);
+    (register_uuid_for_normalized_arg(registry, cat_id, std::get<Ix>(args)),
+     ...);
 }
 
 /*
@@ -213,14 +220,16 @@ class function_request_impl : public function_request_intf<Value>
     // object of the same type, with the same function_ value.
     void
     register_uuid(
+        seri_registry& registry,
         catalog_id cat_id,
         std::shared_ptr<seri_resolver_intf> resolver) const override
     {
-        seri_registry::instance().add(
+        registry.add(
             cat_id, uuid_.str(), std::move(resolver), create, function_);
 
         // Register uuids for any args resulting from normalize_arg()
-        register_uuid_for_normalized_args(cat_id, args_, ArgIndices{});
+        register_uuid_for_normalized_args(
+            registry, cat_id, args_, ArgIndices{});
     }
 
     // other will be a function_request_impl, but possibly instantiated from
@@ -445,17 +454,18 @@ class function_request_impl : public function_request_intf<Value>
     }
 
     void
-    save(cereal::JSONOutputArchive& archive) const override
+    save(JSONRequestOutputArchive& archive) const override
     {
         archive(cereal::make_nvp("args", args_));
     }
 
     void
-    load(cereal::JSONInputArchive& archive) override
+    load(JSONRequestInputArchive& archive) override
     {
+        auto& resources{archive.get_resources()};
+        auto& the_seri_registry{resources.get_seri_registry()};
         archive(cereal::make_nvp("args", args_));
-        function_
-            = seri_registry::instance().find_function<Function>(uuid_.str());
+        function_ = the_seri_registry.find_function<Function>(uuid_.str());
     }
 
  private:
@@ -565,6 +575,7 @@ class proxy_request_base : public function_request_intf<Value>
     // Proxy requests should not be registered.
     void
     register_uuid(
+        seri_registry& registry,
         catalog_id cat_id,
         std::shared_ptr<seri_resolver_intf> resolver) const override
     {
@@ -602,13 +613,13 @@ class proxy_request_base : public function_request_intf<Value>
     // cereal-related
 
     void
-    save(cereal::JSONOutputArchive& archive) const override
+    save(JSONRequestOutputArchive& archive) const override
     {
         archive(cereal::make_nvp("args", args_));
     }
 
     void
-    load(cereal::JSONInputArchive& archive) override
+    load(JSONRequestInputArchive& archive) override
     {
         throw not_implemented_error{"proxy_request_base::load"};
     }
@@ -907,9 +918,11 @@ class function_request_erased
 
     void
     register_uuid(
-        catalog_id cat_id, std::shared_ptr<seri_resolver_intf> resolver) const
+        seri_registry& registry,
+        catalog_id cat_id,
+        std::shared_ptr<seri_resolver_intf> resolver) const
     {
-        impl_->register_uuid(cat_id, std::move(resolver));
+        impl_->register_uuid(registry, cat_id, std::move(resolver));
     }
 
     // *this and other are the same type; however, their impl_'s types could
@@ -980,7 +993,8 @@ class function_request_erased
  public:
     // Interface for cereal
 
-    // Used for creating placeholder subrequests in the catalog.
+    // Used for creating placeholder subrequests in the catalog;
+    // also called when deserializing a subrequest.
     function_request_erased() = default;
 
     // Construct object, deserializing from a cereal archive
@@ -988,13 +1002,13 @@ class function_request_erased
     // Equivalent alternative:
     //   function_request_erased<...> req;
     //   req.load(archive)
-    explicit function_request_erased(cereal::JSONInputArchive& archive)
+    explicit function_request_erased(JSONRequestInputArchive& archive)
     {
         load(archive);
     }
 
     void
-    save(cereal::JSONOutputArchive& archive) const
+    save(JSONRequestOutputArchive& archive) const
     {
         // At least for JSON, there is no difference between multiple archive()
         // calls, or putting everything in one call.
@@ -1003,17 +1017,19 @@ class function_request_erased
         impl_->save(archive);
     }
 
-    // This gets called directly from cereal, for subrequests.
-    // No additional arguments are possible, so the uuid-to-creator map must be
-    // in some global registry that can be accessed here.
+    // We always create JSONRequestInputArchive objects for deserializing
+    // requests, but cereal only knows about cereal::JSONInputArchive.
     void
-    load(cereal::JSONInputArchive& archive)
+    load(cereal::JSONInputArchive& counted_archive)
     {
+        auto& archive{static_cast<JSONRequestInputArchive&>(counted_archive)};
+        auto& resources{archive.get_resources()};
+        auto& the_seri_registry{resources.get_seri_registry()};
         auto uuid{request_uuid::load_with_name(archive, "uuid")};
         archive(cereal::make_nvp("title", title_));
         // Create a mostly empty function_request_impl object. uuid defines its
         // exact type (function_request_impl class instantiation).
-        impl_ = seri_registry::instance().create<intf_type>(std::move(uuid));
+        impl_ = the_seri_registry.create<intf_type>(std::move(uuid));
         // Deserialize the remainder of the function_request_impl object.
         impl_->load(archive);
         init_captured_id();
@@ -1045,10 +1061,13 @@ struct arg_type_struct<function_request_erased<Value, Props>>
 template<typename Value, typename Props>
 void
 register_uuid_for_normalized_arg(
-    catalog_id cat_id, function_request_erased<Value, Props> const& arg)
+    seri_registry& registry,
+    catalog_id cat_id,
+    function_request_erased<Value, Props> const& arg)
 {
     using arg_t = function_request_erased<Value, Props>;
-    arg.register_uuid(cat_id, std::make_shared<seri_resolver_impl<arg_t>>());
+    arg.register_uuid(
+        registry, cat_id, std::make_shared<seri_resolver_impl<arg_t>>());
 }
 
 // Used for comparing subrequests, where the main requests have the same type;

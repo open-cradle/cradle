@@ -67,9 +67,8 @@ thinknode_test_scope::thinknode_test_scope(
     {
         proxy_ = &resources_.get_proxy(proxy_name_);
     }
-    if (proxy_name_ == "rpclib")
+    if (proxy_)
     {
-        // Maybe cleaner to do this for loopback too.
         proxy_->load_shared_library(get_thinknode_dlls_dir(), dll_name_);
     }
     else
@@ -80,7 +79,7 @@ thinknode_test_scope::thinknode_test_scope(
 
 thinknode_test_scope::~thinknode_test_scope()
 {
-    if (proxy_name_ == "rpclib")
+    if (proxy_)
     {
         proxy_->unload_shared_library(dll_name_);
     }
