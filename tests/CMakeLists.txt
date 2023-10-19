@@ -137,6 +137,17 @@ add_library(test_inner_dll_failing_create_catalog MODULE ${srcs_inner_dll_failin
 target_link_libraries(test_inner_dll_failing_create_catalog PUBLIC
     cradle_inner)
 
+add_custom_target(all_inner_test_dlls
+    DEPENDS
+        test_inner_dll_v1
+        test_inner_dll_x0
+        test_inner_dll_x1
+        test_inner_dll_x0x1
+        test_inner_dll_missing_export
+        test_inner_dll_null_capabilities
+        test_inner_dll_no_create_catalog
+        test_inner_dll_failing_create_catalog)
+
 # Create a C++ header file defining the location of the dynamically-loaded test DLLs.
 set(test_dlls_dir_file "${intgen_src_dir}/cradle/test_dlls_dir.h")
 add_custom_command(
@@ -179,10 +190,7 @@ add_custom_target(
 add_dependencies(inner_tests
     rpclib_server
     copy_cradle_dlls
-    test_inner_dll_v1
-    test_inner_dll_x0
-    test_inner_dll_x1
-    test_inner_dll_x0x1)
+    all_inner_test_dlls)
 add_test(
     NAME inner_tests
     COMMAND ${CMAKE_COMMAND}
@@ -296,9 +304,7 @@ add_custom_target(
 add_dependencies(all_unit_tests
     rpclib_server
     copy_cradle_dlls
-    test_inner_dll_v1
-    test_inner_dll_x0
-    test_inner_dll_x1)
+    all_inner_test_dlls)
 add_test(
     NAME all_unit_tests
     COMMAND ${CMAKE_COMMAND}
