@@ -28,9 +28,10 @@ class service_core : public inner_resources
     service_core&
     operator=(service_core const&)
         = delete;
-    service_core(service_core&& other);
+    service_core(service_core&& other) = delete;
     service_core&
-    operator=(service_core&& other);
+    operator=(service_core&& other)
+        = delete;
 
     cppcoro::static_thread_pool&
     get_local_compute_pool_for_image(

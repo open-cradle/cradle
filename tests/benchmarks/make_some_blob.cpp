@@ -23,8 +23,8 @@ BM_try_resolve_testing_request(
     benchmark::State& state, Req const& req, std::string const& proxy_name)
 {
     auto resources{
-        make_inner_test_resources(proxy_name, testing_domain_option{})};
-    testing_request_context ctx{resources, nullptr, proxy_name};
+        make_inner_test_resources(proxy_name, testing_domain_option())};
+    testing_request_context ctx{*resources, nullptr, proxy_name};
 
     // Fill the appropriate cache if any
     auto init = [&]() -> cppcoro::task<void> {
@@ -33,7 +33,7 @@ BM_try_resolve_testing_request(
             benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
             if constexpr (caching_level == caching_level_type::full)
             {
-                sync_wait_write_disk_cache(resources);
+                sync_wait_write_disk_cache(*resources);
             }
         }
         co_return;
@@ -73,11 +73,11 @@ BM_try_resolve_testing_request(
                     }
                     if constexpr (need_empty_memory_cache)
                     {
-                        resources.reset_memory_cache();
+                        resources->reset_memory_cache();
                     }
                     if constexpr (need_empty_disk_cache)
                     {
-                        clear_disk_cache(resources);
+                        resources->clear_secondary_cache();
                     }
                     if constexpr (pause_timing)
                     {

@@ -49,18 +49,6 @@ inner_resources::inner_resources(service_config const& config)
 // available in resources.h.
 inner_resources::~inner_resources() = default;
 
-inner_resources::inner_resources(inner_resources&& other)
-    : impl_{std::move(other.impl_)}
-{
-}
-
-inner_resources&
-inner_resources::operator=(inner_resources&& other)
-{
-    impl_ = std::move(other.impl_);
-    return *this;
-}
-
 service_config const&
 inner_resources::config() const
 {

@@ -105,7 +105,7 @@ do_the_test(bool clear_key0, bool test_snapshots)
 
     // Create a first cache record, zero size for now.
     captured_id key0{make_captured_id(0)};
-    auto task0{fully_cached<blob>(resources, key0, create_task01)};
+    auto task0{fully_cached<blob>(*resources, key0, create_task01)};
     if (clear_key0)
     {
         // Ensure the only remaining reference to key0's id_interface object
@@ -115,7 +115,7 @@ do_the_test(bool clear_key0, bool test_snapshots)
 
     // Create a second cache record, zero size for now.
     captured_id key1{make_captured_id(1)};
-    auto task1{fully_cached<blob>(resources, key1, create_task01)};
+    auto task1{fully_cached<blob>(*resources, key1, create_task01)};
 
     auto create_task2 = [](captured_id const&) -> cppcoro::task<blob> {
         co_return make_blob("43");
@@ -124,7 +124,7 @@ do_the_test(bool clear_key0, bool test_snapshots)
         // Create a third cache record, with non-zero size.
         captured_id key2{make_captured_id(2)};
         immutable_cache_ptr<blob> ptr2(
-            resources.memory_cache(),
+            resources->memory_cache(),
             key2,
             wrap_task_creator<blob>(create_task2));
 
@@ -133,7 +133,7 @@ do_the_test(bool clear_key0, bool test_snapshots)
         // ptr2's destructor moves the cache record to the eviction list.
     }
 
-    cppcoro::sync_wait(eval_tasks(test_snapshots, resources, task0, task1));
+    cppcoro::sync_wait(eval_tasks(test_snapshots, *resources, task0, task1));
 }
 
 } // namespace
@@ -161,25 +161,25 @@ TEST_CASE("small value disk caching", tag)
     {
         auto key = make_captured_id("id_12");
         auto result = secondary_cached<dynamic>(
-            resources, key, [&] { return counted_task(12); });
+            *resources, key, [&] { return counted_task(12); });
         REQUIRE(cppcoro::sync_wait(result) == dynamic(integer(12)));
         REQUIRE(execution_count == 1);
     }
     {
         auto key = make_captured_id("id_42");
         auto result = secondary_cached<dynamic>(
-            resources, key, [&] { return counted_task(42); });
+            *resources, key, [&] { return counted_task(42); });
         REQUIRE(cppcoro::sync_wait(result) == dynamic(integer(42)));
         REQUIRE(execution_count == 2);
     }
     // Data is written to the disk cache in a background thread, so we need to
     // wait for that to finish.
-    sync_wait_write_disk_cache(resources);
+    sync_wait_write_disk_cache(*resources);
     // Now redo the 'id_12' task to see that it's not actually rerun.
     {
         auto key = make_captured_id("id_12");
         auto result = secondary_cached<dynamic>(
-            resources, key, [&] { return counted_task(12); });
+            *resources, key, [&] { return counted_task(12); });
         REQUIRE(cppcoro::sync_wait(result) == dynamic(integer(12)));
         REQUIRE(execution_count == 2);
     }
@@ -207,7 +207,7 @@ TEST_CASE("large value disk caching", tag)
     {
         auto key = make_captured_id("id_12");
         auto result = secondary_cached<dynamic>(
-            resources, key, [&] { return counted_task(12); });
+            *resources, key, [&] { return counted_task(12); });
         REQUIRE(
             cppcoro::sync_wait(result)
             == to_dynamic(generate_random_data(12)));
@@ -216,7 +216,7 @@ TEST_CASE("large value disk caching", tag)
     {
         auto key = make_captured_id("id_42");
         auto result = secondary_cached<dynamic>(
-            resources, key, [&] { return counted_task(42); });
+            *resources, key, [&] { return counted_task(42); });
         REQUIRE(
             cppcoro::sync_wait(result)
             == to_dynamic(generate_random_data(42)));
@@ -224,12 +224,12 @@ TEST_CASE("large value disk caching", tag)
     }
     // Data is written to the disk cache in a background thread, so we need to
     // wait for that to finish.
-    sync_wait_write_disk_cache(resources);
+    sync_wait_write_disk_cache(*resources);
     // Now redo the 'id_12' task to see that it's not actually rerun.
     {
         auto key = make_captured_id("id_12");
         auto result = secondary_cached<dynamic>(
-            resources, key, [&] { return counted_task(12); });
+            *resources, key, [&] { return counted_task(12); });
         REQUIRE(
             cppcoro::sync_wait(result)
             == to_dynamic(generate_random_data(12)));
@@ -249,7 +249,7 @@ TEST_CASE("lazily generated cached tasks", tag)
 
     {
         auto result = cached<integer>(
-            resources,
+            *resources,
             make_captured_id(12),
             [&](captured_id const&) -> cppcoro::task<integer> {
                 return counted_task(12);
@@ -259,7 +259,7 @@ TEST_CASE("lazily generated cached tasks", tag)
     }
     {
         auto result = cached<integer>(
-            resources,
+            *resources,
             make_captured_id(42),
             [&](captured_id const&) -> cppcoro::task<integer> {
                 return counted_task(42);
@@ -270,7 +270,7 @@ TEST_CASE("lazily generated cached tasks", tag)
     // Now redo the '12' task to see that it's not actually rerun.
     {
         auto result = cached<integer>(
-            resources,
+            *resources,
             make_captured_id(12),
             [&](captured_id const&) -> cppcoro::task<integer> {
                 return counted_task(12);
@@ -282,8 +282,8 @@ TEST_CASE("lazily generated cached tasks", tag)
 
 TEST_CASE("shared_task_for_cacheable", tag)
 {
-    clean_tasklet_admin_fixture fixture;
     auto resources{make_inner_test_resources()};
+    clean_tasklet_admin_fixture fixture;
 
     captured_id cache_key{make_captured_id(87)};
     auto task_creator = []() -> cppcoro::task<blob> {
@@ -291,7 +291,7 @@ TEST_CASE("shared_task_for_cacheable", tag)
     };
     auto client = create_tasklet_tracker("client_pool", "client_title");
     auto me = make_shared_task_for_cacheable<blob>(
-        resources, std::move(cache_key), task_creator, client, "my summary");
+        *resources, std::move(cache_key), task_creator, client, "my summary");
     auto res = cppcoro::sync_wait(
         [&]() -> cppcoro::task<blob> { co_return co_await me; }());
 

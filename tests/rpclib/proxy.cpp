@@ -18,7 +18,7 @@ TEST_CASE("client name", "[rpclib]")
 {
     std::string proxy_name{"rpclib"};
     auto resources{make_inner_test_resources(proxy_name)};
-    auto& client{resources.get_proxy(proxy_name)};
+    auto& client{resources->get_proxy(proxy_name)};
 
     REQUIRE(client.name() == "rpclib");
 }
@@ -27,7 +27,7 @@ TEST_CASE("send mock_http message", "[rpclib]")
 {
     std::string proxy_name{"rpclib"};
     auto resources{make_inner_test_resources(proxy_name)};
-    auto& client{resources.get_proxy(proxy_name)};
+    auto& client{resources->get_proxy(proxy_name)};
 
     REQUIRE_NOTHROW(client.mock_http("mock response"));
 }
@@ -36,7 +36,8 @@ TEST_CASE("ping message", "[rpclib]")
 {
     std::string proxy_name{"rpclib"};
     auto resources{make_inner_test_resources(proxy_name)};
-    auto& client{static_cast<rpclib_client&>(resources.get_proxy(proxy_name))};
+    auto& client{
+        static_cast<rpclib_client&>(resources->get_proxy(proxy_name))};
 
     auto git_version = client.ping();
 
@@ -51,7 +52,7 @@ test_make_some_blob(bool use_shared_memory)
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto* tasklet{create_tasklet_tracker("test", "make_some_blob")};
-    testing_request_context ctx{resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, tasklet, proxy_name};
 
     auto req{rq_make_some_blob<caching_level>(10000, use_shared_memory)};
     auto response = cppcoro::sync_wait(resolve_request(ctx, req));
@@ -77,7 +78,7 @@ TEST_CASE("sending bad request", "[rpclib]")
     std::string proxy_name{"rpclib"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    auto& client{resources.get_proxy(proxy_name)};
+    auto& client{resources->get_proxy(proxy_name)};
     service_config_map config_map{
         {remote_config_keys::DOMAIN_NAME, "bad domain"},
     };

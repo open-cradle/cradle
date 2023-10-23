@@ -17,7 +17,7 @@ class blob_file_writer;
 class dll_collection;
 class domain;
 struct immutable_cache;
-struct inner_resources_impl;
+class inner_resources_impl;
 struct mock_http_session;
 class remote_proxy;
 class secondary_storage_intf;
@@ -51,7 +51,14 @@ struct inner_config_keys
 };
 
 /*
- * A bunch of resources helping to resolve requests:
+ * A bunch of resources helping to resolve requests.
+ *
+ * The intention is that the application, or a server, or a test case, creates
+ * a single instance of this class early in its initialization, and does not
+ * copy or move that instance. This allows other objects, with more limited
+ * lifetimes, to hold a reference to an inner_resources object.
+ *
+ * The resources are:
  * - A memory (immutable) cache
  * - A secondary cache
  * - A blob_file_writer writing blobs in shared memory
@@ -84,9 +91,10 @@ class inner_resources
     inner_resources&
     operator=(inner_resources const&)
         = delete;
-    inner_resources(inner_resources&& other);
+    inner_resources(inner_resources&& other) = delete;
     inner_resources&
-    operator=(inner_resources&& other);
+    operator=(inner_resources&& other)
+        = delete;
 
     service_config const&
     config() const;

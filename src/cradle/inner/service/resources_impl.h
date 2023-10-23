@@ -13,6 +13,8 @@
 #include <cradle/inner/resolve/seri_registry.h>
 #include <cradle/inner/service/config.h>
 
+namespace cradle {
+
 class async_db;
 class blob_file_directory;
 class domain;
@@ -22,13 +24,14 @@ struct mock_http_session;
 class remote_proxy;
 class secondary_storage_intf;
 
-namespace cradle {
-
-// Should be accessed from class inner_resources only.
-struct inner_resources_impl
+class inner_resources_impl
 {
+ public:
     inner_resources_impl(
         inner_resources& wrapper, service_config const& config);
+
+ private:
+    friend class inner_resources;
 
     // Passing request will cause it to be mocked only if mocking is enabled,
     // and the request is not of a "do not mock" class.
@@ -44,8 +47,8 @@ struct inner_resources_impl
     std::unique_ptr<async_db> the_async_db_;
     std::unordered_map<std::string, std::unique_ptr<domain>> domains_;
     std::unordered_map<std::string, std::unique_ptr<remote_proxy>> proxies_;
-    dll_collection the_dlls_;
     seri_registry the_seri_registry_;
+    dll_collection the_dlls_;
 
     cppcoro::static_thread_pool http_pool_;
     cppcoro::static_thread_pool async_pool_;

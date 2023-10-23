@@ -34,25 +34,26 @@ make_inner_tests_config()
     return service_config{inner_config_map};
 }
 
-inner_resources
+std::unique_ptr<inner_resources>
 make_inner_test_resources(
     std::string const& proxy_name, domain_option const& domain)
 {
     auto config{make_inner_tests_config()};
-    inner_resources resources{config};
-    resources.set_secondary_cache(std::make_unique<local_disk_cache>(config));
-    init_and_register_proxy(resources, proxy_name, domain);
+    auto resources{std::make_unique<inner_resources>(config)};
+    resources->set_secondary_cache(std::make_unique<local_disk_cache>(config));
+    init_and_register_proxy(*resources, proxy_name, domain);
     return resources;
 }
 
-non_caching_request_resolution_context::
-    non_caching_request_resolution_context()
-    : resources_{make_inner_test_resources()}
+non_caching_request_resolution_context::non_caching_request_resolution_context(
+    inner_resources& resources)
+    : resources_{resources}
 {
 }
 
-caching_request_resolution_context::caching_request_resolution_context()
-    : resources_{make_inner_test_resources()}
+caching_request_resolution_context::caching_request_resolution_context(
+    inner_resources& resources)
+    : resources_{resources}
 {
 }
 

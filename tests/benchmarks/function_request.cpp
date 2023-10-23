@@ -12,6 +12,22 @@
 
 using namespace cradle;
 
+template<caching_level_type level>
+struct request_resolution_context_struct
+{
+    using type = caching_request_resolution_context;
+};
+
+template<>
+struct request_resolution_context_struct<caching_level_type::none>
+{
+    using type = non_caching_request_resolution_context;
+};
+
+template<caching_level_type level>
+using request_resolution_context =
+    typename request_resolution_context_struct<level>::type;
+
 static auto add = [](int a, int b) { return a + b; };
 
 static request_uuid
@@ -168,7 +184,8 @@ template<caching_level_type level, int H>
 void
 BM_resolve_thin_tree_erased(benchmark::State& state)
 {
-    request_resolution_context<level> ctx{};
+    auto resources{make_inner_test_resources()};
+    request_resolution_context<level> ctx{*resources};
     BM_resolve_request(state, ctx, create_thin_tree_erased<level, H>());
 }
 
@@ -189,7 +206,8 @@ template<caching_level_type level, int H>
 void
 BM_resolve_tri_tree_erased(benchmark::State& state)
 {
-    request_resolution_context<level> ctx{};
+    auto resources{make_inner_test_resources()};
+    request_resolution_context<level> ctx{*resources};
     BM_resolve_request(state, ctx, create_triangular_tree_erased<level, H>());
 }
 
@@ -230,8 +248,9 @@ template<int H>
 void
 BM_resolve_triangular_tree_erased_full(benchmark::State& state)
 {
+    auto resources{make_inner_test_resources()};
+    caching_request_resolution_context ctx{*resources};
     spdlog::set_level(spdlog::level::warn);
-    caching_request_resolution_context ctx{};
     BM_resolve_request(
         state,
         ctx,

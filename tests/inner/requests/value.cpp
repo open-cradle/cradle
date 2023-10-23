@@ -29,7 +29,8 @@ TEST_CASE("create value request", tag)
 
 TEST_CASE("evaluate value request", tag)
 {
-    non_caching_request_resolution_context ctx{};
+    auto resources{make_inner_test_resources()};
+    non_caching_request_resolution_context ctx{*resources};
 
     auto req{rq_value(87)};
 
@@ -41,7 +42,8 @@ TEST_CASE("evaluate value request", tag)
 TEST_CASE("evaluate value requests in parallel", tag)
 {
     static constexpr int num_requests = 7;
-    non_caching_request_resolution_context ctx{};
+    auto resources{make_inner_test_resources()};
+    non_caching_request_resolution_context ctx{*resources};
     std::vector<value_request<int>> requests;
     for (int i = 0; i < num_requests; ++i)
     {

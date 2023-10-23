@@ -23,7 +23,7 @@ test_resolve(std::string const& proxy_name)
 {
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    testing_request_context ctx{resources, nullptr, proxy_name};
+    testing_request_context ctx{*resources, nullptr, proxy_name};
 
     constexpr auto caching_level{caching_level_type::full};
     auto req{rq_make_some_blob<caching_level>(256, false)};
@@ -53,7 +53,7 @@ TEST_CASE("resolve serialized request, DLL", tag)
     auto resources{make_inner_test_resources(proxy_name, no_domain_option())};
     tasklet_tracker* tasklet{nullptr};
     // TODO why testing_request_context?
-    testing_request_context ctx{resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, tasklet, proxy_name};
 
     auto req{rq_test_adder_v1p(7, 2)};
     int expected{7 + 2};
@@ -64,7 +64,7 @@ TEST_CASE("resolve serialized request, DLL", tag)
         Catch::Contains("no entry found for uuid"));
 
     std::string dll_name{"test_inner_dll_v1"};
-    auto& the_dlls{resources.the_dlls()};
+    auto& the_dlls{resources->the_dlls()};
     the_dlls.load(get_test_dlls_dir(), dll_name);
 
     auto seri_resp

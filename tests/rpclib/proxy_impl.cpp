@@ -12,7 +12,8 @@ TEST_CASE("rpclib protocol mismatch", "[rpclib]")
 {
     std::string proxy_name{"rpclib"};
     auto resources{make_inner_test_resources(proxy_name)};
-    auto& client{static_cast<rpclib_client&>(resources.get_proxy(proxy_name))};
+    auto& client{
+        static_cast<rpclib_client&>(resources->get_proxy(proxy_name))};
     auto& impl{client.pimpl()};
 
     REQUIRE_THROWS_AS(

@@ -65,7 +65,7 @@ thinknode_test_scope::thinknode_test_scope(
 {
     if (!proxy_name_.empty())
     {
-        proxy_ = &resources_.get_proxy(proxy_name_);
+        proxy_ = &resources_->get_proxy(proxy_name_);
     }
     if (proxy_)
     {
@@ -73,7 +73,7 @@ thinknode_test_scope::thinknode_test_scope(
     }
     else
     {
-        resources_.the_dlls().load(get_thinknode_dlls_dir(), dll_name_);
+        resources_->the_dlls().load(get_thinknode_dlls_dir(), dll_name_);
     }
 }
 
@@ -85,7 +85,7 @@ thinknode_test_scope::~thinknode_test_scope()
     }
     else
     {
-        resources_.the_dlls().unload(dll_name_);
+        resources_->the_dlls().unload(dll_name_);
     }
 }
 
@@ -99,31 +99,32 @@ thinknode_test_scope::make_context(tasklet_tracker* tasklet)
               ? get_environment_variable("CRADLE_THINKNODE_API_TOKEN")
               : "xyz";
     auto proxy_name{get_proxy_name()};
-    return thinknode_request_context{resources_, session, tasklet, proxy_name};
+    return thinknode_request_context{
+        *resources_, session, tasklet, proxy_name};
 }
 
 mock_http_session&
 thinknode_test_scope::enable_http_mocking()
 {
-    return resources_.enable_http_mocking();
+    return resources_->enable_http_mocking();
 }
 
 void
 thinknode_test_scope::clear_caches()
 {
     // TODO clear remote cache for rpclib?
-    resources_.reset_memory_cache();
-    resources_.clear_secondary_cache();
+    resources_->reset_memory_cache();
+    resources_->clear_secondary_cache();
 }
 
-service_core
+std::unique_ptr<service_core>
 make_thinknode_test_resources(
     std::string const& proxy_name, domain_option const& domain)
 {
     auto config{make_thinknode_tests_config()};
-    service_core resources{config};
-    resources.set_secondary_cache(std::make_unique<local_disk_cache>(config));
-    init_and_register_proxy(resources, proxy_name, domain);
+    auto resources{std::make_unique<service_core>(config)};
+    resources->set_secondary_cache(std::make_unique<local_disk_cache>(config));
+    init_and_register_proxy(*resources, proxy_name, domain);
     return resources;
 }
 

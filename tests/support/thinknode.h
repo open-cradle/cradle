@@ -1,6 +1,7 @@
 #ifndef CRADLE_TESTS_SUPPORT_THINKNODE_H
 #define CRADLE_TESTS_SUPPORT_THINKNODE_H
 
+#include <memory>
 #include <string>
 
 #include "common.h"
@@ -30,7 +31,7 @@ class thinknode_test_scope
     service_core&
     get_resources()
     {
-        return resources_;
+        return *resources_;
     }
 
     std::string
@@ -60,7 +61,7 @@ class thinknode_test_scope
 
     std::string proxy_name_;
     bool use_real_api_token_;
-    service_core resources_;
+    std::unique_ptr<service_core> resources_;
     remote_proxy* proxy_{nullptr};
 };
 
@@ -68,7 +69,7 @@ class thinknode_test_scope
 // - optionally registering a single remote proxy; and
 // - optionally adding a single domain.
 // proxy_name should be "" (local, default), "loopback" or "rpclib"
-service_core
+std::unique_ptr<service_core>
 make_thinknode_test_resources(
     std::string const& proxy_name = {},
     domain_option const& domain = no_domain_option());

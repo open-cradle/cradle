@@ -10,19 +10,6 @@ service_core::service_core(service_config const& config)
 
 service_core::~service_core() = default;
 
-service_core::service_core(service_core&& other)
-    : inner_resources{std::move(other)}, impl_{std::move(other.impl_)}
-{
-}
-
-service_core&
-service_core::operator=(service_core&& other)
-{
-    inner_resources::operator=(std::move(other));
-    impl_ = std::move(other.impl_);
-    return *this;
-}
-
 cppcoro::static_thread_pool&
 service_core::get_local_compute_pool_for_image(
     std::pair<std::string, thinknode_provider_image_info> const& tag)

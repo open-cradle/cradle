@@ -118,11 +118,11 @@ TEST_CASE("register and find proxy", tag)
     auto* a_ptr = &*a_proxy;
     auto* b_ptr = &*b_proxy;
 
-    resources.register_proxy(std::move(a_proxy));
-    resources.register_proxy(std::move(b_proxy));
+    resources->register_proxy(std::move(a_proxy));
+    resources->register_proxy(std::move(b_proxy));
 
-    REQUIRE(&resources.get_proxy("b") == b_ptr);
-    REQUIRE(&resources.get_proxy("a") == a_ptr);
+    REQUIRE(&resources->get_proxy("b") == b_ptr);
+    REQUIRE(&resources->get_proxy("a") == a_ptr);
 }
 
 TEST_CASE("re-register proxy", tag)
@@ -132,9 +132,9 @@ TEST_CASE("re-register proxy", tag)
     auto a0_proxy = std::make_unique<test_proxy>("a");
     auto a1_proxy = std::make_unique<test_proxy>("a");
 
-    resources.register_proxy(std::move(a0_proxy));
+    resources->register_proxy(std::move(a0_proxy));
     REQUIRE_THROWS_WITH(
-        resources.register_proxy(std::move(a1_proxy)),
+        resources->register_proxy(std::move(a1_proxy)),
         "Proxy a already registered");
 }
 
@@ -142,8 +142,8 @@ TEST_CASE("get unregistered proxy", tag)
 {
     auto resources{make_inner_test_resources()};
     auto a_proxy = std::make_unique<test_proxy>("a");
-    resources.register_proxy(std::move(a_proxy));
+    resources->register_proxy(std::move(a_proxy));
 
     REQUIRE_THROWS_WITH(
-        resources.get_proxy("nonesuch"), "Proxy nonesuch not registered");
+        resources->get_proxy("nonesuch"), "Proxy nonesuch not registered");
 }

@@ -28,10 +28,10 @@ check_benchmarks_skipped_with_error();
 
 template<UncachedRequest Req>
 void
-call_resolve_by_ref_loop(Req const& req)
+call_resolve_by_ref_loop(Req const& req, inner_resources& resources)
 {
     constexpr int num_loops = 1000;
-    non_caching_request_resolution_context ctx{};
+    non_caching_request_resolution_context ctx{resources};
     auto loop = [&]() -> cppcoro::task<int> {
         int total{};
         for (auto i = 0; i < num_loops; ++i)

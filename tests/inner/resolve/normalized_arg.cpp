@@ -42,8 +42,9 @@ plus_two_coro(context_intf& ctx, int x)
 
 TEST_CASE("resolve serialized requests with normalized args", tag)
 {
-    non_caching_request_resolution_context ctx;
-    seri_catalog cat{ctx.get_resources().get_seri_registry()};
+    auto resources{make_inner_test_resources()};
+    non_caching_request_resolution_context ctx{*resources};
+    seri_catalog cat{resources->get_seri_registry()};
 
     auto func_props{func_props_t{make_test_uuid("plus_two_func")}};
     auto coro_props{coro_props_t{make_test_uuid("plus_two_coro")}};

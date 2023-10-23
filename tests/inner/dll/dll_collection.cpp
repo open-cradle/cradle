@@ -19,8 +19,8 @@ static char const tag[] = "[inner][dll]";
 TEST_CASE("initial DLL state", tag)
 {
     auto resources{make_inner_test_resources()};
-    dll_collection the_dlls{resources};
-    auto& the_seri_registry{resources.get_seri_registry()};
+    dll_collection the_dlls{*resources};
+    auto& the_seri_registry{resources->get_seri_registry()};
 
     REQUIRE(the_dlls.size() == 0);
     REQUIRE(the_dlls.trash_size() == 0);
@@ -30,8 +30,8 @@ TEST_CASE("initial DLL state", tag)
 TEST_CASE("load/unload/reload one DLL", tag)
 {
     auto resources{make_inner_test_resources()};
-    dll_collection the_dlls{resources};
-    auto& the_seri_registry{resources.get_seri_registry()};
+    dll_collection the_dlls{*resources};
+    auto& the_seri_registry{resources->get_seri_registry()};
     std::string dll_name{"test_inner_dll_v1"};
     constexpr auto dll_size{3};
 
@@ -54,8 +54,8 @@ TEST_CASE("load/unload/reload one DLL", tag)
 TEST_CASE("load/unload/reload two DLLs", tag)
 {
     auto resources{make_inner_test_resources()};
-    dll_collection the_dlls{resources};
-    auto& the_seri_registry{resources.get_seri_registry()};
+    dll_collection the_dlls{*resources};
+    auto& the_seri_registry{resources->get_seri_registry()};
     std::string dll0_name{"test_inner_dll_v1"};
     constexpr auto dll0_size{3};
     std::string dll1_name{"test_inner_dll_x0"};
@@ -95,8 +95,8 @@ TEST_CASE("load/unload/reload two DLLs", tag)
 TEST_CASE("unload DLLs with regex", tag)
 {
     auto resources{make_inner_test_resources()};
-    dll_collection the_dlls{resources};
-    auto& the_seri_registry{resources.get_seri_registry()};
+    dll_collection the_dlls{*resources};
+    auto& the_seri_registry{resources->get_seri_registry()};
     std::string dll_v1_name{"test_inner_dll_v1"};
     constexpr auto dll_v1_size{3};
     std::string dll_x0_name{"test_inner_dll_x0"};
@@ -131,7 +131,7 @@ TEST_CASE("unload DLLs with regex", tag)
 TEST_CASE("loading a non-existing DLL fails", tag)
 {
     auto resources{make_inner_test_resources()};
-    dll_collection the_dlls{resources};
+    dll_collection the_dlls{*resources};
     std::string dll_name{"none_such"};
 
     // The error message is system-dependent.
@@ -142,8 +142,8 @@ TEST_CASE("loading a non-existing DLL fails", tag)
 TEST_CASE("loading an already loaded DLL has no effect", tag)
 {
     auto resources{make_inner_test_resources()};
-    dll_collection the_dlls{resources};
-    auto& the_seri_registry{resources.get_seri_registry()};
+    dll_collection the_dlls{*resources};
+    auto& the_seri_registry{resources->get_seri_registry()};
     std::string dll0_name{"test_inner_dll_x0"};
     constexpr auto dll0_size{1};
 
@@ -166,7 +166,7 @@ TEST_CASE("loading an already loaded DLL has no effect", tag)
 TEST_CASE("attempt to load a DLL missing the mandatory export", tag)
 {
     auto resources{make_inner_test_resources()};
-    dll_collection the_dlls{resources};
+    dll_collection the_dlls{*resources};
     std::string dll_name{"test_inner_dll_missing_export"};
 
     REQUIRE_THROWS_WITH(
@@ -177,7 +177,7 @@ TEST_CASE("attempt to load a DLL missing the mandatory export", tag)
 TEST_CASE("attempt to load a DLL returning a null capabilities pointer", tag)
 {
     auto resources{make_inner_test_resources()};
-    dll_collection the_dlls{resources};
+    dll_collection the_dlls{*resources};
     std::string dll_name{"test_inner_dll_null_capabilities"};
 
     REQUIRE_THROWS_WITH(
@@ -188,8 +188,8 @@ TEST_CASE("attempt to load a DLL returning a null capabilities pointer", tag)
 TEST_CASE("load a DLL that does not have a seri_catalog", tag)
 {
     auto resources{make_inner_test_resources()};
-    dll_collection the_dlls{resources};
-    auto& the_seri_registry{resources.get_seri_registry()};
+    dll_collection the_dlls{*resources};
+    auto& the_seri_registry{resources->get_seri_registry()};
     std::string dll_name{"test_inner_dll_no_create_catalog"};
 
     the_dlls.load(get_test_dlls_dir(), dll_name);
@@ -202,7 +202,7 @@ TEST_CASE("load a DLL that does not have a seri_catalog", tag)
 TEST_CASE("attempt to load a DLL with a failing create_catalog function", tag)
 {
     auto resources{make_inner_test_resources()};
-    dll_collection the_dlls{resources};
+    dll_collection the_dlls{*resources};
     std::string dll_name{"test_inner_dll_failing_create_catalog"};
 
     REQUIRE_THROWS_WITH(
@@ -213,7 +213,7 @@ TEST_CASE("attempt to load a DLL with a failing create_catalog function", tag)
 TEST_CASE("attempt to unload a DLL that is not loaded", tag)
 {
     auto resources{make_inner_test_resources()};
-    dll_collection the_dlls{resources};
+    dll_collection the_dlls{*resources};
     std::string dll_name{"dll_that_is_not_loaded"};
 
     REQUIRE_THROWS_WITH(

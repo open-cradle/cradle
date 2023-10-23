@@ -139,6 +139,7 @@ TEST_CASE("create function_request_erased: different functors, one uuid", tag)
 TEST_CASE(
     "function_request_erased: identical capturing lambdas, one uuid", tag)
 {
+    auto resources{make_inner_test_resources()};
     request_props<caching_level_type::memory> props{make_test_uuid("0004")};
     auto lambda_a0{make_lambda(func_a)};
     auto lambda_a1{make_lambda(func_a)};
@@ -150,7 +151,7 @@ TEST_CASE(
     REQUIRE(!(req_a1 < req_a0));
     REQUIRE(req_a0.hash() == req_a1.hash());
 
-    non_caching_request_resolution_context ctx;
+    non_caching_request_resolution_context ctx{*resources};
     auto result_a0{cppcoro::sync_wait(req_a0.resolve_sync(ctx))};
     auto result_a1{cppcoro::sync_wait(req_a1.resolve_sync(ctx))};
 
@@ -166,6 +167,7 @@ TEST_CASE(
     // This is legal if the two lambdas come from different DLLs (and their
     // implementations are identical). The two requests should resolve to the
     // specified values.
+    auto resources{make_inner_test_resources()};
     request_props<caching_level_type::memory> props{make_test_uuid("0005")};
     auto lambda_a{make_lambda(func_a)};
     auto lambda_b{make_lambda(func_b)};
@@ -177,7 +179,7 @@ TEST_CASE(
     REQUIRE(!(req_b < req_a));
     REQUIRE(req_a.hash() == req_b.hash());
 
-    non_caching_request_resolution_context ctx;
+    non_caching_request_resolution_context ctx{*resources};
     auto result_a{cppcoro::sync_wait(req_a.resolve_sync(ctx))};
     auto result_b{cppcoro::sync_wait(req_b.resolve_sync(ctx))};
 
@@ -191,6 +193,7 @@ TEST_CASE(
     tag)
 {
     // A variant on the previous test case.
+    auto resources{make_inner_test_resources()};
     request_props<caching_level_type::memory> props{make_test_uuid("0006")};
     auto lambda_a{make_lambda(func_x, 2)};
     auto lambda_b{make_lambda(func_x, 3)};
@@ -202,7 +205,7 @@ TEST_CASE(
     REQUIRE(!(req_b < req_a));
     REQUIRE(req_a.hash() == req_b.hash());
 
-    non_caching_request_resolution_context ctx;
+    non_caching_request_resolution_context ctx{*resources};
     auto result_a{cppcoro::sync_wait(req_a.resolve_sync(ctx))};
     auto result_b{cppcoro::sync_wait(req_b.resolve_sync(ctx))};
 
@@ -215,6 +218,7 @@ TEST_CASE(
     "uuids",
     tag)
 {
+    auto resources{make_inner_test_resources()};
     request_props<caching_level_type::memory> props_a{make_test_uuid("0010")};
     request_props<caching_level_type::memory> props_b{make_test_uuid("0011")};
     auto lambda_a{make_lambda(func_a)};
@@ -228,7 +232,7 @@ TEST_CASE(
     // A hash collision is possible but very unlikely.
     REQUIRE(req_a.hash() != req_b.hash());
 
-    non_caching_request_resolution_context ctx;
+    non_caching_request_resolution_context ctx{*resources};
     auto result_a{cppcoro::sync_wait(req_a.resolve_sync(ctx))};
     auto result_b{cppcoro::sync_wait(req_b.resolve_sync(ctx))};
 
@@ -371,6 +375,7 @@ TEST_CASE(
 
 TEST_CASE("function_request_impl: load unregistered function", tag)
 {
+    auto resources{make_inner_test_resources()};
     std::string good_uuid_str{"before_0100_after"};
     std::string bad_uuid_str{"before_0101_after"};
     auto good_uuid{make_test_uuid(good_uuid_str)};
@@ -399,7 +404,6 @@ TEST_CASE("function_request_impl: load unregistered function", tag)
     auto bad_seri{std::regex_replace(
         good_seri, std::regex{good_uuid_str}, bad_uuid_str)};
     std::istringstream is(bad_seri);
-    auto resources{make_inner_test_resources()};
-    JSONRequestInputArchive iarchive(is, resources);
+    JSONRequestInputArchive iarchive(is, *resources);
     REQUIRE_THROWS_AS(bad_impl->load(iarchive), unregistered_uuid_error);
 }

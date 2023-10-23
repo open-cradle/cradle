@@ -22,14 +22,14 @@ TEST_CASE("evaluate proxy request, plain args", tag)
     std::string proxy_name{"rpclib"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    auto& proxy{resources.get_proxy(proxy_name)};
+    auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_v1.*");
 
     auto req{rq_test_adder_v1p(7, 2)};
     int expected{7 + 2};
 
     tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, tasklet, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     REQUIRE_THROWS_WITH(
@@ -47,14 +47,14 @@ TEST_CASE("evaluate proxy request, normalized args", tag)
     std::string proxy_name{"rpclib"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    auto& proxy{resources.get_proxy(proxy_name)};
+    auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_v1.*");
 
     auto req{rq_test_adder_v1n(7, 2)};
     int expected{7 + 2};
 
     tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, tasklet, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     REQUIRE_THROWS_WITH(
@@ -78,10 +78,10 @@ TEST_CASE("two DLLs defining same-typed requests", tag)
     std::string proxy_name{"rpclib"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    auto& proxy{resources.get_proxy(proxy_name)};
+    auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, tasklet, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     auto add_req{rq_test_adder_x0(7, 2)};
@@ -105,14 +105,14 @@ TEST_CASE("unload/reload DLL", tag)
     std::string proxy_name{"rpclib"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    auto& proxy{resources.get_proxy(proxy_name)};
+    auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_v1.*");
 
     auto req{rq_test_adder_v1p(7, 2)};
     int expected{7 + 2};
 
     tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, tasklet, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
@@ -137,10 +137,10 @@ TEST_CASE("unload/reload two DLLs", tag)
     std::string proxy_name{"rpclib"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    auto& proxy{resources.get_proxy(proxy_name)};
+    auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, tasklet, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0");
@@ -172,10 +172,10 @@ TEST_CASE("unload DLL sharing resolvers", tag)
     std::string proxy_name{"rpclib"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    auto& proxy{resources.get_proxy(proxy_name)};
+    auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, tasklet, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0x1");
@@ -217,7 +217,7 @@ TEST_CASE("load/unload DLL stress test", "[.dll-stress]")
     std::string proxy_name{"rpclib"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    auto& proxy{resources.get_proxy(proxy_name)};
+    auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_x.*");
 
     std::srand(static_cast<unsigned>(std::time(nullptr)));
@@ -256,10 +256,10 @@ TEST_CASE("load/unload DLL stress test1", tag)
     std::string proxy_name{"rpclib"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    auto& proxy{resources.get_proxy(proxy_name)};
+    auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_x.*");
     tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, tasklet, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0");
