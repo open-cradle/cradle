@@ -1,3 +1,5 @@
+#include <utility>
+
 #include <cereal/types/map.hpp>
 
 #include "thinknode_seri_v1.h"
@@ -30,8 +32,9 @@ namespace cradle {
  * objects must also be registered, hence the
  * seri_catalog::register_resolver() calls.
  */
-thinknode_seri_catalog_v1::thinknode_seri_catalog_v1(seri_registry& registry)
-    : selfreg_seri_catalog{registry}
+thinknode_seri_catalog_v1::thinknode_seri_catalog_v1(
+    std::shared_ptr<seri_registry> registry)
+    : selfreg_seri_catalog{std::move(registry)}
 {
     constexpr caching_level_type level = caching_level_type::full;
     auto sample_thinknode_info{

@@ -1,6 +1,8 @@
 #ifndef CRADLE_THINKNODE_SERI_V1_H
 #define CRADLE_THINKNODE_SERI_V1_H
 
+#include <memory>
+
 #include <cradle/inner/resolve/seri_catalog.h>
 
 namespace cradle {
@@ -10,7 +12,7 @@ namespace cradle {
 class thinknode_seri_catalog_v1 : public selfreg_seri_catalog
 {
  public:
-    thinknode_seri_catalog_v1(seri_registry& registry);
+    thinknode_seri_catalog_v1(std::shared_ptr<seri_registry> registry);
 };
 
 } // namespace cradle

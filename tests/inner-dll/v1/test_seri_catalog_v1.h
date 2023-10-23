@@ -5,7 +5,7 @@ namespace cradle {
 class test_seri_catalog_v1 : public selfreg_seri_catalog
 {
  public:
-    test_seri_catalog_v1(seri_registry& registry);
+    test_seri_catalog_v1(std::shared_ptr<seri_registry> registry);
 };
 
 } // namespace cradle

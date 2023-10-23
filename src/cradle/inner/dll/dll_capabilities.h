@@ -15,8 +15,8 @@ class dll_capabilities
 {
  public:
     // Optional capability to create a seri_catalog.
-    using create_seri_catalog_t
-        = std::unique_ptr<selfreg_seri_catalog>(seri_registry& registry);
+    using create_seri_catalog_t = std::unique_ptr<selfreg_seri_catalog>(
+        std::shared_ptr<seri_registry> registry);
     create_seri_catalog_t* create_seri_catalog{nullptr};
 };
 

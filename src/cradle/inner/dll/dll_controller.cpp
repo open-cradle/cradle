@@ -84,7 +84,7 @@ dll_controller::create_seri_catalog(dll_capabilities const& caps)
     {
         return;
     }
-    auto& registry{resources_.get_seri_registry()};
+    auto registry{resources_.get_seri_registry()};
     catalog_ = create_catalog_func(registry);
     if (!catalog_)
     {
@@ -94,7 +94,7 @@ dll_controller::create_seri_catalog(dll_capabilities const& caps)
     }
     auto cat_id_value{catalog_->get_cat_id().value()};
     logger_.info("loaded catalog #{}", cat_id_value);
-    registry.log_all_entries(
+    registry->log_all_entries(
         fmt::format("after load cat_id {}", cat_id_value));
 }
 

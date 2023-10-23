@@ -463,9 +463,9 @@ class function_request_impl : public function_request_intf<Value>
     load(JSONRequestInputArchive& archive) override
     {
         auto& resources{archive.get_resources()};
-        auto& the_seri_registry{resources.get_seri_registry()};
+        auto the_seri_registry{resources.get_seri_registry()};
         archive(cereal::make_nvp("args", args_));
-        function_ = the_seri_registry.find_function<Function>(uuid_.str());
+        function_ = the_seri_registry->find_function<Function>(uuid_.str());
     }
 
  private:
@@ -1024,12 +1024,12 @@ class function_request_erased
     {
         auto& archive{static_cast<JSONRequestInputArchive&>(counted_archive)};
         auto& resources{archive.get_resources()};
-        auto& the_seri_registry{resources.get_seri_registry()};
+        auto the_seri_registry{resources.get_seri_registry()};
         auto uuid{request_uuid::load_with_name(archive, "uuid")};
         archive(cereal::make_nvp("title", title_));
         // Create a mostly empty function_request_impl object. uuid defines its
         // exact type (function_request_impl class instantiation).
-        impl_ = the_seri_registry.create<intf_type>(std::move(uuid));
+        impl_ = the_seri_registry->create<intf_type>(std::move(uuid));
         // Deserialize the remainder of the function_request_impl object.
         impl_->load(archive);
         init_captured_id();

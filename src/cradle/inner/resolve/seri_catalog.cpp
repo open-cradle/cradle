@@ -8,7 +8,8 @@
 
 namespace cradle {
 
-seri_catalog::seri_catalog(seri_registry& registry) : registry_{registry}
+seri_catalog::seri_catalog(std::shared_ptr<seri_registry> registry)
+    : registry_{std::move(registry)}
 {
 }
 
@@ -22,7 +23,7 @@ seri_catalog::unregister_all() noexcept
 {
     try
     {
-        registry_.unregister_catalog(cat_id_);
+        registry_->unregister_catalog(cat_id_);
     }
     catch (std::exception const& e)
     {
@@ -38,8 +39,9 @@ seri_catalog::unregister_all() noexcept
     }
 }
 
-selfreg_seri_catalog::selfreg_seri_catalog(seri_registry& registry)
-    : seri_catalog{registry}
+selfreg_seri_catalog::selfreg_seri_catalog(
+    std::shared_ptr<seri_registry> registry)
+    : seri_catalog{std::move(registry)}
 {
 }
 

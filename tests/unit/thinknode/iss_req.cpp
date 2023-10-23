@@ -81,13 +81,14 @@ rq_make_test_blob(std::string payload)
 class make_test_blob_catalog : public seri_catalog
 {
  public:
-    make_test_blob_catalog(seri_registry& registry);
+    make_test_blob_catalog(std::shared_ptr<seri_registry> registry);
 };
 
 // An object of this class must exist to deserialize a request created by
 // rq_make_test_blob().
-make_test_blob_catalog::make_test_blob_catalog(seri_registry& registry)
-    : seri_catalog(registry)
+make_test_blob_catalog::make_test_blob_catalog(
+    std::shared_ptr<seri_registry> registry)
+    : seri_catalog(std::move(registry))
 {
     register_resolver(rq_make_test_blob<caching_level_type::none>("sample"));
     register_resolver(rq_make_test_blob<caching_level_type::memory>("sample"));

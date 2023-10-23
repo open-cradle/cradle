@@ -39,7 +39,7 @@ resolve_serialized_local(local_context_intf& ctx, std::string seri_req)
 {
     auto uuid_str{extract_uuid_str(seri_req)};
     auto& resources{ctx.get_resources()};
-    auto resolver{resources.get_seri_registry().find_resolver(uuid_str)};
+    auto resolver{resources.get_seri_registry()->find_resolver(uuid_str)};
     // TODO ensure resolver isn't unloaded while it's resolving
     return resolver->resolve(ctx, std::move(seri_req));
 }

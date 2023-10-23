@@ -159,7 +159,8 @@ class inner_resources
     dll_collection&
     the_dlls();
 
-    seri_registry&
+    // Supporting CG R.37
+    std::shared_ptr<seri_registry>
     get_seri_registry();
 
  private:

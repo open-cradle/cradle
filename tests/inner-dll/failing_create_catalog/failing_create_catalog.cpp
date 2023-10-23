@@ -9,7 +9,7 @@
 namespace cradle {
 
 static std::unique_ptr<selfreg_seri_catalog>
-create_my_catalog(seri_registry& registry)
+create_my_catalog(std::shared_ptr<seri_registry> registry)
 {
     return nullptr;
 }

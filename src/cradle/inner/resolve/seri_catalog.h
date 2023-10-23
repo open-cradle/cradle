@@ -34,8 +34,8 @@ class seri_registry;
 class seri_catalog
 {
  public:
-    // The registry object must outlive this one.
-    seri_catalog(seri_registry& registry);
+    // ~seri_catalog() needs the registry object to still be there.
+    seri_catalog(std::shared_ptr<seri_registry> registry);
 
     virtual ~seri_catalog();
 
@@ -60,7 +60,7 @@ class seri_catalog
     {
         // TODO add Request::is_proxy and throw here if true
         req.register_uuid(
-            registry_, cat_id_, std::make_shared<seri_resolver_impl<Req>>());
+            *registry_, cat_id_, std::make_shared<seri_resolver_impl<Req>>());
     }
 
  protected:
@@ -70,7 +70,7 @@ class seri_catalog
     unregister_all() noexcept;
 
  private:
-    seri_registry& registry_;
+    std::shared_ptr<seri_registry> registry_;
     catalog_id cat_id_;
 };
 
@@ -85,7 +85,7 @@ class seri_catalog
 class selfreg_seri_catalog : public seri_catalog
 {
  public:
-    selfreg_seri_catalog(seri_registry& registry);
+    selfreg_seri_catalog(std::shared_ptr<seri_registry> registry);
 
  protected:
     // register_resolver() to be called from a derived class's constructor only

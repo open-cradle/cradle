@@ -47,7 +47,10 @@ class inner_resources_impl
     std::unique_ptr<async_db> the_async_db_;
     std::unordered_map<std::string, std::unique_ptr<domain>> domains_;
     std::unordered_map<std::string, std::unique_ptr<remote_proxy>> proxies_;
-    seri_registry the_seri_registry_;
+    // the_seri_registry_ is referred to (using shared_ptr's) by
+    // seri_catalog's, which could be owned (at least) by domain and
+    // dll_collection objects.
+    std::shared_ptr<seri_registry> the_seri_registry_;
     dll_collection the_dlls_;
 
     cppcoro::static_thread_pool http_pool_;

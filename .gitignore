@@ -1,7 +1,6 @@
 /*build*
 /out/
 /src/cradle-dll/out/
-/tests/inner/dll/
 .cache
 .vs
 .vscode
