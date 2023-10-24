@@ -306,6 +306,12 @@ rpclib_client_impl::stop_server()
     if (!testing_)
     {
         logger_->info("keep rpclib process running");
+        // ~child() will call terminate (without warning) when the child was
+        // neither joined nor detached.
+        child_.detach();
+        // If ~group() is called without a previous detach or wait, the group
+        // will be terminated.
+        group_.detach();
         return;
     }
     logger_->info("killing rpclib process");
