@@ -3,6 +3,7 @@
 #include <cradle/inner/dll/dll_capabilities.h>
 #include <cradle/inner/dll/dll_controller.h>
 #include <cradle/inner/dll/dll_exceptions.h>
+#include <cradle/inner/dll/dll_trash.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/inner/service/resources.h>
@@ -10,17 +11,27 @@
 
 namespace cradle {
 
+std::string
+make_dll_path(std::string const& dir_path, std::string const& dll_name)
+{
+#ifdef _WIN32
+    return std::string{fmt::format("{}/{}.dll", dir_path, dll_name)};
+#else
+    return std::string{fmt::format("{}/lib{}.so", dir_path, dll_name)};
+#endif
+}
+
 dll_controller::dll_controller(
     inner_resources& resources,
     dll_trash& trash,
     spdlog::logger& logger,
-    std::string path,
-    std::string name)
+    std::string const& dir_path,
+    std::string const& dll_name)
     : resources_{resources},
       trash_{trash},
       logger_{logger},
-      path_{std::move(path)},
-      name_{std::move(name)}
+      path_{make_dll_path(dir_path, dll_name)},
+      name_{dll_name}
 {
     load();
 }
@@ -47,22 +58,22 @@ dll_controller::load()
         | boost::dll::load_mode::rtld_deepbind};
     lib_ = new boost::dll::shared_library(path_, mode);
 
-    using get_capabilities_func_t = dll_capabilities const*();
-    std::string const get_capabilities_func_name{"CRADLE_get_capabilities"};
+    using get_caps_func_t = dll_capabilities const*();
+    std::string const get_caps_func_name{"CRADLE_get_capabilities"};
 
-    get_capabilities_func_t* get_caps_func{nullptr};
+    get_caps_func_t* get_caps_func{nullptr};
     try
     {
         // Throws if the DLL does not export the mandatory symbol.
-        get_caps_func
-            = lib_->get<get_capabilities_func_t>(get_capabilities_func_name);
+        get_caps_func = lib_->get<get_caps_func_t>(get_caps_func_name);
     }
-    catch (std::exception const&)
+    catch (std::exception const& e)
     {
         throw dll_load_error{fmt::format(
-            "Error loading {}: DLL does not export {}",
+            "Error loading {}: cannot get symbol {}: {}",
             path_,
-            get_capabilities_func_name)};
+            get_caps_func_name,
+            e.what())};
     }
     // Should the DLL export a symbol with the correct name but the wrong type,
     // then the application will most likely crash.
@@ -76,6 +87,7 @@ dll_controller::load()
     logger_.info("load done for {}", name_);
 }
 
+// Create a seri catalog for this DLL, in case it offers one.
 void
 dll_controller::create_seri_catalog(dll_capabilities const& caps)
 {

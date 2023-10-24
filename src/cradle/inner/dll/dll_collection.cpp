@@ -14,6 +14,8 @@ dll_collection::dll_collection(inner_resources& resources)
 {
 }
 
+dll_collection::~dll_collection() = default;
+
 void
 dll_collection::load(std::string const& dir_path, std::string const& dll_name)
 {
@@ -23,16 +25,11 @@ dll_collection::load(std::string const& dir_path, std::string const& dll_name)
         logger_->warn("DLL {} already loaded", dll_name);
         return;
     }
-#ifdef _WIN32
-    std::string dll_path{fmt::format("{}/{}.dll", dir_path, dll_name)};
-#else
-    std::string dll_path{fmt::format("{}/lib{}.so", dir_path, dll_name)};
-#endif
     std::unique_ptr<dll_controller> controller;
     try
     {
         controller.reset(new dll_controller(
-            resources_, trash_, *logger_, dll_path, dll_name));
+            resources_, trash_, *logger_, dir_path, dll_name));
     }
     catch (std::exception& e)
     {
@@ -40,7 +37,7 @@ dll_collection::load(std::string const& dir_path, std::string const& dll_name)
         // disappear in controller's destructor, so throw a fresh exception
         // from here, containing a copy of e.what().
         std::string what{e.what()};
-        logger_->error("loading DLL {} failed: {}", dll_path, what);
+        logger_->error("loading DLL {} failed: {}", dll_name, what);
         throw dll_load_error{what};
     }
     controllers_.insert(std::make_pair(dll_name, std::move(controller)));

@@ -3,7 +3,6 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 
 #include <boost/dll.hpp>
 #include <spdlog/spdlog.h>
@@ -11,31 +10,13 @@
 namespace cradle {
 
 class dll_capabilities;
+class dll_trash;
 class inner_resources;
 class selfreg_seri_catalog;
 
-/*
- * Container of DLLs that are no longer active, but not actually unloaded
- * (see below). Maybe useful for reporting/debugging purposes.
- */
-class dll_trash
-{
- public:
-    void
-    add(boost::dll::shared_library* lib)
-    {
-        libs_.push_back(lib);
-    }
-
-    auto
-    size() const
-    {
-        return std::ssize(libs_);
-    }
-
- private:
-    std::vector<boost::dll::shared_library*> libs_;
-};
+// Returns the file path for a DLL.
+std::string
+make_dll_path(std::string const& dir_path, std::string const& dll_name);
 
 /*
  * DLL controller, loading and unloading that DLL.
@@ -68,13 +49,13 @@ class dll_trash
 class dll_controller
 {
  public:
-    // resources and trash must outlive this dll_controller object
+    // resources, trash and logger must outlive this dll_controller object
     dll_controller(
         inner_resources& resources,
         dll_trash& trash,
         spdlog::logger& logger,
-        std::string path,
-        std::string name);
+        std::string const& dir_path,
+        std::string const& dll_name);
 
     ~dll_controller();
 

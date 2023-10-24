@@ -171,7 +171,8 @@ TEST_CASE("attempt to load a DLL missing the mandatory export", tag)
 
     REQUIRE_THROWS_WITH(
         the_dlls.load(get_test_dlls_dir(), dll_name),
-        Catch::Matchers::Contains("does not export CRADLE_get_capabilities"));
+        Catch::Matchers::Contains(
+            "cannot get symbol CRADLE_get_capabilities"));
 }
 
 TEST_CASE("attempt to load a DLL returning a null capabilities pointer", tag)
