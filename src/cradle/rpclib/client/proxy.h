@@ -2,13 +2,8 @@
 #define CRADLE_RPCLIB_CLIENT_PROXY_H
 
 #include <memory>
-#include <stdexcept>
-
-#include <fmt/format.h>
 
 #include <cradle/inner/remote/proxy.h>
-#include <cradle/inner/resolve/seri_result.h>
-#include <cradle/inner/service/config.h>
 
 namespace cradle {
 
@@ -75,12 +70,8 @@ class rpclib_client : public remote_proxy
     std::string
     ping();
 
-    // Intended for test purposes only
-    rpclib_client_impl&
-    pimpl()
-    {
-        return *pimpl_;
-    }
+    void
+    verify_rpclib_protocol(std::string const& server_rpclib_protocol);
 
  private:
     std::unique_ptr<rpclib_client_impl> pimpl_;

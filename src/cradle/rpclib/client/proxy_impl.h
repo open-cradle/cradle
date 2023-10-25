@@ -18,8 +18,6 @@
 
 namespace cradle {
 
-// This class offers roughly the same functions as rpclib_client, but these
-// functions are blocking, and not coroutines.
 class rpclib_client_impl
 {
  public:
@@ -27,72 +25,18 @@ class rpclib_client_impl
 
     ~rpclib_client_impl();
 
-    spdlog::logger&
-    get_logger()
-    {
-        return *logger_;
-    }
-
-    serialized_result
-    resolve_sync(service_config config, std::string seri_req);
-
-    async_id
-    submit_async(service_config config, std::string seri_req);
-
-    remote_context_spec_list
-    get_sub_contexts(async_id aid);
-
-    async_status
-    get_async_status(async_id aid);
-
-    std::string
-    get_async_error_message(async_id aid);
-
-    serialized_result
-    get_async_response(async_id root_aid);
-
-    void
-    request_cancellation(async_id aid);
-
-    void
-    finish_async(async_id root_aid);
-
-    tasklet_info_tuple_list
-    get_tasklet_infos(bool include_finished);
-
-    void
-    load_shared_library(std::string dir_path, std::string dll_name);
-
-    void
-    unload_shared_library(std::string dll_name);
-
-    void
-    mock_http(std::string const& response_body);
+ private:
+    friend class rpclib_client;
+    friend class rpclib_deserialization_observer;
 
     std::string
     ping();
 
     void
-    ack_response(uint32_t pool_id);
-
-    void
     verify_rpclib_protocol(std::string const& server_rpclib_protocol);
 
- private:
-    inline static std::shared_ptr<spdlog::logger> logger_;
-    bool testing_;
-    std::optional<std::string> deploy_dir_;
-    uint16_t port_;
-    std::string secondary_cache_factory_;
-
-    // On Windows, localhost and 127.0.0.1 are not the same:
-    // https://stackoverflow.com/questions/68957411/winsock-connect-is-slow
-    std::string localhost_{"127.0.0.1"};
-    std::unique_ptr<rpc::client> rpc_client_;
-
-    // Server subprocess
-    boost::process::group group_;
-    boost::process::child child_;
+    void
+    ack_response(uint32_t pool_id);
 
     bool
     server_is_running();
@@ -103,16 +47,31 @@ class rpclib_client_impl
     void
     stop_server();
 
-    template<typename... Args>
+    template<typename... Params>
     RPCLIB_MSGPACK::object_handle
-    do_rpc_call(std::string const& func_name, Args... args);
+    do_rpc_call(std::string const& func_name, Params&&... params);
 
-    template<typename... Args>
+    template<typename... Params>
     void
-    do_rpc_async_call(std::string const& func_name, Args... args);
+    do_rpc_async_call(std::string const& func_name, Params&&... params);
 
     serialized_result
     make_serialized_result(rpclib_response const& response);
+
+    std::shared_ptr<spdlog::logger> logger_;
+    bool testing_{};
+    std::optional<std::string> deploy_dir_;
+    uint16_t port_{};
+    std::string secondary_cache_factory_;
+
+    // On Windows, localhost and 127.0.0.1 are not the same:
+    // https://stackoverflow.com/questions/68957411/winsock-connect-is-slow
+    static inline std::string const localhost_{"127.0.0.1"};
+    std::unique_ptr<rpc::client> rpc_client_;
+
+    // Server subprocess
+    boost::process::group group_;
+    boost::process::child child_;
 };
 
 class rpclib_deserialization_observer : public deserialization_observer

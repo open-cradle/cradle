@@ -87,3 +87,14 @@ TEST_CASE("sending bad request", "[rpclib]")
         client.resolve_sync(service_config{config_map}, "bad request"),
         remote_error);
 }
+
+TEST_CASE("rpclib protocol mismatch", "[rpclib]")
+{
+    std::string proxy_name{"rpclib"};
+    auto resources{make_inner_test_resources(proxy_name)};
+    auto& client{
+        static_cast<rpclib_client&>(resources->get_proxy(proxy_name))};
+
+    REQUIRE_THROWS_AS(
+        client.verify_rpclib_protocol("incompatible"), remote_error);
+}
