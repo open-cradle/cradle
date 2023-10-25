@@ -787,7 +787,7 @@ check_title_is_valid(std::string const& title);
 
 // Request (resolution) properties that would be identical between similar
 // requests
-// - Request attributes (AsCoro)
+// - Request attributes (AsCoro, IsProxy)
 // - How it should be resolved (Level, Introspective)
 // All requests in a tree (main request, subrequests) must have the same
 // request_props, so that the main request's uuid defines the complete
@@ -892,7 +892,6 @@ class function_request_erased
             Args...>;
         impl_ = std::make_shared<impl_type>(
             std::move(props.uuid_), std::move(function), std::move(args)...);
-        init_captured_id();
     }
 
     template<typename... Args>
@@ -913,7 +912,6 @@ class function_request_erased
         using impl_type = proxy_request_cached<Value, Args...>;
         impl_ = std::make_shared<impl_type>(
             std::move(props.uuid_), std::move(args)...);
-        init_captured_id();
     }
 
     void
@@ -952,11 +950,11 @@ class function_request_erased
     }
 
     // TODO try to apply the requires to every function only needed for caching
-    captured_id const&
+    captured_id
     get_captured_id() const
         requires(caching_level != caching_level_type::none)
     {
-        return captured_id_;
+        return captured_id{impl_};
     }
 
     request_uuid
@@ -1032,23 +1030,11 @@ class function_request_erased
         impl_ = the_seri_registry->create<intf_type>(std::move(uuid));
         // Deserialize the remainder of the function_request_impl object.
         impl_->load(archive);
-        init_captured_id();
     }
 
  private:
     std::string title_;
     std::shared_ptr<intf_type> impl_;
-    // captured_id_, if set, will hold a shared_ptr reference to impl_
-    captured_id captured_id_;
-
-    void
-    init_captured_id()
-    {
-        if constexpr (caching_level != caching_level_type::none)
-        {
-            captured_id_ = captured_id{impl_};
-        }
-    }
 };
 
 template<typename Value, typename Props>

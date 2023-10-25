@@ -129,7 +129,7 @@ resolve_secondary_cached(Ctx& ctx, Req const& req, Async async)
     using Value = typename Req::value_type;
     auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
     inner_resources& resources{cac_ctx.get_resources()};
-    captured_id const& key{req.get_captured_id()};
+    auto key{req.get_captured_id()};
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
         if constexpr (Async::value)
         {
@@ -145,7 +145,8 @@ resolve_secondary_cached(Ctx& ctx, Req const& req, Async async)
         }
     };
     co_return deserialize_secondary_cache_value<Value>(
-        co_await secondary_cached_blob(resources, key, create_blob_task));
+        co_await secondary_cached_blob(
+            resources, std::move(key), std::move(create_blob_task)));
 }
 
 // This function, being a coroutine, takes key by value.
