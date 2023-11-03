@@ -1,6 +1,7 @@
 #ifndef CRADLE_INNER_REQUESTS_TYPES_H
 #define CRADLE_INNER_REQUESTS_TYPES_H
 
+#include <cstddef>
 #include <string>
 
 namespace cradle {
@@ -29,6 +30,42 @@ to_string(async_status s);
 using async_id = uint64_t;
 
 static constexpr async_id NO_ASYNC_ID{~async_id{}};
+
+/*
+ * Id for a catalog instance.
+ *
+ * The main reason is to distinguish catalogs resulting from loading (and
+ * unloading) the same DLL more than once.
+ */
+class catalog_id
+{
+ public:
+    using wrapped_t = std::size_t;
+
+    // Creates a unique id.
+    catalog_id() noexcept;
+
+    wrapped_t
+    value() const
+    {
+        return wrapped_;
+    }
+
+    bool
+    operator==(catalog_id const& other) const
+    {
+        return wrapped_ == other.wrapped_;
+    }
+
+    bool
+    operator!=(catalog_id const& other) const
+    {
+        return !(*this == other);
+    }
+
+ private:
+    wrapped_t wrapped_{};
+};
 
 } // namespace cradle
 

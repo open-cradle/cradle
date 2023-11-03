@@ -72,9 +72,8 @@ TEST_CASE("msgpack converting plain blob (main)", "[encodings][msgpack]")
 
 TEST_CASE("msgpack converting file blob (main)", "[encodings][msgpack]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
-    auto shared_writer{resources.make_blob_file_writer(3)};
+    auto resources{make_inner_test_resources()};
+    auto shared_writer{resources->make_blob_file_writer(3)};
     auto& writer{*shared_writer};
     std::memcpy(writer.data(), "fgh", 3);
     writer.on_write_completed();
@@ -142,6 +141,6 @@ test_both_throw(blob const& x)
 TEST_CASE(
     "msgpack encoding throws on blob >= 4GB (main)", "[encodings][msgpack]")
 {
-    std::byte data[1];
+    std::byte data[1]{};
     test_both_throw(blob(data, 0x1'00'00'00'00));
 }

@@ -1,28 +1,28 @@
 #ifndef CRADLE_INNER_SERVICE_RESOURCES_H
 #define CRADLE_INNER_SERVICE_RESOURCES_H
 
-// Resources available for resolving requests: the memory cache, and optionally
-// some secondary cache (e.g., a disk cache).
-
 #include <memory>
 #include <optional>
 
 #include <cppcoro/static_thread_pool.hpp>
+#include <cppcoro/task.hpp>
 
-#include <cradle/inner/blob_file/blob_file.h>
-#include <cradle/inner/blob_file/blob_file_dir.h>
-#include <cradle/inner/caching/immutable/cache.h>
-#include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/io/http_requests.h>
-#include <cradle/inner/remote/async_db.h>
-#include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/service/config.h>
-#include <cradle/inner/service/secondary_storage_intf.h>
 
 namespace cradle {
 
-class inner_resources;
+class async_db;
+class blob_file_writer;
+class dll_collection;
+class domain;
+struct immutable_cache;
 class inner_resources_impl;
+struct mock_http_session;
+class remote_proxy;
+class secondary_storage_intf;
+class seri_registry;
+class tasklet_tracker;
 
 // Configuration keys for the inner resources
 struct inner_config_keys
@@ -50,49 +50,83 @@ struct inner_config_keys
     inline static std::string const ASYNC_CONCURRENCY{"async_concurrency"};
 };
 
-// Factory of secondary_storage_intf objects.
-// A "disk cache" type of plugin would implement one such factory.
-class secondary_storage_factory
-{
- public:
-    virtual ~secondary_storage_factory() = default;
-
-    virtual std::unique_ptr<secondary_storage_intf>
-    create(inner_resources& resources, service_config const& config) = 0;
-};
-
-// Registers a secondary cache factory, identified by a key.
-// A plugin would call this function in its initialization.
-void
-register_secondary_storage_factory(
-    std::string const& key,
-    std::unique_ptr<secondary_storage_factory> factory);
-
+/*
+ * A bunch of resources helping to resolve requests.
+ *
+ * The intention is that the application, or a server, or a test case, creates
+ * a single instance of this class early in its initialization, and does not
+ * copy or move that instance. This allows other objects, with more limited
+ * lifetimes, to hold a reference to an inner_resources object.
+ *
+ * The resources are:
+ * - A memory (immutable) cache
+ * - A secondary cache
+ * - A blob_file_writer writing blobs in shared memory
+ * - An optional async_db instance
+ * - A collection of domains
+ * - A collection of remote proxies
+ * - A collection of loaded DLLs
+ * - Thread pools
+ * - An optional mock_http_session object
+ * - A registry of templates of requests that can be (de-)serialized
+ *
+ * TODO make resources optional? E.g. cacheless resolving doesn't need much.
+ * service_config could indicate what to provide.
+ */
 class inner_resources
 {
  public:
-    // Creates an object that needs an inner_initialize() call
-    inner_resources();
+    // Initially, there is no secondary cache:
+    // - Secondary caches are implemented in plugins, that are not accessible
+    //   from here.
+    // - A plugin may need an inner_resources reference in its constructor
+    //   arguments, and creating a plugin from this constructor would mean
+    //   passing a reference to an object under construction. It seems better
+    //   to solve these (inter-)dependencies outside this class.
+    inner_resources(service_config const& config);
 
     virtual ~inner_resources();
 
-    void
-    inner_initialize(service_config const& config);
+    inner_resources(inner_resources const&) = delete;
+    inner_resources&
+    operator=(inner_resources const&)
+        = delete;
+    inner_resources(inner_resources&& other) = delete;
+    inner_resources&
+    operator=(inner_resources&& other)
+        = delete;
+
+    service_config const&
+    config() const;
+
+    immutable_cache&
+    memory_cache();
 
     void
     reset_memory_cache();
 
     void
-    reset_memory_cache(service_config const& config);
-
-    void
-    reset_secondary_cache(service_config const& config);
-
-    cradle::immutable_cache&
-    memory_cache();
+    set_secondary_cache(
+        std::unique_ptr<secondary_storage_intf> secondary_cache);
 
     secondary_storage_intf&
     secondary_cache();
+
+    void
+    clear_secondary_cache();
+
+    http_connection_interface&
+    http_connection_for_thread();
+
+    cppcoro::task<http_response>
+    async_http_request(
+        http_request request, tasklet_tracker* client = nullptr);
+
+    // Set up HTTP mocking.
+    // This returns the mock_http_session that's been associated with these
+    // resources.
+    mock_http_session&
+    enable_http_mocking(bool http_is_synchronous = false);
 
     std::shared_ptr<blob_file_writer>
     make_blob_file_writer(std::size_t size);
@@ -111,40 +145,27 @@ class inner_resources
     get_async_thread_pool();
 
     void
+    register_domain(std::unique_ptr<domain> dom);
+
+    domain&
+    find_domain(std::string const& name);
+
+    void
     register_proxy(std::unique_ptr<remote_proxy> proxy);
 
     remote_proxy&
     get_proxy(std::string const& name);
 
-    inner_resources_impl&
-    impl()
-    {
-        return *impl_;
-    }
+    dll_collection&
+    the_dlls();
+
+    // Supporting CG R.37
+    std::shared_ptr<seri_registry>
+    get_seri_registry();
 
  private:
     std::unique_ptr<inner_resources_impl> impl_;
 };
-
-http_connection_interface&
-http_connection_for_thread(inner_resources& resources);
-
-cppcoro::task<http_response>
-async_http_request(
-    inner_resources& resources,
-    http_request request,
-    tasklet_tracker* client = nullptr);
-
-// Initialize a service for unit testing purposes.
-void
-init_test_service(inner_resources& resources);
-
-// Set up HTTP mocking for a service.
-// This returns the mock_http_session that's been associated with the service.
-struct mock_http_session;
-mock_http_session&
-enable_http_mocking(
-    inner_resources& resources, bool http_is_synchronous = false);
 
 } // namespace cradle
 

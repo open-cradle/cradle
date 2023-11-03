@@ -3,7 +3,7 @@
 
 #include <cradle/external_api.h>
 #include <cradle/inner/core/exception.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 
 namespace cradle {
 
@@ -14,8 +14,6 @@ CRADLE_DEFINE_ERROR_INFO(string, reason)
 
 class api_service_impl
 {
-    cradle::service_core service_core_;
-
  public:
     api_service_impl(std::string json_text);
 
@@ -24,13 +22,13 @@ class api_service_impl
     {
         return service_core_;
     }
+
+ private:
+    cradle::service_core service_core_;
 };
 
 class api_session_impl
 {
-    api_service_impl& service_;
-    cradle::thinknode_session thinknode_session_;
-
  public:
     api_session_impl(
         api_service_impl& service, api_thinknode_session_config const& config);
@@ -46,6 +44,10 @@ class api_session_impl
     {
         return thinknode_session_;
     }
+
+ private:
+    api_service_impl& service_;
+    cradle::thinknode_session thinknode_session_;
 };
 
 } // namespace external

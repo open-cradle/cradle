@@ -20,9 +20,10 @@ BENCHMARK(BM_create_value_request);
 static void
 BM_call_value_request_resolve(benchmark::State& state)
 {
+    auto resources{make_inner_test_resources()};
     for (auto _ : state)
     {
-        call_resolve_by_ref_loop(rq_value(42));
+        call_resolve_by_ref_loop(rq_value(42), *resources);
     }
 }
 BENCHMARK(BM_call_value_request_resolve)->Apply(thousand_loops);
@@ -30,7 +31,8 @@ BENCHMARK(BM_call_value_request_resolve)->Apply(thousand_loops);
 static void
 BM_resolve_value_request(benchmark::State& state)
 {
-    non_caching_request_resolution_context ctx;
+    auto resources{make_inner_test_resources()};
+    non_caching_request_resolution_context ctx{*resources};
     for (auto _ : state)
     {
         resolve_request_loop(state, ctx, rq_value(42));

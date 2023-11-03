@@ -136,6 +136,37 @@ class remote_proxy
     virtual tasklet_info_tuple_list
     get_tasklet_infos(bool include_finished)
         = 0;
+
+    // Dynamically loads a shared library, making its seri resolvers available
+    // on the remote.
+    //
+    // dir_path is an absolute path to the directory containg the shared
+    // library file.
+    // dll_name is the library name as specified in CMakeLists.txt.
+    // On Linux, dll_name "bla" translates to file name "libbla.so";
+    // on Windows, it would be "bla.dll".
+    virtual void
+    load_shared_library(std::string dir_path, std::string dll_name)
+        = 0;
+
+    // Unloads a previously loaded shared library, so that its seri resolvers
+    // are no longer available.
+    //
+    // In the simplest case, dll_name is as for load_shared_library(), and it
+    // is an error if the specified DLL is not loaded.
+    // As an extension, dll_name may contain a "*", in which case it is
+    // interpreted as a regex and all matching DLLs are unloaded; it is not an
+    // error if there are no matching DLLs. This is primarily intended to be
+    // used in unit tests.
+    virtual void
+    unload_shared_library(std::string dll_name)
+        = 0;
+
+    // Instructs the server to mock all HTTP requests, returning a 200
+    // response with response_body for each.
+    virtual void
+    mock_http(std::string const& response_body)
+        = 0;
 };
 
 } // namespace cradle

@@ -77,8 +77,12 @@ using DefaultResolutionConstraints = ResolutionConstraints<
     DefinitelySyncContext<Ctx>,
     DefinitelyAsyncContext<Ctx>>;
 
+// Holds for std::true_type and std::false_type only
 template<typename T>
-concept BoolConst = requires { std::same_as<decltype(T::value), bool>; };
+concept BoolConst
+    = requires {
+          requires std::same_as<std::remove_const_t<decltype(T::value)>, bool>;
+      };
 
 template<Context Ctx, Request Req, BoolConst Async>
 cppcoro::shared_task<typename Req::value_type>
@@ -125,7 +129,7 @@ resolve_secondary_cached(Ctx& ctx, Req const& req, Async async)
     using Value = typename Req::value_type;
     auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
     inner_resources& resources{cac_ctx.get_resources()};
-    captured_id const& key{req.get_captured_id()};
+    auto key{req.get_captured_id()};
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
         if constexpr (Async::value)
         {
@@ -141,7 +145,8 @@ resolve_secondary_cached(Ctx& ctx, Req const& req, Async async)
         }
     };
     co_return deserialize_secondary_cache_value<Value>(
-        co_await secondary_cached_blob(resources, key, create_blob_task));
+        co_await secondary_cached_blob(
+            resources, std::move(key), std::move(create_blob_task)));
 }
 
 // This function, being a coroutine, takes key by value.
@@ -204,9 +209,13 @@ resolve_request_cached(Ctx& ctx, Req const& req, Async async)
         auto& intr_ctx = cast_ctx_to_ref<introspective_context_intf>(ctx);
         return coawait_introspective(intr_ctx, req, ptr.task());
     }
-    // ptr owns a reference to the cache record, and thus to the shared_task,
-    // but its lifetime ends here, so the shared_task must be copied.
-    return ptr.task();
+    else
+    {
+        // ptr owns a reference to the cache record, and thus to the
+        // shared_task, but its lifetime ends here, so the shared_task must
+        // be copied.
+        return ptr.task();
+    }
 }
 
 template<Context Ctx, CachedRequest Req>
@@ -271,6 +280,7 @@ template<Context Ctx, Request Req, typename Constraints>
 cppcoro::shared_task<typename Req::value_type>
 resolve_request_local(Ctx& ctx, Req const& req, Constraints constraints)
 {
+    // TODO static_assert(!req.is_proxy);
     // Second decision (based on constraints if possible): sync or async
     // This is the last time that constraints are used.
     if constexpr (constraints.force_async)

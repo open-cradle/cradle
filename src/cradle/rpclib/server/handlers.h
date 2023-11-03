@@ -11,7 +11,7 @@
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/rpclib/common/common.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 
 namespace cradle {
 
@@ -99,6 +99,14 @@ handle_finish_async(rpclib_handler_context& hctx, async_id root_aid);
 
 tasklet_info_tuple_list
 handle_get_tasklet_infos(rpclib_handler_context& hctx, bool include_finished);
+
+void
+handle_load_shared_library(
+    rpclib_handler_context& hctx, std::string dir_path, std::string dll_name);
+
+void
+handle_unload_shared_library(
+    rpclib_handler_context& hctx, std::string dll_name);
 
 } // namespace cradle
 

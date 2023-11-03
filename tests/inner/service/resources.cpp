@@ -85,6 +85,24 @@ class test_proxy : public remote_proxy
         throw not_implemented_error{"test_proxy::get_tasklet_infos()"};
     }
 
+    void
+    load_shared_library(std::string dir_path, std::string dll_name) override
+    {
+        throw not_implemented_error("test_proxy::load_shared_library()");
+    }
+
+    void
+    unload_shared_library(std::string dll_name) override
+    {
+        throw not_implemented_error("test_proxy::unload_shared_library()");
+    }
+
+    void
+    mock_http(std::string const& response_body) override
+    {
+        throw not_implemented_error("test_proxy::mock_http()");
+    }
+
  private:
     std::string name_;
 };
@@ -93,42 +111,39 @@ class test_proxy : public remote_proxy
 
 TEST_CASE("register and find proxy", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
 
     auto a_proxy = std::make_unique<test_proxy>("a");
     auto b_proxy = std::make_unique<test_proxy>("b");
     auto* a_ptr = &*a_proxy;
     auto* b_ptr = &*b_proxy;
 
-    resources.register_proxy(std::move(a_proxy));
-    resources.register_proxy(std::move(b_proxy));
+    resources->register_proxy(std::move(a_proxy));
+    resources->register_proxy(std::move(b_proxy));
 
-    REQUIRE(&resources.get_proxy("b") == b_ptr);
-    REQUIRE(&resources.get_proxy("a") == a_ptr);
+    REQUIRE(&resources->get_proxy("b") == b_ptr);
+    REQUIRE(&resources->get_proxy("a") == a_ptr);
 }
 
 TEST_CASE("re-register proxy", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
 
     auto a0_proxy = std::make_unique<test_proxy>("a");
     auto a1_proxy = std::make_unique<test_proxy>("a");
 
-    resources.register_proxy(std::move(a0_proxy));
+    resources->register_proxy(std::move(a0_proxy));
     REQUIRE_THROWS_WITH(
-        resources.register_proxy(std::move(a1_proxy)),
+        resources->register_proxy(std::move(a1_proxy)),
         "Proxy a already registered");
 }
 
 TEST_CASE("get unregistered proxy", tag)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
+    auto resources{make_inner_test_resources()};
     auto a_proxy = std::make_unique<test_proxy>("a");
-    resources.register_proxy(std::move(a_proxy));
+    resources->register_proxy(std::move(a_proxy));
 
     REQUIRE_THROWS_WITH(
-        resources.get_proxy("nonesuch"), "Proxy nonesuch not registered");
+        resources->get_proxy("nonesuch"), "Proxy nonesuch not registered");
 }

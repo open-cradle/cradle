@@ -15,9 +15,8 @@
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/domain/testing/context.h>
-#include <cradle/plugins/domain/testing/domain.h>
+#include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
-#include <cradle/rpclib/client/registry.h>
 
 using namespace cradle;
 
@@ -29,23 +28,6 @@ request_uuid
 make_test_uuid(int ext)
 {
     return request_uuid{fmt::format("{}-{:04d}", tag, ext)};
-}
-
-// TODO? have two inner_resources instances; one for test, one for loopback
-void
-setup_loopback_test(inner_resources& inner)
-{
-    init_test_inner_service(inner);
-    inner.ensure_async_db();
-    register_loopback_service(make_inner_tests_config(), inner);
-    register_and_initialize_testing_domain();
-}
-
-void
-setup_rpclib_test(inner_resources& inner)
-{
-    init_test_inner_service(inner);
-    register_rpclib_client(make_inner_tests_config(), inner);
 }
 
 template<typename Ctx, typename Req, typename Constraints>
@@ -144,7 +126,7 @@ test_resolve_async(
 
 void
 test_resolve_async_across_rpc(
-    inner_resources& inner, std::string const& proxy_name)
+    inner_resources& resources, std::string const& proxy_name)
 {
     constexpr int loops = 3;
     constexpr auto level = caching_level_type::memory;
@@ -157,14 +139,14 @@ test_resolve_async_across_rpc(
 
     // TODO clear the memory cache on the remote and check the duration
     auto tree_ctx0{
-        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
     auto ctx0{root_proxy_atst_context{tree_ctx0}};
     test_resolve_async(ctx0, req, constraints, true, loops, delay0, delay1);
 
     // TODO check the duration which should be fast because the result now
     // comes from the memory cache on the remote
     auto tree_ctx1{
-        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
     auto ctx1{root_proxy_atst_context{tree_ctx1}};
     test_resolve_async(ctx1, req, constraints, true, loops, delay0, delay1);
 }
@@ -187,9 +169,8 @@ TEST_CASE("resolve async locally - raw args", tag)
         cancellable_coro,
         rq_function_erased(props1, cancellable_coro, loops, delay0),
         rq_function_erased(props2, cancellable_coro, loops, delay1))};
-    inner_resources inner;
-    init_test_inner_service(inner);
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(inner);
+    auto resources{make_inner_test_resources()};
+    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
     auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};
 
     ResolutionConstraintsLocalAsync constraints;
@@ -206,9 +187,8 @@ TEST_CASE("resolve async locally - normalized args", tag)
     auto req{rq_cancellable_coro<level>(
         rq_cancellable_coro<level>(loops, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
-    inner_resources inner;
-    init_test_inner_service(inner);
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(inner);
+    auto resources{make_inner_test_resources()};
+    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
     auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};
 
     ResolutionConstraintsLocalAsync constraints;
@@ -218,18 +198,20 @@ TEST_CASE("resolve async locally - normalized args", tag)
 
 TEST_CASE("resolve async on loopback", tag)
 {
-    inner_resources inner;
-    setup_loopback_test(inner);
+    std::string proxy_name{"loopback"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_resolve_async_across_rpc(inner, "loopback");
+    test_resolve_async_across_rpc(*resources, proxy_name);
 }
 
 TEST_CASE("resolve async on rpclib", tag)
 {
-    inner_resources inner;
-    setup_rpclib_test(inner);
+    std::string proxy_name{"rpclib"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_resolve_async_across_rpc(inner, "rpclib");
+    test_resolve_async_across_rpc(*resources, proxy_name);
 }
 
 TEST_CASE("resolve async with value_request locally", tag)
@@ -240,9 +222,8 @@ TEST_CASE("resolve async with value_request locally", tag)
     constexpr auto level{caching_level_type::full};
     auto req{rq_cancellable_coro<level>(
         rq_cancellable_coro<level>(loops, delay0), rq_value(val1))};
-    inner_resources inner;
-    init_test_inner_service(inner);
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(inner);
+    auto resources{make_inner_test_resources()};
+    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
     auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};
 
     ResolutionConstraintsLocalAsync constraints;
@@ -250,7 +231,7 @@ TEST_CASE("resolve async with value_request locally", tag)
         = cppcoro::sync_wait(resolve_request(*root_ctx, req, constraints));
     REQUIRE(res0 == 14);
 
-    inner.reset_memory_cache();
+    resources->reset_memory_cache();
     auto res1
         = cppcoro::sync_wait(resolve_request(*root_ctx, req, constraints));
     REQUIRE(res1 == 14);
@@ -278,7 +259,7 @@ test_error_async(Ctx& ctx, Req const& req)
 
 void
 test_error_async_across_rpc(
-    inner_resources& inner, std::string const& proxy_name)
+    inner_resources& resources, std::string const& proxy_name)
 {
     constexpr int loops = 2;
     constexpr auto level = caching_level_type::memory;
@@ -288,7 +269,7 @@ test_error_async_across_rpc(
         rq_cancellable_coro<level>(-1, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
     auto tree_ctx{
-        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
     auto ctx{root_proxy_atst_context{tree_ctx}};
 
     test_error_async(ctx, req);
@@ -302,9 +283,8 @@ TEST_CASE("error async request locally", tag)
     auto req{rq_cancellable_coro<level>(
         rq_cancellable_coro<level>(-1, 11),
         rq_cancellable_coro<level>(2, 24))};
-    inner_resources inner;
-    init_test_inner_service(inner);
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(inner);
+    auto resources{make_inner_test_resources()};
+    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
     auto root_ctx = make_local_async_ctx_tree(tree_ctx, req);
 
     test_error_async(*root_ctx, req);
@@ -312,18 +292,20 @@ TEST_CASE("error async request locally", tag)
 
 TEST_CASE("error async request on loopback", tag)
 {
-    inner_resources inner;
-    setup_loopback_test(inner);
+    std::string proxy_name{"loopback"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_error_async_across_rpc(inner, "loopback");
+    test_error_async_across_rpc(*resources, proxy_name);
 }
 
 TEST_CASE("error async request on rpclib", tag)
 {
-    inner_resources inner;
-    setup_rpclib_test(inner);
+    std::string proxy_name{"rpclib"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_error_async_across_rpc(inner, "rpclib");
+    test_error_async_across_rpc(*resources, proxy_name);
 }
 
 namespace {
@@ -337,6 +319,8 @@ checker_coro(async_context_intf& ctx)
     logger->info("checker_coro(ctx {})", ctx.get_id());
     for (int i = 0; i < 20; ++i)
     {
+        // TODO this hangs when resolve_request() doesn't make it to the RPC
+        // server
         auto status = co_await ctx.get_status_coro();
         logger->info("checker_coro {}: {}", i, status);
         if (status == async_status::FINISHED)
@@ -387,7 +371,7 @@ test_cancel_async(Ctx& ctx, Req const& req)
 
 void
 test_cancel_async_across_rpc(
-    inner_resources& inner, std::string const& proxy_name)
+    inner_resources& resources, std::string const& proxy_name)
 {
     constexpr int loops = 10;
     constexpr auto level = caching_level_type::memory;
@@ -397,7 +381,7 @@ test_cancel_async_across_rpc(
         rq_cancellable_coro<level>(loops, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
     auto tree_ctx{
-        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
     auto ctx{root_proxy_atst_context{tree_ctx}};
 
     test_cancel_async(ctx, req);
@@ -411,9 +395,8 @@ TEST_CASE("cancel async request locally", tag)
     auto req{rq_cancellable_coro<level>(
         rq_cancellable_coro<level>(100, 7),
         rq_cancellable_coro<level>(100, 8))};
-    inner_resources inner;
-    init_test_inner_service(inner);
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(inner);
+    auto resources{make_inner_test_resources()};
+    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
     auto root_ctx = make_local_async_ctx_tree(tree_ctx, req);
 
     test_cancel_async(*root_ctx, req);
@@ -421,18 +404,20 @@ TEST_CASE("cancel async request locally", tag)
 
 TEST_CASE("cancel async request on loopback", tag)
 {
-    inner_resources inner;
-    setup_loopback_test(inner);
+    std::string proxy_name{"loopback"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_cancel_async_across_rpc(inner, "loopback");
+    test_cancel_async_across_rpc(*resources, proxy_name);
 }
 
 TEST_CASE("cancel async request on rpclib", tag)
 {
-    inner_resources inner;
-    setup_rpclib_test(inner);
+    std::string proxy_name{"rpclib"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_cancel_async_across_rpc(inner, "rpclib");
+    test_cancel_async_across_rpc(*resources, proxy_name);
 }
 
 namespace {
@@ -459,12 +444,12 @@ get_subs_control_func(async_context_intf& ctx, bool& threw)
 
 void
 test_failing_get_num_subs(
-    inner_resources& inner, std::string const& proxy_name)
+    inner_resources& resources, std::string const& proxy_name)
 {
     constexpr auto level = caching_level_type::memory;
     auto req{rq_cancellable_coro<level>(2, 3)};
     auto tree_ctx{
-        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
     auto ctx{root_proxy_atst_context{tree_ctx}};
     // Causes submit_async to fail on the remote
     ctx.fail_submit_async();
@@ -486,18 +471,18 @@ test_failing_get_num_subs(
 
 TEST_CASE("get_num_subs failure on loopback", tag)
 {
-    inner_resources inner;
-    setup_loopback_test(inner);
+    std::string proxy_name{"loopback"};
+    auto resources{make_inner_test_resources(proxy_name, no_domain_option())};
 
-    test_failing_get_num_subs(inner, "loopback");
+    test_failing_get_num_subs(*resources, proxy_name);
 }
 
 TEST_CASE("get_num_subs failure on rpclib", tag)
 {
-    inner_resources inner;
-    setup_rpclib_test(inner);
+    std::string proxy_name{"rpclib"};
+    auto resources{make_inner_test_resources(proxy_name, no_domain_option())};
 
-    test_failing_get_num_subs(inner, "rpclib");
+    test_failing_get_num_subs(*resources, proxy_name);
 }
 
 namespace {
@@ -523,12 +508,12 @@ delayed_get_subs_control_func(
 
 void
 test_delayed_get_num_subs(
-    inner_resources& inner, std::string const& proxy_name)
+    inner_resources& resources, std::string const& proxy_name)
 {
     constexpr auto level = caching_level_type::memory;
     auto req{rq_cancellable_coro<level>(2, 3)};
     auto tree_ctx{
-        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
     auto ctx{root_proxy_atst_context{tree_ctx}};
     // Forces resolve_async() on the remote to have a startup delay
     ctx.set_resolve_async_delay(500);
@@ -558,18 +543,20 @@ test_delayed_get_num_subs(
 // resolve_async has started, so get_num_subs needs to wait.
 TEST_CASE("delayed get_num_subs on loopback", tag)
 {
-    inner_resources inner;
-    setup_loopback_test(inner);
+    std::string proxy_name{"loopback"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_delayed_get_num_subs(inner, "loopback");
+    test_delayed_get_num_subs(*resources, proxy_name);
 }
 
 TEST_CASE("delayed get_num_subs on rpclib", tag)
 {
-    inner_resources inner;
-    setup_rpclib_test(inner);
+    std::string proxy_name{"rpclib"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_delayed_get_num_subs(inner, "rpclib");
+    test_delayed_get_num_subs(*resources, proxy_name);
 }
 
 namespace {
@@ -599,12 +586,13 @@ delayed_set_result_control_func(
 }
 
 void
-test_delayed_set_result(inner_resources& inner, std::string const& proxy_name)
+test_delayed_set_result(
+    inner_resources& resources, std::string const& proxy_name)
 {
     constexpr auto level = caching_level_type::memory;
     auto req{rq_cancellable_coro<level>(0, 0)};
     auto tree_ctx{
-        std::make_shared<proxy_atst_tree_context>(inner, proxy_name)};
+        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
     auto ctx{root_proxy_atst_context{tree_ctx}};
     // Forces set_result() on the remote to have a delay
     ctx.set_set_result_delay(200);
@@ -633,18 +621,20 @@ test_delayed_set_result(inner_resources& inner, std::string const& proxy_name)
 // FINISHED
 TEST_CASE("delayed set_result on loopback", tag)
 {
-    inner_resources inner;
-    setup_loopback_test(inner);
+    std::string proxy_name{"loopback"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_delayed_set_result(inner, "loopback");
+    test_delayed_set_result(*resources, proxy_name);
 }
 
 TEST_CASE("delayed set_result on rpclib", tag)
 {
-    inner_resources inner;
-    setup_rpclib_test(inner);
+    std::string proxy_name{"rpclib"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_delayed_set_result(inner, "rpclib");
+    test_delayed_set_result(*resources, proxy_name);
 }
 
 TEST_CASE("create rq_cancellable_coro with different caching levels", tag)

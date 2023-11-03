@@ -6,6 +6,7 @@
 
 #include <boost/exception/all.hpp>
 #include <boost/stacktrace.hpp>
+#include <fmt/format.h>
 
 namespace cradle {
 
@@ -56,17 +57,20 @@ get_required_error_info(Exception const& e)
     return *info;
 }
 
-struct not_implemented_error : public std::logic_error
+class not_implemented_error : public std::logic_error
 {
-    not_implemented_error() : std::logic_error("Not implemented")
+ public:
+    not_implemented_error() : std::logic_error{"Not implemented"}
     {
     }
 
-    not_implemented_error(std::string const& what) : std::logic_error(what)
+    not_implemented_error(std::string const& what)
+        : std::logic_error{fmt::format("Not implemented: {}", what)}
     {
     }
 
-    not_implemented_error(char const* what) : std::logic_error(what)
+    not_implemented_error(char const* what)
+        : std::logic_error{fmt::format("Not implemented: {}", what)}
     {
     }
 };

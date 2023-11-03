@@ -46,16 +46,15 @@ make_http_put_request(int port, std::string const& key, blob value)
 
 } // namespace
 
-http_requests_storage::http_requests_storage(
-    inner_resources& resources, service_config const& config)
+http_requests_storage::http_requests_storage(inner_resources& resources)
     : resources_{resources},
-      port_{static_cast<int>(config.get_mandatory_number(
+      port_{static_cast<int>(resources.config().get_mandatory_number(
           http_requests_storage_config_keys::PORT))}
 {
 }
 
 void
-http_requests_storage::reset(service_config const& config)
+http_requests_storage::clear()
 {
     throw not_implemented_error();
 }
@@ -68,7 +67,7 @@ http_requests_storage::read(std::string key)
     try
     {
         // Throws if status code is not 2xx
-        response = co_await async_http_request(resources_, std::move(query));
+        response = co_await resources_.async_http_request(std::move(query));
     }
     catch (bad_http_status_code& e)
     {
@@ -88,7 +87,7 @@ http_requests_storage::write(std::string key, blob value)
 {
     auto query = make_http_put_request(port_, key, std::move(value));
     // Throws if status_code is not 2xx
-    co_await async_http_request(resources_, std::move(query));
+    co_await resources_.async_http_request(std::move(query));
     co_return;
 }
 

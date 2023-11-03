@@ -1,6 +1,8 @@
 #ifndef CRADLE_WEBSOCKET_SERVER_H
 #define CRADLE_WEBSOCKET_SERVER_H
 
+#include <memory>
+
 #include <cradle/inner/service/config.h>
 #include <cradle/typing/core.h>
 
@@ -25,10 +27,11 @@ CRADLE_DEFINE_EXCEPTION(websocket_server_error)
 // The websocket server uses this type to identify clients.
 typedef int websocket_client_id;
 
-struct websocket_server_impl;
+class websocket_server_impl;
 
-struct websocket_server
+class websocket_server
 {
+ public:
     websocket_server(service_config const& config);
     ~websocket_server();
 
@@ -39,7 +42,7 @@ struct websocket_server
     run();
 
  private:
-    websocket_server_impl* impl_;
+    std::unique_ptr<websocket_server_impl> impl_;
 };
 
 } // namespace cradle

@@ -4,28 +4,26 @@
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/fmt_format.h>
+#include <cradle/inner/dll/dll_collection.h>
+#include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/remote/loopback.h>
-#include <cradle/inner/remote/loopback_impl.h>
 #include <cradle/inner/requests/domain.h>
+#include <cradle/inner/requests/test_context.h>
 #include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/utilities/logging.h>
-#include <cradle/plugins/domain/testing/context.h>
 
 namespace cradle {
 
-loopback_service::loopback_service(
-    service_config const& config, inner_resources& resources)
-    : resources_{resources},
-      testing_{
-          config.get_bool_or_default(generic_config_keys::TESTING, false)},
-      async_pool_{static_cast<BS::concurrency_t>(config.get_number_or_default(
-          loopback_config_keys::ASYNC_CONCURRENCY, 16))}
+loopback_service::loopback_service(std::unique_ptr<inner_resources> resources)
+    : resources_{std::move(resources)},
+      testing_{resources_->config().get_bool_or_default(
+          generic_config_keys::TESTING, false)},
+      logger_{ensure_logger("loopback")},
+      async_pool_{static_cast<BS::concurrency_t>(
+          resources_->config().get_number_or_default(
+              loopback_config_keys::ASYNC_CONCURRENCY, 16))}
 {
-    if (!logger_)
-    {
-        logger_ = create_logger("loopback");
-    }
 }
 
 std::string
@@ -46,8 +44,8 @@ loopback_service::resolve_sync(service_config config, std::string seri_req)
     auto domain_name{
         config.get_mandatory_string(remote_config_keys::DOMAIN_NAME)};
     logger_->debug("resolve_sync({}): request {}", domain_name, seri_req);
-    auto dom = find_domain(domain_name);
-    auto ctx{dom->make_local_sync_context(resources_, config)};
+    auto& dom = resources_->find_domain(domain_name);
+    auto ctx{dom.make_local_sync_context(config)};
     auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(*ctx)};
     auto result = cppcoro::sync_wait(
         resolve_serialized_local(loc_ctx, std::move(seri_req)));
@@ -62,9 +60,9 @@ resolve_async(
     std::string seri_req)
 {
     auto& logger{loopback->get_logger()};
-    if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*actx))
+    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
     {
-        atst_ctx->apply_resolve_async_delay();
+        test_ctx->apply_resolve_async_delay();
     }
     logger.info("resolve_async start");
     // TODO update status to STARTED or so
@@ -95,15 +93,15 @@ loopback_service::submit_async(service_config config, std::string seri_req)
         = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
     logger_->info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
-    auto dom = find_domain(domain_name);
-    auto ctx{dom->make_local_async_context(resources_, config)};
-    if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*ctx))
+    auto& dom = resources_->find_domain(domain_name);
+    auto ctx{dom.make_local_async_context(config)};
+    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*ctx))
     {
-        atst_ctx->apply_fail_submit_async();
+        test_ctx->apply_fail_submit_async();
     }
     auto actx = cast_ctx_to_shared_ptr<local_async_context_intf>(ctx);
     actx->using_result();
-    resources_.ensure_async_db();
+    resources_->ensure_async_db();
     get_async_db().add(actx);
     // TODO populate actx subs?
     // TODO update status to SUBMITTED
@@ -188,23 +186,37 @@ loopback_service::get_tasklet_infos(bool include_finished)
     throw not_implemented_error("TODO loopback_service::get_tasklet_infos");
 }
 
+void
+loopback_service::load_shared_library(
+    std::string dir_path, std::string dll_name)
+{
+    logger_->info("load_shared_library {} {}", dir_path, dll_name);
+    resources_->the_dlls().load(dir_path, dll_name);
+}
+
+void
+loopback_service::unload_shared_library(std::string dll_name)
+{
+    logger_->info("unload_shared_library {}", dll_name);
+    resources_->the_dlls().unload(dll_name);
+}
+
+void
+loopback_service::mock_http(std::string const& response_body)
+{
+    auto& session = resources_->enable_http_mocking();
+    session.set_canned_response(make_http_200_response(response_body));
+}
+
 async_db&
 loopback_service::get_async_db()
 {
-    auto adb{resources_.get_async_db()};
+    auto adb{resources_->get_async_db()};
     if (!adb)
     {
         throw std::logic_error{"loopback service has no async_db"};
     }
     return *adb;
-}
-
-void
-register_loopback_service(
-    service_config const& config, inner_resources& resources)
-{
-    auto proxy{std::make_unique<loopback_service>(config, resources)};
-    resources.register_proxy(std::move(proxy));
 }
 
 } // namespace cradle

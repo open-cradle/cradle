@@ -7,11 +7,9 @@
 
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/domain/testing/domain.h>
+#include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
-#include <cradle/plugins/domain/testing/seri_catalog.h>
 #include <cradle/rpclib/client/proxy.h>
-#include <cradle/rpclib/client/registry.h>
 
 #include "../support/inner_service.h"
 #include "benchmark_support.h"
@@ -19,45 +17,14 @@
 using namespace cradle;
 using namespace std;
 
-static void
-register_remote_services(
-    inner_resources& resources, std::string const& proxy_name)
-{
-    static bool registered_resolvers = false;
-    if (!registered_resolvers)
-    {
-        register_and_initialize_testing_domain();
-        register_testing_seri_resolvers();
-        registered_resolvers = true;
-    }
-    if (proxy_name == "loopback")
-    {
-        register_loopback_service(make_inner_tests_config(), resources);
-    }
-    else if (proxy_name == "rpclib")
-    {
-        register_rpclib_client(make_inner_tests_config(), resources);
-    }
-    else
-    {
-        throw std::invalid_argument(
-            fmt::format("Unknown proxy name {}", proxy_name));
-    }
-}
-
 template<caching_level_type caching_level, bool storing, typename Req>
 void
 BM_try_resolve_testing_request(
     benchmark::State& state, Req const& req, std::string const& proxy_name)
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
-    bool remotely = proxy_name.size() > 0;
-    if (remotely)
-    {
-        register_remote_services(resources, proxy_name);
-    }
-    testing_request_context ctx{resources, nullptr, remotely, proxy_name};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
+    testing_request_context ctx{*resources, nullptr, proxy_name};
 
     // Fill the appropriate cache if any
     auto init = [&]() -> cppcoro::task<void> {
@@ -66,7 +33,7 @@ BM_try_resolve_testing_request(
             benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
             if constexpr (caching_level == caching_level_type::full)
             {
-                sync_wait_write_disk_cache(resources);
+                sync_wait_write_disk_cache(*resources);
             }
         }
         co_return;
@@ -106,11 +73,11 @@ BM_try_resolve_testing_request(
                     }
                     if constexpr (need_empty_memory_cache)
                     {
-                        resources.reset_memory_cache();
+                        resources->reset_memory_cache();
                     }
                     if constexpr (need_empty_disk_cache)
                     {
-                        reset_disk_cache(resources);
+                        resources->clear_secondary_cache();
                     }
                     if constexpr (pause_timing)
                     {
@@ -218,8 +185,8 @@ BENCHMARK(BM_resolve_make_some_blob<caching_level_type::full, false, oneM>)
     ->Apply(thousand_loops);
 #if 0
 /*
-Current problems with benchmarking disk caching:
-(a) The disk cache should be cleared between runs, but reset_disk_cache() does not do that.
+Current/previous problems with benchmarking disk caching:
+(a) The disk cache wasn't be cleared between runs; this has been fixed.
 (b) A race condition: issue #231.
 */
 BENCHMARK(BM_resolve_make_some_blob<caching_level_type::full, true>)

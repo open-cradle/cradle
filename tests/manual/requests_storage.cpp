@@ -9,8 +9,8 @@
 #include <cradle/inner/service/request_store.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/requests.h>
-#include <cradle/plugins/domain/testing/seri_catalog.h>
-#include <cradle/plugins/requests_storage/http/http_requests_storage_factory.h>
+#include <cradle/plugins/domain/testing/testing_seri_catalog.h>
+#include <cradle/plugins/requests_storage/http/http_requests_storage.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 
 /*
@@ -62,47 +62,42 @@ static std::string const the_key
 
 TEST_CASE("store request", tag_store)
 {
-    register_testing_seri_resolvers();
-
-    http_requests_storage_factory factory;
-    inner_resources resources;
-    init_test_inner_service(resources);
-    auto storage{factory.create(resources, make_inner_tests_config())};
+    inner_resources resources{make_inner_tests_config()};
+    auto owned_storage{std::make_unique<http_requests_storage>(resources)};
+    resources.set_secondary_cache(std::move(owned_storage));
+    testing_seri_catalog cat{resources.get_seri_registry()};
 
     auto req0{rq_make_some_blob<caching_level_type::full>(5, false)};
-    cppcoro::sync_wait(store_request(req0, *storage));
+    cppcoro::sync_wait(store_request(req0, resources));
 
     REQUIRE(get_request_key(req0) == the_key);
 }
 
 TEST_CASE("load stored request", tag_load)
 {
-    register_testing_seri_resolvers();
-
-    http_requests_storage_factory factory;
-    inner_resources resources;
-    init_test_inner_service(resources);
-    auto storage{factory.create(resources, make_inner_tests_config())};
+    inner_resources resources{make_inner_tests_config()};
+    auto owned_storage{std::make_unique<http_requests_storage>(resources)};
+    resources.set_secondary_cache(std::move(owned_storage));
+    testing_seri_catalog cat{resources.get_seri_registry()};
 
     auto req_written{rq_make_some_blob<caching_level_type::full>(5, false)};
     using Req = decltype(req_written);
 
     std::string key{the_key};
-    auto req_read = cppcoro::sync_wait(load_request<Req>(key, *storage));
+    auto req_read = cppcoro::sync_wait(load_request<Req>(key, resources));
     REQUIRE(req_read == req_written);
 }
 
 TEST_CASE("load and resolve stored request", tag_load)
 {
-    register_testing_seri_resolvers();
-
-    http_requests_storage_factory factory;
-    inner_resources resources;
-    init_test_inner_service(resources);
-    auto storage{factory.create(resources, make_inner_tests_config())};
+    inner_resources resources{make_inner_tests_config()};
+    auto owned_storage{std::make_unique<http_requests_storage>(resources)};
+    auto& storage{*owned_storage};
+    resources.set_secondary_cache(std::move(owned_storage));
+    testing_seri_catalog cat{resources.get_seri_registry()};
 
     std::string key{the_key};
-    blob req_blob{cppcoro::sync_wait(storage->read(key))};
+    blob req_blob{cppcoro::sync_wait(storage.read(key))};
     if (!req_blob.data())
     {
         throw not_found_error(
@@ -110,7 +105,7 @@ TEST_CASE("load and resolve stored request", tag_load)
     }
     std::string req_serialized{to_string(req_blob)};
 
-    testing_request_context ctx{resources, nullptr, false, ""};
+    testing_request_context ctx{resources, nullptr, ""};
     serialized_result seri_result{
         cppcoro::sync_wait(resolve_serialized_local(ctx, req_serialized))};
     blob result = deserialize_response<blob>(seri_result.value());

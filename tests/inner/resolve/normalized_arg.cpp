@@ -6,6 +6,7 @@
 
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/seri_catalog.h>
+#include <cradle/inner/resolve/seri_registry.h>
 #include <cradle/inner/resolve/seri_req.h>
 
 #include "../../support/inner_service.h"
@@ -41,18 +42,20 @@ plus_two_coro(context_intf& ctx, int x)
 
 TEST_CASE("resolve serialized requests with normalized args", tag)
 {
+    auto resources{make_inner_test_resources()};
+    non_caching_request_resolution_context ctx{*resources};
+    seri_catalog cat{resources->get_seri_registry()};
+
     auto func_props{func_props_t{make_test_uuid("plus_two_func")}};
     auto coro_props{coro_props_t{make_test_uuid("plus_two_coro")}};
     // The framework should generate different uuid's for the requests created
     // by the two following normalize_arg calls, otherwise the second
-    // register_seri_resolver call will fail with a message like
+    // register_resolver call will fail with a message like
     // "conflicting types for uuid normalization_uuid<int>".
-    register_seri_resolver(rq_function_erased(
+    cat.register_resolver(rq_function_erased(
         func_props, plus_two_func, normalize_arg<int, func_props_t>(0)));
-    register_seri_resolver(rq_function_erased(
+    cat.register_resolver(rq_function_erased(
         coro_props, plus_two_coro, normalize_arg<int, coro_props_t>(0)));
-
-    non_caching_request_resolution_context ctx;
 
     // Function is "normal" (no coroutine); main request's arg is normalized
     auto req_a{rq_function_erased(

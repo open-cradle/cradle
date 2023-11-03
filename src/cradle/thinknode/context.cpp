@@ -1,3 +1,4 @@
+#include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/remote/config.h>
 #include <cradle/thinknode/config.h>
 #include <cradle/thinknode/context.h>
@@ -22,7 +23,7 @@ make_session(service_config const& config)
 
 thinknode_request_context::thinknode_request_context(
     service_core& service, service_config const& config)
-    : sync_context_base{service, nullptr, false, ""},
+    : sync_context_base{service, nullptr, ""},
       service{service},
       session{make_session(config)}
 {
@@ -32,9 +33,8 @@ thinknode_request_context::thinknode_request_context(
     service_core& service,
     thinknode_session session,
     tasklet_tracker* tasklet,
-    bool remotely,
     std::string proxy_name)
-    : sync_context_base{service, tasklet, remotely, std::move(proxy_name)},
+    : sync_context_base{service, tasklet, std::move(proxy_name)},
       service{service},
       session{std::move(session)}
 {

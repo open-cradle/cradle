@@ -2,13 +2,8 @@
 #define CRADLE_RPCLIB_CLIENT_PROXY_H
 
 #include <memory>
-#include <stdexcept>
-
-#include <fmt/format.h>
 
 #include <cradle/inner/remote/proxy.h>
-#include <cradle/inner/resolve/seri_result.h>
-#include <cradle/inner/service/config.h>
 
 namespace cradle {
 
@@ -61,22 +56,22 @@ class rpclib_client : public remote_proxy
     tasklet_info_tuple_list
     get_tasklet_infos(bool include_finished) override;
 
-    // Instructs the RPC server to mock all HTTP requests, returning a 200
-    // response with response_body for each.
     void
-    mock_http(std::string const& response_body);
+    load_shared_library(std::string dir_path, std::string dll_name) override;
+
+    void
+    unload_shared_library(std::string dll_name) override;
+
+    void
+    mock_http(std::string const& response_body) override;
 
     // Tests if the rpclib server is running, throws rpc::system_error if not.
     // Returns a compatibility identifier.
     std::string
     ping();
 
-    // Intended for test purposes only
-    rpclib_client_impl&
-    pimpl()
-    {
-        return *pimpl_;
-    }
+    void
+    verify_rpclib_protocol(std::string const& server_rpclib_protocol);
 
  private:
     std::unique_ptr<rpclib_client_impl> pimpl_;

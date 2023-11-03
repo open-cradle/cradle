@@ -1,13 +1,12 @@
+#include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/domain.h>
-#include <cradle/plugins/domain/testing/seri_catalog.h>
 
 namespace cradle {
 
-void
-testing_domain::initialize()
+testing_domain::testing_domain(inner_resources& resources)
+    : resources_{resources}, cat_{resources.get_seri_registry()}
 {
-    register_testing_seri_resolvers();
 }
 
 std::string
@@ -17,27 +16,16 @@ testing_domain::name() const
 }
 
 std::shared_ptr<sync_context_intf>
-testing_domain::make_local_sync_context(
-    inner_resources& resources, service_config const& config) const
+testing_domain::make_local_sync_context(service_config const& config) const
 {
-    return std::make_shared<testing_request_context>(
-        resources, nullptr, false, "");
+    return std::make_shared<testing_request_context>(resources_, nullptr, "");
 }
 
 std::shared_ptr<async_context_intf>
-testing_domain::make_local_async_context(
-    inner_resources& resources, service_config const& config) const
+testing_domain::make_local_async_context(service_config const& config) const
 {
-    auto tree_ctx{std::make_shared<local_atst_tree_context>(resources)};
+    auto tree_ctx{std::make_shared<local_atst_tree_context>(resources_)};
     return std::make_shared<local_atst_context>(tree_ctx, config);
-}
-
-void
-register_and_initialize_testing_domain()
-{
-    auto the_domain{std::make_shared<testing_domain>()};
-    register_domain(the_domain);
-    the_domain->initialize();
 }
 
 } // namespace cradle

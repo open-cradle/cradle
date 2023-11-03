@@ -1,20 +1,17 @@
-#include <cradle/thinknode/apm.h>
-
+#include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 
-#include <cradle/inner/core/monitoring.h>
+#include "../../support/thinknode.h"
 #include <cradle/inner/io/mock_http.h>
-#include <cradle/typing/service/core.h>
-#include <cradle/typing/utilities/testing.h>
+#include <cradle/thinknode/apm.h>
 
 using namespace cradle;
 
 TEST_CASE("app version info", "[thinknode][apm]")
 {
-    service_core service;
-    init_test_service(service);
+    thinknode_test_scope scope;
 
-    auto& mock_http = enable_http_mocking(service);
+    auto& mock_http = scope.enable_http_mocking();
     mock_http.set_script(
         {{make_get_request(
               "https://mgh.thinknode.io/api/v1.0/apm/apps/acme/pets/"
@@ -90,10 +87,6 @@ TEST_CASE("app version info", "[thinknode][apm]")
                         }
                     )")}});
 
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token = "xyz";
-
     auto expected_version_info = make_thinknode_app_version_info(
         "2.0.0",
         some(make_thinknode_app_manifest(
@@ -139,9 +132,9 @@ TEST_CASE("app version info", "[thinknode][apm]")
             date(2017, boost::gregorian::Apr, 26),
             boost::posix_time::time_duration(1, 2, 3)));
 
-    thinknode_request_context trc{service, session, nullptr, false, ""};
+    auto ctx{scope.make_context()};
     auto version_info = cppcoro::sync_wait(
-        get_app_version_info(trc, "acme", "pets", "2.0.0"));
+        get_app_version_info(ctx, "acme", "pets", "2.0.0"));
     REQUIRE(version_info == expected_version_info);
 
     REQUIRE(mock_http.is_complete());

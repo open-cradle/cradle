@@ -2,9 +2,9 @@
 #include <cppcoro/sync_wait.hpp>
 
 #include <cradle/inner/remote/loopback.h>
-#include <cradle/inner/requests/domain.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/domain.h>
+#include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
 
 #include "../../support/inner_service.h"
@@ -18,27 +18,23 @@ static char const tag[] = "[inner][remote][loopback]";
 void
 test_make_some_blob(bool async, bool shared)
 {
-    register_and_initialize_testing_domain();
     constexpr auto caching_level{caching_level_type::full};
-    constexpr auto remotely{true};
-    auto dom{find_domain("testing")};
     std::string proxy_name{"loopback"};
-    inner_resources resources;
-    init_test_inner_service(resources);
-    register_loopback_service(make_inner_tests_config(), resources);
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
     auto req{rq_make_some_blob<caching_level>(10000, shared)};
     blob response;
     if (!async)
     {
-        testing_request_context ctx{resources, nullptr, remotely, proxy_name};
+        testing_request_context ctx{*resources, nullptr, proxy_name};
         ResolutionConstraintsRemoteSync constraints;
         response = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
     }
     else
     {
         auto tree_ctx{
-            std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
+            std::make_shared<proxy_atst_tree_context>(*resources, proxy_name)};
         root_proxy_atst_context ctx{tree_ctx};
         ResolutionConstraintsRemoteAsync constraints;
         response = cppcoro::sync_wait(resolve_request(ctx, req, constraints));

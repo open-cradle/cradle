@@ -15,18 +15,20 @@
 #include <spdlog/spdlog.h>
 
 // Ensure to #include only from the msgpack inside rpclib
+#include <cradle/inner/blob_file/blob_file_dir.h>
 #include <cradle/inner/encodings/msgpack_adaptors_rpclib.h>
 #include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/utilities/git.h>
 #include <cradle/inner/utilities/logging.h>
-#include <cradle/plugins/domain/all/all_domains.h>
+#include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/secondary_cache/all_plugins.h>
 #include <cradle/plugins/secondary_cache/http/http_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/rpclib/common/common.h>
 #include <cradle/rpclib/server/handlers.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/domain_factory.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/version_info.h>
 
 using namespace cradle;
@@ -138,15 +140,13 @@ run_server(cli_options const& options)
     initialize_logging(options.log_level, options.ignore_env_log_level);
     auto my_logger = create_logger("rpclib_server");
 
-    activate_all_secondary_storage_plugins();
-
-    service_core service;
     service_config config{create_config_map(options)};
-    service.initialize(config);
+    service_core service{config};
+    service.set_secondary_cache(create_secondary_storage(service));
     service.ensure_async_db();
+    service.register_domain(create_testing_domain(service));
+    service.register_domain(create_thinknode_domain(service));
     rpclib_handler_context hctx{config, service, *my_logger};
-
-    register_and_initialize_all_domains();
 
     rpc::server srv("127.0.0.1", options.port);
     my_logger->info("listening on port {}", srv.port());
@@ -198,6 +198,15 @@ run_server(cli_options const& options)
     });
     srv.bind("get_tasklet_infos", [&](bool include_finished) {
         return handle_get_tasklet_infos(hctx, include_finished);
+    });
+    srv.bind(
+        "load_shared_library",
+        [&](std::string dir_path, std::string dll_name) {
+            handle_load_shared_library(
+                hctx, std::move(dir_path), std::move(dll_name));
+        });
+    srv.bind("unload_shared_library", [&](std::string dll_name) {
+        handle_unload_shared_library(hctx, std::move(dll_name));
     });
 
     srv.run();

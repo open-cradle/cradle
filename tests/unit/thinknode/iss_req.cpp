@@ -21,11 +21,12 @@
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/requests/function.h>
+#include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/resolve/resolve_request.h>
+#include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
-#include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
 using namespace cradle;
@@ -36,7 +37,7 @@ static char const tag[] = "[thinknode][iss_req]";
 
 template<typename Request>
 auto
-deserialize_function(cereal::JSONInputArchive& iarchive)
+deserialize_function(JSONRequestInputArchive& iarchive)
 {
     using value_type = typename Request::value_type;
     using props_type = typename Request::props_type;
@@ -55,6 +56,43 @@ make_uuid()
 {
     static int next_id{};
     return request_uuid{fmt::format("{}-{}", tag, next_id++)};
+}
+
+cppcoro::task<blob>
+make_test_blob(context_intf& ctx, std::string payload)
+{
+    co_return make_blob(payload);
+}
+
+template<caching_level_type Level>
+auto
+rq_make_test_blob(std::string payload)
+{
+    request_uuid uuid{"uuid_100"};
+    uuid.set_level(Level);
+    std::string title{"make_test_blob"};
+    using props_type = thinknode_request_props<Level>;
+    return rq_function_erased(
+        props_type(std::move(uuid), std::move(title)),
+        make_test_blob,
+        rq_value(std::move(payload)));
+}
+
+class make_test_blob_catalog : public seri_catalog
+{
+ public:
+    make_test_blob_catalog(std::shared_ptr<seri_registry> registry);
+};
+
+// An object of this class must exist to deserialize a request created by
+// rq_make_test_blob().
+make_test_blob_catalog::make_test_blob_catalog(
+    std::shared_ptr<seri_registry> registry)
+    : seri_catalog(std::move(registry))
+{
+    register_resolver(rq_make_test_blob<caching_level_type::none>("sample"));
+    register_resolver(rq_make_test_blob<caching_level_type::memory>("sample"));
+    register_resolver(rq_make_test_blob<caching_level_type::full>("sample"));
 }
 
 // Creates a type-erased, uncached, request for an immediate value in Thinknode
@@ -80,18 +118,19 @@ rq_function_thinknode_value(char const* const value)
 template<typename Request>
 void
 test_serialize_thinknode_request(
+    thinknode_test_scope& scope,
     Request const& req,
     auto& deserialize_request,
     auto& validate_request,
     std::string const& filename)
 {
     // Validate original request
-    validate_request(req);
+    validate_request(scope, req);
 
     // Serialize the original request
     {
         std::ofstream ofs(filename);
-        cereal::JSONOutputArchive oarchive(ofs);
+        JSONRequestOutputArchive oarchive(ofs);
         // Not
         //   oarchive(req);
         // which adds an undesired outer element.
@@ -100,7 +139,7 @@ test_serialize_thinknode_request(
 
     // Deserialize and verify the resulting request equals the original
     std::ifstream ifs(filename);
-    cereal::JSONInputArchive iarchive(ifs);
+    JSONRequestInputArchive iarchive{ifs, scope.get_resources()};
     Request req1{deserialize_request(iarchive)};
     REQUIRE(req1.hash() == req.hash());
     REQUIRE(
@@ -111,11 +150,11 @@ test_serialize_thinknode_request(
         REQUIRE(
             req1.get_introspection_title() == req.get_introspection_title());
     }
-    validate_request(req1);
+    validate_request(scope, req1);
 }
 
 // Make a "post ISS object" request, where the payload is a blob
-template<caching_level_type Level>
+template<caching_level_type Level = caching_level_type::full>
 auto
 make_post_iss_request_constant()
 {
@@ -125,23 +164,28 @@ make_post_iss_request_constant()
         make_blob("payload"));
 }
 
+// Make a "post ISS object" proxy request, where the payload is a blob
+auto
+make_post_iss_proxy_request_constant()
+{
+    return rq_proxy_post_iss_object(
+        "123",
+        make_thinknode_type_info_with_string_type(thinknode_string_type()),
+        make_blob("payload"));
+}
+
 // Make a "post ISS object" request, where the payload comes
-// from a sub-request
+// from a subrequest.
+// Deserializing this request requires a make_test_blob_catalog object to exist
+// (due to the subrequest being a "make_test_blob" one).
 template<caching_level_type Level>
 auto
 make_post_iss_request_subreq(std::string payload = "payload")
 {
-    auto make_blob_coro = [](context_intf& ctx, std::string const& payload)
-        -> cppcoro::task<blob> { co_return make_blob(payload); };
-    std::string uuid_text{fmt::format("uuid_100_{}", static_cast<int>(Level))};
-    thinknode_request_props<Level> props{
-        request_uuid(uuid_text), "make_blob_coro"};
-    auto make_blob_request
-        = rq_function_erased(props, make_blob_coro, rq_value(payload));
     return rq_post_iss_object<Level>(
         "123",
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
-        make_blob_request);
+        rq_make_test_blob<Level>(std::move(payload)));
 }
 
 // Test resolving a number of "post ISS object" requests in parallel
@@ -153,54 +197,62 @@ make_post_iss_request_subreq(std::string payload = "payload")
 template<typename Request>
 void
 test_post_iss_requests_parallel(
+    thinknode_test_scope& scope,
     std::vector<Request> const& requests,
     std::vector<blob> const& payloads,
     std::vector<std::string> const& results,
-    bool introspective = false,
-    bool remotely = false)
+    bool introspective)
 {
     constexpr caching_level_type level = Request::caching_level;
+    scope.clear_caches();
+    auto& resources{scope.get_resources()};
     clean_tasklet_admin_fixture fixture;
-    service_core service;
-    init_test_service(service);
-    if (remotely)
+
+    mock_http_session* mock_http{nullptr};
+    if (auto proxy = scope.get_proxy())
     {
-        ensure_thinknode_seri_resolvers();
-        register_loopback_service(make_inner_tests_config(), service);
+        // Assumes a single request/response
+        auto response{
+            make_http_200_response("{ \"id\": \"" + results[0] + "\" }")};
+        // TODO should body be blob or string?
+        auto const& body{response.body};
+        std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
+        proxy->mock_http(s);
+    }
+    else
+    {
+        mock_http_script script;
+        for (unsigned i = 0; i < payloads.size(); ++i)
+        {
+            mock_http_exchange exchange{
+                make_http_request(
+                    http_request_method::POST,
+                    "https://mgh.thinknode.io/api/v1.0/iss/string?context=123",
+                    {{"Authorization", "Bearer xyz"},
+                     {"Accept", "application/json"},
+                     {"Content-Type", "application/octet-stream"}},
+                    payloads[i]),
+                make_http_200_response("{ \"id\": \"" + results[i] + "\" }")};
+            script.push_back(exchange);
+        }
+        mock_http = &resources.enable_http_mocking();
+        mock_http->set_script(script);
     }
 
-    mock_http_script script;
-    for (unsigned i = 0; i < payloads.size(); ++i)
-    {
-        mock_http_exchange exchange{
-            make_http_request(
-                http_request_method::POST,
-                "https://mgh.thinknode.io/api/v1.0/iss/string?context=123",
-                {{"Authorization", "Bearer xyz"},
-                 {"Accept", "application/json"},
-                 {"Content-Type", "application/octet-stream"}},
-                payloads[i]),
-            make_http_200_response("{ \"id\": \"" + results[i] + "\" }")};
-        script.push_back(exchange);
-    }
-    auto& mock_http = enable_http_mocking(service);
-    mock_http.set_script(script);
-
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token = "xyz";
     tasklet_tracker* tasklet = nullptr;
     if (introspective)
     {
         tasklet = create_tasklet_tracker("my_pool", "my_title");
     }
-    thinknode_request_context ctx{
-        service, session, tasklet, remotely, "loopback"};
+    auto ctx{scope.make_context(tasklet)};
 
     auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
 
     REQUIRE(res == results);
-    REQUIRE(mock_http.is_complete());
+    if (mock_http)
+    {
+        CHECK(mock_http->is_complete());
+    }
     // Order unspecified so don't check mock_http.is_in_order()
     if (introspective)
     {
@@ -227,8 +279,8 @@ test_post_iss_requests_parallel(
 
     if constexpr (level >= caching_level_type::full)
     {
-        sync_wait_write_disk_cache(service);
-        service.reset_memory_cache();
+        sync_wait_write_disk_cache(resources);
+        resources.reset_memory_cache();
 
         // Resolve using disk cache
         auto res2 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
@@ -239,66 +291,71 @@ test_post_iss_requests_parallel(
 // Test a single "post ISS object" request
 template<typename Request>
 void
-test_post_iss_request(
-    Request const& req, bool introspective, bool remotely = false)
+test_post_iss_request(thinknode_test_scope& scope, Request const& req)
 {
     std::vector<Request> requests = {req};
     auto payload = make_blob("payload");
     std::vector<blob> payloads = {payload};
     std::vector<std::string> results = {"def"};
+    bool introspective = false;
 
     test_post_iss_requests_parallel(
-        requests, payloads, results, introspective, remotely);
+        scope, requests, payloads, results, introspective);
 }
 
 } // namespace
 
 TEST_CASE("ISS POST serialization - value", tag)
 {
-    auto req{make_post_iss_request_constant<caching_level_type::full>()};
-    // With this test_request lambda, testing serialization includes testing
-    // that the deserialized request can be resolved.
-    auto test_request
-        = [](auto const& req1) { test_post_iss_request(req1, false); };
+    thinknode_test_scope scope;
+    auto req{make_post_iss_request_constant()};
+    //  With this validate_request lambda, testing serialization includes
+    //  verifying that the deserialized request can be locally resolved.
     test_serialize_thinknode_request(
+        scope,
         req,
         deserialize_function<decltype(req)>,
-        test_request,
+        test_post_iss_request<decltype(req)>,
         "iss_post_value.json");
 }
 
 TEST_CASE("ISS POST serialization - subreq", tag)
 {
+    thinknode_test_scope scope;
+    make_test_blob_catalog test_cat{scope.get_resources().get_seri_registry()};
     auto req{make_post_iss_request_subreq<caching_level_type::full>()};
-    auto test_request
-        = [](auto const& req1) { test_post_iss_request(req1, false); };
     test_serialize_thinknode_request(
+        scope,
         req,
         deserialize_function<decltype(req)>,
-        test_request,
+        test_post_iss_request<decltype(req)>,
         "iss_post_subreq.json");
 }
 
 TEST_CASE("ISS POST resolution - value, uncached", tag)
 {
+    thinknode_test_scope scope;
     test_post_iss_request(
-        make_post_iss_request_constant<caching_level_type::none>(), false);
+        scope, make_post_iss_request_constant<caching_level_type::none>());
 }
 
-TEST_CASE("ISS POST resolution - value, memory cached", tag)
+TEST_CASE("ISS POST resolution - subreq, memory cached", tag)
 {
+    thinknode_test_scope scope;
     test_post_iss_request(
-        make_post_iss_request_subreq<caching_level_type::memory>(), false);
+        scope, make_post_iss_request_subreq<caching_level_type::memory>());
 }
 
 TEST_CASE("ISS POST resolution - value, fully cached", tag)
 {
+    thinknode_test_scope scope;
     test_post_iss_request(
-        make_post_iss_request_subreq<caching_level_type::full>(), false);
+        scope, make_post_iss_request_subreq<caching_level_type::full>());
 }
 
 TEST_CASE("ISS POST resolution - subreq, fully cached, parallel", tag)
 {
+    thinknode_test_scope scope;
     constexpr caching_level_type level = caching_level_type::full;
     using Req = decltype(make_post_iss_request_subreq<level>());
     std::vector<blob> payloads;
@@ -325,61 +382,91 @@ TEST_CASE("ISS POST resolution - subreq, fully cached, parallel", tag)
         results.emplace_back(result);
     }
 
-    test_post_iss_requests_parallel(requests, payloads, results);
+    test_post_iss_requests_parallel(scope, requests, payloads, results, false);
 }
 
-TEST_CASE("ISS POST resolution - remote", tag)
+TEST_CASE("ISS POST resolution - loopback", tag)
 {
-    ensure_all_domains_registered();
-    test_post_iss_request(
-        make_post_iss_request_constant<caching_level_type::full>(),
-        false,
-        true);
+    thinknode_test_scope scope{"loopback"};
+    test_post_iss_request(scope, make_post_iss_request_constant());
+}
+
+TEST_CASE("ISS POST resolution - proxy, loopback", tag)
+{
+    thinknode_test_scope scope{"loopback"};
+    test_post_iss_request(scope, make_post_iss_proxy_request_constant());
+}
+
+TEST_CASE("ISS POST resolution - rpclib", tag)
+{
+    thinknode_test_scope scope{"rpclib"};
+    test_post_iss_request(scope, make_post_iss_request_constant());
+}
+
+TEST_CASE("ISS POST resolution - proxy, rpclib", tag)
+{
+    thinknode_test_scope scope{"rpclib"};
+    test_post_iss_request(scope, make_post_iss_proxy_request_constant());
 }
 
 TEST_CASE("RESOLVE ISS OBJECT TO IMMUTABLE serialization", tag)
 {
-    auto req{rq_resolve_iss_object_to_immutable<caching_level_type::full>(
-        "123", "abc", true)};
-    auto test_request = [](auto const& req1) {};
+    thinknode_test_scope scope;
+    constexpr caching_level_type level = caching_level_type::full;
+    auto req{rq_resolve_iss_object_to_immutable<level>("123", "abc", true)};
+    auto validate_request = [](thinknode_test_scope&, auto const& req1) {};
     test_serialize_thinknode_request(
+        scope,
         req,
         deserialize_function<decltype(req)>,
-        test_request,
+        validate_request,
         "resolve_iss_object_to_immutable.json");
 }
 
+namespace {
+
+// Not introspective
 template<typename Request>
 void
 test_retrieve_immutable_object_parallel(
+    thinknode_test_scope& scope,
     std::vector<Request> const& requests,
     std::vector<std::string> const& object_ids,
     std::vector<std::string> const& responses)
 {
     constexpr caching_level_type level = Request::caching_level;
-    service_core service;
-    init_test_service(service);
-
-    mock_http_script script;
-    for (unsigned i = 0; i < object_ids.size(); ++i)
+    scope.clear_caches();
+    auto& resources{scope.get_resources()};
+    mock_http_session* mock_http{nullptr};
+    if (auto proxy = scope.get_proxy())
     {
-        mock_http_exchange exchange{
-            make_get_request(
-                std::string("https://mgh.thinknode.io/api/v1.0/iss/immutable/")
-                    + object_ids[i] + "?context=123",
-                {{"Authorization", "Bearer xyz"},
-                 {"Accept", "application/octet-stream"}}),
-            make_http_200_response(responses[i])};
-        script.push_back(exchange);
+        // Assumes a single request/response
+        auto response{make_http_200_response(responses[0])};
+        // TODO should body be blob or string?
+        auto const& body{response.body};
+        std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
+        proxy->mock_http(s);
     }
-    auto& mock_http = enable_http_mocking(service);
-    mock_http.set_script(script);
+    else
+    {
+        mock_http_script script;
+        for (unsigned i = 0; i < object_ids.size(); ++i)
+        {
+            mock_http_exchange exchange{
+                make_get_request(
+                    std::string(
+                        "https://mgh.thinknode.io/api/v1.0/iss/immutable/")
+                        + object_ids[i] + "?context=123",
+                    {{"Authorization", "Bearer xyz"},
+                     {"Accept", "application/octet-stream"}}),
+                make_http_200_response(responses[i])};
+            script.push_back(exchange);
+        }
+        mock_http = &resources.enable_http_mocking();
+        mock_http->set_script(script);
+    }
 
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token = "xyz";
-    tasklet_tracker* tasklet = nullptr;
-    thinknode_request_context ctx{service, session, tasklet, false, ""};
+    auto ctx{scope.make_context()};
 
     auto res = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
 
@@ -389,9 +476,13 @@ test_retrieve_immutable_object_parallel(
         std::back_inserter(results),
         [](std::string const& resp) -> blob { return make_blob(resp); });
     REQUIRE(res == results);
-    REQUIRE(mock_http.is_complete());
+    if (mock_http)
+    {
+        CHECK(mock_http->is_complete());
+    }
     // Order unspecified so don't check mock_http.is_in_order()
 
+    // TODO only local?
     if constexpr (level >= caching_level_type::memory)
     {
         // Resolve using memory cache
@@ -401,8 +492,8 @@ test_retrieve_immutable_object_parallel(
 
     if constexpr (level >= caching_level_type::full)
     {
-        sync_wait_write_disk_cache(service);
-        service.reset_memory_cache();
+        sync_wait_write_disk_cache(resources);
+        resources.reset_memory_cache();
 
         // Resolve using disk cache
         auto res2 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
@@ -412,43 +503,84 @@ test_retrieve_immutable_object_parallel(
 
 template<typename Request>
 void
-test_retrieve_immutable_object_req(Request const& req)
+test_retrieve_immutable_object(thinknode_test_scope& scope, Request const& req)
 {
     std::vector<Request> requests = {req};
     std::vector<std::string> object_ids = {"abc"};
     std::vector<std::string> responses = {"payload"};
 
-    test_retrieve_immutable_object_parallel(requests, object_ids, responses);
+    test_retrieve_immutable_object_parallel(
+        scope, requests, object_ids, responses);
 }
 
-static void
-test_retrieve_immutable_object(auto create_req, auto immutable_id)
-{
-    string context_id{"123"};
-    auto req{create_req(context_id, immutable_id)};
-    test_retrieve_immutable_object_req(req);
-}
+} // namespace
 
-TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - value, fully cached", tag)
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT creation - template arg", tag)
 {
-    test_retrieve_immutable_object(
-        rq_retrieve_immutable_object<caching_level_type::full, std::string>,
-        "abc");
-}
-
-TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - subreq, fully cached", tag)
-{
+    thinknode_test_scope scope;
     constexpr caching_level_type level = caching_level_type::full;
-    auto arg_request{rq_function_thinknode_value<level>("abc")};
-    test_retrieve_immutable_object(
-        rq_retrieve_immutable_object<level, decltype(arg_request)>,
-        rq_function_thinknode_value<level>("abc"));
+    std::string const context_id{"123"};
+    std::string const object_id{"abc"}; // same as above
+    auto ctx{scope.make_context()};
+
+    auto coro = [=](context_intf& ctx) -> cppcoro::task<std::string> {
+        co_return object_id;
+    };
+    auto req0{rq_retrieve_immutable_object<level>(
+        context_id,
+        rq_function_erased(
+            thinknode_request_props<level>{make_uuid(), "arg"}, coro))};
+    test_retrieve_immutable_object(scope, req0);
+
+    // The second argument in req1 is "normalized" to the same thing
+    // passed to req0.
+    auto req1{rq_retrieve_immutable_object<level>(context_id, object_id)};
+    REQUIRE(typeid(req0) == typeid(req1));
+    REQUIRE(req0.get_uuid().str() == req1.get_uuid().str());
+    test_retrieve_immutable_object(scope, req1);
+
+    // A value request is normalized in the same way.
+    auto req2{
+        rq_retrieve_immutable_object<level>(context_id, rq_value(object_id))};
+    REQUIRE(typeid(req0) == typeid(req2));
+    REQUIRE(req0.get_uuid().str() == req2.get_uuid().str());
+    test_retrieve_immutable_object(scope, req2);
 }
 
-TEST_CASE(
-    "RETRIEVE IMMUTABLE OBJECT resolution - value, fully cached, parallel",
-    tag)
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization", tag)
 {
+    thinknode_test_scope scope;
+    constexpr caching_level_type level = caching_level_type::full;
+    auto req{rq_retrieve_immutable_object<level>("123", "abc")};
+    test_serialize_thinknode_request(
+        scope,
+        req,
+        deserialize_function<decltype(req)>,
+        test_retrieve_immutable_object<decltype(req)>,
+        "retrieve_immutable.json");
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - value, local", tag)
+{
+    thinknode_test_scope scope;
+    constexpr caching_level_type level = caching_level_type::full;
+    test_retrieve_immutable_object(
+        scope, rq_retrieve_immutable_object<level>("123", "abc"));
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - subreq, local", tag)
+{
+    thinknode_test_scope scope;
+    constexpr caching_level_type level = caching_level_type::full;
+    test_retrieve_immutable_object(
+        scope,
+        rq_retrieve_immutable_object<level>(
+            "123", rq_function_thinknode_value<level>("abc")));
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT resolution - value, local, parallel", tag)
+{
+    thinknode_test_scope scope;
     constexpr caching_level_type level = caching_level_type::full;
     using Req = decltype(rq_retrieve_immutable_object<level>("", ""));
     std::vector<std::string> object_ids;
@@ -473,22 +605,43 @@ TEST_CASE(
         auto response = ss_response.str();
         responses.push_back(response);
     }
-    test_retrieve_immutable_object_parallel(requests, object_ids, responses);
+    test_retrieve_immutable_object_parallel(
+        scope, requests, object_ids, responses);
 }
 
-TEST_CASE("RETRIEVE IMMUTABLE OBJECT serialization - function", tag)
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT - loopback", tag)
 {
+    thinknode_test_scope scope{"loopback"};
     constexpr caching_level_type level = caching_level_type::full;
-    auto req{rq_retrieve_immutable_object<level>("123", "abc")};
-    test_serialize_thinknode_request(
-        req,
-        deserialize_function<decltype(req)>,
-        test_retrieve_immutable_object_req<decltype(req)>,
-        "retrieve_immutable.json");
+    test_retrieve_immutable_object(
+        scope, rq_retrieve_immutable_object<level>("123", "abc"));
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT - proxy, loopback", tag)
+{
+    thinknode_test_scope scope{"loopback"};
+    test_retrieve_immutable_object(
+        scope, rq_proxy_retrieve_immutable_object("123", "abc"));
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT - rpclib", tag)
+{
+    thinknode_test_scope scope{"rpclib"};
+    constexpr caching_level_type level = caching_level_type::full;
+    test_retrieve_immutable_object(
+        scope, rq_retrieve_immutable_object<level>("123", "abc"));
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT - proxy, rpclib", tag)
+{
+    thinknode_test_scope scope{"rpclib"};
+    test_retrieve_immutable_object(
+        scope, rq_proxy_retrieve_immutable_object("123", "abc"));
 }
 
 TEST_CASE("Composite request serialization", tag)
 {
+    thinknode_test_scope scope;
     constexpr auto level = caching_level_type::full;
     std::string const context_id{"123"};
     auto req0{rq_post_iss_object<level>(
@@ -498,38 +651,11 @@ TEST_CASE("Composite request serialization", tag)
     auto req1{
         rq_resolve_iss_object_to_immutable<level>(context_id, req0, true)};
     auto req2{rq_retrieve_immutable_object<level>(context_id, req1)};
-    auto test_request = [](auto const& req1) {};
+    auto validate_request = [](thinknode_test_scope&, auto const& req1) {};
     test_serialize_thinknode_request(
+        scope,
         req2,
         deserialize_function<decltype(req2)>,
-        test_request,
+        validate_request,
         "composite.json");
-}
-
-TEST_CASE("RETRIEVE IMMUTABLE OBJECT creation - template arg", tag)
-{
-    constexpr caching_level_type level = caching_level_type::full;
-    std::string const context_id{"123"};
-    auto coro = [](context_intf& ctx) -> cppcoro::task<std::string> {
-        co_return std::string{"my_immutable_id}"};
-    };
-    auto req0{rq_retrieve_immutable_object<level>(
-        context_id,
-        rq_function_erased(
-            thinknode_request_props<level>{make_uuid(), "arg"}, coro))};
-    // The second argument in req1 will be "normalized" to the same thing
-    // passed to req0.
-    auto req1{
-        rq_retrieve_immutable_object<level>(context_id, "my_immutable_id")};
-
-    REQUIRE(typeid(req0) == typeid(req1));
-    REQUIRE(req0.get_uuid().str() == req1.get_uuid().str());
-
-#if 0
-// TODO support arguments from any request kind
-    auto req2{rq_retrieve_immutable_object<level>(context_id,
-        rq_value(std::string{"my_immutable_id}"}))};
-    REQUIRE(typeid(req0) == typeid(req2));
-    REQUIRE(req0.get_uuid().str() == req2.get_uuid().str());
-#endif
 }

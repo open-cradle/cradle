@@ -18,6 +18,10 @@ class Session:
     def api_url(self) -> str:
         return self.impl.api_url
 
+    def kill(self) -> None:
+        command = cmd.KillCommand(self.context_id)
+        self.impl.perform_command(command)
+
     def registration(self) -> None:
         command = cmd.RegistrationCommand(self.context_id,
                                           self.impl.api_url, self.impl.api_token)

@@ -1,0 +1,16 @@
+#ifndef CRADLE_TEST_DLLS_DIR_H
+#define CRADLE_TEST_DLLS_DIR_H
+
+#include <string>
+
+namespace cradle {
+
+inline std::string
+get_test_dlls_dir()
+{
+    return "@test_dlls_dir@";
+}
+
+} // namespace cradle
+
+#endif

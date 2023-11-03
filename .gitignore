@@ -1,5 +1,8 @@
 /*build*
+/out/
+/src/cradle-dll/out/
 .cache
+.vs
 .vscode
 .gcovr.txt
 .lcov.info
@@ -8,5 +11,5 @@
 cradle.egg-info/
 python/config.yml
 .token
-coverage.txt
+coverage*.txt
 .docker-auth

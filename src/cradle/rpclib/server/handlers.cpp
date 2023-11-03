@@ -1,6 +1,8 @@
 #include <functional>
+#include <memory>
 #include <stdexcept>
 #include <thread>
+#include <vector>
 
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
@@ -8,6 +10,7 @@
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/fmt_format.h>
+#include <cradle/inner/dll/dll_collection.h>
 #include <cradle/inner/introspection/tasklet_impl.h>
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/config.h>
@@ -17,7 +20,7 @@
 #include <cradle/inner/service/config_map_from_json.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/rpclib/server/handlers.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 
 namespace cradle {
 
@@ -63,14 +66,13 @@ resolve_sync(
     std::string config_json,
     std::string seri_req)
 {
-    auto& service{hctx.service()};
     auto& logger{hctx.logger()};
     service_config config{read_config_map_from_json(config_json)};
     auto domain_name
         = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
     logger.info("resolve_sync {}: {}", domain_name, seri_req);
-    auto dom = find_domain(domain_name);
-    auto ctx{dom->make_local_sync_context(service, config)};
+    auto& dom = hctx.service().find_domain(domain_name);
+    auto ctx{dom.make_local_sync_context(config)};
     cppcoro::task<serialized_result> task;
     auto optional_client_tasklet_id
         = config.get_optional_number(remote_config_keys::TASKLET_ID);
@@ -106,12 +108,20 @@ handle_resolve_sync(
     std::string seri_req)
 try
 {
+#if 1
+    // Why dispatch to another thread?
+    // The intention is to have at least one thread handling RPC messages even
+    // if all request-resolving threads are busy.
+    // TODO try achieving this without dispatching.
     auto fut = hctx.request_pool().submit(
         resolve_sync,
         std::ref(hctx),
         std::move(config_json),
         std::move(seri_req));
     return fut.get();
+#else
+    return resolve_sync(hctx, std::move(config_json), std::move(seri_req));
+#endif
 }
 catch (std::exception& e)
 {
@@ -137,7 +147,7 @@ void
 handle_mock_http(rpclib_handler_context& hctx, std::string body)
 try
 {
-    auto& session = enable_http_mocking(hctx.service());
+    auto& session = hctx.service().enable_http_mocking();
     session.set_canned_response(make_http_200_response(body));
 }
 catch (std::exception& e)
@@ -185,15 +195,14 @@ handle_submit_async(
     std::string seri_req)
 try
 {
-    auto& service{hctx.service()};
     auto& logger{hctx.logger()};
     service_config config{read_config_map_from_json(config_json)};
     auto domain_name
         = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
     logger.info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
-    auto dom = find_domain(domain_name);
-    auto ctx{dom->make_local_async_context(service, config)};
+    auto& dom = hctx.service().find_domain(domain_name);
+    auto ctx{dom.make_local_async_context(config)};
     if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*ctx))
     {
         atst_ctx->apply_fail_submit_async();
@@ -399,6 +408,38 @@ catch (std::exception& e)
 {
     handle_exception(hctx, e);
     return tasklet_info_tuple_list{};
+}
+
+void
+handle_load_shared_library(
+    rpclib_handler_context& hctx, std::string dir_path, std::string dll_name)
+try
+{
+    auto& logger{hctx.logger()};
+    logger.info("handle_load_shared_library({}, {})", dir_path, dll_name);
+
+    auto& the_dlls{hctx.service().the_dlls()};
+    the_dlls.load(dir_path, dll_name);
+}
+catch (std::exception& e)
+{
+    handle_exception(hctx, e);
+}
+
+void
+handle_unload_shared_library(
+    rpclib_handler_context& hctx, std::string dll_name)
+try
+{
+    auto& logger{hctx.logger()};
+    logger.info("handle_unload_shared_library({})", dll_name);
+
+    auto& the_dlls{hctx.service().the_dlls()};
+    the_dlls.unload(dll_name);
+}
+catch (std::exception& e)
+{
+    handle_exception(hctx, e);
 }
 
 } // namespace cradle

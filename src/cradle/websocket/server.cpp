@@ -34,6 +34,7 @@
 #include <cppcoro/when_all.hpp>
 
 #include <cradle/inner/core/sha256_hash_id.h>
+#include <cradle/inner/dll/dll_collection.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/file_io.h>
@@ -47,10 +48,10 @@
 #include <cradle/inner/utilities/functional.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/inner/utilities/text.h>
+#include <cradle/plugins/secondary_cache/all_plugins.h>
 #include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/rpclib/client/proxy.h>
-#include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/apm.h>
 #include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/calc.h>
@@ -60,6 +61,7 @@
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/thinknode/secondary_cache_serialization.h>
 #include <cradle/thinknode/utilities.h>
+#include <cradle/thinknode_dlls_dir.h>
 #include <cradle/typing/core/fmt_format.h>
 #include <cradle/typing/core/unique_hash.h>
 #include <cradle/typing/encodings/json.h>
@@ -187,8 +189,11 @@ struct client_request
     tasklet_tracker* tasklet;
 };
 
-struct websocket_server_impl
+class websocket_server_impl
 {
+ public:
+    websocket_server_impl(service_config const& config);
+
     service_config config;
     std::shared_ptr<spdlog::logger> logger;
     // TODO another http_request_system singleton in typing/service/core.cpp
@@ -1440,12 +1445,12 @@ make_thinknode_request_context(
     client_request& request,
     bool remotely = false)
 {
+    std::string proxy_name{remotely ? "rpclib" : ""};
     thinknode_request_context ctx{
         server.core,
         get_client(server.clients, request.client).session,
         request.tasklet,
-        remotely,
-        "rpclib"};
+        proxy_name};
     return ctx;
 }
 
@@ -1894,44 +1899,40 @@ on_message(
     // tasklet_run. Force-finish here?
 }
 
-static void
-initialize(websocket_server_impl& server, service_config const& config)
+websocket_server_impl::websocket_server_impl(service_config const& in_config)
+    : config{in_config}, logger{create_logger("ws_server")}, core{in_config}
 {
-    server.config = config;
-    server.logger = create_logger("ws_server");
+    core.set_secondary_cache(create_secondary_storage(core));
 
-    server.core.initialize(config);
-
-    server.ws.clear_access_channels(websocketpp::log::alevel::all);
-    server.ws.init_asio();
+    ws.clear_access_channels(websocketpp::log::alevel::all);
+    ws.init_asio();
     // TODO following line under evaluation, for development only
-    server.ws.set_reuse_addr(true);
-    server.ws.set_open_handler(
-        [&](connection_hdl hdl) { on_open(server, hdl); });
-    server.ws.set_close_handler(
-        [&](connection_hdl hdl) { on_close(server, hdl); });
-    server.ws.set_message_handler(
+    ws.set_reuse_addr(true);
+    ws.set_open_handler([&](connection_hdl hdl) { on_open(*this, hdl); });
+    ws.set_close_handler([&](connection_hdl hdl) { on_close(*this, hdl); });
+    ws.set_message_handler(
         [&](connection_hdl hdl, ws_server_type::message_ptr message) {
-            on_message(server, hdl, message);
+            on_message(*this, hdl, message);
         });
 
-    register_and_initialize_thinknode_domain();
-    register_rpclib_client(config, server.core);
+    core.register_proxy(std::make_unique<rpclib_client>(config));
+
+    // TODO maybe delay loading Thinknode DLL until really needed
+    // Load Thinknode DLL locally
+    core.the_dlls().load(get_thinknode_dlls_dir(), "cradle_thinknode_v1");
+    // Load Thinknode DLL in the rpclib server
+    auto& proxy{core.get_proxy("rpclib")};
+    proxy.load_shared_library(get_thinknode_dlls_dir(), "cradle_thinknode_v1");
 }
 
 websocket_server::websocket_server(service_config const& config)
+    : impl_{std::make_unique<websocket_server_impl>(config)}
 {
-    impl_ = new websocket_server_impl;
-    initialize(*impl_, config);
 }
 
 websocket_server::~websocket_server()
 {
-    if (impl_)
-    {
-        cppcoro::sync_wait(impl_->async_scope.join());
-        delete impl_;
-    }
+    cppcoro::sync_wait(impl_->async_scope.join());
 }
 
 void

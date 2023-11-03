@@ -46,17 +46,17 @@ rq_local(Function function, std::string const& title)
 
 TEST_CASE("register seri resolver and call it", tag)
 {
+    auto resources{make_inner_test_resources()};
     static char const arg[] = "a";
     auto req{rq_local(make_string<arg>{}, arg)};
+    seri_catalog cat{resources->get_seri_registry()};
 
-    REQUIRE_NOTHROW(register_seri_resolver(req));
+    REQUIRE_NOTHROW(cat.register_resolver(req));
 
-    inner_resources resources;
-    init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr, false, ""};
+    testing_request_context ctx{*resources, nullptr, ""};
     std::string seri_req{serialize_request(req)};
     auto seri_resp{
-        cppcoro::sync_wait(seri_catalog::instance().resolve(ctx, seri_req))};
+        cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req))};
     std::string response{deserialize_response<std::string>(seri_resp.value())};
     seri_resp.on_deserialized();
 
@@ -65,50 +65,58 @@ TEST_CASE("register seri resolver and call it", tag)
 
 TEST_CASE("call unregistered resolver", tag)
 {
+    auto resources{make_inner_test_resources()};
     static char const arg[] = "b";
     auto req{rq_local(make_string<arg>{}, arg)};
-    inner_resources resources;
-    init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr, false, ""};
+    testing_request_context ctx{*resources, nullptr, ""};
+
+#if 0
+    // Even serialization now fails if the request was not registered:
+    REQUIRE_THROWS_WITH(
+        serialize_request(req),
+        Catch::Contains("seri_registry: no entry for"));
+#else
     std::string seri_req{serialize_request(req)};
 
     REQUIRE_THROWS_WITH(
-        cppcoro::sync_wait(seri_catalog::instance().resolve(ctx, seri_req)),
-        Catch::StartsWith("no request registered with uuid"));
+        cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req)),
+        Catch::Contains("no entry found for uuid b"));
+#endif
 }
 
+// TODO convert to seri_registry(?) test (catches missing uuid since refactor)
 TEST_CASE("serialized request lacking uuid", tag)
 {
+    auto resources{make_inner_test_resources()};
     static char const arg[] = "c";
     auto req{rq_local(make_string<arg>{}, arg)};
-    register_seri_resolver(req);
-    inner_resources resources;
-    init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr, false, ""};
+    seri_catalog cat{resources->get_seri_registry()};
+    cat.register_resolver(req);
+    testing_request_context ctx{*resources, nullptr, ""};
     std::string correct{serialize_request(req)};
 
     std::regex re("uuid");
     std::string wrong{std::regex_replace(correct, re, "wrong")};
 
     REQUIRE_THROWS_WITH(
-        cppcoro::sync_wait(seri_catalog::instance().resolve(ctx, wrong)),
-        Catch::StartsWith("no uuid found in JSON"));
+        cppcoro::sync_wait(resolve_serialized_local(ctx, wrong)),
+        Catch::Contains("no uuid found in JSON"));
 }
 
 TEST_CASE("malformed serialized request", tag)
 {
+    auto resources{make_inner_test_resources()};
     static char const arg[] = "d";
     auto req{rq_local(make_string<arg>{}, arg)};
-    register_seri_resolver(req);
-    inner_resources resources;
-    init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr, false, ""};
+    seri_catalog cat{resources->get_seri_registry()};
+    cat.register_resolver(req);
+    testing_request_context ctx{*resources, nullptr, ""};
     std::string seri_req{serialize_request(req)};
 
     seri_req.pop_back();
 
     REQUIRE_THROWS_WITH(
-        cppcoro::sync_wait(seri_catalog::instance().resolve(ctx, seri_req)),
+        cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req)),
         Catch::StartsWith("rapidjson internal assertion failure"));
 }
 
@@ -130,25 +138,27 @@ make_f_string(context_intf& ctx)
 
 TEST_CASE("resolve two C++ functions with the same signature", tag)
 {
-    auto req_e{rq_local(make_e_string, "test_seri_catalog_e")};
-    auto req_f{rq_local(make_f_string, "test_seri_catalog_f")};
+    auto resources{make_inner_test_resources()};
+    std::string uuid_str_e{"test_seri_catalog_e"};
+    std::string uuid_str_f{"test_seri_catalog_f"};
+    auto req_e{rq_local(make_e_string, uuid_str_e)};
+    auto req_f{rq_local(make_f_string, uuid_str_f)};
+    seri_catalog cat{resources->get_seri_registry()};
 
-    REQUIRE_NOTHROW(register_seri_resolver(req_e));
-    REQUIRE_NOTHROW(register_seri_resolver(req_f));
+    REQUIRE_NOTHROW(cat.register_resolver(req_e));
+    REQUIRE_NOTHROW(cat.register_resolver(req_f));
 
     std::string seri_req_e{serialize_request(req_e)};
     std::string seri_req_f{serialize_request(req_f)};
 
     REQUIRE(seri_req_e != seri_req_f);
 
-    inner_resources resources;
-    init_test_inner_service(resources);
-    testing_request_context ctx{resources, nullptr, false, ""};
+    testing_request_context ctx{*resources, nullptr, ""};
 
     auto seri_resp_e{
-        cppcoro::sync_wait(seri_catalog::instance().resolve(ctx, seri_req_e))};
+        cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req_e))};
     auto seri_resp_f{
-        cppcoro::sync_wait(seri_catalog::instance().resolve(ctx, seri_req_f))};
+        cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req_f))};
     REQUIRE(seri_resp_e.value() != seri_resp_f.value());
 
     std::string resp_e{deserialize_response<std::string>(seri_resp_e.value())};

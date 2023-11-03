@@ -3,7 +3,7 @@
 
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/thinknode/context.h>
-#include <cradle/typing/service/core.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/websocket/types.hpp>
 
 namespace cradle {

@@ -30,11 +30,11 @@ struct http_cache_config_values
 class http_cache : public secondary_storage_intf
 {
  public:
-    http_cache(inner_resources& resources, service_config const& config);
+    http_cache(inner_resources& resources);
 
     // Not (yet?) implemented
     void
-    reset(service_config const& config) override;
+    clear() override;
 
     // Returns blob{} if the value is not in the cache.
     // Throws on other errors.

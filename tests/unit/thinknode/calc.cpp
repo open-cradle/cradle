@@ -1,16 +1,14 @@
-#include <cradle/thinknode/calc.h>
-
-#include <cstring>
-
 #include <cppcoro/sync_wait.hpp>
 
 #include <fmt/format.h>
 
 #include <fakeit.h>
 
+#include "../../support/thinknode.h"
 #include <cradle/inner/core/monitoring.h>
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/utilities/for_async.h>
+#include <cradle/thinknode/calc.h>
 #include <cradle/typing/encodings/json.h>
 #include <cradle/typing/utilities/testing.h>
 
@@ -78,10 +76,9 @@ TEST_CASE("calc status utilities", "[thinknode][tn_calc]")
 
 TEST_CASE("calc status query", "[thinknode][tn_calc]")
 {
-    service_core service;
-    init_test_service(service);
+    thinknode_test_scope scope;
 
-    auto& mock_http = enable_http_mocking(service);
+    auto& mock_http = scope.enable_http_mocking();
     mock_http.set_script(
         {{make_get_request(
               "https://mgh.thinknode.io/api/v1.0/calc/abc/"
@@ -90,13 +87,9 @@ TEST_CASE("calc status query", "[thinknode][tn_calc]")
                {"Accept", "application/json"}}),
           make_http_200_response("{ \"completed\": null }")}});
 
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token = "xyz";
-
-    thinknode_request_context trc{service, session, nullptr, false, ""};
+    auto ctx{scope.make_context()};
     auto status
-        = cppcoro::sync_wait(query_calculation_status(trc, "123", "abc"));
+        = cppcoro::sync_wait(query_calculation_status(ctx, "123", "abc"));
     REQUIRE(status == make_calculation_status_with_completed(nil));
 
     REQUIRE(mock_http.is_complete());
@@ -105,10 +98,9 @@ TEST_CASE("calc status query", "[thinknode][tn_calc]")
 
 TEST_CASE("calc request retrieval", "[thinknode][tn_calc]")
 {
-    service_core service;
-    init_test_service(service);
+    thinknode_test_scope scope;
 
-    auto& mock_http = enable_http_mocking(service);
+    auto& mock_http = scope.enable_http_mocking();
     mock_http.set_script(
         {{make_get_request(
               "https://mgh.thinknode.io/api/v1.0/calc/abc?context=123",
@@ -116,13 +108,9 @@ TEST_CASE("calc request retrieval", "[thinknode][tn_calc]")
                {"Accept", "application/json"}}),
           make_http_200_response("{ \"value\": [2.1, 4.2] }")}});
 
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token = "xyz";
-
-    thinknode_request_context trc{service, session, nullptr, false, ""};
+    auto ctx{scope.make_context()};
     auto request
-        = cppcoro::sync_wait(retrieve_calculation_request(trc, "123", "abc"));
+        = cppcoro::sync_wait(retrieve_calculation_request(ctx, "123", "abc"));
 
     REQUIRE(
         request
@@ -134,10 +122,9 @@ TEST_CASE("calc request retrieval", "[thinknode][tn_calc]")
 
 TEST_CASE("calc status long polling", "[thinknode][tn_calc]")
 {
-    service_core service;
-    init_test_service(service);
+    thinknode_test_scope scope;
 
-    auto& mock_http = enable_http_mocking(service);
+    auto& mock_http = scope.enable_http_mocking();
     mock_http.set_script(
         {{make_get_request(
               "https://mgh.thinknode.io/api/v1.0/calc/abc/status?context=123",
@@ -169,13 +156,9 @@ TEST_CASE("calc status long polling", "[thinknode][tn_calc]")
                calculation_uploading_status{0.995}),
            make_calculation_status_with_completed(nil)};
 
-    thinknode_session session;
-    session.api_url = "https://mgh.thinknode.io/api/v1.0";
-    session.access_token = "xyz";
-
-    thinknode_request_context trc{service, session, nullptr, false, ""};
+    auto ctx{scope.make_context()};
     cppcoro::sync_wait([&]() -> cppcoro::task<> {
-        auto statuses = long_poll_calculation_status(trc, "123", "abc");
+        auto statuses = long_poll_calculation_status(ctx, "123", "abc");
         size_t status_counter = 0;
         co_await for_async(std::move(statuses), [&](auto status) {
             REQUIRE(status == expected_statuses.at(status_counter));

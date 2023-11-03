@@ -41,7 +41,9 @@ make_ll_disk_cache_config(service_config const& config)
 {
     return ll_disk_cache_config{
         config.get_optional_string(local_disk_cache_config_keys::DIRECTORY),
-        config.get_optional_number(local_disk_cache_config_keys::SIZE_LIMIT)};
+        config.get_optional_number(local_disk_cache_config_keys::SIZE_LIMIT),
+        config.get_bool_or_default(
+            local_disk_cache_config_keys::START_EMPTY, false)};
 }
 
 static uint32_t
@@ -66,9 +68,9 @@ local_disk_cache::local_disk_cache(service_config const& config)
 }
 
 void
-local_disk_cache::reset(service_config const& config)
+local_disk_cache::clear()
 {
-    ll_cache_.reset(make_ll_disk_cache_config(config));
+    ll_cache_.clear();
 }
 
 // This is a coroutine so takes key by value.

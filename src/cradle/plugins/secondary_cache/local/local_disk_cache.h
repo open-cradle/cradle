@@ -26,6 +26,10 @@ struct local_disk_cache_config_keys
     // (Optional integer)
     inline static std::string const NUM_THREADS_WRITE_POOL{
         "disk_cache/num_threads_write_pool"};
+
+    // (Optional boolean)
+    // If true, the cache is cleared on initialization.
+    inline static std::string const START_EMPTY{"disk_cache/start_empty"};
 };
 
 struct local_disk_cache_config_values
@@ -40,7 +44,7 @@ class local_disk_cache : public secondary_storage_intf
     local_disk_cache(service_config const& config);
 
     void
-    reset(service_config const& config) override;
+    clear() override;
 
     cppcoro::task<blob>
     read(std::string key) override;

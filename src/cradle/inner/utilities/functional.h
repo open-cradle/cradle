@@ -12,10 +12,10 @@ auto
 map(Fn const& fn, std::vector<Item> const& items)
 {
     typedef decltype(fn(Item())) mapped_item_type;
-    size_t item_count = items.size();
+    std::size_t item_count = items.size();
     std::vector<mapped_item_type> result;
     result.reserve(item_count);
-    for (size_t i = 0; i != item_count; ++i)
+    for (std::size_t i = 0; i != item_count; ++i)
         result.push_back(fn(items[i]));
     return result;
 }
@@ -26,10 +26,10 @@ auto
 map(Fn const& fn, std::vector<Item>&& items)
 {
     typedef decltype(fn(Item())) mapped_item_type;
-    size_t item_count = items.size();
+    std::size_t item_count = items.size();
     std::vector<mapped_item_type> result;
     result.reserve(item_count);
-    for (size_t i = 0; i != item_count; ++i)
+    for (std::size_t i = 0; i != item_count; ++i)
         result.push_back(fn(std::move(items[i])));
     return result;
 }

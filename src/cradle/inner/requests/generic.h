@@ -87,6 +87,11 @@ class context_intf
  public:
     virtual ~context_intf() = default;
 
+    // Returns the resources available for resolving a request.
+    virtual inner_resources&
+    get_resources()
+        = 0;
+
     // Indicates if requests will be resolved remotely.
     // - Will return true if the context does not support local resolution
     // - Will return false if the context does not support remote resolution
@@ -386,15 +391,11 @@ class remote_async_context_intf : public remote_context_intf,
 // Context interface needed for resolving a cached request.
 // Implicitly local-only although not derived from local_context_intf,
 // but an implementation class should do that.
+// Resources must provide at least a memory cache.
 class caching_context_intf : public virtual context_intf
 {
  public:
     virtual ~caching_context_intf() = default;
-
-    // Returns resources implementing the cache(s).
-    virtual inner_resources&
-    get_resources()
-        = 0;
 };
 
 // Context interface needed for resolving an introspective request.
@@ -487,10 +488,13 @@ concept ValidContext
 template<typename T>
 concept Request
     = requires {
-          std::same_as<typename T::element_type, T>;
+          requires std::same_as<typename T::element_type, T>;
           typename T::value_type;
-          std::same_as<decltype(T::caching_level), caching_level_type>;
-          std::same_as<decltype(T::introspective), bool>;
+          requires std::same_as<
+              std::remove_const_t<decltype(T::caching_level)>,
+              caching_level_type>;
+          requires std::
+              same_as<std::remove_const_t<decltype(T::introspective)>, bool>;
       } && requires(T const& req) {
                {
                    req.get_uuid()

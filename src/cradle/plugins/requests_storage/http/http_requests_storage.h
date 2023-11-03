@@ -24,12 +24,11 @@ struct http_requests_storage_config_keys
 class http_requests_storage : public secondary_storage_intf
 {
  public:
-    http_requests_storage(
-        inner_resources& resources, service_config const& config);
+    http_requests_storage(inner_resources& resources);
 
     // Not (yet?) implemented
     void
-    reset(service_config const& config) override;
+    clear() override;
 
     // Returns blob{} if the value is not in the storage.
     // Throws on other errors.

@@ -67,6 +67,9 @@ option(CRADLE_GPROF_PROFILING "Enable CPU profiling using gprof" OFF)
 # Define TSan (ThreadSanitizer) options.
 option(CRADLE_THREAD_SANITIZER "Enable ThreadSanitizer (TSan)" OFF)
 
+# Define UBSan (UndefinedBehaviorSanitizer) options.
+option(CRADLE_UNDEFINED_BEHAVIOR_SANITIZER "Enable UndefinedBehaviorSanitizer (UBSan)" OFF)
+
 # Detect the compiler.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(IS_CLANG true)
@@ -87,6 +90,42 @@ endif()
 # CRADLE requires C++20
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+
+# Some of CRADLE's libraries are intended to be dynamically loaded, so are
+# built as MODULE libraries.
+#
+# Such a MODULE library is linked with other libraries; CRADLE and third-party
+# ones (e.g. cppcoro). Preferably, all of these libraries will be SHARED
+# ones. Having them STATIC would mean they will appear twice in the running
+# executable: once from being linked into the executable, and once from being
+# linked into the MODULE library. This not only is a waste of resources, but
+# also causes multiple instances of singletons, leading to incorrect program
+# behaviour.
+#
+# For this reason, all CRADLE libraries are SHARED. Third-party libraries
+# currently seem to be STATIC, but this should change too. However, these
+# STATIC libraries should be compiled into position-independent object code,
+# otherwise they cannot be linked into the SHARED CRADLE libraries:
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# TODO third-party libraries (like cppcoro) should be SHARED ones.
+#
+# For libraries build via vcpkg, this is dictated by the VCPKG_TARGET_TRIPLET setting.
+# For Linux, the value is x64-linux, and vcpkg/triplets/x64-linux.cmake has
+#   set(VCPKG_TARGET_ARCHITECTURE x64)
+#   set(VCPKG_CRT_LINKAGE dynamic)
+#   set(VCPKG_LIBRARY_LINKAGE static)
+# For Windows, the value is x64-windows, and vcpkg/triplets/x64-windows.cmake has
+#   set(VCPKG_TARGET_ARCHITECTURE x64)
+#   set(VCPKG_CRT_LINKAGE dynamic)
+#   set(VCPKG_LIBRARY_LINKAGE dynamic)
+# The difference is intentional, cf. https://github.com/microsoft/vcpkg/discussions/19127.
+#
+# cppcoro is exceptional in that it is not built via vcpkg.
+# On Windows, the CRADLE buildtree contains cppcoro.lib but not cppcoro.dll.
+
+# See CMake documentation for rationale.
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS 1)
 
 # version_info.h defines the CRADLE version.
 if(CRADLE_VERSION)
@@ -128,7 +167,7 @@ FetchContent_MakeAvailable(fetched_cppcoro)
 
 # Find core dependencies.
 find_package(Boost REQUIRED COMPONENTS
-    filesystem program_options)
+    filesystem program_options random)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(msgpack CONFIG REQUIRED)
 find_package(CURL CONFIG REQUIRED)
@@ -216,13 +255,19 @@ endif()
 if((IS_GCC OR IS_CLANG) AND CRADLE_GPROF_PROFILING)
     message(STATUS "Enabling CPU profiling using gprof")
     add_compile_options(-pg)
+    # TODO also shared libs? add_link_options?
     string(APPEND CMAKE_EXE_LINKER_FLAGS " -pg")
 elseif(IS_CLANG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     # Set build options for instrumenting test coverage.
     message(STATUS "Enabling gcov support")
     add_compile_options(-DLLVM_USE_LINKER=gold -fprofile-instr-generate
                         -fcoverage-mapping)
+    # TODO replace with
+    #   add_link_options(-fprofile-instr-generate -fcoverage-mapping)
+    # and make it work.
     string(APPEND CMAKE_EXE_LINKER_FLAGS
+           " -fprofile-instr-generate -fcoverage-mapping")
+    string(APPEND CMAKE_SHARED_LINKER_FLAGS
            " -fprofile-instr-generate -fcoverage-mapping")
 endif()
 
@@ -230,9 +275,22 @@ if(CRADLE_THREAD_SANITIZER)
     message(STATUS "Enabling ThreadSanitizer")
     if(IS_GCC OR IS_CLANG)
         add_compile_options(-fsanitize=thread -g)
+        # TODO also shared libs? add_link_options?
         string(APPEND CMAKE_EXE_LINKER_FLAGS " -fsanitize=thread")
     elseif(IS_MSVC)
        add_compile_options(/fsanitize=address /Zi)
+    endif()
+endif()
+
+if(CRADLE_UNDEFINED_BEHAVIOR_SANITIZER)
+    message(STATUS "Enabling UndefinedBehaviorSanitizer")
+    if(IS_CLANG)
+        # Make sure to use clang++ (not ld) as a linker; e.g.
+        # CMAKE_LINKER:FILEPATH=/usr/bin/clang++-15
+        add_compile_options(-fsanitize=undefined)
+        # No need to pass this option to the linker, it seems
+    else()
+        message(FATAL_ERROR "UBSan supported for Clang only")
     endif()
 endif()
 
@@ -299,6 +357,14 @@ else()
     message(FATAL_ERROR "Invalid setting for CRADLE_PREPROCESSOR_USAGE")
 endif()
 
+# Partition ${generated_srcs} based on src/cradle subdirectory.
+set(generated_srcs_typing ${generated_srcs})
+list(FILTER generated_srcs_typing INCLUDE REGEX "src/cradle/typing")
+set(generated_srcs_thinknode ${generated_srcs})
+list(FILTER generated_srcs_thinknode INCLUDE REGEX "src/cradle/thinknode")
+set(generated_srcs_websocket ${generated_srcs})
+list(FILTER generated_srcs_websocket INCLUDE REGEX "src/cradle/websocket")
+
 # Files generated by the preprocessor are in ${generated_src_dir};
 # depending on the ${CRADLE_PREPROCESSOR_USAGE} setting, generated by this cmake,
 # or provided through other means.
@@ -342,7 +408,7 @@ endfunction()
 # The library for the in-tree third-party software
 file(GLOB_RECURSE srcs_third_party CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/*.cpp")
-add_library(lib_third_party STATIC ${srcs_third_party})
+add_library(lib_third_party SHARED ${srcs_third_party})
 record_public_include_directory(lib_third_party
     ${CMAKE_CURRENT_SOURCE_DIR}/src/third-party
     include/third-party
@@ -351,7 +417,7 @@ record_public_include_directory(lib_third_party
 # The library for the inner core
 file(GLOB_RECURSE srcs_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/inner/*.cpp")
-add_library(cradle_inner STATIC ${srcs_inner})
+add_library(cradle_inner SHARED ${srcs_inner})
 add_dependencies(cradle_inner version_info)
 # simdjson.h "local variable is initialized but not referenced"
 # Only when building from Visual Studio GUI, not from command line?!
@@ -378,6 +444,7 @@ record_public_include_directory(cradle_inner
     include/third-party
     "*.[ih]*")
 target_link_libraries(cradle_inner PUBLIC
+    Boost::filesystem
     Boost::headers
     cereal::cereal
     cppcoro
@@ -396,7 +463,7 @@ file(GLOB_RECURSE srcs_plugins_inner CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/secondary_cache/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/requests_storage/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/testing/*.cpp")
-add_library(cradle_plugins_inner STATIC ${srcs_plugins_inner})
+add_library(cradle_plugins_inner SHARED ${srcs_plugins_inner})
 record_public_include_directory(cradle_plugins_inner
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     include
@@ -413,7 +480,7 @@ target_link_libraries(cradle_plugins_inner PUBLIC
 # The library for the rpclib client
 file(GLOB_RECURSE srcs_rpclib_client CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/client/*.cpp")
-add_library(cradle_rpclib_client STATIC)
+add_library(cradle_rpclib_client SHARED)
 target_sources(cradle_rpclib_client PRIVATE
     ${srcs_rpclib_client})
 add_dependencies(cradle_rpclib_client deploy_dir_file_target)
@@ -423,7 +490,6 @@ record_public_include_directory(cradle_rpclib_client
     "*.h")
 target_link_libraries(cradle_rpclib_client PUBLIC
     cradle_inner
-    Boost::filesystem
     Boost::headers
     cppcoro
     rpclib::rpc
@@ -432,8 +498,10 @@ target_link_libraries(cradle_rpclib_client PUBLIC
 # The typing library (a.o.) adds a type system (e.g. dynamics)
 file(GLOB_RECURSE srcs_typing CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/typing/*.cpp")
-add_library(cradle_typing STATIC ${srcs_typing} ${headers})
-target_sources(cradle_typing PRIVATE ${generated_headers} ${generated_srcs})
+add_library(cradle_typing SHARED ${srcs_typing} ${headers})
+target_sources(cradle_typing PRIVATE
+    ${generated_headers}
+    ${generated_srcs_typing})
 record_public_include_directory(cradle_typing
     ${generated_src_dir}
     include/generated
@@ -453,7 +521,7 @@ target_link_libraries(cradle_typing PUBLIC
 # The library for the plugins depending on the typing library
 file(GLOB_RECURSE srcs_plugins_typing CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/serialization/secondary_cache/legacy/native/*.cpp")
-add_library(cradle_plugins_typing STATIC ${srcs_plugins_typing})
+add_library(cradle_plugins_typing SHARED ${srcs_plugins_typing})
 add_dependencies(cradle_plugins_typing preprocessing)
 target_link_libraries(cradle_plugins_typing PUBLIC
     cradle_typing
@@ -462,8 +530,11 @@ target_link_libraries(cradle_plugins_typing PUBLIC
 # The thinknode library adds some Thinknode requests
 file(GLOB_RECURSE srcs_thinknode CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/thinknode/*.cpp")
-add_library(cradle_thinknode STATIC ${srcs_thinknode} ${headers})
-target_sources(cradle_thinknode PRIVATE ${generated_headers} ${generated_srcs})
+add_library(cradle_thinknode SHARED ${srcs_thinknode} ${headers})
+target_sources(cradle_thinknode PRIVATE
+    ${generated_headers}
+    ${generated_srcs_typing}
+    ${generated_srcs_thinknode})
 target_link_libraries(cradle_thinknode PUBLIC
     cradle_plugins_typing
     cradle_typing
@@ -472,17 +543,10 @@ target_link_libraries(cradle_thinknode PUBLIC
     cppcoro
     spdlog::spdlog)
 
-# A library of plugins depending on the thinknode library
-file(GLOB_RECURSE srcs_plugins_thinknode CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/domain/all/*.cpp")
-add_library(cradle_plugins_thinknode STATIC ${srcs_plugins_thinknode})
-target_link_libraries(cradle_plugins_thinknode PUBLIC
-    cradle_thinknode)
-
 # The websocket library adds more Thinknode requests, and a WebSocket interface
 file(GLOB_RECURSE srcs_websocket CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/websocket/*.cpp")
-add_library(cradle_websocket STATIC ${srcs_websocket} ${headers})
+add_library(cradle_websocket SHARED ${srcs_websocket} ${headers})
 # There doesn't seem to be a better way to disable the warnings that are
 # generated by WebSocket++.
 if(IS_MSVC)
@@ -494,10 +558,15 @@ if(IS_MSVC)
         APPEND_STRING PROPERTY COMPILE_FLAGS " /wd4996 /wd4127 /wd4267 /wd4244")
 endif()
 target_sources(cradle_websocket PRIVATE ${generated_headers} ${generated_srcs})
+add_dependencies(cradle_websocket
+    thinknode_dlls_dir_target)
+# Boost::random required by websocketpp even though not advertised
 target_link_libraries(cradle_websocket PUBLIC
     cradle_thinknode
     cradle_rpclib_client
+    cradle_plugins_inner
     Boost::headers
+    Boost::random
     cereal::cereal
     cppcoro
     spdlog::spdlog
@@ -506,7 +575,7 @@ target_link_libraries(cradle_websocket PUBLIC
 # The external library adds a C++ API
 file(GLOB_RECURSE srcs_external CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/external/*.cpp")
-add_library(cradle_external STATIC ${srcs_external} ${headers})
+add_library(cradle_external SHARED ${srcs_external} ${headers})
 target_sources(cradle_external PRIVATE ${generated_headers} ${generated_srcs})
 target_link_libraries(cradle_external PUBLIC
     cradle_websocket)
@@ -515,7 +584,6 @@ target_link_libraries(cradle_external PUBLIC
 add_executable(websocket_server src/server.cpp)
 target_link_libraries(websocket_server
     cradle_websocket
-    cradle_plugins_inner
     Boost::program_options)
 
 # The rpclib server
@@ -523,7 +591,6 @@ file(GLOB_RECURSE srcs_rpclib_server CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/server/*.cpp")
 add_executable(rpclib_server ${srcs_rpclib_server})
 target_link_libraries(rpclib_server PRIVATE
-    cradle_plugins_thinknode
     cradle_thinknode
     cradle_plugins_inner
     Boost::headers
@@ -536,6 +603,9 @@ target_link_libraries(rpclib_server PRIVATE
 # Convenience target denoting all servers
 add_custom_target(servers)
 add_dependencies(servers websocket_server rpclib_server)
+
+# Create dynamic-loadable DLLs
+add_subdirectory(src/cradle-dll)
 
 if (CRADLE_ENABLE_TESTING)
     # Retrieve the token info if it exists
@@ -569,7 +639,7 @@ if(CRADLE_INSTALL)
     install(
         TARGETS
             cradle_inner cradle_typing lib_third_party cradle_plugins_inner
-            cradle_plugins_typing cradle_thinknode cradle_plugins_thinknode
+            cradle_plugins_typing cradle_thinknode
             cradle_rpclib_client cradle_websocket cradle_external cppcoro
         EXPORT CradleTargets
         LIBRARY DESTINATION lib

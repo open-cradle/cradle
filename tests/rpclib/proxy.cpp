@@ -8,9 +8,7 @@
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/requests.h>
-#include <cradle/plugins/domain/testing/seri_catalog.h>
 #include <cradle/rpclib/client/proxy.h>
-#include <cradle/rpclib/client/registry.h>
 
 #include "../support/inner_service.h"
 
@@ -18,30 +16,28 @@ using namespace cradle;
 
 TEST_CASE("client name", "[rpclib]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
-    auto& client
-        = register_rpclib_client(make_inner_tests_config(), resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{make_inner_test_resources(proxy_name)};
+    auto& client{resources->get_proxy(proxy_name)};
 
     REQUIRE(client.name() == "rpclib");
 }
 
 TEST_CASE("send mock_http message", "[rpclib]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
-    auto& client
-        = register_rpclib_client(make_inner_tests_config(), resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{make_inner_test_resources(proxy_name)};
+    auto& client{resources->get_proxy(proxy_name)};
 
     REQUIRE_NOTHROW(client.mock_http("mock response"));
 }
 
 TEST_CASE("ping message", "[rpclib]")
 {
-    inner_resources resources;
-    init_test_inner_service(resources);
-    auto& client
-        = register_rpclib_client(make_inner_tests_config(), resources);
+    std::string proxy_name{"rpclib"};
+    auto resources{make_inner_test_resources(proxy_name)};
+    auto& client{
+        static_cast<rpclib_client&>(resources->get_proxy(proxy_name))};
 
     auto git_version = client.ping();
 
@@ -52,14 +48,11 @@ static void
 test_make_some_blob(bool use_shared_memory)
 {
     constexpr auto caching_level{caching_level_type::full};
-    constexpr auto remotely{true};
     std::string proxy_name{"rpclib"};
-    register_testing_seri_resolvers();
-    inner_resources service;
-    init_test_inner_service(service);
-    register_rpclib_client(make_inner_tests_config(), service);
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
     auto* tasklet{create_tasklet_tracker("test", "make_some_blob")};
-    testing_request_context ctx{service, tasklet, remotely, proxy_name};
+    testing_request_context ctx{*resources, tasklet, proxy_name};
 
     auto req{rq_make_some_blob<caching_level>(10000, use_shared_memory)};
     auto response = cppcoro::sync_wait(resolve_request(ctx, req));
@@ -82,9 +75,10 @@ TEST_CASE("resolve to a blob file", "[rpclib]")
 
 TEST_CASE("sending bad request", "[rpclib]")
 {
-    inner_resources service;
-    init_test_inner_service(service);
-    auto& client = register_rpclib_client(make_inner_tests_config(), service);
+    std::string proxy_name{"rpclib"};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
+    auto& client{resources->get_proxy(proxy_name)};
     service_config_map config_map{
         {remote_config_keys::DOMAIN_NAME, "bad domain"},
     };
@@ -92,4 +86,15 @@ TEST_CASE("sending bad request", "[rpclib]")
     REQUIRE_THROWS_AS(
         client.resolve_sync(service_config{config_map}, "bad request"),
         remote_error);
+}
+
+TEST_CASE("rpclib protocol mismatch", "[rpclib]")
+{
+    std::string proxy_name{"rpclib"};
+    auto resources{make_inner_test_resources(proxy_name)};
+    auto& client{
+        static_cast<rpclib_client&>(resources->get_proxy(proxy_name))};
+
+    REQUIRE_THROWS_AS(
+        client.verify_rpclib_protocol("incompatible"), remote_error);
 }

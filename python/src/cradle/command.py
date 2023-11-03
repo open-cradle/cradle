@@ -22,6 +22,24 @@ class Command:
         raise NotImplementedError
 
 
+class KillCommand(Command):
+    def __init__(self, context_id: str):
+        super().__init__(context_id)
+
+    def name(self) -> str:
+        return 'kill'
+
+    def create_content(self) -> Content:
+        return \
+            {
+                'kill': {
+                }
+            }
+
+    def decode_content(self, _content: Content) -> None:
+        return None
+
+
 class RegistrationCommand(Command):
     def __init__(self, context_id: str, api_url: str, api_token: str):
         super().__init__(context_id)

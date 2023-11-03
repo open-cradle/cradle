@@ -14,16 +14,13 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/rpclib/client/proxy.h>
-#include <cradle/rpclib/client/registry.h>
 #include <cradle/thinknode/caching.h>
 #include <cradle/thinknode/iss_req.h>
-#include <cradle/thinknode/seri_catalog.h>
+#include <cradle/thinknode/service/core.h>
 #include <cradle/typing/encodings/msgpack.h>
-#include <cradle/typing/service/core.h>
 #include <cradle/typing/utilities/testing.h>
 
 #include "../support/inner_service.h"
-#include "../support/outer_service.h"
 #include "../support/thinknode.h"
 #include "benchmark_support.h"
 
@@ -53,35 +50,6 @@ BENCHMARK(BM_create_post_iss_request<caching_level_type::memory>)
 BENCHMARK(BM_create_post_iss_request<caching_level_type::full>)
     ->Name("BM_create_post_iss_request_fully_cached");
 
-static void
-register_remote_services(
-    inner_resources& resources,
-    std::string const& proxy_name,
-    http_response const& response)
-{
-    ensure_thinknode_seri_resolvers();
-    ensure_all_domains_registered();
-    if (proxy_name == "loopback")
-    {
-        register_loopback_service(make_inner_tests_config(), resources);
-    }
-    else if (proxy_name == "rpclib")
-    {
-        auto& rpclib_client
-            = register_rpclib_client(make_outer_tests_config(), resources);
-
-        // TODO should body be blob or string?
-        auto const& body{response.body};
-        std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
-        rpclib_client.mock_http(s);
-    }
-    else
-    {
-        throw std::invalid_argument(
-            fmt::format("Unknown proxy name {}", proxy_name));
-    }
-}
-
 static char const s_loopback[] = "loopback";
 static char const s_rpclib[] = "rpclib";
 
@@ -90,25 +58,28 @@ void
 BM_try_resolve_thinknode_request(
     benchmark::State& state,
     Req const& req,
-    string const& api_url,
     http_response const& response,
-    char const* proxy_name = nullptr)
+    char const* proxy_name_ptr = nullptr)
 {
-    service_core service;
-    init_test_service(service);
-    auto& mock_http = enable_http_mocking(service, true);
-    mock_http.set_canned_response(response);
-    thinknode_session session;
-    session.api_url = api_url;
-    session.access_token = "xyz";
-    bool remotely = proxy_name != nullptr;
-    if (remotely)
+    std::string proxy_name;
+    if (proxy_name_ptr)
     {
-        register_remote_services(service, proxy_name, response);
+        proxy_name = proxy_name_ptr;
     }
-    std::string proxy_name_string{proxy_name ? proxy_name : ""};
-    thinknode_request_context ctx{
-        service, session, nullptr, remotely, proxy_name_string};
+    thinknode_test_scope scope{proxy_name};
+    auto& resources{scope.get_resources()};
+    if (auto proxy = scope.get_proxy())
+    {
+        auto const& body{response.body};
+        std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
+        proxy->mock_http(s);
+    }
+    else
+    {
+        auto& mock_http = resources.enable_http_mocking();
+        mock_http.set_canned_response(response);
+    }
+    auto ctx{scope.make_context()};
 
     // Fill the appropriate cache if any
     auto init = [&]() -> cppcoro::task<void> {
@@ -117,7 +88,7 @@ BM_try_resolve_thinknode_request(
             benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
             if constexpr (caching_level == caching_level_type::full)
             {
-                sync_wait_write_disk_cache(service);
+                sync_wait_write_disk_cache(resources);
             }
         }
         co_return;
@@ -157,11 +128,11 @@ BM_try_resolve_thinknode_request(
                     }
                     if constexpr (need_empty_memory_cache)
                     {
-                        service.reset_memory_cache();
+                        resources.reset_memory_cache();
                     }
                     if constexpr (need_empty_disk_cache)
                     {
-                        reset_disk_cache(service);
+                        resources.clear_secondary_cache();
                     }
                     if constexpr (pause_timing)
                     {
@@ -184,14 +155,13 @@ void
 BM_resolve_thinknode_request(
     benchmark::State& state,
     Req const& req,
-    string const& api_url,
     http_response const& response,
     char const* proxy_name = nullptr)
 {
     try
     {
         BM_try_resolve_thinknode_request<caching_level, storing, Req>(
-            state, req, api_url, response, proxy_name);
+            state, req, response, proxy_name);
     }
     catch (std::exception& e)
     {
@@ -210,7 +180,6 @@ template<
 void
 BM_resolve_post_iss_request(benchmark::State& state)
 {
-    string api_url{"https://mgh.thinknode.io/api/v1.0"};
     string context_id{"123"};
     auto schema{
         make_thinknode_type_info_with_string_type(thinknode_string_type())};
@@ -219,7 +188,7 @@ BM_resolve_post_iss_request(benchmark::State& state)
         rq_post_iss_object<caching_level>(context_id, schema, object_data)};
     auto response{make_http_200_response("{ \"id\": \"def\" }")};
     BM_resolve_thinknode_request<caching_level, storing>(
-        state, req, api_url, response, proxy_name);
+        state, req, response, proxy_name);
 }
 
 BENCHMARK(BM_resolve_post_iss_request<caching_level_type::none>)
@@ -253,14 +222,13 @@ template<
 void
 BM_resolve_retrieve_immutable_request(benchmark::State& state)
 {
-    string api_url{"https://mgh.thinknode.io/api/v1.0"};
     string context_id{"123"};
     string immutable_id{"abc"};
     auto req{
         rq_retrieve_immutable_object<caching_level>(context_id, immutable_id)};
     auto response{make_http_200_response("payload")};
     BM_resolve_thinknode_request<caching_level, storing>(
-        state, req, api_url, response, proxy_name);
+        state, req, response, proxy_name);
 }
 
 BENCHMARK(
