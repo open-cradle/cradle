@@ -94,7 +94,7 @@ class request_uuid
     //    "uuid": { "value0": "...uuid text..." },
     template<typename Archive>
     void
-    save_with_name(Archive& archive, std::string const& name)
+    save_with_name(Archive& archive, std::string const& name) const
     {
         archive(cereal::make_nvp(name, str()));
     }

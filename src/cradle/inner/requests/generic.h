@@ -481,6 +481,7 @@ concept ValidContext
  * Attributes:
  * - value_type: result type
  * - caching_level
+ * - a boolean indicating whether this is a proxy request
  * - introspective
  * - An id uniquely identifying the request (class). Can be a placeholder
  *   if such identification is not needed (TODO define when).
@@ -493,6 +494,8 @@ concept Request
           requires std::same_as<
               std::remove_const_t<decltype(T::caching_level)>,
               caching_level_type>;
+          requires std::
+              same_as<std::remove_const_t<decltype(T::is_proxy)>, bool>;
           requires std::
               same_as<std::remove_const_t<decltype(T::introspective)>, bool>;
       } && requires(T const& req) {
@@ -566,7 +569,7 @@ struct arg_type_struct
 
 // Yields the type of an argument to an rq_function-like call
 template<typename T>
-using arg_type = typename arg_type_struct<T>::value_type;
+using arg_type = typename arg_type_struct<std::decay_t<T>>::value_type;
 
 // Casts a context_intf reference to DestCtx*.
 // Returns nullptr if the runtime type doesn't match.

@@ -25,6 +25,7 @@ class value_request
 
     static constexpr caching_level_type caching_level{
         caching_level_type::none};
+    static constexpr bool is_proxy{true};
     static constexpr bool introspective{false};
 
     value_request(Value const& value) : value_{value}
@@ -51,9 +52,15 @@ class value_request
     }
 
     Value
-    get_value() const
+    get_value() const&
     {
         return value_;
+    }
+
+    Value&&
+    get_value() &&
+    {
+        return std::move(value_);
     }
 
     void

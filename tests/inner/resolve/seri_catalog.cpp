@@ -20,7 +20,7 @@ namespace {
 static char const tag[] = "[inner][resolve][seri_catalog]";
 
 template<caching_level_type Level>
-using local_props = request_props<Level, true, true>;
+using local_props = request_props<Level, request_function_t::coro, true>;
 
 template<char const* arg>
 class make_string

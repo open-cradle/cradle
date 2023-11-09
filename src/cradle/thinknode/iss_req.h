@@ -20,10 +20,13 @@ namespace cradle {
 // The caching level will typically be "full", but (e.g. for testing purposes)
 // supporting other options may be useful.
 template<caching_level_type Level>
-using thinknode_request_props = request_props<Level, true, true>;
+using thinknode_request_props
+    = request_props<Level, request_function_t::coro, true>;
 
-using thinknode_proxy_props
-    = request_props<caching_level_type::full, true, true, true>;
+using thinknode_proxy_props = request_props<
+    caching_level_type::full,
+    request_function_t::proxy_coro,
+    true>;
 
 // Creates a function_request_erased object representing a
 // "post ISS object" request,

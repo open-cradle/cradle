@@ -76,7 +76,7 @@ template<caching_level_type level, int H>
     requires(level == caching_level_type::full)
 auto create_triangular_tree_erased()
 {
-    request_props<level, false, false> props{make_uuid()};
+    request_props<level, request_function_t::plain, false> props{make_uuid()};
     if constexpr (H == 1)
     {
         return rq_function_erased(props, add, 2, 1);
@@ -95,15 +95,16 @@ template<caching_level_type level, int H>
 auto
 create_triangular_tree_erased_introspective()
 {
+    using props_type = request_props<level, request_function_t::plain, true>;
     if constexpr (H == 1)
     {
-        request_props<level, false, true> props{make_uuid(), "add 2+1"};
+        props_type props{make_uuid(), "add 2+1"};
         return rq_function_erased(props, add, 2, 1);
     }
     else
     {
         std::string title{fmt::format("add H{}", H)};
-        request_props<level, false, true> props{make_uuid(), title};
+        props_type props{make_uuid(), title};
         return rq_function_erased(
             props,
             add,

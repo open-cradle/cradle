@@ -315,8 +315,7 @@ TEST_CASE("compare function_request_erased: one C++ function", tag)
 
 TEST_CASE("compare function_request_erased: identical C++ functions", tag)
 {
-    constexpr bool is_coro{true};
-    request_props<caching_level_type::memory, is_coro> props{
+    request_props<caching_level_type::memory, request_function_t::coro> props{
         make_test_uuid("0050")};
     auto req_a0{rq_function_erased(props, coro_a)};
     auto req_a1{rq_function_erased(props, coro_a)};
@@ -332,11 +331,10 @@ TEST_CASE("compare function_request_erased: identical C++ functions", tag)
 
 TEST_CASE("compare function_request_erased: different C++ functions", tag)
 {
-    constexpr bool is_coro{true};
-    request_props<caching_level_type::memory, is_coro> props_a{
-        make_test_uuid("0060")};
-    request_props<caching_level_type::memory, is_coro> props_b{
-        make_test_uuid("0061")};
+    using props_type
+        = request_props<caching_level_type::memory, request_function_t::coro>;
+    props_type props_a{make_test_uuid("0060")};
+    props_type props_b{make_test_uuid("0061")};
     // req_a and req_b have the same signature (type), but refer to different
     // C++ functions.
     auto req_a{rq_function_erased(props_a, coro_a)};
@@ -355,8 +353,7 @@ TEST_CASE("compare function_request_erased: different C++ functions", tag)
 TEST_CASE(
     "compare function_request_erased: C++ functions with different args", tag)
 {
-    constexpr bool is_coro{true};
-    request_props<caching_level_type::memory, is_coro> props{
+    request_props<caching_level_type::memory, request_function_t::coro> props{
         make_test_uuid("0070")};
     // req_a and req_b have the same signature (type), refer to different
     // C++ functions, but take different args.
@@ -385,7 +382,7 @@ TEST_CASE("function_request_impl: load unregistered function", tag)
     using props_type = decltype(props);
     using impl_type = function_request_impl<
         value_type,
-        props_type::func_is_coro,
+        props_type::function_type == request_function_t::coro,
         decltype(&func_a)>;
 
     auto good_impl{std::make_shared<impl_type>(good_uuid, func_a)};
@@ -400,7 +397,8 @@ TEST_CASE("function_request_impl: load unregistered function", tag)
     }
     std::string good_seri = os.str();
 
-    std::shared_ptr<impl_type> bad_impl{std::make_shared<impl_type>(bad_uuid)};
+    std::shared_ptr<impl_type> bad_impl{
+        std::make_shared<impl_type>(std::move(bad_uuid))};
     auto bad_seri{std::regex_replace(
         good_seri, std::regex{good_uuid_str}, bad_uuid_str)};
     std::istringstream is(bad_seri);

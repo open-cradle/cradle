@@ -66,7 +66,7 @@ class unregistered_uuid_error : public uuid_error
 class seri_registry
 {
  public:
-    using create_t = std::shared_ptr<void>(request_uuid const& uuid);
+    using create_t = std::shared_ptr<void>(request_uuid&& uuid);
     template<typename Function>
     using function_t = std::shared_ptr<Function>;
     using resolver_t = std::shared_ptr<seri_resolver_intf>;
@@ -98,10 +98,10 @@ class seri_registry
     // Intf should be a function_request_intf instantiation.
     template<typename Intf>
     std::shared_ptr<Intf>
-    create(request_uuid const& uuid)
+    create(request_uuid&& uuid)
     {
         entry_t& entry{find_entry(uuid.str(), false)};
-        return std::static_pointer_cast<Intf>(entry.create(uuid));
+        return std::static_pointer_cast<Intf>(entry.create(std::move(uuid)));
     }
 
     template<typename Function>

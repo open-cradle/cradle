@@ -158,7 +158,10 @@ TEST_CASE("resolve async locally - raw args", tag)
     constexpr int loops = 3;
     int delay0 = 5;
     int delay1 = 6;
-    using Props = request_props<caching_level_type::none, true, false>;
+    using Props = request_props<
+        caching_level_type::none,
+        request_function_t::coro,
+        false>;
     Props props0{make_test_uuid(100)};
     Props props1{make_test_uuid(101)};
     Props props2{make_test_uuid(102)};

@@ -257,7 +257,10 @@ TEST_CASE("evaluate function requests in parallel - uncached coroutine", tag)
     auto resources{make_inner_test_resources()};
     static constexpr int num_requests = 7;
     using Value = int;
-    using Props = request_props<caching_level_type::none, true, false>;
+    using Props = request_props<
+        caching_level_type::none,
+        request_function_t::coro,
+        false>;
     using Req = function_request_erased<Value, Props>;
     int num_add_calls{};
     auto add{create_adder_coro(num_add_calls)};

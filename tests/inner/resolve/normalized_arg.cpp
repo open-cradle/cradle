@@ -1,3 +1,4 @@
+#include <cstring>
 #include <string>
 
 #include <catch2/catch.hpp>
@@ -23,8 +24,12 @@ make_test_uuid(std::string const& ext)
     return request_uuid{fmt::format("{}-{}", tag, ext)};
 }
 
-using func_props_t = request_props<caching_level_type::none, false, false>;
-using coro_props_t = request_props<caching_level_type::none, true, false>;
+using func_props_t = request_props<
+    caching_level_type::none,
+    request_function_t::plain,
+    false>;
+using coro_props_t
+    = request_props<caching_level_type::none, request_function_t::coro, false>;
 
 int
 plus_two_func(int x)
@@ -102,4 +107,25 @@ TEST_CASE("resolve serialized requests with normalized args", tag)
     int resp_d{deserialize_response<int>(seri_resp_d.value())};
     seri_resp_d.on_deserialized();
     REQUIRE(resp_d == 5);
+}
+
+TEST_CASE("normalized C-string arg stored as std::string", tag)
+{
+    auto resources{make_inner_test_resources()};
+    non_caching_request_resolution_context ctx{*resources};
+
+    auto function = [](std::string const& arg) { return arg; };
+    auto func_props{func_props_t{make_test_uuid("identity")}};
+    char arg_string[] = "original";
+    auto req{rq_function_erased(
+        func_props,
+        function,
+        normalize_arg<std::string, func_props_t>(arg_string))};
+
+    auto res0 = cppcoro::sync_wait(resolve_request(ctx, req));
+    REQUIRE(res0 == "original");
+
+    std::strcpy(arg_string, "changed");
+    auto res1 = cppcoro::sync_wait(resolve_request(ctx, req));
+    REQUIRE(res1 == "original");
 }

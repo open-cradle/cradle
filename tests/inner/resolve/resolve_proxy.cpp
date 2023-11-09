@@ -69,10 +69,8 @@ TEST_CASE("evaluate proxy request, normalized args", tag)
 
 // The test_inner_dll_x0 and test_inner_dll_x1 DLLs each define one request.
 // The two request functions have the same signature, so the corresponding
-// function_request_impl instantiations will be identical too. Depending on the
-// dynamic loader implementation, the two functions use the same, global,
-// function_request_impl::matching_functions_ singleton (Linux), or a per-DLL
-// one (Windows). Both should work correctly.
+// function_request_impl instantiations will be identical too. The framework
+// should distinguish the two.
 TEST_CASE("two DLLs defining same-typed requests", tag)
 {
     std::string proxy_name{"rpclib"};
