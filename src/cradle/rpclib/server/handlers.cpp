@@ -108,20 +108,8 @@ handle_resolve_sync(
     std::string seri_req)
 try
 {
-#if 1
-    // Why dispatch to another thread?
-    // The intention is to have at least one thread handling RPC messages even
-    // if all request-resolving threads are busy.
-    // TODO try achieving this without dispatching.
-    auto fut = hctx.request_pool().submit(
-        resolve_sync,
-        std::ref(hctx),
-        std::move(config_json),
-        std::move(seri_req));
-    return fut.get();
-#else
+    // This call blocks the rpclib handler thread.
     return resolve_sync(hctx, std::move(config_json), std::move(seri_req));
-#endif
 }
 catch (std::exception& e)
 {
@@ -213,6 +201,7 @@ try
     // TODO update status to SUBMITTED
     // This function should return asap.
     // Need to dispatch a thread calling the blocking cppcoro::sync_wait().
+    // TODO actx writes before now should synchronize with the pool thread
     hctx.request_pool().push_task(
         resolve_async, std::ref(hctx), actx, std::move(seri_req));
     async_id aid = actx->get_id();
