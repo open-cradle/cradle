@@ -167,11 +167,11 @@ TEST_CASE("resolve async locally - raw args", tag)
     Props props2{make_test_uuid(102)};
     // rq_cancellable_coro would call normalize_arg() on its arguments and
     // we don't want that in this test.
-    auto req{rq_function_erased(
+    auto req{rq_function(
         props0,
         cancellable_coro,
-        rq_function_erased(props1, cancellable_coro, loops, delay0),
-        rq_function_erased(props2, cancellable_coro, loops, delay1))};
+        rq_function(props1, cancellable_coro, loops, delay0),
+        rq_function(props2, cancellable_coro, loops, delay1))};
     auto resources{make_inner_test_resources()};
     auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
     auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};

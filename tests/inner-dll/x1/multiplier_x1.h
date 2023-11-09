@@ -11,8 +11,7 @@ inline auto
 rq_test_multiplier_x1(int a, int b)
 {
     using props_type = multiplier_x1_props<true>;
-    return rq_function_erased<int>(
-        props_type{request_uuid{multiplier_x1_uuid}}, a, b);
+    return rq_proxy<int>(props_type{request_uuid{multiplier_x1_uuid}}, a, b);
 }
 
 } // namespace cradle

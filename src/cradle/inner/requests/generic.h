@@ -498,11 +498,7 @@ concept Request
               same_as<std::remove_const_t<decltype(T::is_proxy)>, bool>;
           requires std::
               same_as<std::remove_const_t<decltype(T::introspective)>, bool>;
-      } && requires(T const& req) {
-               {
-                   req.get_uuid()
-                   } -> std::convertible_to<request_uuid>;
-           };
+      };
 // TODO say something about resolve_sync()/_async() as we used to do
 
 template<typename T>

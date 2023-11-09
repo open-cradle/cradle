@@ -25,7 +25,7 @@ class value_request
 
     static constexpr caching_level_type caching_level{
         caching_level_type::none};
-    static constexpr bool is_proxy{true};
+    static constexpr bool is_proxy{false};
     static constexpr bool introspective{false};
 
     value_request(Value const& value) : value_{value}
@@ -34,13 +34,6 @@ class value_request
 
     value_request(Value&& value) : value_{std::move(value)}
     {
-    }
-
-    request_uuid
-    get_uuid() const
-    {
-        // There should be no reason to call this.
-        throw not_implemented_error("value_request::get_uuid()");
     }
 
     // A value request is "trivial": it presents itself as having no

@@ -24,6 +24,7 @@ namespace cradle {
  * A uuid is used in:
  * - Calculating a disk-cache hash (when resolving a fully-cached request)
  * - Request serialization
+ * Without a uuid, neither of these are possible.
  *
  * A uuid is not needed for resolving uncached or memory-cached requests.
  *

@@ -57,13 +57,13 @@ TEST_CASE("resolve serialized requests with normalized args", tag)
     // by the two following normalize_arg calls, otherwise the second
     // register_resolver call will fail with a message like
     // "conflicting types for uuid normalization_uuid<int>".
-    cat.register_resolver(rq_function_erased(
+    cat.register_resolver(rq_function(
         func_props, plus_two_func, normalize_arg<int, func_props_t>(0)));
-    cat.register_resolver(rq_function_erased(
+    cat.register_resolver(rq_function(
         coro_props, plus_two_coro, normalize_arg<int, coro_props_t>(0)));
 
     // Function is "normal" (no coroutine); main request's arg is normalized
-    auto req_a{rq_function_erased(
+    auto req_a{rq_function(
         func_props, plus_two_func, normalize_arg<int, func_props_t>(1))};
     std::string seri_req_a{serialize_request(req_a)};
     auto seri_resp_a{
@@ -73,10 +73,10 @@ TEST_CASE("resolve serialized requests with normalized args", tag)
     REQUIRE(resp_a == 3);
 
     // Function is "normal" (no coroutine); main request's arg is subrequest
-    auto req_b{rq_function_erased(
+    auto req_b{rq_function(
         func_props,
         plus_two_func,
-        rq_function_erased(
+        rq_function(
             func_props, plus_two_func, normalize_arg<int, func_props_t>(1)))};
     std::string seri_req_b{serialize_request(req_b)};
     auto seri_resp_b{
@@ -86,7 +86,7 @@ TEST_CASE("resolve serialized requests with normalized args", tag)
     REQUIRE(resp_b == 5);
 
     // Function is coroutine; main request's arg is normalized
-    auto req_c{rq_function_erased(
+    auto req_c{rq_function(
         coro_props, plus_two_coro, normalize_arg<int, coro_props_t>(1))};
     std::string seri_req_c{serialize_request(req_c)};
     auto seri_resp_c{
@@ -96,10 +96,10 @@ TEST_CASE("resolve serialized requests with normalized args", tag)
     REQUIRE(resp_c == 3);
 
     // Function is coroutine; main request's arg is subrequest
-    auto req_d{rq_function_erased(
+    auto req_d{rq_function(
         coro_props,
         plus_two_coro,
-        rq_function_erased(
+        rq_function(
             coro_props, plus_two_coro, normalize_arg<int, coro_props_t>(1)))};
     std::string seri_req_d{serialize_request(req_d)};
     auto seri_resp_d{
@@ -117,7 +117,7 @@ TEST_CASE("normalized C-string arg stored as std::string", tag)
     auto function = [](std::string const& arg) { return arg; };
     auto func_props{func_props_t{make_test_uuid("identity")}};
     char arg_string[] = "original";
-    auto req{rq_function_erased(
+    auto req{rq_function(
         func_props,
         function,
         normalize_arg<std::string, func_props_t>(arg_string))};
@@ -128,4 +128,53 @@ TEST_CASE("normalized C-string arg stored as std::string", tag)
     std::strcpy(arg_string, "changed");
     auto res1 = cppcoro::sync_wait(resolve_request(ctx, req));
     REQUIRE(res1 == "original");
+}
+
+// A proxy subrequest should serialize to the same value as a corresponding
+// function subrequest.
+// A proxy subrequest is possible for a proxy main request, but not for a
+// function main request.
+// A function subrequest is possible for either type of main request.
+TEST_CASE("compare normalized proxy/function requests", tag)
+{
+    using proxy_props_t = request_props<
+        caching_level_type::none,
+        request_function_t::proxy_plain,
+        false>;
+    proxy_props_t proxy_main_props{request_uuid{"main"}};
+    func_props_t func_subreq_props{request_uuid{"sub"}};
+    proxy_props_t proxy_subreq_props{request_uuid{"sub"}};
+
+    auto func_subreq{rq_function(func_subreq_props, plus_two_func, 17)};
+    auto proxy_subreq{rq_proxy<int>(proxy_subreq_props, 17)};
+
+    auto req_a{rq_proxy<int>(proxy_main_props, func_subreq)};
+    auto req_b{rq_proxy<int>(proxy_main_props, proxy_subreq)};
+
+    std::string seri_req_a{serialize_request(req_a)};
+    std::string seri_req_b{serialize_request(req_b)};
+
+    REQUIRE(seri_req_a == seri_req_b);
+}
+
+TEST_CASE("compare normalized proxy/coroutine requests", tag)
+{
+    using proxy_props_t = request_props<
+        caching_level_type::none,
+        request_function_t::proxy_coro,
+        false>;
+    proxy_props_t proxy_main_props{request_uuid{"main"}};
+    coro_props_t coro_subreq_props{request_uuid{"sub"}};
+    proxy_props_t proxy_subreq_props{request_uuid{"sub"}};
+
+    auto coro_subreq{rq_function(coro_subreq_props, plus_two_coro, 19)};
+    auto proxy_subreq{rq_proxy<int>(proxy_subreq_props, 19)};
+
+    auto req_a{rq_proxy<int>(proxy_main_props, coro_subreq)};
+    auto req_b{rq_proxy<int>(proxy_main_props, proxy_subreq)};
+
+    std::string seri_req_a{serialize_request(req_a)};
+    std::string seri_req_b{serialize_request(req_b)};
+
+    REQUIRE(seri_req_a == seri_req_b);
 }

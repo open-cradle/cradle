@@ -28,7 +28,7 @@ rq_make_some_blob(std::size_t size, bool use_shared_memory)
     request_uuid uuid{"make_some_blob"};
     uuid.set_level(Level);
     std::string title{"make_some_blob"};
-    return rq_function_erased(
+    return rq_function(
         props_type(std::move(uuid), std::move(title)),
         make_some_blob,
         size,
@@ -49,7 +49,7 @@ rq_cancellable_coro(Loops loops, Delay delay)
     request_uuid uuid{"cancellable_coro"};
     uuid.set_level(Level);
     std::string title{"cancellable_coro"};
-    return rq_function_erased(
+    return rq_function(
         props_type(std::move(uuid), std::move(title)),
         cancellable_coro,
         normalize_arg<int, props_type>(std::move(loops)),

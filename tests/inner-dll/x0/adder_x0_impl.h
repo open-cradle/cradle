@@ -14,7 +14,7 @@ inline auto
 rq_test_adder_x0_impl(int a, int b)
 {
     using props_type = adder_x0_props<false>;
-    return rq_function_erased(
+    return rq_function(
         props_type{request_uuid{adder_x0_uuid}}, adder_x0_func, a, b);
 }
 

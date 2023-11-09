@@ -6,7 +6,6 @@
 
 #include <boost/exception/all.hpp>
 #include <boost/stacktrace.hpp>
-#include <fmt/format.h>
 
 namespace cradle {
 
@@ -65,12 +64,12 @@ class not_implemented_error : public std::logic_error
     }
 
     not_implemented_error(std::string const& what)
-        : std::logic_error{fmt::format("Not implemented: {}", what)}
+        : std::logic_error{std::string{"Not implemented: "} + what}
     {
     }
 
     not_implemented_error(char const* what)
-        : std::logic_error{fmt::format("Not implemented: {}", what)}
+        : std::logic_error{std::string{"Not implemented: "} + what}
     {
     }
 };

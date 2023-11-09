@@ -14,7 +14,7 @@ inline auto
 rq_test_multiplier_x1_impl(int a, int b)
 {
     using props_type = multiplier_x1_props<false>;
-    return rq_function_erased(
+    return rq_function(
         props_type{request_uuid{multiplier_x1_uuid}},
         multiplier_x1_func,
         a,

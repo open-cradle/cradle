@@ -10,24 +10,28 @@ namespace cradle {
 int
 adder_v1_func(int a, int b);
 
+// Creates a non-proxy request, that can be resolved locally or remotely.
+// Plain args, disabling the option of subrequests.
 inline auto
 rq_test_adder_v1p_impl(int a, int b)
 {
     using props_type = adder_v1_props<false>;
-    return rq_function_erased(
+    return rq_function(
         props_type{request_uuid{adder_v1p_uuid}, adder_v1_title},
         adder_v1_func,
         a,
         b);
 }
 
+// Creates a non-proxy request, that can be resolved locally or remotely.
+// Normalized args, enabling subrequests.
 template<typename A, typename B>
     requires TypedArg<A, int> && TypedArg<B, int>
 auto
 rq_test_adder_v1n_impl(A a, B b)
 {
     using props_type = adder_v1_props<false>;
-    return rq_function_erased(
+    return rq_function(
         props_type{request_uuid{adder_v1n_uuid}, adder_v1_title},
         adder_v1_func,
         normalize_arg<int, props_type>(std::move(a)),

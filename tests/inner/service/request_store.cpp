@@ -70,8 +70,8 @@ static auto add2 = [](int a, int b) { return a + b; };
 TEST_CASE("get_request_key()", tag)
 {
     request_props<caching_level_type::full> props{make_test_uuid(100)};
-    auto req0{rq_function_erased(props, add2, 1, 2)};
-    auto req1{rq_function_erased(props, add2, 1, 3)};
+    auto req0{rq_function(props, add2, 1, 2)};
+    auto req1{rq_function(props, add2, 1, 3)};
 
     std::string key0{get_request_key(req0)};
     std::string key1{get_request_key(req1)};
@@ -90,13 +90,13 @@ TEST_CASE("store request in storage", tag)
     seri_catalog cat{resources.get_seri_registry()};
     request_props<caching_level_type::full> props{make_test_uuid(200)};
 
-    auto req0{rq_function_erased(props, add2, 1, 2)};
+    auto req0{rq_function(props, add2, 1, 2)};
     cat.register_resolver(req0);
     cppcoro::sync_wait(store_request(req0, resources));
 
     REQUIRE(storage.size() == 1);
 
-    auto req1{rq_function_erased(props, add2, 1, 3)};
+    auto req1{rq_function(props, add2, 1, 3)};
     cppcoro::sync_wait(store_request(req1, resources));
 
     REQUIRE(storage.size() == 2);
@@ -109,7 +109,7 @@ TEST_CASE("load request from storage (hit)", tag)
     seri_catalog cat{resources.get_seri_registry()};
 
     request_props<caching_level_type::full> props{make_test_uuid(300)};
-    auto req_written{rq_function_erased(props, add2, 1, 2)};
+    auto req_written{rq_function(props, add2, 1, 2)};
     cat.register_resolver(req_written);
     cppcoro::sync_wait(store_request(req_written, resources));
 
@@ -125,9 +125,9 @@ TEST_CASE("load request from storage (miss)", tag)
     resources.set_secondary_cache(std::make_unique<mock_storage>());
     seri_catalog cat{resources.get_seri_registry()};
     request_props<caching_level_type::full> props{make_test_uuid(400)};
-    auto req_written{rq_function_erased(props, add2, 1, 2)};
+    auto req_written{rq_function(props, add2, 1, 2)};
     cat.register_resolver(req_written);
-    auto req_not_written{rq_function_erased(props, add2, 1, 3)};
+    auto req_not_written{rq_function(props, add2, 1, 3)};
     cppcoro::sync_wait(store_request(req_written, resources));
 
     using Req = decltype(req_not_written);

@@ -361,9 +361,12 @@ resolve_request(
     Ctx& ctx, Req const& req, Constraints constraints = Constraints())
 {
     static_assert(ValidContext<Ctx>);
+    static_assert(!(Req::is_proxy && constraints.force_local));
     // TODO check_context_satisfies_constraints(ctx, constraints);
-    // First decision (based on constraints if possible): remotely or locally
-    if constexpr (constraints.force_remote)
+
+    // First decision (based on constraints if possible): remotely or locally.
+    // A proxy request also forces remote resolving.
+    if constexpr (Req::is_proxy || constraints.force_remote)
     {
         // Cast here to be like the runtime decision below
         auto& rem_ctx{cast_ctx_to_ref<remote_context_intf>(ctx)};

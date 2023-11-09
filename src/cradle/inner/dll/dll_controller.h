@@ -36,7 +36,7 @@ make_dll_path(std::string const& dir_path, std::string const& dll_name);
  *   probably is code in the DLL.
  * - A request object's function resides in the DLL.
  * Keeping track of these references is possible but not without cost. In
- * particular, a function_request_erased constructor would need to translate
+ * particular, a function_request constructor would need to translate
  * its uuid to some catalog reference, and increase a reference count. This
  * means locking a mutex, whereas creating a request object currently is
  * relatively cheap.

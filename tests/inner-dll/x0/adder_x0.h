@@ -11,8 +11,7 @@ inline auto
 rq_test_adder_x0(int a, int b)
 {
     using props_type = adder_x0_props<true>;
-    return rq_function_erased<int>(
-        props_type{request_uuid{adder_x0_uuid}}, a, b);
+    return rq_proxy<int>(props_type{request_uuid{adder_x0_uuid}}, a, b);
 }
 
 } // namespace cradle
