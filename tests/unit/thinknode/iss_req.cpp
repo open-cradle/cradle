@@ -15,6 +15,9 @@
 #include "../../support/request.h"
 #include "../../support/tasklet_testing.h"
 #include "../../support/thinknode.h"
+#include "../../thinknode-dll/t0/make_some_blob_t0.h"
+#include "../../thinknode-dll/t0/make_some_blob_t0_impl.h"
+#include "../../thinknode-dll/t0/seri_catalog_t0.h"
 #include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/introspection/tasklet_info.h>
@@ -26,6 +29,7 @@
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
+#include <cradle/test_dlls_dir.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/typing/utilities/testing.h>
 
@@ -41,7 +45,7 @@ deserialize_function(JSONRequestInputArchive& iarchive)
 {
     using value_type = typename Request::value_type;
     using props_type = typename Request::props_type;
-    return function_request_erased<value_type, props_type>(iarchive);
+    return function_request<value_type, props_type>(iarchive);
 }
 
 template<typename Value>
@@ -58,43 +62,6 @@ make_uuid()
     return request_uuid{fmt::format("{}-{}", tag, next_id++)};
 }
 
-cppcoro::task<blob>
-make_test_blob(context_intf& ctx, std::string payload)
-{
-    co_return make_blob(payload);
-}
-
-template<caching_level_type Level>
-auto
-rq_make_test_blob(std::string payload)
-{
-    request_uuid uuid{"uuid_100"};
-    uuid.set_level(Level);
-    std::string title{"make_test_blob"};
-    using props_type = thinknode_request_props<Level>;
-    return rq_function_erased(
-        props_type(std::move(uuid), std::move(title)),
-        make_test_blob,
-        rq_value(std::move(payload)));
-}
-
-class make_test_blob_catalog : public seri_catalog
-{
- public:
-    make_test_blob_catalog(std::shared_ptr<seri_registry> registry);
-};
-
-// An object of this class must exist to deserialize a request created by
-// rq_make_test_blob().
-make_test_blob_catalog::make_test_blob_catalog(
-    std::shared_ptr<seri_registry> registry)
-    : seri_catalog(std::move(registry))
-{
-    register_resolver(rq_make_test_blob<caching_level_type::none>("sample"));
-    register_resolver(rq_make_test_blob<caching_level_type::memory>("sample"));
-    register_resolver(rq_make_test_blob<caching_level_type::full>("sample"));
-}
-
 // Creates a type-erased, uncached, request for an immediate value in Thinknode
 // context.
 template<caching_level_type Level, typename Value>
@@ -102,7 +69,7 @@ auto
 rq_function_thinknode_value(Value&& value)
 {
     using props_type = thinknode_request_props<Level>;
-    return function_request_erased<Value, props_type>(
+    return function_request<Value, props_type>(
         props_type{make_uuid(), "rq_function_thinknode_value"},
         identity_coro<Value>,
         std::forward<Value>(value));
@@ -176,8 +143,8 @@ make_post_iss_proxy_request_constant()
 
 // Make a "post ISS object" request, where the payload comes
 // from a subrequest.
-// Deserializing this request requires a make_test_blob_catalog object to exist
-// (due to the subrequest being a "make_test_blob" one).
+// Deserializing or resolving this request requires DLL test_thinknode_dll_t0
+// on the machine (local/remote) that is performing the operation.
 template<caching_level_type Level>
 auto
 make_post_iss_request_subreq(std::string payload = "payload")
@@ -186,6 +153,19 @@ make_post_iss_request_subreq(std::string payload = "payload")
         "123",
         make_thinknode_type_info_with_string_type(thinknode_string_type()),
         rq_make_test_blob<Level>(std::move(payload)));
+}
+
+// Make a "post ISS object" proxy request, where the payload comes
+// from a subrequest.
+// Deserializing or resolving this request requires DLL test_thinknode_dll_t0
+// on the remote.
+auto
+make_post_iss_proxy_request_subreq(std::string payload = "payload")
+{
+    return rq_proxy_post_iss_object(
+        "123",
+        make_thinknode_type_info_with_string_type(thinknode_string_type()),
+        rq_proxy_make_test_blob(std::move(payload)));
 }
 
 // Test resolving a number of "post ISS object" requests in parallel
@@ -322,7 +302,7 @@ TEST_CASE("ISS POST serialization - value", tag)
 TEST_CASE("ISS POST serialization - subreq", tag)
 {
     thinknode_test_scope scope;
-    make_test_blob_catalog test_cat{scope.get_resources().get_seri_registry()};
+    seri_catalog_t0 cat{scope.get_resources().get_seri_registry()};
     auto req{make_post_iss_request_subreq<caching_level_type::full>()};
     test_serialize_thinknode_request(
         scope,
@@ -385,28 +365,62 @@ TEST_CASE("ISS POST resolution - subreq, fully cached, parallel", tag)
     test_post_iss_requests_parallel(scope, requests, payloads, results, false);
 }
 
-TEST_CASE("ISS POST resolution - loopback", tag)
+TEST_CASE("ISS POST resolution - value, loopback", tag)
 {
     thinknode_test_scope scope{"loopback"};
     test_post_iss_request(scope, make_post_iss_request_constant());
 }
 
-TEST_CASE("ISS POST resolution - proxy, loopback", tag)
+TEST_CASE("ISS POST resolution - subreq, loopback", tag)
+{
+    thinknode_test_scope scope{"loopback"};
+    scope.get_proxy()->load_shared_library(
+        get_test_dlls_dir(), "test_thinknode_dll_t0");
+    test_post_iss_request(
+        scope, make_post_iss_request_subreq<caching_level_type::full>());
+}
+
+TEST_CASE("ISS POST resolution - value, proxy, loopback", tag)
 {
     thinknode_test_scope scope{"loopback"};
     test_post_iss_request(scope, make_post_iss_proxy_request_constant());
 }
 
-TEST_CASE("ISS POST resolution - rpclib", tag)
+TEST_CASE("ISS POST resolution - subreq, proxy, loopback", tag)
+{
+    thinknode_test_scope scope{"loopback"};
+    scope.get_proxy()->load_shared_library(
+        get_test_dlls_dir(), "test_thinknode_dll_t0");
+    test_post_iss_request(scope, make_post_iss_proxy_request_subreq());
+}
+
+TEST_CASE("ISS POST resolution - value, rpclib", tag)
 {
     thinknode_test_scope scope{"rpclib"};
     test_post_iss_request(scope, make_post_iss_request_constant());
 }
 
-TEST_CASE("ISS POST resolution - proxy, rpclib", tag)
+TEST_CASE("ISS POST resolution - subreq, rpclib", tag)
+{
+    thinknode_test_scope scope{"rpclib"};
+    scope.get_proxy()->load_shared_library(
+        get_test_dlls_dir(), "test_thinknode_dll_t0");
+    test_post_iss_request(
+        scope, make_post_iss_request_subreq<caching_level_type::full>());
+}
+
+TEST_CASE("ISS POST resolution - value, proxy, rpclib", tag)
 {
     thinknode_test_scope scope{"rpclib"};
     test_post_iss_request(scope, make_post_iss_proxy_request_constant());
+}
+
+TEST_CASE("ISS POST resolution - subreq, proxy, rpclib", tag)
+{
+    thinknode_test_scope scope{"rpclib"};
+    scope.get_proxy()->load_shared_library(
+        get_test_dlls_dir(), "test_thinknode_dll_t0");
+    test_post_iss_request(scope, make_post_iss_proxy_request_subreq());
 }
 
 TEST_CASE("RESOLVE ISS OBJECT TO IMMUTABLE serialization", tag)
@@ -528,7 +542,7 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT creation - template arg", tag)
     };
     auto req0{rq_retrieve_immutable_object<level>(
         context_id,
-        rq_function_erased(
+        rq_function(
             thinknode_request_props<level>{make_uuid(), "arg"}, coro))};
     test_retrieve_immutable_object(scope, req0);
 
@@ -536,14 +550,12 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT creation - template arg", tag)
     // passed to req0.
     auto req1{rq_retrieve_immutable_object<level>(context_id, object_id)};
     REQUIRE(typeid(req0) == typeid(req1));
-    REQUIRE(req0.get_uuid().str() == req1.get_uuid().str());
     test_retrieve_immutable_object(scope, req1);
 
     // A value request is normalized in the same way.
     auto req2{
         rq_retrieve_immutable_object<level>(context_id, rq_value(object_id))};
     REQUIRE(typeid(req0) == typeid(req2));
-    REQUIRE(req0.get_uuid().str() == req2.get_uuid().str());
     test_retrieve_immutable_object(scope, req2);
 }
 

@@ -11,12 +11,11 @@ namespace cradle {
 /**
  * Registers resolvers that can resolve serialized Thinknode requests
  *
- * (Current?) limitations:
- * - function_request_erased only
- * - request_props<caching_level_type::full, true, true> so
- *   - Fully cached
- *   - Function is coroutine
- *   - Introspective
+ * These Thinknode requests are implemented by instantiations of class
+ * function_request, with the following properties:
+ * - Fully cached
+ * - Function is coroutine
+ * - Introspective
  *
  * The first thing is that when deserializing a JSON-serialized request,
  * a corresponding function_request_impl object must be created.
@@ -27,7 +26,7 @@ namespace cradle {
  * through the rq_...() calls.
  *
  * By registering the polymorphic types with cereal, it will create the
- * function_request_impl objects, but not the function_request_erased ones.
+ * function_request_impl objects, but not the function_request ones.
  * This will instead happen in seri_resolver_impl::resolve(); these _impl
  * objects must also be registered, hence the
  * seri_catalog::register_resolver() calls.

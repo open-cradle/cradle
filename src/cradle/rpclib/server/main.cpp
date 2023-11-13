@@ -209,6 +209,16 @@ run_server(cli_options const& options)
         handle_unload_shared_library(hctx, std::move(dll_name));
     });
 
+    // If all handler threads are busy resolving a resolve_sync request,
+    // the server is unresponsive until the first thread finishes.
+    auto num_threads{config.get_number_or_default(
+        rpclib_config_keys::REQUEST_CONCURRENCY, 16)};
+    if (num_threads > 1)
+    {
+        // Create a number of handler threads
+        srv.async_run(num_threads - 1);
+    }
+    // One additional handler on the current thread
     srv.run();
 
     rpc::this_server().stop();

@@ -20,7 +20,7 @@ namespace {
 static char const tag[] = "[inner][resolve][seri_catalog]";
 
 template<caching_level_type Level>
-using local_props = request_props<Level, true, true>;
+using local_props = request_props<Level, request_function_t::coro, true>;
 
 template<char const* arg>
 class make_string
@@ -38,7 +38,7 @@ auto
 rq_local(Function function, std::string const& title)
 {
     constexpr auto level{caching_level_type::memory};
-    return rq_function_erased(
+    return rq_function(
         local_props<level>(request_uuid{title}, title), std::move(function));
 }
 

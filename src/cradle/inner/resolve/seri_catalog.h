@@ -58,7 +58,7 @@ class seri_catalog
     void
     register_resolver(Req const& req)
     {
-        // TODO add Request::is_proxy and throw here if true
+        static_assert(!Req::is_proxy);
         req.register_uuid(
             *registry_, cat_id_, std::make_shared<seri_resolver_impl<Req>>());
     }

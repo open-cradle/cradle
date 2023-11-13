@@ -24,6 +24,7 @@ namespace cradle {
  * A uuid is used in:
  * - Calculating a disk-cache hash (when resolving a fully-cached request)
  * - Request serialization
+ * Without a uuid, neither of these are possible.
  *
  * A uuid is not needed for resolving uncached or memory-cached requests.
  *
@@ -94,7 +95,7 @@ class request_uuid
     //    "uuid": { "value0": "...uuid text..." },
     template<typename Archive>
     void
-    save_with_name(Archive& archive, std::string const& name)
+    save_with_name(Archive& archive, std::string const& name) const
     {
         archive(cereal::make_nvp(name, str()));
     }

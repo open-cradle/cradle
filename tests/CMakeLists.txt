@@ -55,7 +55,8 @@ target_link_libraries(unit_test_runner PRIVATE
     catch2_runner
     thinknode_test_support
     test_lib_unit
-    cradle_inner)
+    cradle_inner
+    test_thinknode_t0)
 add_dependencies(unit_test_runner
     copy_thinknode_dlls)
 
@@ -69,6 +70,10 @@ add_custom_target(
     COMMAND ${CMAKE_COMMAND} -E chdir unit-testing ${CMAKE_COMMAND} -E env CRADLE_DEPLOY_DIR=${CMAKE_CURRENT_BINARY_DIR} CRADLE_THINKNODE_API_TOKEN=${API_TOKEN} CRADLE_THINKNODE_DOCKER_AUTH=${DOCKER_AUTH} $<TARGET_FILE:unit_test_runner>
     WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
     DEPENDS unit_test_runner)
+add_dependencies(unit_tests
+    rpclib_server
+    copy_cradle_dlls
+    all_thinknode_test_dlls)
 add_test(
     NAME unit_tests
     COMMAND ${CMAKE_COMMAND}
@@ -109,6 +114,25 @@ add_library(test_inner_dll_x0x1 MODULE ${srcs_inner_dll_x0x1})
 target_link_libraries(test_inner_dll_x0x1 PUBLIC
     cradle_inner)
 
+# Create two more DLLs; for Thinknode tests.
+# One is for linking into a test runner, the other for dynamically loading by a test.
+# Used in unit/thinknode/iss_req.cpp.
+set(srcs_thinknode_t0
+    "thinknode-dll/t0/make_some_blob_t0_impl.cpp"
+    "thinknode-dll/t0/seri_catalog_t0.cpp")
+add_library(test_thinknode_t0 SHARED ${srcs_thinknode_t0})
+target_include_directories(test_thinknode_t0 PUBLIC
+    ${generated_src_dir})
+target_link_libraries(test_thinknode_t0 PUBLIC
+    cradle_inner
+    cradle_plugins_inner
+    cradle_thinknode)
+set(srcs_thinknode_dll_t0
+    "thinknode-dll/t0/dll_stuff_t0.cpp")
+add_library(test_thinknode_dll_t0 MODULE ${srcs_thinknode_dll_t0})
+target_link_libraries(test_thinknode_dll_t0 PUBLIC
+    test_thinknode_t0)
+
 # Create an invalid DLL, that does not export the mandatory CRADLE_get_capabilities function.
 file(GLOB_RECURSE srcs_inner_dll_missing_export CONFIGURE_DEPENDS
     "inner-dll/missing_export/*.cpp")
@@ -147,6 +171,10 @@ add_custom_target(all_inner_test_dlls
         test_inner_dll_null_capabilities
         test_inner_dll_no_create_catalog
         test_inner_dll_failing_create_catalog)
+
+add_custom_target(all_thinknode_test_dlls
+    DEPENDS
+        test_thinknode_dll_t0)
 
 # Create a C++ header file defining the location of the dynamically-loaded test DLLs.
 set(test_dlls_dir_file "${intgen_src_dir}/cradle/test_dlls_dir.h")
@@ -264,7 +292,8 @@ target_link_libraries(all_unit_tests_runner
     test_lib_unit
     test_lib_external
     test_lib_inner
-    test_lib_plugins)
+    test_lib_plugins
+    test_thinknode_t0)
 add_dependencies(all_unit_tests_runner
     copy_thinknode_dlls)
 
@@ -304,7 +333,8 @@ add_custom_target(
 add_dependencies(all_unit_tests
     rpclib_server
     copy_cradle_dlls
-    all_inner_test_dlls)
+    all_inner_test_dlls
+    all_thinknode_test_dlls)
 add_test(
     NAME all_unit_tests
     COMMAND ${CMAKE_COMMAND}
@@ -376,10 +406,26 @@ add_test(
         --build ${CMAKE_BINARY_DIR}
         --target benchmark_tests)
 
+# On Windows, the DLL (.dll) files that an EXE (.exe) implicitly loads must be in the same directory
+# as that EXE. An EXE may also explicitly load DLLs (via the mechanism implemented in inner/dll);
+# those DLLs are specified by an absolute path, and need not appear in the EXE's directory.
+# However, such an explicitly loaded DLL may (transitively) depend on other DLLs; those are
+# again loaded implicitly, and so must appear in the EXE's directory.
+#
+# We currently have two directories containing EXEs:
+# - A directory containing the servers from the main project (rpclib_server, websocket_server).
+#   The DLLs from the main CRADLE project are already in that directory, as are third-party
+#   DLLs (like the ones for boost). We only need to copy test DLLs that are linked into other test
+#   DLLs that are explicitly loaded.
+# - A directory containing the test runners from the tests project (like inner_test_runner).
+#   The CRADLE test DLLs are already in that directory, as are third-party DLLs. We still need
+#   to copy all DLLs from the main CRADLE project (like cradle_inner).
+#
+# cppcoro is statically linked so has no DLL.
+#
+# CMake 3.21 introduces $<TARGET_RUNTIME_DLLS:tgt> which could remove the need to manually
+# track all DLL dependencies.
 if(IS_MSVC)
-    # Copy CRADLE's DLLs to the directory containing the test executables.
-    # Third-party DLLs are already there.
-    # cppcoro is statically linked so has no DLL.
     add_custom_target(copy_cradle_dlls
         COMMAND ${CMAKE_COMMAND} -E echo "copy DLLs to $<TARGET_FILE_DIR:inner_test_runner>"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -392,7 +438,11 @@ if(IS_MSVC)
             $<TARGET_FILE:cradle_rpclib_client>
             $<TARGET_FILE:cradle_websocket>
             $<TARGET_FILE:cradle_external>
-        $<TARGET_FILE_DIR:inner_test_runner>)
+        $<TARGET_FILE_DIR:inner_test_runner>
+        COMMAND ${CMAKE_COMMAND} -E echo "copy DLLs to $<TARGET_FILE_DIR:rpclib_server>"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:test_thinknode_t0>
+        $<TARGET_FILE_DIR:rpclib_server>)
     add_dependencies(copy_cradle_dlls
         cradle_inner
         cradle_typing
@@ -402,7 +452,8 @@ if(IS_MSVC)
         cradle_thinknode
         cradle_rpclib_client
         cradle_websocket
-        cradle_external)
+        cradle_external
+        test_thinknode_t0)
 else()
     add_custom_target(copy_cradle_dlls)
 endif()

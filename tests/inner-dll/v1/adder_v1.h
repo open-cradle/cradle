@@ -3,33 +3,32 @@
 
 #include <string>
 
+#include "adder_v1_defs.h"
 #include <cradle/inner/requests/function.h>
+#include <cradle/inner/requests/uuid.h>
 
 namespace cradle {
 
-// Plain args
+// Creates a proxy request that will be resolved remotely.
+// Plain args, disabling the option of subrequests.
 inline auto
 rq_test_adder_v1p(int a, int b)
 {
-    constexpr bool is_proxy{true};
-    using props_type
-        = request_props<caching_level_type::none, false, false, is_proxy>;
-    request_uuid uuid{"test-adder-v1p"};
-    return rq_function_erased<int>(props_type{std::move(uuid)}, a, b);
+    using props_type = adder_v1_props<true>;
+    return rq_proxy<int>(
+        props_type{request_uuid{adder_v1p_uuid}, adder_v1_title}, a, b);
 }
 
-// Normalized args
+// Creates a proxy request that will be resolved remotely.
+// Normalized args, enabling subrequests.
 template<typename A, typename B>
     requires TypedArg<A, int> && TypedArg<B, int>
 auto
 rq_test_adder_v1n(A a, B b)
 {
-    constexpr bool is_proxy{true};
-    using props_type
-        = request_props<caching_level_type::none, false, false, is_proxy>;
-    request_uuid uuid{"test-adder-v1n"};
-    return rq_function_erased<int>(
-        props_type{std::move(uuid)},
+    using props_type = adder_v1_props<true>;
+    return rq_proxy<int>(
+        props_type{request_uuid{adder_v1n_uuid}, adder_v1_title},
         normalize_arg<int, props_type>(std::move(a)),
         normalize_arg<int, props_type>(std::move(b)));
 }

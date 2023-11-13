@@ -22,11 +22,13 @@ template<caching_level_type Level>
 auto
 rq_make_some_blob(std::size_t size, bool use_shared_memory)
 {
-    using props_type = request_props<Level, true, true>;
+    constexpr bool introspective{true};
+    using props_type
+        = request_props<Level, request_function_t::coro, introspective>;
     request_uuid uuid{"make_some_blob"};
     uuid.set_level(Level);
     std::string title{"make_some_blob"};
-    return rq_function_erased(
+    return rq_function(
         props_type(std::move(uuid), std::move(title)),
         make_some_blob,
         size,
@@ -41,11 +43,13 @@ template<caching_level_type Level, typename Loops, typename Delay>
 auto
 rq_cancellable_coro(Loops loops, Delay delay)
 {
-    using props_type = request_props<Level, true, true>;
+    constexpr bool introspective{true};
+    using props_type
+        = request_props<Level, request_function_t::coro, introspective>;
     request_uuid uuid{"cancellable_coro"};
     uuid.set_level(Level);
     std::string title{"cancellable_coro"};
-    return rq_function_erased(
+    return rq_function(
         props_type(std::move(uuid), std::move(title)),
         cancellable_coro,
         normalize_arg<int, props_type>(std::move(loops)),
