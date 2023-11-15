@@ -24,6 +24,39 @@
 
 namespace cradle {
 
+thread_pool_guard::thread_pool_guard(int num_available_threads)
+    : num_free_threads_{num_available_threads}
+{
+}
+
+void
+thread_pool_guard::claim_thread()
+{
+    std::scoped_lock lock{mutex_};
+    if (num_free_threads_ == 0)
+    {
+        throw std::runtime_error{"all threads for this request type are busy"};
+    }
+    num_free_threads_ -= 1;
+}
+
+void
+thread_pool_guard::release_thread()
+{
+    std::scoped_lock lock{mutex_};
+    num_free_threads_ += 1;
+}
+
+thread_pool_claim::thread_pool_claim(thread_pool_guard& guard) : guard_{guard}
+{
+    guard_.claim_thread();
+}
+
+thread_pool_claim::~thread_pool_claim()
+{
+    guard_.release_thread();
+}
+
 rpclib_handler_context::rpclib_handler_context(
     service_config const& config,
     service_core& service,
@@ -32,10 +65,22 @@ rpclib_handler_context::rpclib_handler_context(
       testing_{
           config.get_bool_or_default(generic_config_keys::TESTING, false)},
       logger_{logger},
-      request_pool_{
-          static_cast<BS::concurrency_t>(config.get_number_or_default(
-              rpclib_config_keys::REQUEST_CONCURRENCY, 16))}
+      handler_pool_size_{std::max(
+          2,
+          static_cast<int>(config.get_number_or_default(
+              rpclib_config_keys::REQUEST_CONCURRENCY, 16)))},
+      handler_pool_guard_{handler_pool_size_ - 1},
+      async_request_pool_size_{static_cast<int>(config.get_number_or_default(
+          rpclib_config_keys::REQUEST_CONCURRENCY, 16))},
+      async_request_pool_{
+          static_cast<BS::concurrency_t>(async_request_pool_size_)}
 {
+}
+
+thread_pool_claim
+rpclib_handler_context::claim_sync_request_thread()
+{
+    return thread_pool_claim{handler_pool_guard_};
 }
 
 // [[noreturn]]
@@ -108,7 +153,9 @@ handle_resolve_sync(
     std::string seri_req)
 try
 {
-    // This call blocks the rpclib handler thread.
+    auto claim{hctx.claim_sync_request_thread()};
+    // resolve_sync() blocks the handler thread, but thanks to the claim there
+    // will be at least one thread left to handle incoming requests.
     return resolve_sync(hctx, std::move(config_json), std::move(seri_req));
 }
 catch (std::exception& e)
@@ -143,6 +190,12 @@ catch (std::exception& e)
     handle_exception(hctx, e);
 }
 
+// Resolves an async request, running on a dedicated thread from the
+// async_request_pool_.
+// Note that any std::shared_ptr passed to this function currently won't be
+// destroyed until the thread starts processing its next task from the queue.
+// This is due to https://github.com/bshoshany/thread-pool/issues/124;
+// the solution has been implemented but not yet released.
 static void
 resolve_async(
     rpclib_handler_context& hctx,
@@ -202,7 +255,7 @@ try
     // This function should return asap.
     // Need to dispatch a thread calling the blocking cppcoro::sync_wait().
     // TODO actx writes before now should synchronize with the pool thread
-    hctx.request_pool().push_task(
+    hctx.async_request_pool().push_task(
         resolve_async, std::ref(hctx), actx, std::move(seri_req));
     async_id aid = actx->get_id();
     logger.info("async_id {}", aid);
