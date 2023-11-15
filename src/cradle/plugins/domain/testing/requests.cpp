@@ -56,4 +56,24 @@ cancellable_coro(context_intf& ctx, int loops, int delay)
     co_return res;
 }
 
+int
+non_cancellable_func(int loops, int delay)
+{
+    auto logger = spdlog::get("cradle");
+    logger->info("non_cancellable_func(loops={}, delay={})", loops, delay);
+    int i = 0;
+    for (; i < std::abs(loops); ++i)
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+    }
+    if (loops < 0)
+    {
+        logger->info("non_cancellable_func(): throwing error");
+        throw async_error{"non_cancellable_func() failed"};
+    }
+    int res = i + delay;
+    logger->info("non_cancellable_func(): return {}", res);
+    return res;
+}
+
 } // namespace cradle

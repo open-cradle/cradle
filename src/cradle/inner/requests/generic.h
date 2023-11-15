@@ -342,6 +342,11 @@ class local_async_context_intf : public local_context_intf,
     //
     // Note that after this call, tasks can still finish successfully or fail.
     // Thus, a "cancelling" state would not be meaningful.
+    //
+    // Also note that cancellation depends on cooperation by the request
+    // implementation. In particular, an implementation that has no access to
+    // the context object (such as a non-coroutine function_request) is unable
+    // to cooperate. Thus, a cancellation request just may have no effect.
     virtual void
     request_cancellation()
         = 0;

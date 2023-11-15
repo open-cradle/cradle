@@ -56,6 +56,28 @@ rq_cancellable_coro(Loops loops, Delay delay)
         normalize_arg<int, props_type>(std::move(delay)));
 }
 
+// A non-coroutine, non-cancellable, simplified version of cancellable_coro()
+int
+non_cancellable_func(int loops, int delay);
+
+template<caching_level_type Level, typename Loops, typename Delay>
+    requires TypedArg<Loops, int> && TypedArg<Delay, int>
+auto
+rq_non_cancellable_func(Loops loops, Delay delay)
+{
+    constexpr bool introspective{true};
+    using props_type
+        = request_props<Level, request_function_t::plain, introspective>;
+    request_uuid uuid{"non_cancellable_func"};
+    uuid.set_level(Level);
+    std::string title{"non_cancellable_func"};
+    return rq_function(
+        props_type(std::move(uuid), std::move(title)),
+        non_cancellable_func,
+        normalize_arg<int, props_type>(std::move(loops)),
+        normalize_arg<int, props_type>(std::move(delay)));
+}
+
 } // namespace cradle
 
 #endif
