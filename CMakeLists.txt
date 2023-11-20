@@ -179,9 +179,16 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
 find_package(lz4 CONFIG REQUIRED)
 find_package(cereal CONFIG REQUIRED)
-find_package(rpclib CONFIG REQUIRED)
 find_package(tomlplusplus CONFIG REQUIRED)
 find_path(BSHOSHANY_THREAD_POOL_INCLUDE_DIRS "BS_thread_pool.hpp")
+
+# The patch command may not be idempotent; if anything changes (like GIT_TAG),
+# all build-directory/_deps/fetched_rpclib* should be removed before rebuilding.
+FetchContent_Declare(fetched_rpclib
+    GIT_REPOSITORY https://github.com/rpclib/rpclib.git
+    GIT_TAG "v2.3.0"
+    PATCH_COMMAND git apply ${CMAKE_CURRENT_SOURCE_DIR}/patches/rpclib.patch)
+FetchContent_MakeAvailable(fetched_rpclib)
 
 # TODO: Isolate these so they're only required for testing.
 find_package(Catch2 CONFIG REQUIRED)
@@ -492,7 +499,7 @@ target_link_libraries(cradle_rpclib_client PUBLIC
     cradle_inner
     Boost::headers
     cppcoro
-    rpclib::rpc
+    rpc
     spdlog::spdlog)
 
 # The typing library (a.o.) adds a type system (e.g. dynamics)
@@ -597,7 +604,7 @@ target_link_libraries(rpclib_server PRIVATE
     Boost::program_options
     cppcoro
     fmt::fmt
-    rpclib::rpc
+    rpc
     spdlog::spdlog)
 
 # Convenience target denoting all servers

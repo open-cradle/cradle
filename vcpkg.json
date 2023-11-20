@@ -30,7 +30,6 @@
         "msgpack",
         "nlohmann-json",
         "openssl",
-        "rpclib",
         "simdjson",
         "spdlog",
         "sqlite3",
