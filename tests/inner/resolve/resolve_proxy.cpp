@@ -153,10 +153,6 @@ busy_thread_func(
 
 // When too many rpclib server handler threads are busy, a following
 // resolve_sync request should immediately fail.
-// The error message should contain "all threads for this request type are
-// busy" but due to what seems to be an rpclib bug this can also be "server
-// could not find function 're". The _length_ of the error message is
-// correct, but the text is wrong.
 TEST_CASE("rpclib server busy on many parallel resolve_sync requests", tag)
 {
     std::string proxy_name{"rpclib"};
@@ -184,7 +180,10 @@ TEST_CASE("rpclib server busy on many parallel resolve_sync requests", tag)
         }
     }
     REQUIRE(progress.error_occurred());
-    // REQUIRE(progress.error_message().find("busy") != std::string::npos);
+    REQUIRE(
+        progress.error_message().find(
+            "all threads for this request type are busy")
+        != std::string::npos);
 
     // Wait until at least one server thread has become idle again.
     std::this_thread::sleep_for(std::chrono::milliseconds(400));
