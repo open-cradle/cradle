@@ -23,7 +23,7 @@ jobs:
 
     - uses: friendlyanon/setup-vcpkg@v1
       with:
-        committish: 662dbb50e63af15baa2909b7eac5b1b87e86a0aa
+        committish: 0c20b2a97c390e106150837042d921b0939e7ecb
 
     - name: Install
       run: |

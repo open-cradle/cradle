@@ -1,0 +1,36 @@
+diff --git a/include/rpc/msgpack/v1/object.hpp b/include/rpc/msgpack/v1/object.hpp
+index a7220a5..077664f 100644
+--- a/include/rpc/msgpack/v1/object.hpp
++++ b/include/rpc/msgpack/v1/object.hpp
+@@ -653,7 +653,7 @@ inline object::object(const msgpack_object& o)
+ inline void operator<< (clmdep_msgpack::object& o, const msgpack_object& v)
+ {
+     // FIXME beter way?
+-    std::memcpy(&o, &v, sizeof(v));
++    std::memcpy(static_cast<void*>(&o), &v, sizeof(v));
+ }
+ 
+ inline object::operator msgpack_object() const
+diff --git a/lib/rpc/detail/response.cc b/lib/rpc/detail/response.cc
+index 6169c58..0c461f2 100644
+--- a/lib/rpc/detail/response.cc
++++ b/lib/rpc/detail/response.cc
+@@ -51,14 +51,16 @@ void response::capture_result(RPCLIB_MSGPACK::object_handle &r) {
+     if (!result_) {
+         result_ = std::make_shared<RPCLIB_MSGPACK::object_handle>();
+     }
+-    result_->set(std::move(r).get());
++    result_->set(std::move(r.get()));
++    result_->zone() = std::move(r.zone());
+ }
+ 
+ void response::capture_error(RPCLIB_MSGPACK::object_handle &e) {
+     if (!error_) {
+         error_ = std::shared_ptr<RPCLIB_MSGPACK::object_handle>();
+     }
+-    error_->set(std::move(e).get());
++    error_->set(std::move(e.get()));
++    error_->zone() = std::move(e.zone());
+ }
+ 
+ } /* detail */

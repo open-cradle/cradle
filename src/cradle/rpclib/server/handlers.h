@@ -1,6 +1,8 @@
 #ifndef CRADLE_RPCLIB_SERVER_HANDLERS_H
 #define CRADLE_RPCLIB_SERVER_HANDLERS_H
 
+#include <memory>
+#include <mutex>
 #include <string>
 
 #include <BS_thread_pool.hpp>
@@ -15,6 +17,42 @@
 
 namespace cradle {
 
+// Guards a thread pool, ensuring that the number of claimed threads never
+// exceeds the availability.
+class thread_pool_guard
+{
+ public:
+    thread_pool_guard(int num_available_threads);
+
+    // Claims a thread; throws if none available
+    void
+    claim_thread();
+
+    // Releases a claimed thread
+    void
+    release_thread();
+
+ private:
+    std::mutex mutex_;
+    int num_free_threads_;
+};
+
+// Claim on a thread from a pool.
+// RAII class (the thread being the allocated resource).
+// Must be created before actually allocating a thread from a pool.
+// Must be destroyed just before the thread finishes its job.
+class thread_pool_claim
+{
+ public:
+    thread_pool_claim(thread_pool_guard& guard);
+
+    ~thread_pool_claim();
+
+ private:
+    thread_pool_guard& guard_;
+};
+
+// Context shared by the request handler threads.
 class rpclib_handler_context
 {
  public:
@@ -42,9 +80,9 @@ class rpclib_handler_context
     }
 
     BS::thread_pool&
-    request_pool()
+    async_request_pool()
     {
-        return request_pool_;
+        return async_request_pool_;
     }
 
     async_db&
@@ -54,11 +92,45 @@ class rpclib_handler_context
         return *service_.get_async_db();
     }
 
+    int
+    handler_pool_size() const
+    {
+        return handler_pool_size_;
+    }
+
+    // Claims a thread for handling a resolve_sync request
+    // (the only type of request that could block a handler thread for an
+    // undeterminate time).
+    thread_pool_claim
+    claim_sync_request_thread();
+
  private:
     service_core& service_;
     bool testing_;
     spdlog::logger& logger_;
-    BS::thread_pool request_pool_;
+
+    // Each incoming request is handled by a separate thread from a pool
+    // containing handler_pool_size_ threads.
+    // A handler thread handles a short request (taking little time to handle),
+    // or a potentially long resolve_sync one. If all handler threads would be
+    // busy resolving a resolve_sync request, the server is unresponsive until
+    // the first thread finishes.
+    // To prevent this, the number of threads available for the resolve_sync
+    // requests is handler_pool_size_ - 1, so that always one thread is left to
+    // handle short requests, and the server remains responsive. This means
+    // that handler_pool_size_ must be at least 2.
+    // If a resolve_sync request comes in while no threads are available, the
+    // request immediately fails with a "busy" error.
+    // The thread pool itself is created in run_server().
+    int const handler_pool_size_;
+    thread_pool_guard handler_pool_guard_;
+
+    // A handler thread dispatches a resolve_async request to an async thread
+    // from a pool of async_request_pool_size_ threads. Dispatching happens
+    // via a request queue of unbounded size. Thus, even if all async threads
+    // would be busy, the server stays responsive.
+    int const async_request_pool_size_;
+    BS::thread_pool async_request_pool_;
 };
 
 rpclib_response

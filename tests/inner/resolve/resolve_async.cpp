@@ -153,7 +153,7 @@ test_resolve_async_across_rpc(
 
 } // namespace
 
-TEST_CASE("resolve async locally - raw args", tag)
+TEST_CASE("resolve async locally - raw args, coro", tag)
 {
     constexpr int loops = 3;
     int delay0 = 5;
@@ -172,6 +172,32 @@ TEST_CASE("resolve async locally - raw args", tag)
         cancellable_coro,
         rq_function(props1, cancellable_coro, loops, delay0),
         rq_function(props2, cancellable_coro, loops, delay1))};
+    auto resources{make_inner_test_resources()};
+    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
+    auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};
+
+    ResolutionConstraintsLocalAsync constraints;
+    test_resolve_async(
+        *root_ctx, req, constraints, false, loops, delay0, delay1);
+}
+
+TEST_CASE("resolve async locally - raw args, non-coro", tag)
+{
+    constexpr int loops = 3;
+    int delay0 = 5;
+    int delay1 = 6;
+    using Props = request_props<
+        caching_level_type::none,
+        request_function_t::plain,
+        false>;
+    Props props0{make_test_uuid(100)};
+    Props props1{make_test_uuid(101)};
+    Props props2{make_test_uuid(102)};
+    auto req{rq_function(
+        props0,
+        non_cancellable_func,
+        rq_function(props1, non_cancellable_func, loops, delay0),
+        rq_function(props2, non_cancellable_func, loops, delay1))};
     auto resources{make_inner_test_resources()};
     auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
     auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};
@@ -244,12 +270,10 @@ namespace {
 
 template<typename Ctx, typename Req>
 cppcoro::task<void>
-test_error_async_coro(Ctx& ctx, Req const& req)
+test_error_async_coro(Ctx& ctx, Req const& req, auto const& matcher)
 {
     REQUIRE_THROWS_MATCHES(
-        co_await resolve_request(ctx, req),
-        async_error,
-        Catch::Matchers::Message("cancellable_coro() failed"));
+        co_await resolve_request(ctx, req), async_error, matcher);
     REQUIRE(co_await ctx.get_status_coro() == async_status::ERROR);
 }
 
@@ -257,7 +281,16 @@ template<typename Ctx, typename Req>
 void
 test_error_async(Ctx& ctx, Req const& req)
 {
-    cppcoro::sync_wait(test_error_async_coro(ctx, req));
+    cppcoro::sync_wait(test_error_async_coro(
+        ctx, req, Catch::Matchers::Message("cancellable_coro() failed")));
+}
+
+template<typename Ctx, typename Req>
+void
+test_error_async_plain(Ctx& ctx, Req const& req)
+{
+    cppcoro::sync_wait(test_error_async_coro(
+        ctx, req, Catch::Matchers::Message("non_cancellable_func() failed")));
 }
 
 void
@@ -280,7 +313,7 @@ test_error_async_across_rpc(
 
 } // namespace
 
-TEST_CASE("error async request locally", tag)
+TEST_CASE("error async request locally - coro", tag)
 {
     constexpr auto level = caching_level_type::none;
     auto req{rq_cancellable_coro<level>(
@@ -291,6 +324,19 @@ TEST_CASE("error async request locally", tag)
     auto root_ctx = make_local_async_ctx_tree(tree_ctx, req);
 
     test_error_async(*root_ctx, req);
+}
+
+TEST_CASE("error async request locally - non-coro", tag)
+{
+    constexpr auto level = caching_level_type::none;
+    auto req{rq_non_cancellable_func<level>(
+        rq_non_cancellable_func<level>(-1, 11),
+        rq_non_cancellable_func<level>(2, 24))};
+    auto resources{make_inner_test_resources()};
+    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
+    auto root_ctx = make_local_async_ctx_tree(tree_ctx, req);
+
+    test_error_async_plain(*root_ctx, req);
 }
 
 TEST_CASE("error async request on loopback", tag)

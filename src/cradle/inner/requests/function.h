@@ -37,9 +37,13 @@ namespace cradle {
 /*
  * Requests based on a function, which can be either a "normal" function
  * (plain C++ function or object), or a coroutine.
+ *
  * Currently, a coroutine takes a context as its first argument, whereas
  * a normal function does not. This could be split into four cases
- * (function/coroutine with/without context argument).
+ * (function/coroutine with/without context argument). As cancellation requests
+ * are communicated via the context, the current restriction means that
+ * non-coroutine requests cannot be cancelled (the cancellation request is
+ * possible but has no effect; no error is returned).
  *
  * The request classes defined in this file are "type-erased". E.g., a
  * function_request object holds a shared_ptr to a function_request_intf
@@ -461,8 +465,7 @@ class function_request_impl : public function_request_intf<Value>,
     {
         if constexpr (!func_is_coro)
         {
-            // TODO make resolve_async() for non-coro really async
-            return resolve_sync_non_coro(ctx);
+            return resolve_async_non_coro(ctx);
         }
         else if constexpr (sizeof...(Args) == 1)
         {
@@ -508,6 +511,44 @@ class function_request_impl : public function_request_intf<Value>,
                 std::tie(ctx),
                 co_await when_all_wrapper(
                     std::move(sub_tasks), ArgIndices{})));
+    }
+
+    cppcoro::task<Value>
+    resolve_async_non_coro(local_async_context_intf& ctx) const
+    {
+        // Throws on error or cancellation. However, since a cancellation
+        // request is communicated via the context object, and a non-coroutine
+        // function has no access to that object, cancellation looks
+        // impossible.
+        // If a subtask throws (because of cancellation or otherwise),
+        // the main task will wait until all other subtasks have finished
+        // (or thrown).
+        // This justifies passing contexts around by reference.
+        try
+        {
+            auto sub_tasks = make_async_sub_tasks(ctx, args_, ArgIndices{});
+            ctx.update_status(async_status::SUBS_RUNNING);
+            auto sub_results = co_await when_all_wrapper(
+                std::move(sub_tasks), ArgIndices{});
+            ctx.update_status(async_status::SELF_RUNNING);
+            // Rescheduling allows tasks to run in parallel, but is not
+            // always opportune
+            co_await ctx.reschedule_if_opportune();
+            auto result = std::apply(*function_, std::move(sub_results));
+            ctx.update_status(async_status::FINISHED);
+            co_return result;
+        }
+        catch (async_cancelled const&)
+        {
+            // This probably cannot happen.
+            ctx.update_status(async_status::CANCELLED);
+            throw;
+        }
+        catch (std::exception const& e)
+        {
+            ctx.update_status_error(e.what());
+            throw;
+        }
     }
 
     cppcoro::task<Value>
