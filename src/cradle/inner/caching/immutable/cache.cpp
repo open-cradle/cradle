@@ -5,11 +5,7 @@
 #include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/utilities/text.h>
 
-using std::string;
-
 namespace cradle {
-
-immutable_cache::immutable_cache() = default;
 
 immutable_cache::~immutable_cache() = default;
 
@@ -26,15 +22,54 @@ immutable_cache::reset(immutable_cache_config config)
 }
 
 void
-immutable_cache::reset()
-{
-    this->impl.reset();
-}
-
-void
 clear_unused_entries(immutable_cache& cache)
 {
     detail::reduce_memory_cache_size(*cache.impl, 0);
+}
+
+immutable_cache_info
+get_summary_info(immutable_cache& cache)
+{
+    auto& impl = *cache.impl;
+    std::scoped_lock<std::mutex> lock(impl.mutex);
+    immutable_cache_info info;
+    info.ac_num_records = static_cast<int>(impl.records.size());
+    info.ac_num_records_pending_eviction
+        = static_cast<int>(impl.eviction_list.records.size());
+    info.ac_num_records_in_use
+        = info.ac_num_records - info.ac_num_records_pending_eviction;
+    info.cas_num_records = impl.cas.num_records();
+    info.cas_total_size = impl.cas.total_size();
+    return info;
+}
+
+std::ostream&
+operator<<(std::ostream& os, immutable_cache_entry_snapshot const& entry)
+{
+    os << "state " << static_cast<int>(entry.state) << ", size " << entry.size
+       << ", key " << entry.key;
+    return os;
+}
+
+std::ostream&
+operator<<(std::ostream& os, immutable_cache_snapshot const& snapshot)
+{
+    os << "CAS size: " << snapshot.total_size << "\n";
+    os << snapshot.in_use.size() << " entries in use\n";
+    int i = 0;
+    for (auto const& entry : snapshot.in_use)
+    {
+        os << "[" << i << "] " << entry << "\n";
+        ++i;
+    }
+    os << snapshot.pending_eviction.size() << " entries pending eviction\n";
+    i = 0;
+    for (auto const& entry : snapshot.pending_eviction)
+    {
+        os << "[" << i << "] " << entry << "\n";
+        ++i;
+    }
+    return os;
 }
 
 immutable_cache_snapshot
@@ -43,16 +78,14 @@ get_cache_snapshot(immutable_cache& cache_object)
     auto& cache = *cache_object.impl;
     std::scoped_lock<std::mutex> lock(cache.mutex);
     immutable_cache_snapshot snapshot;
-    snapshot.in_use.reserve(cache.records.size());
     for (auto const& [key, record] : cache.records)
     {
         immutable_cache_entry_snapshot entry{
             get_unique_string(*record->key),
             record->state,
-            // is_initialized(data) ? some(data.ptr->type_info()) : none,
-            record->size};
+            record->cas_record ? record->cas_record->deep_size() : 0};
         // Put the entry's info the appropriate list depending on whether
-        // or not its in the eviction list.
+        // or not it's in the eviction list.
         if (record->eviction_list_iterator
             != cache.eviction_list.records.end())
         {
@@ -63,19 +96,11 @@ get_cache_snapshot(immutable_cache& cache_object)
             snapshot.in_use.push_back(std::move(entry));
         }
     }
-    snapshot.total_size_eviction_list = cache.eviction_list.total_size;
+    snapshot.total_size = cache.cas.total_size();
     return snapshot;
 }
 
-// Get summary information about the cache.
-immutable_cache_info
-get_summary_info(immutable_cache& cache)
-{
-    return detail::get_summary_info(*cache.impl);
-}
-
-// Helper struct to compare two immutable_cache_snapshot objects
-// (that have an unordered nature).
+// Helper struct to compare two immutable_cache_snapshot objects.
 struct sorted_snapshot
 {
     explicit sorted_snapshot(immutable_cache_snapshot const& unsorted);
@@ -114,13 +139,6 @@ immutable_cache_snapshot::operator==(
     immutable_cache_snapshot const& other) const
 {
     return sorted_snapshot(*this) == sorted_snapshot(other);
-}
-
-auto
-immutable_cache_snapshot::operator<=>(
-    immutable_cache_snapshot const& other) const
-{
-    return sorted_snapshot(*this) <=> sorted_snapshot(other);
 }
 
 } // namespace cradle

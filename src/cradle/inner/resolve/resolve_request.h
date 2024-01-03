@@ -4,7 +4,6 @@
 #include <stdexcept>
 #include <type_traits>
 
-#include <cppcoro/shared_task.hpp>
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/caching/immutable.h>
@@ -85,10 +84,10 @@ concept BoolConst
       };
 
 template<Context Ctx, Request Req, BoolConst Async>
-cppcoro::shared_task<typename Req::value_type>
+cppcoro::task<typename Req::value_type>
 resolve_request_uncached(Ctx& ctx, Req const& req, Async async)
 {
-    // TODO maybe let req.resolve_*sync() return shared_task
+    // TODO maybe let req.resolve_*sync() return cppcoro::task
     if constexpr (Async::value)
     {
         auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
@@ -129,7 +128,6 @@ resolve_secondary_cached(Ctx& ctx, Req const& req, Async async)
     using Value = typename Req::value_type;
     auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
     inner_resources& resources{cac_ctx.get_resources()};
-    auto key{req.get_captured_id()};
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
         if constexpr (Async::value)
         {
@@ -146,80 +144,91 @@ resolve_secondary_cached(Ctx& ctx, Req const& req, Async async)
     };
     co_return deserialize_secondary_cache_value<Value>(
         co_await secondary_cached_blob(
-            resources, std::move(key), std::move(create_blob_task)));
+            resources, req.get_captured_id(), std::move(create_blob_task)));
 }
 
-// This function, being a coroutine, takes key by value.
-// The caller should ensure that cache, ctx and req outlive the coroutine.
+// Called if the action cache contains no record for this request.
+// Resolves the request, stores the result in the CAS, updates the action
+// cache. The cache is accessed via ptr. The caller should ensure that ctx, req
+// and ptr outlive the coroutine.
 template<Context Ctx, CachedRequest Req, BoolConst Async>
-cppcoro::shared_task<typename Req::value_type>
+cppcoro::shared_task<void>
 resolve_request_on_memory_cache_miss(
     Ctx& ctx,
     Req const& req,
     Async async,
-    detail::immutable_cache_impl& cache,
-    captured_id key)
+    immutable_cache_ptr<typename Req::value_type>& ptr)
 {
-    // cache and key could be retrieved from ctx and req, respectively.
     try
     {
-        auto value = co_await resolve_secondary_cached(ctx, req, async);
-        record_immutable_cache_value(cache, *key, deep_sizeof(value));
-        co_return value;
+        ptr.record_value(co_await resolve_secondary_cached(ctx, req, async));
     }
     catch (...)
     {
-        record_immutable_cache_failure(cache, *key);
+        ptr.record_failure();
         throw;
     }
 }
 
-// co_await's a shared_task, with introspection (in the form of a dedicated
-// tasklet) tracking that co_await.
-template<CachedIntrospectiveRequest Req>
-cppcoro::shared_task<typename Req::value_type>
-coawait_introspective(
-    introspective_context_intf& ctx,
-    Req const& req,
-    cppcoro::shared_task<typename Req::value_type> shared_task)
+// co_await's ptr's shared_task, ensuring that its value is available, and
+// co_returns that value.
+// ptr has a move constructor, so is moved to the coroutine frame.
+template<typename Value>
+cppcoro::task<Value>
+eval_ptr(std::unique_ptr<immutable_cache_ptr<Value>> ptr)
 {
-    // Ensure that the tasklet's first timestamp coincides (almost) with the
-    // "co_await shared_task".
-    co_await dummy_coroutine();
-    coawait_introspection guard{
-        ctx, "resolve_request", req.get_introspection_title()};
-    co_return co_await shared_task;
+    co_await ptr->ensure_value_task();
+    co_return ptr->get_value();
 }
 
+// co_await's ptr's shared_task, with introspection (in the form of a
+// dedicated tasklet) tracking that co_await, and co_returns ptr's value.
+template<typename Value>
+cppcoro::task<Value>
+eval_ptr_introspective(
+    std::unique_ptr<immutable_cache_ptr<Value>> ptr,
+    introspective_context_intf& ctx,
+    std::string title)
+{
+    // Ensure that the tasklet's first timestamp coincides (almost) with
+    // the "co_await shared_task".
+    co_await dummy_coroutine();
+    coawait_introspection guard{ctx, "resolve_request", title};
+    co_await ptr->ensure_value_task();
+    co_return ptr->get_value();
+}
+
+// This is not a coroutine.
 template<Context Ctx, CachedRequest Req, BoolConst Async>
-cppcoro::shared_task<typename Req::value_type>
+cppcoro::task<typename Req::value_type>
 resolve_request_cached(Ctx& ctx, Req const& req, Async async)
 {
+    using value_type = typename Req::value_type;
+    using ptr_type = immutable_cache_ptr<value_type>;
     auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
-    immutable_cache_ptr<typename Req::value_type> ptr{
+    // The immutable_cache_ptr object must outlive this function call, and as
+    // it cannot be copied nor moved, it must be on the heap.
+    auto ptr{std::make_unique<ptr_type>(
         cac_ctx.get_resources().memory_cache(),
         req.get_captured_id(),
-        [&](detail::immutable_cache_impl& internal_cache,
-            captured_id const& key) {
+        [&](untyped_immutable_cache_ptr& ptr) {
             return resolve_request_on_memory_cache_miss(
-                ctx, req, async, internal_cache, key);
-        }};
+                ctx, req, async, static_cast<ptr_type&>(ptr));
+        })};
     if constexpr (IntrospectiveRequest<Req>)
     {
         auto& intr_ctx = cast_ctx_to_ref<introspective_context_intf>(ctx);
-        return coawait_introspective(intr_ctx, req, ptr.task());
+        return eval_ptr_introspective(
+            std::move(ptr), intr_ctx, req.get_introspection_title());
     }
     else
     {
-        // ptr owns a reference to the cache record, and thus to the
-        // shared_task, but its lifetime ends here, so the shared_task must
-        // be copied.
-        return ptr.task();
+        return eval_ptr(std::move(ptr));
     }
 }
 
 template<Context Ctx, CachedRequest Req>
-cppcoro::shared_task<typename Req::value_type>
+cppcoro::task<typename Req::value_type>
 resolve_request_async_cached(Ctx& ctx, Req const& req)
 {
     auto result = co_await resolve_request_cached(ctx, req, std::true_type{});
@@ -231,7 +240,7 @@ resolve_request_async_cached(Ctx& ctx, Req const& req)
 }
 
 template<Context Ctx, Request Req>
-cppcoro::shared_task<typename Req::value_type>
+cppcoro::task<typename Req::value_type>
 resolve_request_sync(Ctx& ctx, Req const& req)
 {
     // Third decision: cached or not
@@ -241,14 +250,12 @@ resolve_request_sync(Ctx& ctx, Req const& req)
     }
     else
     {
-        // Calls one of the two resolve_request_cached() functions, depending
-        // on Req demanding introspection or not (compile-time decision)
         return resolve_request_cached(ctx, req, std::false_type{});
     }
 }
 
 template<Context Ctx, Request Req>
-cppcoro::shared_task<typename Req::value_type>
+cppcoro::task<typename Req::value_type>
 resolve_request_async(Ctx& ctx, Req const& req)
 {
     // Cf. the similar construct in seri_resolver_impl::resolve()
@@ -269,7 +276,7 @@ resolve_request_async(Ctx& ctx, Req const& req)
 
 template<Context Ctx, typename Val, typename Constraints>
     requires(!Request<Val>)
-cppcoro::shared_task<Val> resolve_request_local(
+cppcoro::task<Val> resolve_request_local(
     Ctx& ctx, Val const& val, Constraints constraints)
 {
     // async status, if appropriate, should already be FINISHED
@@ -277,7 +284,7 @@ cppcoro::shared_task<Val> resolve_request_local(
 }
 
 template<Context Ctx, Request Req, typename Constraints>
-cppcoro::shared_task<typename Req::value_type>
+cppcoro::task<typename Req::value_type>
 resolve_request_local(Ctx& ctx, Req const& req, Constraints constraints)
 {
     // TODO static_assert(!req.is_proxy);
@@ -305,7 +312,7 @@ resolve_request_local(Ctx& ctx, Req const& req, Constraints constraints)
 }
 
 template<Request Req>
-cppcoro::shared_task<typename Req::value_type>
+cppcoro::task<typename Req::value_type>
 resolve_request_remote(remote_context_intf& ctx, Req const& req)
 {
     co_return resolve_remote_to_value(ctx, req);
@@ -347,7 +354,7 @@ cppcoro::task<Val> resolve_request(
  *   monitored via its context tree.
  * - This function throws async_cancelled when an asynchronous request is
  *   cancelled.
- * - The return type will be cppcoro::shared_task<typename Req::value_type>
+ * - The return type will be cppcoro::task<typename Req::value_type>
  *   if Req is a request.
  * - It seems likely that for multiple calls for the same Request, Ctx will be
  *   the same in each case (so just one template instantiation).

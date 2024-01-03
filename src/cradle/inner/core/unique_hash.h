@@ -1,6 +1,7 @@
 #ifndef CRADLE_INNER_CORE_UNIQUE_HASH_H
 #define CRADLE_INNER_CORE_UNIQUE_HASH_H
 
+#include <array>
 #include <cassert>
 #include <concepts>
 #include <cstddef>
@@ -22,11 +23,7 @@ class unique_hasher
  public:
     using byte_t = unsigned char;
     static constexpr size_t result_size = SHA256_DIGEST_LENGTH;
-
-    struct result_t
-    {
-        byte_t bytes[result_size];
-    };
+    using result_t = std::array<unsigned char, result_size>;
 
     unique_hasher()
     {
@@ -62,14 +59,14 @@ class unique_hasher
     void
     combine(result_t const& partial)
     {
-        encode_bytes(partial.bytes, result_size);
+        encode_bytes(partial.data(), result_size);
     }
 
-    void
-    get_result(result_t& result)
+    result_t
+    get_result()
     {
         finish();
-        result = result_;
+        return result_;
     }
 
     std::string
@@ -95,6 +92,9 @@ update_unique_hash(unique_hasher& hasher, T val)
 
 void
 update_unique_hash(unique_hasher& hasher, std::string const& val);
+
+void
+update_unique_hash(unique_hasher& hasher, char const* val);
 
 void
 update_unique_hash(unique_hasher& hasher, blob const& val);

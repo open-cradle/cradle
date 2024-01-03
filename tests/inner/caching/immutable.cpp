@@ -1,51 +1,46 @@
-#include <cradle/inner/caching/immutable.h>
-
 #include <sstream>
+#include <stdexcept>
 
 #include <catch2/catch.hpp>
 #include <cppcoro/sync_wait.hpp>
 
+#include <cradle/inner/caching/immutable.h>
 #include <cradle/inner/core/get_unique_string.h>
 
 using namespace cradle;
 
 namespace {
 
-cppcoro::shared_task<int>
-test_task(
-    detail::immutable_cache_impl& cache,
-    id_interface const& key,
-    int the_answer)
+static char const tag[] = "[inner][caching][immutable]";
+
+cppcoro::shared_task<void>
+test_task(untyped_immutable_cache_ptr& untyped_ptr, int the_answer)
 {
-    // TODO test cache_task_wrapper() itself, instead of copied code
-    record_immutable_cache_value(cache, key, sizeof(int));
-    co_return the_answer;
+    using ptr_type = immutable_cache_ptr<int>;
+    auto& ptr = static_cast<ptr_type&>(untyped_ptr);
+    ptr.record_value(std::move(the_answer));
+    co_return;
 }
 
 template<class Value>
 Value
 await_cache_value(immutable_cache_ptr<Value>& ptr)
 {
-    return cppcoro::sync_wait(ptr.task());
+    cppcoro::sync_wait(ptr.ensure_value_task());
+    return ptr.get_value();
 }
 
 } // namespace
 
-TEST_CASE("basic immutable cache usage", "[immutable_cache]")
+TEST_CASE("basic immutable cache usage", tag)
 {
     std::string key0 = get_unique_string(make_id(0));
     std::string key1 = get_unique_string(make_id(1));
 
-    immutable_cache cache;
+    immutable_cache cache{immutable_cache_config{1024}};
     {
-        INFO("Cache reset() and is_initialized() work as expected.");
-        REQUIRE(!cache.is_initialized());
+        INFO("Cache reset() works as expected.");
         cache.reset(immutable_cache_config{1024});
-        REQUIRE(cache.is_initialized());
-        cache.reset();
-        REQUIRE(!cache.is_initialized());
-        cache.reset(immutable_cache_config{1024});
-        REQUIRE(cache.is_initialized());
     }
 
     INFO(
@@ -54,9 +49,9 @@ TEST_CASE("basic immutable cache usage", "[immutable_cache]")
     bool p_needed_creation = false;
     auto p_key = make_captured_id(0);
     immutable_cache_ptr<int> p(
-        cache, p_key, [&](detail::immutable_cache_impl&, captured_id const&) {
+        cache, p_key, [&](untyped_immutable_cache_ptr& ptr) {
             p_needed_creation = true;
-            return test_task(*cache.impl, *p_key, 42);
+            return test_task(ptr, 42);
         });
     REQUIRE(p_needed_creation);
     // Also check that all the ptr accessors work.
@@ -76,9 +71,9 @@ TEST_CASE("basic immutable cache usage", "[immutable_cache]")
     bool q_needed_creation = false;
     auto q_key = make_captured_id(1);
     auto q = std::make_unique<immutable_cache_ptr<int>>(
-        cache, q_key, [&](detail::immutable_cache_impl&, captured_id const&) {
+        cache, q_key, [&](untyped_immutable_cache_ptr& ptr) {
             q_needed_creation = true;
-            return test_task(*cache.impl, *q_key, 112);
+            return test_task(ptr, 112);
         });
     {
         INFO(
@@ -105,9 +100,9 @@ TEST_CASE("basic immutable cache usage", "[immutable_cache]")
     bool r_needed_creation = false;
     auto r_key = make_captured_id(0);
     immutable_cache_ptr<int> r(
-        cache, r_key, [&](detail::immutable_cache_impl&, captured_id const&) {
+        cache, r_key, [&](untyped_immutable_cache_ptr& ptr) {
             r_needed_creation = true;
-            return test_task(*cache.impl, *r_key, 42);
+            return test_task(ptr, 42);
         });
     {
         INFO(
@@ -202,19 +197,19 @@ TEST_CASE("basic immutable cache usage", "[immutable_cache]")
 
 namespace {
 
-cppcoro::shared_task<std::string>
-one_kb_string_task(
-    detail::immutable_cache_impl& cache, id_interface const& key, char content)
+cppcoro::shared_task<void>
+one_kb_string_task(untyped_immutable_cache_ptr& untyped_ptr, char content)
 {
-    // TODO test cache_task_wrapper() itself, instead of copied code
+    using ptr_type = immutable_cache_ptr<std::string>;
+    auto& ptr = static_cast<ptr_type&>(untyped_ptr);
     std::string result(1024, content);
-    record_immutable_cache_value(cache, key, deep_sizeof(result));
-    co_return result;
+    ptr.record_value(std::move(result));
+    co_return;
 }
 
 } // namespace
 
-TEST_CASE("immutable cache LRU eviction", "[immutable_cache]")
+TEST_CASE("immutable cache LRU eviction", tag)
 {
     // Initialize the cache with 1.5kB of space for unused data.
     immutable_cache cache(immutable_cache_config{1536});
@@ -223,9 +218,9 @@ TEST_CASE("immutable cache LRU eviction", "[immutable_cache]")
     bool p_needed_creation = false;
     auto p_key = make_captured_id(1);
     auto p = std::make_unique<immutable_cache_ptr<std::string>>(
-        cache, p_key, [&](detail::immutable_cache_impl&, captured_id const&) {
+        cache, p_key, [&](untyped_immutable_cache_ptr& ptr) {
             p_needed_creation = true;
-            return one_kb_string_task(*cache.impl, *p_key, 'a');
+            return one_kb_string_task(ptr, 'a');
         });
     REQUIRE(p_needed_creation);
     REQUIRE(await_cache_value(*p) == std::string(1024, 'a'));
@@ -234,9 +229,9 @@ TEST_CASE("immutable cache LRU eviction", "[immutable_cache]")
     bool q_needed_creation = false;
     auto q_key = make_captured_id(2);
     auto q = std::make_unique<immutable_cache_ptr<std::string>>(
-        cache, q_key, [&](detail::immutable_cache_impl&, captured_id const&) {
+        cache, q_key, [&](untyped_immutable_cache_ptr& ptr) {
             q_needed_creation = true;
-            return one_kb_string_task(*cache.impl, *q_key, 'b');
+            return one_kb_string_task(ptr, 'b');
         });
     REQUIRE(q_needed_creation);
     REQUIRE(await_cache_value(*q) == std::string(1024, 'b'));
@@ -250,9 +245,9 @@ TEST_CASE("immutable cache LRU eviction", "[immutable_cache]")
     bool r_needed_creation = false;
     auto r_key = make_captured_id(1);
     immutable_cache_ptr<std::string> r(
-        cache, r_key, [&](detail::immutable_cache_impl&, captured_id const&) {
+        cache, r_key, [&](untyped_immutable_cache_ptr& ptr) {
             r_needed_creation = true;
-            return one_kb_string_task(*cache.impl, *r_key, 'a');
+            return one_kb_string_task(ptr, 'a');
         });
     REQUIRE(r_needed_creation);
     REQUIRE(!r.is_ready());
@@ -262,11 +257,221 @@ TEST_CASE("immutable cache LRU eviction", "[immutable_cache]")
     bool s_needed_creation = false;
     auto s_key = make_captured_id(2);
     immutable_cache_ptr<std::string> s(
-        cache, s_key, [&](detail::immutable_cache_impl&, captured_id const&) {
+        cache, s_key, [&](untyped_immutable_cache_ptr& ptr) {
             s_needed_creation = true;
-            return one_kb_string_task(*cache.impl, *s_key, 'b');
+            return one_kb_string_task(ptr, 'b');
         });
     REQUIRE(!s_needed_creation);
     REQUIRE(s.is_ready());
     REQUIRE(await_cache_value(s) == std::string(1024, 'b'));
+}
+
+namespace detail {
+
+// Similar to resolve_request.h code, but not using requests.
+// Maybe there is a common abstraction that should be factored out.
+template<typename Value>
+cppcoro::task<Value>
+eval_ptr(std::unique_ptr<immutable_cache_ptr<Value>> ptr)
+{
+    co_await ptr->ensure_value_task();
+    co_return ptr->get_value();
+}
+
+template<typename Value, typename CreateTask>
+cppcoro::shared_task<void>
+eval_created_task(CreateTask create_task, immutable_cache_ptr<Value>& ptr)
+{
+    try
+    {
+        ptr.record_value(co_await create_task());
+    }
+    catch (...)
+    {
+        ptr.record_failure();
+        throw;
+    }
+}
+
+template<typename Value, typename CreateTask>
+cppcoro::task<Value>
+eval_cached(immutable_cache& cache, captured_id key, CreateTask create_task)
+{
+    using ptr_type = immutable_cache_ptr<Value>;
+    auto ptr{std::make_unique<ptr_type>(
+        cache,
+        key,
+        [create_task
+         = std::move(create_task)](untyped_immutable_cache_ptr& ptr) {
+            return eval_created_task<Value>(
+                create_task, static_cast<ptr_type&>(ptr));
+        })};
+    return eval_ptr(std::move(ptr));
+}
+
+} // namespace detail
+
+TEST_CASE("two-phase memory caching", tag)
+{
+    immutable_cache cache{immutable_cache_config{1024}};
+
+    auto key0 = make_captured_id("task0");
+    auto task0 = ::detail::eval_cached<int>(
+        cache, key0, []() -> cppcoro::task<int> { co_return 3 * 3; });
+    REQUIRE(cppcoro::sync_wait(task0) == 9);
+    // Expecting one AC record in use, one CAS record
+    auto info0{get_summary_info(cache)};
+    REQUIRE(info0.ac_num_records_in_use == 1);
+    REQUIRE(info0.ac_num_records_pending_eviction == 0);
+    REQUIRE(info0.cas_num_records == 1);
+    REQUIRE(info0.cas_total_size == sizeof(int));
+
+    // Different key, but same result as task0
+    auto key1 = make_captured_id("task1");
+    auto task1 = ::detail::eval_cached<int>(
+        cache, key1, []() -> cppcoro::task<int> { co_return 2 + 7; });
+    REQUIRE(cppcoro::sync_wait(task1) == 9);
+    // Expecting two AC records in use, sharing the one CAS record
+    auto info1{get_summary_info(cache)};
+    REQUIRE(info1.ac_num_records_in_use == 2);
+    REQUIRE(info1.ac_num_records_pending_eviction == 0);
+    REQUIRE(info1.cas_num_records == 1);
+    REQUIRE(info1.cas_total_size == sizeof(int));
+
+    // Different key, different result
+    auto key2 = make_captured_id("task2");
+    auto task2 = ::detail::eval_cached<int>(
+        cache, key2, []() -> cppcoro::task<int> { co_return 1 + 2; });
+    REQUIRE(cppcoro::sync_wait(task2) == 3);
+    // Expecting three AC records in use, two CAS records
+    auto info2{get_summary_info(cache)};
+    REQUIRE(info2.ac_num_records_in_use == 3);
+    REQUIRE(info2.ac_num_records_pending_eviction == 0);
+    REQUIRE(info2.cas_num_records == 2);
+    REQUIRE(info2.cas_total_size == 2 * sizeof(int));
+
+    // Move task0's record to the eviction list
+    task0 = decltype(task0)();
+    // Expecting two AC records in use, still two CAS records
+    auto info3{get_summary_info(cache)};
+    REQUIRE(info3.ac_num_records_in_use == 2);
+    REQUIRE(info3.ac_num_records_pending_eviction == 1);
+    REQUIRE(info3.cas_num_records == 2);
+    REQUIRE(info3.cas_total_size == 2 * sizeof(int));
+
+    // Move task1's record to the eviction list
+    task1 = decltype(task1)();
+    // Expecting one AC record in use, still two CAS records
+    // (one of them being referenced only from the eviction list)
+    auto info4{get_summary_info(cache)};
+    REQUIRE(info4.ac_num_records_in_use == 1);
+    REQUIRE(info4.ac_num_records_pending_eviction == 2);
+    REQUIRE(info4.cas_num_records == 2);
+    REQUIRE(info4.cas_total_size == 2 * sizeof(int));
+
+    // Purge the eviction list, deleting two AC records and one CAS record
+    clear_unused_entries(cache);
+    // Expecting one AC record in use, one CAS record
+    auto info5{get_summary_info(cache)};
+    REQUIRE(info5.ac_num_records_in_use == 1);
+    REQUIRE(info5.ac_num_records_pending_eviction == 0);
+    REQUIRE(info5.cas_num_records == 1);
+    REQUIRE(info5.cas_total_size == sizeof(int));
+
+    // Move task2's record to the eviction list
+    task2 = decltype(task2)();
+    // Expecting no AC record in use, still one CAS record
+    auto info6{get_summary_info(cache)};
+    REQUIRE(info6.ac_num_records_in_use == 0);
+    REQUIRE(info6.ac_num_records_pending_eviction == 1);
+    REQUIRE(info6.cas_num_records == 1);
+    REQUIRE(info6.cas_total_size == sizeof(int));
+
+    // Purge the eviction list, deleting the last AC record and CAS record
+    clear_unused_entries(cache);
+    // Expecting no AC record in use, no CAS record
+    auto info7{get_summary_info(cache)};
+    REQUIRE(info7.ac_num_records_in_use == 0);
+    REQUIRE(info7.ac_num_records_pending_eviction == 0);
+    REQUIRE(info7.cas_num_records == 0);
+    REQUIRE(info7.cas_total_size == 0);
+}
+
+TEST_CASE("immutable cache - snapshotting", tag)
+{
+    immutable_cache cache{immutable_cache_config{1024}};
+
+    // Create two AC records, one CAS record
+    auto key0 = make_captured_id("task0");
+    auto task0 = ::detail::eval_cached<int>(
+        cache, key0, []() -> cppcoro::task<int> { co_return 3 * 3; });
+    REQUIRE(cppcoro::sync_wait(task0) == 9);
+    auto key1 = make_captured_id("task1");
+    auto task1 = ::detail::eval_cached<int>(
+        cache, key1, []() -> cppcoro::task<int> { co_return 2 + 7; });
+    REQUIRE(cppcoro::sync_wait(task1) == 9);
+
+    auto snapshot0{get_cache_snapshot(cache)};
+    CHECK(snapshot0.in_use.size() == 2);
+    CHECK(snapshot0.pending_eviction.size() == 0);
+    CHECK(snapshot0.total_size == sizeof(int));
+    CHECK(snapshot0 == snapshot0);
+    std::ostringstream oss0;
+    oss0 << snapshot0;
+    auto str0{oss0.str()};
+    CHECK(str0.find("2 entries in use") != str0.npos);
+    CHECK(str0.find("0 entries pending eviction") != str0.npos);
+
+    // Move task0's record to the eviction list
+    task0 = decltype(task0)();
+
+    auto snapshot1{get_cache_snapshot(cache)};
+    CHECK(snapshot1.in_use.size() == 1);
+    CHECK(snapshot1.pending_eviction.size() == 1);
+    CHECK(snapshot1.total_size == sizeof(int));
+    CHECK(snapshot1 == snapshot1);
+    std::ostringstream oss1;
+    oss1 << snapshot1;
+    auto str1{oss1.str()};
+    CHECK(str1.find("1 entries in use") != str1.npos);
+    CHECK(str1.find("1 entries pending eviction") != str1.npos);
+
+    CHECK(snapshot0 != snapshot1);
+    CHECK(!(snapshot0 == snapshot1));
+}
+
+TEST_CASE("immutable caching - retry failure", tag)
+{
+    class forced_failure : public std::runtime_error
+    {
+     public:
+        using std::runtime_error::runtime_error;
+    };
+
+    immutable_cache cache{immutable_cache_config{1024}};
+    auto key = make_captured_id("task");
+
+    // A failing task causes an AC record with state "failed" and no CAS
+    // record.
+    auto task0
+        = ::detail::eval_cached<int>(cache, key, []() -> cppcoro::task<int> {
+              throw forced_failure{"forced failure"};
+          });
+    REQUIRE_THROWS_AS(cppcoro::sync_wait(task0), forced_failure);
+    auto snapshot0{get_cache_snapshot(cache)};
+    CHECK(snapshot0.in_use.size() == 1);
+    CHECK(snapshot0.in_use[0].state == immutable_cache_entry_state::FAILED);
+    CHECK(snapshot0.pending_eviction.size() == 0);
+    CHECK(snapshot0.total_size == 0);
+
+    // Retry the failed task, and let it succeed: the existing AC record
+    // becomes "ready", and the result is stored as a CAS record.
+    auto task1 = ::detail::eval_cached<int>(
+        cache, key, []() -> cppcoro::task<int> { co_return 9; });
+    REQUIRE(cppcoro::sync_wait(task1) == 9);
+    auto snapshot1{get_cache_snapshot(cache)};
+    CHECK(snapshot1.in_use.size() == 1);
+    CHECK(snapshot1.in_use[0].state == immutable_cache_entry_state::READY);
+    CHECK(snapshot1.pending_eviction.size() == 0);
+    CHECK(snapshot1.total_size == sizeof(int));
 }
