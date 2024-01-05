@@ -662,7 +662,7 @@ class function_request_impl : public function_request_intf<Value>,
                 (update_unique_hash(hasher, args), ...);
             },
             args_);
-        hasher.get_result(this->unique_hash_);
+        this->unique_hash_ = hasher.get_result();
         this->have_unique_hash_ = true;
     }
 };

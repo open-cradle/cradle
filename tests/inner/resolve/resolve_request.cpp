@@ -351,12 +351,12 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     }
     REQUIRE(num_add_calls == num_requests);
     auto ic0 = get_summary_info(mem_cache);
-    REQUIRE(ic0.entry_count == num_requests);
+    REQUIRE(ic0.ac_num_records == num_requests);
     auto dc0 = ll_cache.get_summary_info();
     REQUIRE(dc0.entry_count == num_requests);
 
     ctx.reset_memory_cache();
-    REQUIRE(get_summary_info(mem_cache).entry_count == 0);
+    REQUIRE(get_summary_info(mem_cache).ac_num_records == 0);
     auto res1 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
 
     REQUIRE(res1.size() == num_requests);
@@ -366,7 +366,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     }
     REQUIRE(num_add_calls == num_requests);
     auto ic1 = get_summary_info(mem_cache);
-    REQUIRE(ic1.entry_count == num_requests);
+    REQUIRE(ic1.ac_num_records == num_requests);
     auto dc1 = ll_cache.get_summary_info();
     REQUIRE(dc1.entry_count == num_requests);
 }
@@ -389,4 +389,45 @@ TEST_CASE("resolve function_request with subrequest", tag)
     // The following shouldn't assert even if function_request_impl::hash()
     // is modified to always return the same value.
     REQUIRE(cppcoro::sync_wait(resolve_request(ctx, req2)) == 10);
+}
+
+TEST_CASE("evaluate function request - memory cache behavior", tag)
+{
+    auto resources{make_inner_test_resources()};
+    auto& mem_cache{resources->memory_cache()};
+    request_props<caching_level_type::memory> props{make_test_uuid(600)};
+    int num_add_calls{};
+    auto add{create_adder(num_add_calls)};
+    auto req{rq_function(props, add, 6, 3)};
+
+    // Initially, the memory cache should be empty.
+    auto info0{get_summary_info(mem_cache)};
+    CHECK(info0.ac_num_records_in_use == 0);
+    CHECK(info0.ac_num_records_pending_eviction == 0);
+    CHECK(info0.cas_num_records == 0);
+
+    // Creating the task should create a pointer to a new cache record.
+    caching_request_resolution_context ctx{*resources};
+    auto task = resolve_request(ctx, req);
+    auto info1{get_summary_info(mem_cache)};
+    CHECK(info1.ac_num_records_in_use == 1);
+    CHECK(info1.ac_num_records_pending_eviction == 0);
+    CHECK(info1.cas_num_records == 0);
+
+    // Resolving the request (running the task) should create an entry in the
+    // CAS. The task should still hold a reference to the record-in-use.
+    auto res0 = cppcoro::sync_wait(task);
+    REQUIRE(res0 == 9);
+    auto info2{get_summary_info(mem_cache)};
+    CHECK(info2.ac_num_records_in_use == 1);
+    CHECK(info2.ac_num_records_pending_eviction == 0);
+    CHECK(info2.cas_num_records == 1);
+
+    // The task owns the ptr which is the only reference to the record-in-use.
+    // After deleting the task, the record is no longer in use.
+    task = decltype(task)();
+    auto info3{get_summary_info(mem_cache)};
+    CHECK(info3.ac_num_records_in_use == 0);
+    CHECK(info3.ac_num_records_pending_eviction == 1);
+    CHECK(info3.cas_num_records == 1);
 }

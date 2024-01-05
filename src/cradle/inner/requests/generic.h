@@ -489,7 +489,10 @@ concept ValidContext
  * - a boolean indicating whether this is a proxy request
  * - introspective
  * - An id uniquely identifying the request (class). Can be a placeholder
- *   if such identification is not needed (TODO define when).
+ *   if such identification is not needed.
+ *
+ * TODO make request's value restrictions explicit
+ * TODO define when request's id can be a placeholder
  */
 template<typename T>
 concept Request

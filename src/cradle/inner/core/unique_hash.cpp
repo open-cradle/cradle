@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cstring>
 #include <iomanip>
 #include <sstream>
 
@@ -14,7 +15,7 @@ unique_hasher::get_string()
     ss << std::hex << std::setfill('0');
     for (size_t i = 0; i < result_size; ++i)
     {
-        ss << std::setw(2) << static_cast<unsigned int>(result_.bytes[i]);
+        ss << std::setw(2) << static_cast<unsigned int>(result_.data()[i]);
     }
     return ss.str();
 }
@@ -24,7 +25,7 @@ unique_hasher::finish()
 {
     if (!finished_)
     {
-        SHA256_Final(result_.bytes, &ctx_);
+        SHA256_Final(result_.data(), &ctx_);
         finished_ = true;
     }
 }
@@ -33,6 +34,12 @@ void
 update_unique_hash(unique_hasher& hasher, std::string const& val)
 {
     hasher.encode_bytes(val.data(), val.size());
+}
+
+void
+update_unique_hash(unique_hasher& hasher, char const* val)
+{
+    hasher.encode_bytes(val, std::strlen(val));
 }
 
 void

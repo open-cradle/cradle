@@ -9,9 +9,9 @@ namespace cradle {
 
 // This should be the least-special, last-resort definition.
 // Only for dynamic's?
-template<typename Value>
-void
-update_unique_hash(unique_hasher& hasher, Value const& value)
+template<typename T>
+    requires(!(std::integral<T> || std::floating_point<T>) )
+void update_unique_hash(unique_hasher& hasher, T const& value)
 {
     auto natively_encoded = write_natively_encoded_value(to_dynamic(value));
     auto begin = &*natively_encoded.begin();

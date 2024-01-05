@@ -31,9 +31,7 @@ get_ref_result()
 {
     unique_hasher hasher;
     hasher.encode_bytes(ref_data, 4);
-    unique_hasher::result_t result{};
-    hasher.get_result(result);
-    return result;
+    return hasher.get_result();
 }
 
 // Get the hash string over the reference input (ref_data)
@@ -49,8 +47,7 @@ get_ref_string()
 void
 verify_ref_result(unique_hasher& hasher)
 {
-    unique_hasher::result_t result{};
-    hasher.get_result(result);
+    auto result{hasher.get_result()};
     REQUIRE(memcmp(&result, &null_result, sizeof(result)) != 0);
     auto ref_result{get_ref_result()};
     REQUIRE(memcmp(&result, &ref_result, sizeof(result)) == 0);
@@ -65,8 +62,7 @@ verify_ref_result(unique_hasher& hasher)
 void
 verify_non_ref_result(unique_hasher& hasher)
 {
-    unique_hasher::result_t result{};
-    hasher.get_result(result);
+    auto result{hasher.get_result()};
     REQUIRE(memcmp(&result, &null_result, sizeof(result)) != 0);
     auto ref_result{get_ref_result()};
     REQUIRE(memcmp(&result, &ref_result, sizeof(result)) != 0);
@@ -83,8 +79,7 @@ TEST_CASE("unique_hash: empty input", tag)
 {
     unique_hasher hasher;
 
-    unique_hasher::result_t result{};
-    hasher.get_result(result);
+    auto result{hasher.get_result()};
     REQUIRE(memcmp(&result, &null_result, sizeof(result)) == 0);
     REQUIRE(hasher.get_string() == null_string);
 }
@@ -134,8 +129,7 @@ TEST_CASE("unique_hash: combine", tag)
     unique_hasher hasher1;
     char const data1[] = {0x11, 0x12, 0x13, 0x14};
     hasher1.encode_bytes(data1, 4);
-    unique_hasher::result_t result1{};
-    hasher1.get_result(result1);
+    auto result1{hasher1.get_result()};
 
     hasher.combine(result1);
 

@@ -5,7 +5,6 @@
 
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/caching/immutable/internals.h>
-#include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/utilities/functional.h>
 
@@ -15,23 +14,36 @@ namespace cradle {
 
 struct immutable_cache;
 
-using create_task_function = function_view<std::any(
-    detail::immutable_cache_impl& cache, captured_id const& key)>;
-
 namespace detail {
 
 struct immutable_cache_record;
 
-// untyped_immutable_cache_ptr provides all of the functionality of
-// immutable_cache_ptr without compile-time knowledge of the data type.
-struct untyped_immutable_cache_ptr
+} // namespace detail
+
+using ensure_value_task_t = cppcoro::shared_task<void>;
+class untyped_immutable_cache_ptr;
+using create_task_function_t
+    = function_view<ensure_value_task_t(untyped_immutable_cache_ptr& ptr)>;
+
+/*
+ * Reference to a record in the action cache.
+ *
+ * The record is kept off the eviction list while at least one reference to it
+ * exists. When the last reference goes away, the record is moved to the back
+ * of the eviction list (LRU behavior).
+ *
+ * untyped_immutable_cache_ptr provides all of the functionality of
+ * immutable_cache_ptr without compile-time knowledge of the data type.
+ */
+class untyped_immutable_cache_ptr
 {
+ public:
     untyped_immutable_cache_ptr(
         immutable_cache& cache,
         captured_id const& key,
-        create_task_function const& create_task);
+        create_task_function_t const& create_task);
 
-    ~untyped_immutable_cache_ptr();
+    virtual ~untyped_immutable_cache_ptr();
 
     untyped_immutable_cache_ptr(untyped_immutable_cache_ptr const& other)
         = delete;
@@ -43,65 +55,12 @@ struct untyped_immutable_cache_ptr
     operator=(untyped_immutable_cache_ptr&& other)
         = delete;
 
-    id_interface const&
-    key() const
-    {
-        return *record_.key;
-    }
-
-    immutable_cache_record*
-    record() const
-    {
-        return &record_;
-    }
-
- private:
-    // the internal cache record for the entry
-    detail::immutable_cache_record& record_;
-};
-
-} // namespace detail
-
-void
-record_immutable_cache_value(
-    detail::immutable_cache_impl& cache, id_interface const& key, size_t size);
-
-void
-record_immutable_cache_failure(
-    detail::immutable_cache_impl& cache, id_interface const& key);
-
-// immutable_cache_ptr<T> represents one's interest in a particular immutable
-// value (of type T). The value is assumed to be the result of performing some
-// operation (with reproducible results). If there are already other parties
-// interested in the result, the pointer will immediately pick up whatever
-// progress has already been made in computing that result.
-//
-// This is a polling-based approach to observing a cache value.
-//
-template<class T>
-struct immutable_cache_ptr
-{
-    immutable_cache_ptr(
-        immutable_cache& cache,
-        captured_id const& key,
-        create_task_function const& create_task_function)
-        : untyped_{cache, key, create_task_function}
-    {
-    }
-
-    cppcoro::shared_task<T> const&
-    task() const
-    {
-        return std::any_cast<cppcoro::shared_task<T> const&>(
-            untyped_.record()->task);
-    }
-
     // Should be called while holding the cache's mutex.
     // Used by test code only (also the three is_* functions).
     immutable_cache_entry_state
     state() const
     {
-        return untyped_.record()->state;
+        return record_.state;
     }
     bool
     is_loading() const
@@ -122,11 +81,66 @@ struct immutable_cache_ptr
     id_interface const&
     key() const
     {
-        return untyped_.key();
+        return *record_.key;
     }
 
- private:
-    detail::untyped_immutable_cache_ptr untyped_;
+    cppcoro::shared_task<void> const&
+    ensure_value_task() const
+    {
+        return record_.task;
+    }
+
+    void
+    record_failure();
+
+ protected:
+    // the internal cache record for the entry
+    detail::immutable_cache_record& record_;
+
+    void
+    record_value_untyped(
+        detail::cas_record_base::digest_type const& digest,
+        detail::cas_record_maker_intf const& record_maker);
+};
+
+// immutable_cache_ptr<T> represents one's interest in a particular immutable
+// value (of type T). The value is assumed to be the result of performing some
+// operation (with reproducible results). If there are already other parties
+// interested in the result, the pointer will immediately pick up whatever
+// progress has already been made in computing that result.
+//
+// This is a polling-based approach to observing a cache value.
+//
+template<typename Value>
+class immutable_cache_ptr : public untyped_immutable_cache_ptr
+{
+ public:
+    immutable_cache_ptr(
+        immutable_cache& cache,
+        captured_id const& key,
+        create_task_function_t const& create_task_function)
+        : untyped_immutable_cache_ptr{cache, key, create_task_function}
+    {
+    }
+
+    void
+    record_value(Value&& value)
+    {
+        unique_hasher hasher;
+        update_unique_hash(hasher, value);
+        auto digest{hasher.get_result()};
+        record_value_untyped(
+            digest, detail::cas_record_maker(digest, std::move(value)));
+    }
+
+    Value
+    get_value() const
+    {
+        assert(record_.cas_record != nullptr);
+        using typed_cas_record = detail::cas_record<Value>;
+        return static_cast<typed_cas_record const*>(record_.cas_record)
+            ->value();
+    }
 };
 
 } // namespace cradle
