@@ -46,13 +46,15 @@ get_message(rpc::rpc_error& exc)
 
 } // namespace
 
-rpclib_client::rpclib_client(service_config const& config)
-    : pimpl_{std::make_unique<rpclib_client_impl>(config)}
+rpclib_client::rpclib_client(
+    service_config const& config, std::shared_ptr<spdlog::logger> logger)
+    : pimpl_{std::make_unique<rpclib_client_impl>(config, logger)}
 {
 }
 
-rpclib_client_impl::rpclib_client_impl(service_config const& config)
-    : logger_{ensure_logger("rpclib_client")},
+rpclib_client_impl::rpclib_client_impl(
+    service_config const& config, std::shared_ptr<spdlog::logger> logger)
+    : logger_{logger ? std::move(logger) : ensure_logger("rpclib_client")},
       testing_{
           config.get_bool_or_default(generic_config_keys::TESTING, false)},
       deploy_dir_{config.get_optional_string(generic_config_keys::DEPLOY_DIR)},

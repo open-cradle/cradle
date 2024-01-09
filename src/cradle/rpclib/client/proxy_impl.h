@@ -21,7 +21,8 @@ namespace cradle {
 class rpclib_client_impl
 {
  public:
-    rpclib_client_impl(service_config const& config);
+    rpclib_client_impl(
+        service_config const& config, std::shared_ptr<spdlog::logger> logger);
 
     ~rpclib_client_impl();
 

@@ -19,7 +19,10 @@ class rpclib_client_impl;
 class rpclib_client : public remote_proxy
 {
  public:
-    rpclib_client(service_config const& config);
+    rpclib_client(
+        service_config const& config,
+        std::shared_ptr<spdlog::logger> logger
+        = std::shared_ptr<spdlog::logger>());
 
     ~rpclib_client();
 
