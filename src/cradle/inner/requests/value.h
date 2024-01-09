@@ -28,11 +28,11 @@ class value_request
     static constexpr bool is_proxy{false};
     static constexpr bool introspective{false};
 
-    value_request(Value const& value) : value_{value}
+    value_request(Value const& value) : value_(value)
     {
     }
 
-    value_request(Value&& value) : value_{std::move(value)}
+    value_request(Value&& value) : value_(std::move(value))
     {
     }
 
