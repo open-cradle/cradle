@@ -58,15 +58,15 @@ read_json_value(simdjson::dom::element const& json)
     {
         case simdjson::dom::element_type::NULL_VALUE:
         default: // to avoid warnings
-            return nil;
+            return dynamic(nil);
         case simdjson::dom::element_type::BOOL:
-            return bool(json);
+            return dynamic(bool(json));
         case simdjson::dom::element_type::INT64:
-            return boost::numeric_cast<integer>(int64_t(json));
+            return dynamic(boost::numeric_cast<integer>(int64_t(json)));
         case simdjson::dom::element_type::UINT64:
-            return boost::numeric_cast<integer>(uint64_t(json));
+            return dynamic(boost::numeric_cast<integer>(uint64_t(json)));
         case simdjson::dom::element_type::DOUBLE:
-            return double(json);
+            return dynamic(double(json));
         case simdjson::dom::element_type::STRING: {
             // Times are also encoded as JSON strings, so this checks to see if
             // the string parses as a time. If so, it just assumes it's
@@ -84,14 +84,14 @@ read_json_value(simdjson::dom::element const& json)
                     // string here.
                     if (to_value_string(t) == s)
                     {
-                        return t;
+                        return dynamic(t);
                     }
                 }
                 catch (...)
                 {
                 }
             }
-            return string(s);
+            return dynamic(string(s));
         }
         case simdjson::dom::element_type::ARRAY: {
             simdjson::dom::array source = json;
@@ -104,7 +104,7 @@ read_json_value(simdjson::dom::element const& json)
                     map[read_json_value(i["key"])]
                         = read_json_value(i["value"]);
                 }
-                return map;
+                return dynamic(std::move(map));
             }
             // Otherwise, read it as an actual array.
             else
@@ -115,7 +115,7 @@ read_json_value(simdjson::dom::element const& json)
                 {
                     array.push_back(read_json_value(i));
                 }
-                return array;
+                return dynamic(std::move(array));
             }
         }
         case simdjson::dom::element_type::OBJECT: {
@@ -143,7 +143,8 @@ read_json_value(simdjson::dom::element const& json)
                         encoded.data(),
                         encoded.length(),
                         get_mime_base64_character_set());
-                    return make_blob(std::move(decoded), decoded_size);
+                    return dynamic(
+                        make_blob(std::move(decoded), decoded_size));
                 }
                 else
                 {
@@ -162,9 +163,9 @@ read_json_value(simdjson::dom::element const& json)
                 dynamic_map map;
                 for (auto const& i : object)
                 {
-                    map[string(i.key)] = read_json_value(i.value);
+                    map[dynamic{string(i.key)}] = read_json_value(i.value);
                 }
-                return map;
+                return dynamic(std::move(map));
             }
         }
     }

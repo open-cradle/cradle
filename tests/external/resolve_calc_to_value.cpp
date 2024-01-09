@@ -19,7 +19,8 @@ TEST_CASE("resolve_calc_to_value", "[external]")
     auto test_calc
         = make_calculation_request_with_lambda(make_lambda_calculation(
             make_function([](dynamic_array args, tasklet_tracker*) {
-                return cast<double>(args.at(0)) + cast<double>(args.at(1));
+                return dynamic(
+                    cast<double>(args.at(0)) + cast<double>(args.at(1)));
             }),
             {make_calculation_request_with_value(dynamic(1.0)),
              make_calculation_request_with_value(dynamic(1.0))}));

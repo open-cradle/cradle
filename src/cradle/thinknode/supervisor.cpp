@@ -190,18 +190,22 @@ spawn_provider(
             {{"Content-Type", "application/json"},
              {"X-Registry-Auth",
               get_environment_variable("CRADLE_THINKNODE_DOCKER_AUTH")}},
-            value_to_json_blob(dynamic(
-                {{"Image",
-                  "registry-mgh.thinknode.com/" + account + "/" + app + "@"
-                      + extract_tag(image)},
-                 {"Env",
-                  {(service_type == docker_service_type::WINDOWS
-                    || service_type == docker_service_type::WSL)
-                       ? "THINKNODE_HOST=host.docker.internal"
-                       : "THINKNODE_HOST=localhost",
-                   "THINKNODE_PORT=" + boost::lexical_cast<string>(port),
-                   "THINKNODE_PID=" + pid}},
-                 {"HostConfig", {{"NetworkMode", "host"}}}})));
+            value_to_json_blob(
+                {{dynamic("Image"),
+                  dynamic(
+                      "registry-mgh.thinknode.com/" + account + "/" + app + "@"
+                      + extract_tag(image))},
+                 {dynamic("Env"),
+                  {dynamic(
+                       (service_type == docker_service_type::WINDOWS
+                        || service_type == docker_service_type::WSL)
+                           ? "THINKNODE_HOST=host.docker.internal"
+                           : "THINKNODE_HOST=localhost"),
+                   dynamic(
+                       "THINKNODE_PORT=" + boost::lexical_cast<string>(port)),
+                   dynamic("THINKNODE_PID=" + pid)}},
+                 {dynamic("HostConfig"),
+                  {{dynamic("NetworkMode"), dynamic("host")}}}}));
         auto response
             = connection.perform_request(check_in, reporter, request);
         id = cast<string>(

@@ -1127,7 +1127,7 @@ process_calc_tree_subdiff(
     value_diff_item item)
 {
     if (item.op == value_diff_op::UPDATE && !item.path.empty()
-        && item.path.back() == "reference")
+        && item.path.back() == dynamic("reference"))
     {
         auto id_a = cast<string>(*item.a);
         auto id_b = cast<string>(*item.b);

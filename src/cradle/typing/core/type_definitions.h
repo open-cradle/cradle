@@ -118,69 +118,98 @@ struct dynamic
     }
 
     // Construct a dynamic from one of the base types.
-    dynamic(nil_t v)
+    explicit dynamic(nil_t v)
     {
         set(v);
     }
-    dynamic(bool v)
+    explicit dynamic(bool v)
     {
         set(v);
     }
-    dynamic(integer v)
+    explicit dynamic(integer v)
     {
         set(v);
     }
-    dynamic(double v)
+    explicit dynamic(int v)
+    {
+        set(integer(v));
+    }
+    explicit dynamic(double v)
     {
         set(v);
     }
-    dynamic(string const& v)
+    explicit dynamic(string const& v)
     {
         set(v);
     }
-    dynamic(string&& v)
+    explicit dynamic(string&& v)
     {
         set(std::move(v));
     }
-    dynamic(char const* v)
+    explicit dynamic(char const* v)
     {
         set(string(v));
     }
-    dynamic(blob const& v)
+    explicit dynamic(blob const& v)
     {
         set(v);
     }
-    dynamic(blob&& v)
+    explicit dynamic(blob&& v)
     {
         set(std::move(v));
     }
-    dynamic(boost::posix_time::ptime const& v)
+    explicit dynamic(boost::posix_time::ptime const& v)
     {
         set(v);
     }
-    dynamic(boost::posix_time::ptime&& v)
+    explicit dynamic(boost::posix_time::ptime&& v)
     {
         set(std::move(v));
     }
-    dynamic(dynamic_array const& v)
+    explicit dynamic(dynamic_array const& v)
     {
         set(v);
     }
-    dynamic(dynamic_array&& v)
+    explicit dynamic(dynamic_array&& v)
     {
         set(std::move(v));
     }
-    dynamic(dynamic_map const& v)
+    explicit dynamic(dynamic_map const& v)
     {
         set(v);
     }
-    dynamic(dynamic_map&& v)
+    explicit dynamic(dynamic_map&& v)
     {
         set(std::move(v));
     }
 
     // Construct from an initializer list.
+    // Note that this constructor is intentionally left implicit because a) it
+    // greatly simplifies certain constructions and b) the dynamic type is
+    // already involved as the type of the list items.
     dynamic(std::initializer_list<dynamic> list);
+
+    dynamic(dynamic const& x) = default;
+    dynamic(dynamic& x) = default;
+    dynamic(dynamic&& x) = default;
+
+    dynamic&
+    operator=(dynamic const& x)
+        = default;
+    dynamic&
+    operator=(dynamic& x)
+        = default;
+    dynamic&
+    operator=(dynamic&& x)
+        = default;
+
+    template<class Value>
+    dynamic&
+    operator=(Value&& x)
+    {
+        this->set(std::forward<Value>(x));
+        return *this;
+    }
 
     // GETTERS
 
