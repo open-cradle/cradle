@@ -51,6 +51,7 @@
 #include <cradle/plugins/secondary_cache/all_plugins.h>
 #include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
+#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/thinknode/apm.h>
 #include <cradle/thinknode/caching.h>

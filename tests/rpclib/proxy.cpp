@@ -10,6 +10,7 @@
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
+#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/rpclib/client/proxy.h>
 
 #include "../support/inner_service.h"
