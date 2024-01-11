@@ -115,7 +115,14 @@ CRADLE_DEFINE_ERROR_INFO(std::list<dynamic>, dynamic_value_path)
 // dynamic_value_path info associated with :e. If there is currently no path
 // info associated with :e, a path containing only :p is associated with it.
 void
-add_dynamic_path_element(boost::exception& e, dynamic const& path_element);
+add_dynamic_path_element(boost::exception& e, dynamic path_element);
+
+template<class Element>
+void
+add_dynamic_path_element(boost::exception& e, Element path_element)
+{
+    add_dynamic_path_element(e, dynamic{std::move(path_element)});
+}
 
 // VALUES
 

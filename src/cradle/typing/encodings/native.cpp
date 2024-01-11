@@ -22,28 +22,28 @@ read_natively_encoded_value(raw_memory_reader<raw_input_buffer>& r, dynamic& v)
     switch (type)
     {
         case value_type::NIL:
-            v = nil;
+            v = dynamic(nil);
             break;
         case value_type::BOOLEAN: {
             uint8_t x;
             raw_read(r, &x, 1);
-            v = bool(x != 0);
+            v = dynamic(bool(x != 0));
             break;
         }
         case value_type::INTEGER: {
             integer x;
             raw_read(r, &x, 8);
-            v = x;
+            v = dynamic(x);
             break;
         }
         case value_type::FLOAT: {
             double x;
             raw_read(r, &x, 8);
-            v = x;
+            v = dynamic(x);
             break;
         }
         case value_type::STRING: {
-            v = read_string<uint32_t>(r);
+            v = dynamic(read_string<uint32_t>(r));
             break;
         }
         case value_type::BLOB: {
@@ -52,13 +52,13 @@ read_natively_encoded_value(raw_memory_reader<raw_input_buffer>& r, dynamic& v)
             auto size = boost::numeric_cast<size_t>(length);
             byte_vector bv(size);
             raw_read(r, bv.data(), size);
-            v = make_blob(std::move(bv));
+            v = dynamic(make_blob(std::move(bv)));
             break;
         }
         case value_type::DATETIME: {
             int64_t t;
             raw_read(r, &t, 8);
-            v = the_epoch + boost::posix_time::milliseconds(t);
+            v = dynamic(the_epoch + boost::posix_time::milliseconds(t));
             break;
         }
         case value_type::ARRAY: {
@@ -67,7 +67,7 @@ read_natively_encoded_value(raw_memory_reader<raw_input_buffer>& r, dynamic& v)
             dynamic_array value(boost::numeric_cast<size_t>(length));
             for (auto& item : value)
                 read_natively_encoded_value(r, item);
-            v = value;
+            v = dynamic(std::move(value));
             break;
         }
         case value_type::MAP: {
@@ -82,7 +82,7 @@ read_natively_encoded_value(raw_memory_reader<raw_input_buffer>& r, dynamic& v)
                 read_natively_encoded_value(r, value);
                 map[key] = value;
             }
-            v = map;
+            v = dynamic(std::move(map));
             break;
         }
     }

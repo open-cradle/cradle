@@ -20,23 +20,23 @@ read_msgpack_value(
     {
         case msgpack::type::NIL:
         default:
-            return nil;
+            return dynamic(nil);
         case msgpack::type::BOOLEAN:
-            return object.via.boolean;
+            return dynamic(object.via.boolean);
         case msgpack::type::POSITIVE_INTEGER:
-            return boost::numeric_cast<integer>(object.via.u64);
+            return dynamic(boost::numeric_cast<integer>(object.via.u64));
         case msgpack::type::NEGATIVE_INTEGER:
-            return boost::numeric_cast<integer>(object.via.i64);
+            return dynamic(boost::numeric_cast<integer>(object.via.i64));
         case msgpack::type::FLOAT:
-            return boost::numeric_cast<double>(object.via.f64);
+            return dynamic(boost::numeric_cast<double>(object.via.f64));
         case msgpack::type::STR: {
             string s;
             object.convert(s);
-            return s;
+            return dynamic(std::move(s));
         }
         case msgpack::type::BIN:
-            return blob{
-                ownership, as_bytes(object.via.bin.ptr), object.via.bin.size};
+            return dynamic(blob{
+                ownership, as_bytes(object.via.bin.ptr), object.via.bin.size});
         case msgpack::type::ARRAY: {
             size_t size = object.via.array.size;
             dynamic_array array;
@@ -46,7 +46,7 @@ read_msgpack_value(
                 array.push_back(
                     read_msgpack_value(ownership, object.via.array.ptr[i]));
             }
-            return array;
+            return dynamic(std::move(array));
         }
         case msgpack::type::MAP: {
             dynamic_map map;
@@ -56,7 +56,7 @@ read_msgpack_value(
                 map[read_msgpack_value(ownership, pair.key)]
                     = read_msgpack_value(ownership, pair.val);
             }
-            return map;
+            return dynamic(std::move(map));
         }
         case msgpack::type::EXT: {
             switch (object.via.ext.type())
@@ -95,8 +95,9 @@ read_msgpack_value(
                             break;
                         }
                     }
-                    return ptime(date(1970, 1, 1))
-                           + boost::posix_time::milliseconds(t);
+                    return dynamic(
+                        ptime(date(1970, 1, 1))
+                        + boost::posix_time::milliseconds(t));
                 }
                 default:
                     CRADLE_THROW(

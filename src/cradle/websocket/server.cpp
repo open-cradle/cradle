@@ -51,6 +51,7 @@
 #include <cradle/plugins/secondary_cache/all_plugins.h>
 #include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
+#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/thinknode/apm.h>
 #include <cradle/thinknode/caching.h>
@@ -1127,7 +1128,7 @@ process_calc_tree_subdiff(
     value_diff_item item)
 {
     if (item.op == value_diff_op::UPDATE && !item.path.empty()
-        && item.path.back() == "reference")
+        && item.path.back() == dynamic("reference"))
     {
         auto id_a = cast<string>(*item.a);
         auto id_b = cast<string>(*item.b);

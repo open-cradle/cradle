@@ -44,54 +44,54 @@ TEST_CASE("basic JSON encoding", "[encodings][json]")
         R"(
             null
         )",
-        nil);
+        dynamic(nil));
     test_json_encoding(
         R"(
             false
         )",
-        false);
+        dynamic(false));
     test_json_encoding(
         R"(
             true
         )",
-        true);
+        dynamic(true));
     test_json_encoding(
         R"(
             1
         )",
-        integer(1));
+        dynamic(integer(1)));
     test_json_encoding(
         R"(
             10737418240
         )",
-        integer(10737418240));
+        dynamic(integer(10737418240)));
     test_json_encoding(
         R"(
             -1
         )",
-        integer(-1));
+        dynamic(integer(-1)));
     test_json_encoding(
         R"(
             1.25
         )",
-        1.25);
+        dynamic(1.25));
     test_json_encoding(
         R"(
             "hi"
         )",
-        "hi");
+        dynamic("hi"));
 
     // Try some arrays.
     test_json_encoding(
         R"(
             [ 1, 2, 3 ]
         )",
-        dynamic({integer(1), integer(2), integer(3)}));
+        {dynamic(integer(1)), dynamic(integer(2)), dynamic(integer(3))});
     test_json_encoding(
         R"(
             []
         )",
-        dynamic_array());
+        dynamic(dynamic_array{}));
 
     // Try a map with string keys.
     test_json_encoding(
@@ -101,7 +101,7 @@ TEST_CASE("basic JSON encoding", "[encodings][json]")
                 "n": 4.125
             }
         )",
-        {{"happy", true}, {"n", 4.125}});
+        {{dynamic("happy"), dynamic(true)}, {dynamic("n"), dynamic(4.125)}});
 
     // Try a map with non-string keys.
     test_json_encoding(
@@ -117,7 +117,9 @@ TEST_CASE("basic JSON encoding", "[encodings][json]")
                 }
             ]
         )",
-        dynamic_map({{false, "no"}, {true, "yes"}}));
+        dynamic(dynamic_map{
+            {dynamic(false), dynamic("no")},
+            {dynamic(true), dynamic("yes")}}));
 
     // Try some other JSON that looks like the above.
     test_json_encoding(
@@ -131,7 +133,8 @@ TEST_CASE("basic JSON encoding", "[encodings][json]")
                 }
             ]
         )",
-        {{{"key", false}}, {{"key", true}}});
+        {{{dynamic("key"), dynamic(false)}},
+         {{dynamic("key"), dynamic(true)}}});
     test_json_encoding(
         R"(
             [
@@ -145,7 +148,9 @@ TEST_CASE("basic JSON encoding", "[encodings][json]")
                 }
             ]
         )",
-        {{{"key", false}, {"valu", "no"}}, {{"key", true}, {"valu", "yes"}}});
+        {{{dynamic("key"), dynamic(false)}, {dynamic("valu"), dynamic("no")}},
+         {{dynamic("key"), dynamic(true)},
+          {dynamic("valu"), dynamic("yes")}}});
     test_json_encoding(
         R"(
             [
@@ -159,24 +164,26 @@ TEST_CASE("basic JSON encoding", "[encodings][json]")
                 }
             ]
         )",
-        {{{"ke", false}, {"value", "no"}}, {{"ke", true}, {"value", "yes"}}});
+        {{{dynamic("ke"), dynamic(false)}, {dynamic("value"), dynamic("no")}},
+         {{dynamic("ke"), dynamic(true)},
+          {dynamic("value"), dynamic("yes")}}});
 
     // Try some ptimes.
     test_json_encoding(
         R"(
             "2017-04-26T01:02:03.000Z"
         )",
-        ptime(
+        dynamic(ptime(
             date(2017, boost::gregorian::Apr, 26),
-            boost::posix_time::time_duration(1, 2, 3)));
+            boost::posix_time::time_duration(1, 2, 3))));
     test_json_encoding(
         R"(
             "2017-05-26T13:02:03.456Z"
         )",
-        ptime(
+        dynamic(ptime(
             date(2017, boost::gregorian::May, 26),
             boost::posix_time::time_duration(13, 2, 3)
-                + boost::posix_time::milliseconds(456)));
+                + boost::posix_time::milliseconds(456))));
 
     // Try some thing that look like a ptime at first and check that they're
     // just treated as strings.
@@ -184,62 +191,62 @@ TEST_CASE("basic JSON encoding", "[encodings][json]")
         R"(
             "2017-05-26T13:13:03.456ZABC"
         )",
-        "2017-05-26T13:13:03.456ZABC");
+        dynamic("2017-05-26T13:13:03.456ZABC"));
     test_json_encoding(
         R"(
             "2017-05-26T13:XX:03.456Z"
         )",
-        "2017-05-26T13:XX:03.456Z");
+        dynamic("2017-05-26T13:XX:03.456Z"));
     test_json_encoding(
         R"(
             "2017-05-26T13:03.456Z"
         )",
-        "2017-05-26T13:03.456Z");
+        dynamic("2017-05-26T13:03.456Z"));
     test_json_encoding(
         R"(
             "2017-05-26T42:00:03.456Z"
         )",
-        "2017-05-26T42:00:03.456Z");
+        dynamic("2017-05-26T42:00:03.456Z"));
     test_json_encoding(
         R"(
             "X017-05-26T13:02:03.456Z"
         )",
-        "X017-05-26T13:02:03.456Z");
+        dynamic("X017-05-26T13:02:03.456Z"));
     test_json_encoding(
         R"(
             "2X17-05-26T13:02:03.456Z"
         )",
-        "2X17-05-26T13:02:03.456Z");
+        dynamic("2X17-05-26T13:02:03.456Z"));
     test_json_encoding(
         R"(
             "20X7-05-26T13:02:03.456Z"
         )",
-        "20X7-05-26T13:02:03.456Z");
+        dynamic("20X7-05-26T13:02:03.456Z"));
     test_json_encoding(
         R"(
             "201X-05-26T13:02:03.456Z"
         )",
-        "201X-05-26T13:02:03.456Z");
+        dynamic("201X-05-26T13:02:03.456Z"));
     test_json_encoding(
         R"(
             "2017X05-26T13:02:03.456Z"
         )",
-        "2017X05-26T13:02:03.456Z");
+        dynamic("2017X05-26T13:02:03.456Z"));
     test_json_encoding(
         R"(
             "2017-05-26T13:02:03.456_"
         )",
-        "2017-05-26T13:02:03.456_");
+        dynamic("2017-05-26T13:02:03.456_"));
     test_json_encoding(
         R"(
             "2017-05-26T13:02:03.456_"
         )",
-        "2017-05-26T13:02:03.456_");
+        dynamic("2017-05-26T13:02:03.456_"));
     test_json_encoding(
         R"(
             "2017-05-26T13:02:03.45Z"
         )",
-        "2017-05-26T13:02:03.45Z");
+        dynamic("2017-05-26T13:02:03.45Z"));
 
     // Try a blob.
     test_json_encoding(
@@ -249,7 +256,7 @@ TEST_CASE("basic JSON encoding", "[encodings][json]")
                 "type": "base64-encoded-blob"
             }
         )",
-        make_string_literal_blob("some blob data"));
+        dynamic(make_string_literal_blob("some blob data")));
 
     // Try some other things that aren't blobs but look similar.
     test_json_encoding(
@@ -259,7 +266,8 @@ TEST_CASE("basic JSON encoding", "[encodings][json]")
                 "type": "blob"
             }
         )",
-        {{"type", "blob"}, {"blob", "asdf"}});
+        {{dynamic("type"), dynamic("blob")},
+         {dynamic("blob"), dynamic("asdf")}});
     test_json_encoding(
         R"(
             {
@@ -267,7 +275,8 @@ TEST_CASE("basic JSON encoding", "[encodings][json]")
                 "type": 12
             }
         )",
-        {{"type", integer(12)}, {"blob", "asdf"}});
+        {{dynamic("type"), dynamic(integer(12))},
+         {dynamic("blob"), dynamic("asdf")}});
 }
 
 TEST_CASE("malformed JSON blob", "[encodings][json]")

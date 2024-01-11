@@ -9,6 +9,7 @@
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/requests.h>
+#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/test_dlls_dir.h>
 
 using namespace cradle;

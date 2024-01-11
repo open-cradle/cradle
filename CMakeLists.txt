@@ -187,7 +187,8 @@ find_path(BSHOSHANY_THREAD_POOL_INCLUDE_DIRS "BS_thread_pool.hpp")
 FetchContent_Declare(fetched_rpclib
     GIT_REPOSITORY https://github.com/rpclib/rpclib.git
     GIT_TAG "v2.3.0"
-    PATCH_COMMAND git apply ${CMAKE_CURRENT_SOURCE_DIR}/patches/rpclib.patch)
+    PATCH_COMMAND git apply ${CMAKE_CURRENT_SOURCE_DIR}/patches/rpclib.patch
+    UPDATE_DISCONNECTED TRUE)
 FetchContent_MakeAvailable(fetched_rpclib)
 
 # TODO: Isolate these so they're only required for testing.

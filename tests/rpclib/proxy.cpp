@@ -7,7 +7,10 @@
 #include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/service/resources.h>
+#include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/domain/testing/requests.h>
+#include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
+#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/rpclib/client/proxy.h>
 
 #include "../support/inner_service.h"
@@ -21,6 +24,20 @@ TEST_CASE("client name", "[rpclib]")
     auto& client{resources->get_proxy(proxy_name)};
 
     REQUIRE(client.name() == "rpclib");
+}
+
+TEST_CASE("alternate logger for client", "[rpclib]")
+{
+    std::string proxy_name{"rpclib"};
+    auto config{make_inner_tests_config()};
+    auto resources{std::make_unique<inner_resources>(config)};
+    resources->set_secondary_cache(std::make_unique<local_disk_cache>(config));
+    auto logger{ensure_logger("alternate")};
+    resources->register_proxy(
+        std::make_unique<rpclib_client>(resources->config(), logger));
+    auto& client{resources->get_proxy(proxy_name)};
+
+    REQUIRE(&client.get_logger() == logger.get());
 }
 
 TEST_CASE("send mock_http message", "[rpclib]")

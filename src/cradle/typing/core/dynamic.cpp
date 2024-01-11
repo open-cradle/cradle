@@ -75,11 +75,11 @@ dynamic::dynamic(std::initializer_list<dynamic> list)
             auto const& array = cast<dynamic_array>(v);
             map[array[0]] = array[1];
         }
-        *this = std::move(map);
+        *this = dynamic(std::move(map));
     }
     else
     {
-        *this = dynamic_array(list);
+        *this = dynamic(dynamic_array(list));
     }
 }
 
@@ -215,16 +215,17 @@ type_info_query<dynamic>::get(api_type_info* info)
 }
 
 void
-add_dynamic_path_element(boost::exception& e, dynamic const& path_element)
+add_dynamic_path_element(boost::exception& e, dynamic path_element)
 {
     std::list<dynamic>* info = get_error_info<dynamic_value_path_info>(e);
     if (info)
     {
-        info->push_front(path_element);
+        info->push_front(std::move(path_element));
     }
     else
     {
-        e << dynamic_value_path_info(std::list<dynamic>({path_element}));
+        e << dynamic_value_path_info(
+            std::list<dynamic>({std::move(path_element)}));
     }
 }
 

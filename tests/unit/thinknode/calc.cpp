@@ -114,7 +114,8 @@ TEST_CASE("calc request retrieval", "[thinknode][tn_calc]")
 
     REQUIRE(
         request
-        == make_thinknode_calc_request_with_value(dynamic({2.1, 4.2})));
+        == make_thinknode_calc_request_with_value(
+            {dynamic(2.1), dynamic(4.2)}));
 
     REQUIRE(mock_http.is_complete());
     REQUIRE(mock_http.is_in_order());

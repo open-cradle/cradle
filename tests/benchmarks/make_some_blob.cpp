@@ -9,6 +9,7 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
+#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/rpclib/client/proxy.h>
 
 #include "../support/inner_service.h"
