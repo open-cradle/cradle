@@ -59,7 +59,7 @@ http_cache::clear()
     throw not_implemented_error();
 }
 
-cppcoro::task<blob>
+cppcoro::task<std::optional<blob>>
 http_cache::read(std::string key)
 {
     auto query = make_cache_get_request(port_, key);
@@ -77,7 +77,7 @@ http_cache::read(std::string key)
         {
             throw;
         }
-        co_return blob{};
+        co_return std::nullopt;
     }
     co_return std::move(response.body);
 }

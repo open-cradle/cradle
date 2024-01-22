@@ -30,9 +30,9 @@ class http_requests_storage : public secondary_storage_intf
     void
     clear() override;
 
-    // Returns blob{} if the value is not in the storage.
+    // Returns std::nullopt if the value is not in the storage.
     // Throws on other errors.
-    cppcoro::task<blob>
+    cppcoro::task<std::optional<blob>>
     read(std::string key) override;
 
     cppcoro::task<void>

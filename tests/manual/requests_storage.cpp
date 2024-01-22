@@ -97,13 +97,13 @@ TEST_CASE("load and resolve stored request", tag_load)
     testing_seri_catalog cat{resources.get_seri_registry()};
 
     std::string key{the_key};
-    blob req_blob{cppcoro::sync_wait(storage.read(key))};
-    if (!req_blob.data())
+    auto opt_req_blob{cppcoro::sync_wait(storage.read(key))};
+    if (!opt_req_blob)
     {
         throw not_found_error(
             fmt::format("Storage has no entry with key {}", key));
     }
-    std::string req_serialized{to_string(req_blob)};
+    std::string req_serialized{to_string(*opt_req_blob)};
 
     testing_request_context ctx{resources, nullptr, ""};
     serialized_result seri_result{

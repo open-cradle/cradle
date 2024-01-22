@@ -46,7 +46,7 @@ class local_disk_cache : public secondary_storage_intf
     void
     clear() override;
 
-    cppcoro::task<blob>
+    cppcoro::task<std::optional<blob>>
     read(std::string key) override;
 
     cppcoro::task<void>

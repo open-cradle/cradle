@@ -74,7 +74,7 @@ local_disk_cache::clear()
 }
 
 // This is a coroutine so takes key by value.
-cppcoro::task<blob>
+cppcoro::task<std::optional<blob>>
 local_disk_cache::read(std::string key)
 {
     try
@@ -125,7 +125,7 @@ local_disk_cache::read(std::string key)
         spdlog::get("cradle")->warn("error reading disk cache entry {}", key);
     }
     spdlog::get("cradle")->debug("disk cache miss on {}", key);
-    co_return blob{};
+    co_return std::nullopt;
 }
 
 cppcoro::task<void>

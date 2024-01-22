@@ -55,13 +55,13 @@ cppcoro::task<Req>
 load_request(std::string key, inner_resources& resources)
 {
     auto& storage{resources.secondary_cache()};
-    blob req_blob{co_await storage.read(key)};
-    if (!req_blob.data())
+    auto opt_req_blob{co_await storage.read(key)};
+    if (!opt_req_blob)
     {
         throw not_found_error(
             fmt::format("Storage has no entry with key {}", key));
     }
-    co_return deserialize_request<Req>(resources, to_string(req_blob));
+    co_return deserialize_request<Req>(resources, to_string(*opt_req_blob));
 }
 
 } // namespace cradle

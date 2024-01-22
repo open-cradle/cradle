@@ -12,12 +12,13 @@ secondary_cached_blob(
 {
     std::string key{get_unique_string(*id_key)};
     auto& cache = resources.secondary_cache();
-    auto result = co_await cache.read(key);
-    if (!result.data())
+    auto opt_result = co_await cache.read(key);
+    if (opt_result)
     {
-        result = co_await create_task();
-        co_await cache.write(key, result);
+        co_return *opt_result;
     }
+    auto result = co_await create_task();
+    co_await cache.write(key, result);
     co_return result;
 }
 

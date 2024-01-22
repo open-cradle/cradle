@@ -1,7 +1,6 @@
 #ifndef CRADLE_INNER_CORE_TYPE_DEFINITIONS_H
 #define CRADLE_INNER_CORE_TYPE_DEFINITIONS_H
 
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -16,6 +15,7 @@ typedef std::nullopt_t none_t;
 inline constexpr std::nullopt_t none(std::nullopt);
 
 // some(x) creates an optional of the proper type with the value of :x.
+// Could be replaced with std::make_optional.
 template<class T>
 auto
 some(T&& x)
@@ -41,7 +41,7 @@ class data_owner
 
     // true if the data is formed by a memory-mapped file
     virtual bool
-    maps_file() const
+    maps_file() const noexcept
     {
         return false;
     }
@@ -65,23 +65,26 @@ class data_owner
     }
 };
 
-// A blob is an immutable sequence of bytes: once constructed or deserialized,
-// it must not be changed anymore.
+// A blob represents a sequence of bytes. It is intended to be immutable: once
+// constructed or deserialized, it normally won't change anymore.
 class blob
 {
  public:
-    // Should be followed up by a reset()
-    blob() = default;
+    // Creates an empty blob.
+    blob() noexcept : data_{&empty_data_}, size_{0}
+    {
+    }
 
     // To be used for static data (no owner)
-    blob(std::byte const* data, std::size_t size) : data_{data}, size_{size}
+    blob(std::byte const* data, std::size_t size) noexcept
+        : data_{data}, size_{size}
     {
     }
 
     blob(
         std::shared_ptr<data_owner> owner,
         std::byte const* data,
-        std::size_t size)
+        std::size_t size) noexcept
         : owner_{std::move(owner)}, data_{data}, size_{size}
     {
     }
@@ -91,42 +94,42 @@ class blob
     reset(
         std::shared_ptr<data_owner> owner,
         std::byte const* data,
-        std::size_t size)
+        std::size_t size) noexcept
     {
-        assert(!data_);
         owner_ = std::move(owner);
         data_ = data;
         size_ = size;
     }
 
     std::byte const*
-    data() const
+    data() const noexcept
     {
         return data_;
     }
 
     std::size_t
-    size() const
+    size() const noexcept
     {
         return size_;
     }
 
     data_owner const*
-    owner() const
+    owner() const noexcept
     {
         return owner_.get();
     }
 
     data_owner const*
-    mapped_file_data_owner() const
+    mapped_file_data_owner() const noexcept
     {
         return owner_ && owner_->maps_file() ? &*owner_ : nullptr;
     }
 
  private:
+    static inline std::byte empty_data_{};
     std::shared_ptr<data_owner> owner_;
-    std::byte const* data_{nullptr};
-    std::size_t size_{0};
+    std::byte const* data_;
+    std::size_t size_;
 };
 
 } // namespace cradle
