@@ -12,45 +12,63 @@
 #include <cradle/inner/fs/utilities.h>
 #include <cradle/inner/utilities/text.h>
 
-using std::string;
-
 using namespace cradle;
 
 namespace {
 
-void
-init_disk_cache(ll_disk_cache& cache, string const& cache_dir = "disk_cache")
-{
-    reset_directory(cache_dir);
+static char const tag[] = "[ll_disk_cache]";
 
+ll_disk_cache_config
+create_config(std::string const& cache_dir)
+{
     ll_disk_cache_config config;
-    config.directory = some(cache_dir);
+    config.directory = cache_dir;
     // Given the way that the value strings are generated below, this is
     // enough to hold a little under 20 items (which matters for testing
     // the eviction behavior).
     config.size_limit = 500;
+    return config;
+}
 
-    cache.reset(config);
-    REQUIRE(cache.is_initialized());
-
+void
+check_initial_cache(ll_disk_cache& cache, std::string const& cache_dir)
+{
     auto info = cache.get_summary_info();
     REQUIRE(info.directory == cache_dir);
     REQUIRE(info.entry_count == 0);
     REQUIRE(info.total_size == 0);
 }
 
-// Generate some (meaningless) key string for the item with the given ID.
-string
+ll_disk_cache
+create_disk_cache()
+{
+    std::string const cache_dir = "disk_cache";
+    reset_directory(cache_dir);
+    ll_disk_cache cache{create_config(cache_dir)};
+    check_initial_cache(cache, cache_dir);
+    return cache;
+}
+
+void
+reset_disk_cache(ll_disk_cache& cache, std::string const& cache_dir)
+{
+    reset_directory(cache_dir);
+    cache.reset(create_config(cache_dir));
+    check_initial_cache(cache, cache_dir);
+}
+
+// Generate some (meaningless) key std::string for the item with the given ID.
+std::string
 generate_key_string(int item_id)
 {
-    return "meaningless_key_string_" + lexical_cast<string>(item_id);
+    return "meaningless_key_string_" + lexical_cast<std::string>(item_id);
 }
 
 // Generate some (meaningless) value string for the item with the given ID.
-string
+std::string
 generate_value_string(int item_id)
 {
-    return "meaningless_value_string_" + lexical_cast<string>(item_id);
+    return "meaningless_value_string_" + lexical_cast<std::string>(item_id);
 }
 
 // Test access to an item. - This simulates access to an item via the disk
@@ -129,18 +147,9 @@ test_item_access(ll_disk_cache& cache, int item_id)
 
 } // namespace
 
-TEST_CASE("resetting", "[ll_disk_cache]")
+TEST_CASE("simple item access", tag)
 {
-    ll_disk_cache cache;
-    init_disk_cache(cache);
-    cache.reset();
-    REQUIRE(!cache.is_initialized());
-}
-
-TEST_CASE("simple item access", "[ll_disk_cache]")
-{
-    ll_disk_cache cache;
-    init_disk_cache(cache);
+    auto cache{create_disk_cache()};
     // The first time, it shouldn't be in the cache, but the second time, it
     // should be.
     REQUIRE(!test_item_access(cache, 0));
@@ -149,11 +158,10 @@ TEST_CASE("simple item access", "[ll_disk_cache]")
     REQUIRE(test_item_access(cache, 1));
 }
 
-TEST_CASE("multiple initializations", "[ll_disk_cache]")
+TEST_CASE("multiple initializations", tag)
 {
-    ll_disk_cache cache;
-    init_disk_cache(cache);
-    init_disk_cache(cache, "alt_disk_cache");
+    auto cache{create_disk_cache()};
+    reset_disk_cache(cache, "alt_disk_cache");
     // Test that it can still handle basic operations.
     REQUIRE(!test_item_access(cache, 0));
     REQUIRE(test_item_access(cache, 0));
@@ -161,10 +169,9 @@ TEST_CASE("multiple initializations", "[ll_disk_cache]")
     REQUIRE(test_item_access(cache, 1));
 }
 
-TEST_CASE("clearing", "[ll_disk_cache]")
+TEST_CASE("clearing", tag)
 {
-    ll_disk_cache cache;
-    init_disk_cache(cache);
+    auto cache{create_disk_cache()};
     REQUIRE(!test_item_access(cache, 0));
     REQUIRE(!test_item_access(cache, 1));
     REQUIRE(test_item_access(cache, 0));
@@ -174,10 +181,9 @@ TEST_CASE("clearing", "[ll_disk_cache]")
     REQUIRE(!test_item_access(cache, 1));
 }
 
-TEST_CASE("LRU removal", "[ll_disk_cache]")
+TEST_CASE("LRU removal", tag)
 {
-    ll_disk_cache cache;
-    init_disk_cache(cache);
+    auto cache{create_disk_cache()};
     test_item_access(cache, 0);
     test_item_access(cache, 1);
     // This pattern of access should ensure that entries 0 and 1 always remain
@@ -201,10 +207,9 @@ TEST_CASE("LRU removal", "[ll_disk_cache]")
     }
 }
 
-TEST_CASE("entry removal error", "[ll_disk_cache]")
+TEST_CASE("entry removal error", tag)
 {
-    ll_disk_cache cache;
-    init_disk_cache(cache);
+    auto cache{create_disk_cache()};
 
     // Access item 1 and then open the file that holds it to create a lock on
     // it.
@@ -232,10 +237,9 @@ TEST_CASE("entry removal error", "[ll_disk_cache]")
     test_item_access(cache, 1);
 }
 
-TEST_CASE("manual entry removal", "[ll_disk_cache]")
+TEST_CASE("manual entry removal", tag)
 {
-    ll_disk_cache cache;
-    init_disk_cache(cache);
+    auto cache{create_disk_cache()};
     for (int i = 0; i != 2; ++i)
     {
         // Insert the item and check that it was inserted.
@@ -252,9 +256,9 @@ TEST_CASE("manual entry removal", "[ll_disk_cache]")
     }
 }
 
-TEST_CASE("cache summary info", "[ll_disk_cache]")
+TEST_CASE("cache summary info", tag)
 {
-    ll_disk_cache cache;
+    auto cache{create_disk_cache()};
 
     int64_t expected_size = 0;
     int64_t expected_count = 0;
@@ -265,7 +269,6 @@ TEST_CASE("cache summary info", "[ll_disk_cache]")
     };
 
     // Test an empty cache.
-    init_disk_cache(cache);
     check_summary_info();
 
     // Add an entry.
@@ -297,10 +300,9 @@ TEST_CASE("cache summary info", "[ll_disk_cache]")
     check_summary_info();
 }
 
-TEST_CASE("cache entry list", "[ll_disk_cache]")
+TEST_CASE("cache entry list", tag)
 {
-    ll_disk_cache cache;
-    init_disk_cache(cache);
+    auto cache{create_disk_cache()};
     test_item_access(cache, 0);
     test_item_access(cache, 1);
     test_item_access(cache, 2);
@@ -327,7 +329,7 @@ TEST_CASE("cache entry list", "[ll_disk_cache]")
     }
 }
 
-TEST_CASE("corrupt cache", "[ll_disk_cache]")
+TEST_CASE("corrupt cache", tag)
 {
     // Set up an invalid cache directory.
     reset_directory("disk_cache");
@@ -337,12 +339,11 @@ TEST_CASE("corrupt cache", "[ll_disk_cache]")
 
     // Check that the cache still initializes and that the extraneous file
     // is removed.
-    ll_disk_cache cache;
-    init_disk_cache(cache);
+    auto cache{create_disk_cache()};
     REQUIRE(!exists(extraneous_file));
 }
 
-TEST_CASE("incompatible cache", "[ll_disk_cache]")
+TEST_CASE("incompatible cache", tag)
 {
     // Set up a cache directory with an incompatible database version number.
     reset_directory("disk_cache");
@@ -359,7 +360,6 @@ TEST_CASE("incompatible cache", "[ll_disk_cache]")
 
     // Check that the cache still initializes and that the extraneous file
     // is removed.
-    ll_disk_cache cache;
-    init_disk_cache(cache);
+    auto cache{create_disk_cache()};
     REQUIRE(!exists(extraneous_file));
 }

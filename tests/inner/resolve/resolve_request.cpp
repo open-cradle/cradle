@@ -328,9 +328,8 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     caching_request_resolution_context ctx{*resources};
-    auto& ll_cache
-        = static_cast<local_disk_cache&>(resources->secondary_cache())
-              .get_ll_disk_cache();
+    auto& disk_cache{
+        static_cast<local_disk_cache&>(resources->secondary_cache())};
     std::vector<Req> requests;
     for (int i = 0; i < num_requests; ++i)
     {
@@ -352,7 +351,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     REQUIRE(num_add_calls == num_requests);
     auto ic0 = get_summary_info(mem_cache);
     REQUIRE(ic0.ac_num_records == num_requests);
-    auto dc0 = ll_cache.get_summary_info();
+    auto dc0 = disk_cache.get_summary_info();
     REQUIRE(dc0.entry_count == num_requests);
 
     ctx.reset_memory_cache();
@@ -367,7 +366,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     REQUIRE(num_add_calls == num_requests);
     auto ic1 = get_summary_info(mem_cache);
     REQUIRE(ic1.ac_num_records == num_requests);
-    auto dc1 = ll_cache.get_summary_info();
+    auto dc1 = disk_cache.get_summary_info();
     REQUIRE(dc1.entry_count == num_requests);
 }
 

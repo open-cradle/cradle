@@ -1497,10 +1497,9 @@ process_message(websocket_server_impl& server, client_request request)
         }
         case client_message_content_tag::CACHE_INSERT: {
             auto const& insertion = as_cache_insert(content);
-            auto& ll_disk_cache{
-                static_cast<local_disk_cache&>(server.core.secondary_cache())
-                    .get_ll_disk_cache()};
-            ll_disk_cache.insert(insertion.key, insertion.value);
+            auto& cache{
+                static_cast<local_disk_cache&>(server.core.secondary_cache())};
+            cache.write_raw_value(insertion.key, insertion.value);
             send_response(
                 server,
                 request,
@@ -1510,16 +1509,14 @@ process_message(websocket_server_impl& server, client_request request)
         }
         case client_message_content_tag::CACHE_QUERY: {
             auto const& key = as_cache_query(content);
-            auto& ll_disk_cache{
-                static_cast<local_disk_cache&>(server.core.secondary_cache())
-                    .get_ll_disk_cache()};
-            auto entry = ll_disk_cache.find(key);
+            auto& cache{
+                static_cast<local_disk_cache&>(server.core.secondary_cache())};
+            auto opt_value = cache.read_raw_value(key);
             send_response(
                 server,
                 request,
                 make_server_message_content_with_cache_response(
-                    make_websocket_cache_response(
-                        key, entry ? entry->value : none)));
+                    make_websocket_cache_response(key, opt_value)));
             break;
         }
         case client_message_content_tag::ISS_OBJECT: {

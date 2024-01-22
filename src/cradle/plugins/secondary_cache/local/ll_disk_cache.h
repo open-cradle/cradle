@@ -11,6 +11,7 @@
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/fs/types.h>
 #include <cradle/inner/service/config.h>
+#include <cradle/plugins/secondary_cache/local/disk_cache_info.h>
 
 namespace cradle {
 
@@ -36,21 +37,6 @@ struct ll_disk_cache_config
     std::optional<std::string> directory;
     std::optional<size_t> size_limit;
     bool start_empty{};
-};
-
-struct ll_disk_cache_info
-{
-    // the directory where the cache is stored
-    std::string directory;
-
-    // maximum size of the disk cache
-    int64_t size_limit;
-
-    // the number of entries currently stored in the cache
-    int64_t entry_count;
-
-    // the total size (in bytes)
-    int64_t total_size;
 };
 
 struct ll_disk_cache_entry
@@ -90,36 +76,21 @@ struct ll_disk_cache_impl;
 class ll_disk_cache
 {
  public:
-    // The default constructor creates an invalid disk cache that must be
-    // initialized via reset().
-    ll_disk_cache();
-
     // Create a disk cache that's initialized with the given config.
+    // The cache starts empty (only) if config.start_empty.
     ll_disk_cache(ll_disk_cache_config const& config);
+
+    ll_disk_cache(ll_disk_cache&& other);
 
     ~ll_disk_cache();
 
     // Reset the cache with a new config.
-    // After a successful call to this, the cache is considered initialized.
+    // The cache is emptied (only) if config.start_empty.
     void
     reset(ll_disk_cache_config const& config);
 
-    // Reset the cache to an uninitialized state.
-    void
-    reset();
-
-    // Is the cache initialized?
-    bool
-    is_initialized()
-    {
-        return impl_ ? true : false;
-    }
-
-    // The rest of this interface should only be used if is_initialized()
-    // returns true.
-
     // Get summary information about the cache.
-    ll_disk_cache_info
+    disk_cache_info
     get_summary_info();
 
     // Get a list of all entries in the cache.

@@ -1,11 +1,15 @@
 #ifndef CRADLE_PLUGINS_SECONDARY_CACHE_LOCAL_LOCAL_DISK_CACHE_H
 #define CRADLE_PLUGINS_SECONDARY_CACHE_LOCAL_LOCAL_DISK_CACHE_H
 
+#include <optional>
+#include <string>
+
 #include <BS_thread_pool.hpp>
 #include <cppcoro/static_thread_pool.hpp>
 
 #include <cradle/inner/service/config.h>
 #include <cradle/inner/service/secondary_storage_intf.h>
+#include <cradle/plugins/secondary_cache/local/disk_cache_info.h>
 #include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
 
 namespace cradle {
@@ -52,23 +56,27 @@ class local_disk_cache : public secondary_storage_intf
     cppcoro::task<void>
     write(std::string key, blob value) override;
 
-    ll_disk_cache&
-    get_ll_disk_cache()
-    {
-        return ll_cache_;
-    }
+    // Get summary information about the cache.
+    disk_cache_info
+    get_summary_info();
 
-    cppcoro::static_thread_pool&
-    read_pool()
-    {
-        return read_pool_;
-    }
+    // Reads the value stored in the database for key.
+    // - Returns std::nullopt if the database has no entry for key.
+    // - Returns std::nullopt if the value is stored outside the database
+    //   (i.e., in a file).
+    // - Returns a base64-encoded string if the value is in the database.
+    std::optional<std::string>
+    read_raw_value(std::string const& key);
 
-    BS::thread_pool&
-    write_pool()
-    {
-        return write_pool_;
-    }
+    // Stores a value in the database.
+    // - value should be base64-encoded.
+    // - The value is stored in the database itself, not in a file, regardless
+    //   of its size.
+    void
+    write_raw_value(std::string const& key, std::string const& value);
+
+    bool
+    busy_writing_to_file() const;
 
  private:
     ll_disk_cache ll_cache_;

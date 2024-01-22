@@ -1,7 +1,5 @@
 // A reference key-value store based on a local disk cache.
 
-#include <cppcoro/fmap.hpp>
-#include <cppcoro/static_thread_pool.hpp>
 #include <spdlog/spdlog.h>
 
 // Boost.Crc triggers some warnings on MSVC.
@@ -184,6 +182,32 @@ local_disk_cache::write(std::string key, blob value)
     });
 
     co_return;
+}
+
+disk_cache_info
+local_disk_cache::get_summary_info()
+{
+    return ll_cache_.get_summary_info();
+}
+
+std::optional<std::string>
+local_disk_cache::read_raw_value(std::string const& key)
+{
+    auto opt_entry{ll_cache_.find(key)};
+    return opt_entry ? opt_entry->value : std::nullopt;
+}
+
+void
+local_disk_cache::write_raw_value(
+    std::string const& key, std::string const& value)
+{
+    ll_cache_.insert(key, value);
+}
+
+bool
+local_disk_cache::busy_writing_to_file() const
+{
+    return write_pool_.get_tasks_total() > 0;
 }
 
 } // namespace cradle
