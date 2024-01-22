@@ -1,8 +1,3 @@
-#include <cassert>
-#include <cstring>
-#include <iomanip>
-#include <sstream>
-
 #include <cradle/inner/core/unique_hash.h>
 
 namespace cradle {
@@ -11,13 +6,20 @@ std::string
 unique_hasher::get_string()
 {
     finish();
-    std::stringstream ss;
-    ss << std::hex << std::setfill('0');
-    for (size_t i = 0; i < result_size; ++i)
+
+    // This low-level code is much (say, 40x) faster than an implementation
+    // based on std::ostringstream or fmt::format.
+    std::string s(result_size * 2, '?');
+    char* p = s.data();
+    // Clang completely unrolls this loop.
+    for (std::size_t i = 0; i < result_size; ++i)
     {
-        ss << std::setw(2) << static_cast<unsigned int>(result_.data()[i]);
+        static const char x[] = "0123456789abcdef";
+        uint8_t val = result_.data()[i];
+        *p++ = x[val >> 4];
+        *p++ = x[val & 0xf];
     }
-    return ss.str();
+    return s;
 }
 
 void

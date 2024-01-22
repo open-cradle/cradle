@@ -3,8 +3,8 @@
 #include <benchmark/benchmark.h>
 #include <cppcoro/sync_wait.hpp>
 
+#include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/core/hash.h>
-#include <cradle/inner/core/unique_hash.h>
 #include <cradle/plugins/domain/testing/requests.h>
 
 #include "../support/common.h"
@@ -46,17 +46,36 @@ BM_CompareEqualBlobs(benchmark::State& state)
     }
 }
 
+static auto
+get_unique_result(auto const& value)
+{
+    unique_hasher hasher;
+    update_unique_hash(hasher, value);
+    return hasher.get_result();
+}
+
 void
-BM_UniqueHash(benchmark::State& state)
+BM_UniqueHashGetResult(benchmark::State& state)
 {
     auto the_blob = make_my_blob();
-    unique_hasher the_hasher;
     for (auto _ : state)
     {
-        update_unique_hash(the_hasher, the_blob);
+        benchmark::DoNotOptimize(get_unique_result(the_blob));
+    }
+}
+
+// Unique hash string e.g. used for disk cache digest
+void
+BM_UniqueHashGetString(benchmark::State& state)
+{
+    auto the_blob = make_my_blob();
+    for (auto _ : state)
+    {
+        benchmark::DoNotOptimize(get_unique_string_tmpl(the_blob));
     }
 }
 
 BENCHMARK(BM_BoostHash);
 BENCHMARK(BM_CompareEqualBlobs);
-BENCHMARK(BM_UniqueHash);
+BENCHMARK(BM_UniqueHashGetResult);
+BENCHMARK(BM_UniqueHashGetString);
