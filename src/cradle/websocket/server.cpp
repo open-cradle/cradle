@@ -1499,7 +1499,7 @@ process_message(websocket_server_impl& server, client_request request)
             auto const& insertion = as_cache_insert(content);
             auto& cache{
                 static_cast<local_disk_cache&>(server.core.secondary_cache())};
-            cache.write_raw_value(insertion.key, insertion.value);
+            cache.write_raw_value(insertion.key, make_blob(insertion.value));
             send_response(
                 server,
                 request,
@@ -1512,11 +1512,16 @@ process_message(websocket_server_impl& server, client_request request)
             auto& cache{
                 static_cast<local_disk_cache&>(server.core.secondary_cache())};
             auto opt_value = cache.read_raw_value(key);
+            std::optional<std::string> opt_string;
+            if (opt_value)
+            {
+                opt_string = to_string(*opt_value);
+            }
             send_response(
                 server,
                 request,
                 make_server_message_content_with_cache_response(
-                    make_websocket_cache_response(key, opt_value)));
+                    make_websocket_cache_response(key, opt_string)));
             break;
         }
         case client_message_content_tag::ISS_OBJECT: {

@@ -352,7 +352,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     auto ic0 = get_summary_info(mem_cache);
     REQUIRE(ic0.ac_num_records == num_requests);
     auto dc0 = disk_cache.get_summary_info();
-    REQUIRE(dc0.entry_count == num_requests);
+    REQUIRE(dc0.ac_entry_count == num_requests);
 
     ctx.reset_memory_cache();
     REQUIRE(get_summary_info(mem_cache).ac_num_records == 0);
@@ -367,7 +367,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     auto ic1 = get_summary_info(mem_cache);
     REQUIRE(ic1.ac_num_records == num_requests);
     auto dc1 = disk_cache.get_summary_info();
-    REQUIRE(dc1.entry_count == num_requests);
+    REQUIRE(dc1.ac_entry_count == num_requests);
 }
 
 static auto add2 = [](int a, int b) { return a + b; };

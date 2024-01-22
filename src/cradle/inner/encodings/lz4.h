@@ -10,20 +10,23 @@ namespace lz4 {
 
 // Given the size of a block of data, return the worst-case size of that data
 // when it's compressed with LZ4.
-size_t
-max_compressed_size(size_t original_size);
+std::size_t
+max_compressed_size(std::size_t original_size);
 
 // Compress a block of data with LZ4.
 // Return the actual size of the compressed data.
-size_t
-compress(void* dst, size_t dst_size, void const* src, size_t src_size);
+std::size_t
+compress(
+    void* dst, std::size_t dst_size, void const* src, std::size_t src_size);
 
 // Decompress a block of data that's been compressed with LZ4.
 // When decompressing, we assume the caller already knows the size of the
 // uncompressed data (based on other info related to the data), so the caller
 // is expected to allocate the full block of data and pass in its size.
-void
-decompress(void* dst, size_t dst_size, void const* src, size_t src_size);
+// Returns the actual size of the decompressed data (<= dst_size);
+std::size_t
+decompress(
+    void* dst, std::size_t dst_size, void const* src, std::size_t src_size);
 
 } // namespace lz4
 

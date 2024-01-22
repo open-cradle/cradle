@@ -35,34 +35,33 @@ namespace cradle {
 struct ll_disk_cache_config
 {
     std::optional<std::string> directory;
-    std::optional<size_t> size_limit;
+    std::optional<std::size_t> size_limit;
     bool start_empty{};
 };
 
-struct ll_disk_cache_entry
+// An entry in the CAS.
+struct ll_disk_cache_cas_entry
 {
-    // the key for the entry
-    std::string key;
+    // the internal numeric ID of the entry within the CAS
+    int64_t cas_id;
 
-    // the internal numeric ID of the entry within the cache
-    int64_t id;
+    // The key for the entry: digest over the entry's value.
+    // The digest is assumed to be unique (no collisions).
+    std::string digest;
 
-    // true iff the entry is stored directly in the database
+    // true iff the value is stored directly in the database
     bool in_db;
 
     // the value associated with the entry - This may be omitted, depending
     // on how the entry is stored in the cache and how this info was
     // queried.
-    std::optional<std::string> value;
+    std::optional<blob> value;
 
     // the size of the entry, as stored in the cache (in bytes)
     int64_t size;
 
     // the original (decompressed) size of the entry
     int64_t original_size;
-
-    // a 32-bit CRC of the contents of the entry
-    uint32_t crc32;
 };
 
 // This exception indicates a failure in the operation of the disk cache.
@@ -93,29 +92,35 @@ class ll_disk_cache
     disk_cache_info
     get_summary_info();
 
-    // Get a list of all entries in the cache.
-    // Note that none of the returned entries will include values.
-    std::vector<ll_disk_cache_entry>
-    get_entry_list();
+    // Get a list of all entries in the CAS.
+    // None of the returned entries will include values.
+    std::vector<ll_disk_cache_cas_entry>
+    get_cas_entry_list();
 
-    // Remove an individual entry from the cache.
+    // Remove an individual entry from the AC; if the AC entry holds the
+    // only reference to a CAS record, remove that too.
     void
-    remove_entry(int64_t id);
+    remove_entry(int64_t ac_id);
 
-    // Clear the cache of all data.
+    // Clear the cache (both AC and CAS) of all data.
     void
     clear();
 
-    // Look up a key in the cache.
+    // Look up an AC key in the cache.
     //
-    // The returned entry is valid iff there's a valid entry associated with
-    // :key.
+    // The returned entry is valid iff there's a valid CAS entry associated
+    // with :key.
     //
     // Note that for entries stored directly in the database, this also
     // retrieves the value associated with the entry.
     //
-    std::optional<ll_disk_cache_entry>
-    find(std::string const& key);
+    std::optional<ll_disk_cache_cas_entry>
+    find(std::string const& ac_key);
+
+    // Returns the ac_id for the specified AC entry if existing, or nullopt
+    // otherwise
+    std::optional<int64_t>
+    look_up_ac_id(std::string const& ac_key);
 
     // Add a small entry to the cache.
     //
@@ -128,53 +133,43 @@ class ll_disk_cache
     //
     void
     insert(
-        std::string const& key,
-        std::string const& value,
-        std::optional<size_t> original_size = none);
+        std::string const& ac_key,
+        std::string const& digest,
+        blob const& value,
+        std::optional<std::size_t> original_size = std::nullopt);
 
     // Add an arbitrarily large entry to the cache.
     //
     // This is a two-part process.
-    // First, you initiate the insert to get the ID for the entry.
+    // First, you initiate the insert to get the (CAS) ID for the entry.
     // Then, once the entry is written to disk, you finish the insert.
     // (If an error occurs in between, it's OK to simply abandon the entry,
     // as it will be marked as invalid initially.)
-    //
-    int64_t
-    initiate_insert(std::string const& key);
-    // :original_size is the original size of the data (if it's compressed).
-    // This can be omitted and the data will be understood to be uncompressed.
+
+    // Returns the cas_id for the CAS entry the caller must ultimately call
+    // finish_insert() for, or nullopt if no finish_insert() is needed
+    std::optional<int64_t>
+    initiate_insert(std::string const& ac_key, std::string const& digest);
+
+    // :original_size is the original size of the data;
+    // it may differ from stored_size if the value is stored compressed.
     void
     finish_insert(
-        int64_t id,
-        uint32_t crc32,
-        std::optional<size_t> original_size = none);
+        int64_t cas_id, std::size_t stored_size, std::size_t original_size);
 
-    // Given an ID within the cache, this computes the path of the file that
+    // Given an ID within the CAS, this computes the path of the file that
     // would store the data associated with that ID (assuming that entry were
     // actually stored in a file rather than in the database).
     file_path
-    get_path_for_id(int64_t id);
+    get_path_for_digest(std::string const& digest);
 
-    // Record that an ID within the cache was just used.
-    // When a lot of small objects are being read from the cache, the calls to
-    // record_usage() can slow down the loading process.
-    // To address this, calls are buffered and sent all at once when the cache
-    // is idle.
+    // Writes pending AC usage information to the database.
+    // Should be called on polling basis with forced = false, where the
+    // implementation decides if a write will really happen. A final call
+    // before shutdown could have force = true. This could also be useful
+    // for unit tests.
     void
-    record_usage(int64_t id);
-
-    // If you know that the cache is idle, you can call this to force the cache
-    // to write out its buffered usage records. (This is automatically called
-    // when the cache is destructed.)
-    void
-    write_usage_records();
-
-    // Another approach is to call this function periodically.
-    // It checks to see how long it's been since the cache was last used, and
-    // if the cache appears idle, it automatically writes the usage records.
-    void
-    do_idle_processing();
+    flush_ac_usage(bool forced = false);
 
  private:
     std::unique_ptr<ll_disk_cache_impl> impl_;

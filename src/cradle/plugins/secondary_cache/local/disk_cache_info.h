@@ -7,16 +7,20 @@ namespace cradle {
 
 struct disk_cache_info
 {
-    // the directory where the cache is stored
+    // the directory containing the files for the CAS
     std::string directory;
 
-    // maximum size of the disk cache
+    // maximum size of the CAS
     int64_t size_limit;
 
-    // the number of entries currently stored in the cache
-    int64_t entry_count;
+    // the number of entries currently stored in the AC
+    int64_t ac_entry_count;
 
-    // the total size (in bytes)
+    // the number of entries currently stored in the CAS
+    int64_t cas_entry_count;
+
+    // the total size (in bytes) of the values in the CAS
+    // (counting the stored sizes, not the original ones)
     int64_t total_size;
 };
 

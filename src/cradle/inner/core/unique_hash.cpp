@@ -50,4 +50,10 @@ update_unique_hash(unique_hasher& hasher, blob const& val)
     hasher.encode_bytes(val.data(), val.size());
 }
 
+void
+update_unique_hash(unique_hasher& hasher, byte_vector const& val)
+{
+    hasher.encode_bytes(val.data(), val.size());
+}
+
 } // namespace cradle

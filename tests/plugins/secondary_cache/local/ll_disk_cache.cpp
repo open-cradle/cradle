@@ -1,5 +1,3 @@
-#include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
-
 #include <chrono>
 #include <filesystem>
 #include <thread>
@@ -7,10 +5,13 @@
 #include <catch2/catch.hpp>
 #include <sqlite3.h>
 
+#include <cradle/inner/core/get_unique_string.h>
+#include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/encodings/base64.h>
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/fs/utilities.h>
 #include <cradle/inner/utilities/text.h>
+#include <cradle/plugins/secondary_cache/local/ll_disk_cache.h>
 
 using namespace cradle;
 
@@ -35,7 +36,8 @@ check_initial_cache(ll_disk_cache& cache, std::string const& cache_dir)
 {
     auto info = cache.get_summary_info();
     REQUIRE(info.directory == cache_dir);
-    REQUIRE(info.entry_count == 0);
+    REQUIRE(info.ac_entry_count == 0);
+    REQUIRE(info.cas_entry_count == 0);
     REQUIRE(info.total_size == 0);
 }
 
@@ -71,6 +73,85 @@ generate_value_string(int item_id)
     return "meaningless_value_string_" + lexical_cast<std::string>(item_id);
 }
 
+bool
+test_item_access(
+    ll_disk_cache& cache,
+    bool external,
+    std::string const& key,
+    std::string const& string_value,
+    bool ac_only)
+{
+    auto value{make_blob(string_value)};
+    auto digest = get_unique_string_tmpl(value);
+
+    auto entry = cache.find(key);
+    cache.flush_ac_usage(true);
+    if (external)
+    {
+        // Use external storage.
+        auto path = cache.get_path_for_digest(digest);
+        if (entry)
+        {
+            auto cached_contents = make_blob(read_file_contents(path));
+            REQUIRE(cached_contents == value);
+            return true;
+        }
+        else
+        {
+            auto opt_cas_id = cache.initiate_insert(key, digest);
+            if (ac_only)
+            {
+                REQUIRE(!opt_cas_id);
+            }
+            else
+            {
+                REQUIRE(opt_cas_id);
+                auto size = value.size();
+                auto original_size = size;
+                dump_string_to_file(path, string_value);
+                cache.finish_insert(*opt_cas_id, size, original_size);
+            }
+            // Check that it's been added in the database.
+            auto new_entry = cache.find(key);
+            REQUIRE(new_entry);
+            // Start it all again to test update behavior; this time there's no
+            // need to finish.
+            opt_cas_id = cache.initiate_insert(key, digest);
+            REQUIRE(!opt_cas_id);
+            return false;
+        }
+    }
+    else
+    {
+        // Use in-database storage.
+        if (entry)
+        {
+            REQUIRE(entry->value);
+            REQUIRE(*entry->value == value);
+            return true;
+        }
+        else
+        {
+            cache.insert(key, digest, value);
+            // Check that it's been added.
+            auto new_entry = cache.find(key);
+            REQUIRE(new_entry);
+            REQUIRE(new_entry->value);
+            REQUIRE(*new_entry->value == value);
+            // Overwrite it with a dummy value.
+            // TODO overwriting with different value should never happen
+            cache.insert(key, digest, make_string_literal_blob("overwritten"));
+            // Do it all again to test update behavior.
+            cache.insert(key, digest, value);
+            new_entry = cache.find(key);
+            REQUIRE(new_entry);
+            REQUIRE(new_entry->value);
+            REQUIRE(*new_entry->value == value);
+            return false;
+        }
+    }
+}
+
 // Test access to an item. - This simulates access to an item via the disk
 // cache. It works whether or not the item is already cached. (It will insert
 // it if it's not already there.) It tests various steps along the way,
@@ -85,64 +166,12 @@ generate_value_string(int item_id)
 bool
 test_item_access(ll_disk_cache& cache, int item_id)
 {
+    bool external = item_id % 2 == 1;
     auto key = generate_key_string(item_id);
     auto value = generate_value_string(item_id);
+    bool ac_only{false};
 
-    // We're faking the CRC. The cache doesn't care.
-    auto computed_crc = uint32_t(item_id) + 1;
-
-    auto entry = cache.find(key);
-    if (item_id % 2 == 1)
-    {
-        // Use external storage.
-        if (entry)
-        {
-            auto cached_contents
-                = read_file_contents(cache.get_path_for_id(entry->id));
-            REQUIRE(cached_contents == value);
-            REQUIRE(entry->crc32 == computed_crc);
-            cache.record_usage(entry->id);
-            cache.write_usage_records();
-            return true;
-        }
-        else
-        {
-            auto entry_id = cache.initiate_insert(key);
-            dump_string_to_file(cache.get_path_for_id(entry_id), value);
-            cache.finish_insert(entry_id, computed_crc);
-            return false;
-        }
-    }
-    else
-    {
-        // Use in-database storage.
-        if (entry)
-        {
-            REQUIRE(entry->value);
-            REQUIRE(*entry->value == value);
-            cache.record_usage(entry->id);
-            cache.write_usage_records();
-            return true;
-        }
-        else
-        {
-            cache.insert(key, value);
-            // Check that it's been added.
-            auto new_entry = cache.find(key);
-            REQUIRE(new_entry);
-            REQUIRE(new_entry->value);
-            REQUIRE(*new_entry->value == value);
-            // Overwrite it with a dummy value.
-            cache.insert(key, "overwritten");
-            // Do it all again to test update behavior.
-            cache.insert(key, value);
-            new_entry = cache.find(key);
-            REQUIRE(new_entry);
-            REQUIRE(new_entry->value);
-            REQUIRE(*new_entry->value == value);
-            return false;
-        }
-    }
+    return test_item_access(cache, external, key, value, ac_only);
 }
 
 } // namespace
@@ -156,6 +185,90 @@ TEST_CASE("simple item access", tag)
     REQUIRE(test_item_access(cache, 0));
     REQUIRE(!test_item_access(cache, 1));
     REQUIRE(test_item_access(cache, 1));
+}
+
+static void
+test_different_keys_with_the_same_value(bool external)
+{
+    auto cache{create_disk_cache()};
+    std::string key0{"key0"};
+    std::string key1{"key1"};
+    std::string value{"shared_value"};
+    bool ac_only{false};
+
+    REQUIRE(!test_item_access(cache, external, key0, value, ac_only));
+    REQUIRE(test_item_access(cache, external, key0, value, ac_only));
+    auto summary0 = cache.get_summary_info();
+    REQUIRE(summary0.ac_entry_count == 1);
+    REQUIRE(summary0.cas_entry_count == 1);
+
+    // Add an item with a different key but the same value; this should only
+    // create a new AC entry, referring to the existing CAS entry.
+    ac_only = true;
+    REQUIRE(!test_item_access(cache, external, key1, value, ac_only));
+    REQUIRE(test_item_access(cache, external, key1, value, ac_only));
+    auto summary1 = cache.get_summary_info();
+    REQUIRE(summary1.ac_entry_count == 2);
+    REQUIRE(summary1.cas_entry_count == 1);
+    REQUIRE(summary1.total_size == summary0.total_size);
+}
+
+TEST_CASE("different keys with the same value - internal", tag)
+{
+    test_different_keys_with_the_same_value(false);
+}
+
+TEST_CASE("different keys with the same value - external", tag)
+{
+    test_different_keys_with_the_same_value(true);
+}
+
+static void
+test_look_up_non_existing_ac_entry(bool external)
+{
+    auto cache{create_disk_cache()};
+    std::string key0{"key0 - inserted"};
+    std::string key1{"key1 - not existing"};
+    std::string value{"value"};
+    bool ac_only{false};
+
+    REQUIRE(!test_item_access(cache, external, key0, value, ac_only));
+    auto summary0 = cache.get_summary_info();
+    REQUIRE(summary0.ac_entry_count == 1);
+    REQUIRE(summary0.cas_entry_count == 1);
+
+    auto opt_ac_id = cache.look_up_ac_id(key1);
+    REQUIRE(!opt_ac_id);
+    auto summary1 = cache.get_summary_info();
+    REQUIRE(summary1.ac_entry_count == 1);
+    REQUIRE(summary1.cas_entry_count == 1);
+}
+
+TEST_CASE("look up non-existing AC entry - internal", tag)
+{
+    test_look_up_non_existing_ac_entry(false);
+}
+
+TEST_CASE("look up non-existing AC entry - external", tag)
+{
+    test_look_up_non_existing_ac_entry(true);
+}
+
+TEST_CASE("look up invalid entry - external", tag)
+{
+    auto cache{create_disk_cache()};
+    std::string key{"key"};
+    std::string value{"value"};
+    auto digest{get_unique_string_tmpl(value)};
+
+    auto opt_cas_id0 = cache.initiate_insert(key, digest);
+    REQUIRE(opt_cas_id0);
+    auto opt_entry = cache.find(key);
+    REQUIRE(!opt_entry);
+
+    auto opt_cas_id1 = cache.initiate_insert(key, digest);
+    REQUIRE(!opt_cas_id1);
+    // No cache.finish_insert(*opt_cas_id1) follow-up possible.
 }
 
 TEST_CASE("multiple initializations", tag)
@@ -214,10 +327,13 @@ TEST_CASE("entry removal error", tag)
     // Access item 1 and then open the file that holds it to create a lock on
     // it.
     test_item_access(cache, 1);
+    auto key1{generate_key_string(1)};
+    auto opt_entry1{cache.find(key1)};
+    REQUIRE(opt_entry1);
     std::ifstream item1;
     open_file(
         item1,
-        cache.get_path_for_id(cache.find(generate_key_string(1))->id),
+        cache.get_path_for_digest(opt_entry1->digest),
         std::ios::in | std::ios::binary);
 
     // Now access a bunch of other items to force item 1 to be evicted.
@@ -247,9 +363,11 @@ TEST_CASE("manual entry removal", tag)
         REQUIRE(test_item_access(cache, i));
         // Remove it.
         {
-            auto entry = cache.find(generate_key_string(i));
-            if (entry)
-                cache.remove_entry(entry->id);
+            auto opt_ac_id = cache.look_up_ac_id(generate_key_string(i));
+            if (opt_ac_id)
+            {
+                cache.remove_entry(*opt_ac_id);
+            }
         }
         // Check that it's not there.
         REQUIRE(!test_item_access(cache, i));
@@ -261,10 +379,10 @@ TEST_CASE("cache summary info", tag)
     auto cache{create_disk_cache()};
 
     int64_t expected_size = 0;
-    int64_t expected_count = 0;
+    int64_t expected_ac_count = 0;
     auto check_summary_info = [&]() {
         auto summary = cache.get_summary_info();
-        REQUIRE(summary.entry_count == expected_count);
+        REQUIRE(summary.ac_entry_count == expected_ac_count);
         REQUIRE(summary.total_size == expected_size);
     };
 
@@ -274,58 +392,81 @@ TEST_CASE("cache summary info", tag)
     // Add an entry.
     test_item_access(cache, 0);
     expected_size += generate_value_string(0).length();
-    ++expected_count;
+    ++expected_ac_count;
     check_summary_info();
 
     // Add another entry.
     test_item_access(cache, 1);
     expected_size += generate_value_string(1).length();
-    ++expected_count;
+    ++expected_ac_count;
     check_summary_info();
 
     // Add another entry.
     test_item_access(cache, 2);
     expected_size += generate_value_string(2).length();
-    ++expected_count;
+    ++expected_ac_count;
     check_summary_info();
 
     // Remove an entry.
     {
-        auto entry = cache.find(generate_key_string(0));
-        if (entry)
-            cache.remove_entry(entry->id);
+        auto opt_ac_id = cache.look_up_ac_id(generate_key_string(0));
+        if (opt_ac_id)
+        {
+            cache.remove_entry(*opt_ac_id);
+        }
     }
     expected_size -= generate_value_string(0).length();
-    --expected_count;
+    --expected_ac_count;
     check_summary_info();
 }
 
-TEST_CASE("cache entry list", tag)
+TEST_CASE("cache CAS entry list", tag)
 {
     auto cache{create_disk_cache()};
     test_item_access(cache, 0);
     test_item_access(cache, 1);
     test_item_access(cache, 2);
-    // Remove an entry.
+    // Remove an entry (AC and CAS).
     {
-        auto entry = cache.find(generate_key_string(0));
-        if (entry)
-            cache.remove_entry(entry->id);
+        auto opt_ac_id = cache.look_up_ac_id(generate_key_string(0));
+        if (opt_ac_id)
+        {
+            cache.remove_entry(*opt_ac_id);
+        }
     }
     // Check the entry list.
-    auto entries = cache.get_entry_list();
-    // This assumes that the list is in order of last access, which just
-    // happens to be the case.
+    auto entries = cache.get_cas_entry_list();
+    // One entry has its value stored in the database, the other one in a file,
+    // but the returned order is unspecified.
     REQUIRE(entries.size() == 2);
+    ll_disk_cache_cas_entry* file_entry{nullptr};
+    ll_disk_cache_cas_entry* db_entry{nullptr};
+    if (entries[0].in_db)
     {
-        REQUIRE(entries[0].key == generate_key_string(1));
-        REQUIRE(size_t(entries[0].size) == generate_value_string(1).length());
-        REQUIRE(!entries[0].in_db);
+        file_entry = &entries[1];
+        db_entry = &entries[0];
+    }
+    else
+    {
+        file_entry = &entries[0];
+        db_entry = &entries[1];
     }
     {
-        REQUIRE(entries[1].key == generate_key_string(2));
-        REQUIRE(size_t(entries[1].size) == generate_value_string(2).length());
-        REQUIRE(entries[1].in_db);
+        REQUIRE(
+            file_entry->digest
+            == get_unique_string_tmpl(generate_value_string(1)));
+        REQUIRE(
+            std::size_t(file_entry->size)
+            == generate_value_string(1).length());
+        REQUIRE(!file_entry->in_db);
+    }
+    {
+        REQUIRE(
+            db_entry->digest
+            == get_unique_string_tmpl(generate_value_string(2)));
+        REQUIRE(
+            std::size_t(db_entry->size) == generate_value_string(2).length());
+        REQUIRE(db_entry->in_db);
     }
 }
 
@@ -362,4 +503,67 @@ TEST_CASE("incompatible cache", tag)
     // is removed.
     auto cache{create_disk_cache()};
     REQUIRE(!exists(extraneous_file));
+}
+
+TEST_CASE("recover from a corrupt index.db", tag)
+{
+    reset_directory("disk_cache");
+    dump_string_to_file("disk_cache/index.db", "not a database file");
+    auto config{create_config("disk_cache")};
+    REQUIRE_NOTHROW(std::make_unique<ll_disk_cache>(config));
+}
+
+TEST_CASE("recover from a missing finish_insert", tag)
+{
+    std::string cache_dir{"disk_cache"};
+    reset_directory(cache_dir);
+    std::string key0{"key0"};
+    std::string digest0{"digest0"};
+    std::size_t size0{3};
+    std::string key1{"key1"};
+    std::string digest1{"digest1"};
+    std::size_t size1{5};
+
+    // Simulate a first process run initiating two inserts, but finishing only
+    // one: the process gets killed before it can finish the second one.
+    {
+        ll_disk_cache cache{create_config(cache_dir)};
+        auto opt_cas_id0 = cache.initiate_insert(key0, digest0);
+        REQUIRE(opt_cas_id0);
+        auto opt_cas_id1 = cache.initiate_insert(key1, digest1);
+        REQUIRE(opt_cas_id1);
+        cache.finish_insert(*opt_cas_id0, size0, size0);
+        // No finish_insert(*opt_cas_id1);
+    }
+
+    // The second process run finds a database with invalid entries. It should
+    // be able to replace them with valid ones.
+    {
+        ll_disk_cache cache{create_config(cache_dir)};
+
+        // Only the first entry can be found.
+        auto opt_entry0 = cache.find(key0);
+        REQUIRE(opt_entry0);
+        REQUIRE(static_cast<std::size_t>(opt_entry0->size) == size0);
+        auto opt_entry1 = cache.find(key1);
+        REQUIRE(!opt_entry1);
+
+        // The cache re-initialization should have deleted any invalid entries.
+        auto info = cache.get_summary_info();
+        REQUIRE(info.ac_entry_count == 1);
+        REQUIRE(info.cas_entry_count == 1);
+
+        // Properly insert the second entry; after this, the cache should
+        // contain both entries.
+        auto opt_cas_id1 = cache.initiate_insert(key1, digest1);
+        REQUIRE(opt_cas_id1);
+        cache.finish_insert(*opt_cas_id1, size1, size1);
+
+        opt_entry1 = cache.find(key1);
+        REQUIRE(opt_entry1);
+        REQUIRE(static_cast<std::size_t>(opt_entry1->size) == size1);
+        info = cache.get_summary_info();
+        REQUIRE(info.ac_entry_count == 2);
+        REQUIRE(info.cas_entry_count == 2);
+    }
 }

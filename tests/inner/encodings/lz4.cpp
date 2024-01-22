@@ -47,3 +47,44 @@ TEST_CASE("lz4 decompression error", "[encodings][lz4]")
     char const* bad_lz4_data = "whatever";
     REQUIRE_THROWS(lz4::decompress(nullptr, 0, bad_lz4_data, 8));
 }
+
+TEST_CASE("lz4 throws decompressing truncated data", "[encodings][lz4]")
+{
+    size_t const original_data_size = 0x3020401;
+    std::unique_ptr<uint8_t[]> original_data(new uint8_t[original_data_size]);
+    for (size_t i = 0; i != original_data_size; ++i)
+    {
+        original_data[i] = (std::rand() & 0x7f) + 0x70;
+    }
+
+    size_t max_compressed_size = lz4::max_compressed_size(original_data_size);
+    std::unique_ptr<uint8_t[]> compressed_data(
+        new uint8_t[max_compressed_size]);
+    auto actual_compressed_size = lz4::compress(
+        compressed_data.get(),
+        max_compressed_size,
+        original_data.get(),
+        original_data_size);
+
+    std::unique_ptr<uint8_t[]> decompressed_data(
+        new uint8_t[original_data_size]);
+    for (decltype(actual_compressed_size) i = 0;
+         i < 100 && i < actual_compressed_size;
+         ++i)
+    {
+        bool throws = false;
+        try
+        {
+            lz4::decompress(
+                decompressed_data.get(),
+                original_data_size,
+                compressed_data.get(),
+                actual_compressed_size - i);
+        }
+        catch (lz4_error const&)
+        {
+            throws = true;
+        }
+        REQUIRE(throws == (i > 0));
+    }
+}
