@@ -3,9 +3,17 @@
 
 #include <string>
 
-#include <cradle/inner/core/id.h>
+#include <cradle/inner/core/unique_hash.h>
 
 namespace cradle {
+
+std::string
+get_unique_string_tmpl(auto const& value)
+{
+    unique_hasher hasher;
+    update_unique_hash(hasher, value);
+    return hasher.get_string();
+}
 
 // Get a string that is unique for the given ID (based on its hash).
 // The primary purpose of these strings is to act as keys in the disk cache.
@@ -30,6 +38,11 @@ namespace cradle {
 //
 // In case of an old-style Thinknode request, id must be a sha256_hashed_id
 // calculated for that request.
+//
+// Trying to make this a specialization of get_unique_string_tmpl() doesn't
+// work for some reason.
+struct id_interface;
+
 std::string
 get_unique_string(id_interface const& id);
 

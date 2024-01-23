@@ -27,7 +27,7 @@ class mock_storage : public secondary_storage_intf
     void
     clear() override;
 
-    cppcoro::task<blob>
+    cppcoro::task<std::optional<blob>>
     read(std::string key) override;
 
     cppcoro::task<void>
@@ -49,11 +49,12 @@ mock_storage::clear()
     throw not_implemented_error();
 }
 
-cppcoro::task<blob>
+cppcoro::task<std::optional<blob>>
 mock_storage::read(std::string key)
 {
     auto it = storage_.find(key);
-    co_return it != storage_.end() ? it->second : blob();
+    co_return it != storage_.end() ? std::make_optional(it->second)
+                                   : std::nullopt;
 }
 
 cppcoro::task<void>

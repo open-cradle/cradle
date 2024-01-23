@@ -8,15 +8,16 @@ namespace cradle {
 
 namespace lz4 {
 
-size_t
-max_compressed_size(size_t original_size)
+std::size_t
+max_compressed_size(std::size_t original_size)
 {
-    return boost::numeric_cast<size_t>(
+    return boost::numeric_cast<std::size_t>(
         LZ4_compressBound(boost::numeric_cast<int>(original_size)));
 }
 
-size_t
-compress(void* dst, size_t dst_size, void const* src, size_t src_size)
+std::size_t
+compress(
+    void* dst, std::size_t dst_size, void const* src, std::size_t src_size)
 {
     int const compressed_size = LZ4_compress_default(
         reinterpret_cast<char const*>(src),
@@ -27,11 +28,12 @@ compress(void* dst, size_t dst_size, void const* src, size_t src_size)
     {
         CRADLE_THROW(lz4_error() << lz4_error_code_info(compressed_size));
     }
-    return boost::numeric_cast<size_t>(compressed_size);
+    return boost::numeric_cast<std::size_t>(compressed_size);
 }
 
-void
-decompress(void* dst, size_t dst_size, void const* src, size_t src_size)
+std::size_t
+decompress(
+    void* dst, std::size_t dst_size, void const* src, std::size_t src_size)
 {
     int const decompressed_size = LZ4_decompress_safe(
         reinterpret_cast<char const*>(src),
@@ -42,6 +44,7 @@ decompress(void* dst, size_t dst_size, void const* src, size_t src_size)
     {
         CRADLE_THROW(lz4_error() << lz4_error_code_info(decompressed_size));
     }
+    return boost::numeric_cast<std::size_t>(decompressed_size);
 }
 
 } // namespace lz4

@@ -99,6 +99,9 @@ update_unique_hash(unique_hasher& hasher, char const* val);
 void
 update_unique_hash(unique_hasher& hasher, blob const& val);
 
+void
+update_unique_hash(unique_hasher& hasher, byte_vector const& val);
+
 } // namespace cradle
 
 #endif

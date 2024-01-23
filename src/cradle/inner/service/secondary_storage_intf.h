@@ -4,6 +4,7 @@
 // Interface to a secondary storage (e.g., a disk cache).
 // The implementation will be provided by a plugin.
 
+#include <optional>
 #include <string>
 
 #include <cppcoro/task.hpp>
@@ -23,10 +24,10 @@ class secondary_storage_intf
         = 0;
 
     // Reads the value for key.
-    // Returns blob{} if the value is not in the storage.
+    // Returns std::nullopt if the value is not in the storage.
     // Throws on other errors.
     // This could be a coroutine so takes arguments by value.
-    virtual cppcoro::task<blob>
+    virtual cppcoro::task<std::optional<blob>>
     read(std::string key) = 0;
 
     // This operation may be synchronous or asynchronous.

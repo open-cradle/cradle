@@ -51,11 +51,10 @@ occurs_soon(Condition&& condition, int wait_time_in_ms = 1000)
 inline void
 sync_wait_write_disk_cache(inner_resources& resources)
 {
-    auto& write_pool
-        = static_cast<local_disk_cache&>(resources.secondary_cache())
-              .write_pool();
+    auto& disk_cache{
+        static_cast<local_disk_cache&>(resources.secondary_cache())};
 
-    if (!occurs_soon([&] { return write_pool.get_tasks_total() == 0; }))
+    if (!occurs_soon([&] { return !disk_cache.busy_writing_to_file(); }))
     {
         throw assertion_error("Disk cache writes not finished in time");
     }

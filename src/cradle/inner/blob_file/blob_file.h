@@ -33,7 +33,7 @@ class blob_file_writer : public data_owner
     blob_file_writer(file_path path, std::size_t size);
 
     bool
-    maps_file() const override
+    maps_file() const noexcept override
     {
         return true;
     }
@@ -79,7 +79,7 @@ class blob_file_reader : public data_owner
     blob_file_reader(file_path path);
 
     bool
-    maps_file() const override
+    maps_file() const noexcept override
     {
         return true;
     }

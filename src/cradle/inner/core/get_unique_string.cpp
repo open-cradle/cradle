@@ -1,4 +1,5 @@
 #include <cradle/inner/core/get_unique_string.h>
+#include <cradle/inner/core/id.h>
 #include <cradle/inner/core/unique_hash.h>
 
 namespace cradle {
