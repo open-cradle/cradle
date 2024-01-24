@@ -64,7 +64,7 @@ TEST_CASE("store request", tag_store)
 {
     inner_resources resources{make_inner_tests_config()};
     auto owned_storage{std::make_unique<http_requests_storage>(resources)};
-    resources.set_secondary_cache(std::move(owned_storage));
+    resources.set_requests_storage(std::move(owned_storage));
     testing_seri_catalog cat{resources.get_seri_registry()};
 
     auto req0{rq_make_some_blob<caching_level_type::full>(5, false)};
@@ -77,7 +77,7 @@ TEST_CASE("load stored request", tag_load)
 {
     inner_resources resources{make_inner_tests_config()};
     auto owned_storage{std::make_unique<http_requests_storage>(resources)};
-    resources.set_secondary_cache(std::move(owned_storage));
+    resources.set_requests_storage(std::move(owned_storage));
     testing_seri_catalog cat{resources.get_seri_registry()};
 
     auto req_written{rq_make_some_blob<caching_level_type::full>(5, false)};
@@ -90,10 +90,11 @@ TEST_CASE("load stored request", tag_load)
 
 TEST_CASE("load and resolve stored request", tag_load)
 {
-    inner_resources resources{make_inner_tests_config()};
+    auto owned_resources{make_inner_test_resources()};
+    auto& resources{*owned_resources};
     auto owned_storage{std::make_unique<http_requests_storage>(resources)};
     auto& storage{*owned_storage};
-    resources.set_secondary_cache(std::move(owned_storage));
+    resources.set_requests_storage(std::move(owned_storage));
     testing_seri_catalog cat{resources.get_seri_registry()};
 
     std::string key{the_key};

@@ -19,6 +19,8 @@ namespace {
  * passing --disable_http_ac_validation=1.
  * An alternative would be to simulate Bazel, and store an ActionResult
  * referring to the blob in the CAS.
+ * Different requests will never serialize to the same value, so a two-phase
+ * approach would not be useful here.
  */
 
 std::string
