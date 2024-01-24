@@ -34,13 +34,10 @@ hashes over the file contents; these hashes are used as indices for storing the 
 Metadata is stored under `/ac/` (AC: action cache) and output files are stored under `/cas/`
 (CAS: content-addressable storage).
 
-The CRADLE story is a bit simpler: it only has a single SHA256 hash over the request.
-The CAS is meant to be addressed by hashes over the stored data; bazel-remote even
-enforces this, by rejecting PUT requests where there is a mismatch between hash and data.
-CRADLE does not have these hashes, and thus cannot use the CAS. The alternative is to
-use the AC. This area is meant to contain action result metadata and bazel-remote
-default behavior is to reject entries that do not look like valid metadata.
-Fortunately, this validation can be disabled, by passing `--disable_http_ac_validation=1`.
+The CRADLE story is a bit simpler: the output of an action is just a single value. Instead of
+converting this value to and from a Bazel action result, CRADLE stores just the value's SHA256 digest
+in the AC. bazel-remote default behavior is to reject AC entries that do not look like valid
+metadata. Fortunately, this validation can be disabled, by passing `--disable_http_ac_validation`.
 
 ### Caching on a local disk
 bazel-remote is available as a Docker container. 
@@ -48,20 +45,20 @@ bazel-remote is available as a Docker container.
 The following command starts the container, instructing it to use a local directory only:
 ```
 docker run -u 1000:1000 -v /path/to/cache/dir:/data -p 9090:8080 buchgr/bazel-remote-cache \
---disable_http_ac_validation=1
+--max_size 1 --disable_http_ac_validation
 ```
 
 bazel-remote has many other configuration options; see [the documentation](https://github.com/buchgr/bazel-remote)
 for more information.
 
-CRADLE results will be stored under the `/path/to/cache/dir` directory. There are three
+CRADLE results are stored under the `/path/to/cache/dir` directory. There are three
 subdirectories:
 
 * `cas.v2`: CAS
 * `ac.v2`: validated action result metadata
 * `raw.v2`: unvalidated action result metadata
 
-As explained above, CRADLE results will end up in `raw.v2`; the other two subdirectories
+As explained above, CRADLE results will end up in `raw.v2` and `cas.v2`; `ac.v2`
 will not contain any files.
 
 ### Caching on S3
@@ -73,7 +70,7 @@ docker run -u 1000:1000 \
 -v /path/to/cache/dir:/data \
 -v $HOME/.aws:/aws-config \
 -p 9090:8080 buchgr/bazel-remote-cache \
---disable_http_ac_validation=1 \
+--max_size 1 --disable_http_ac_validation \
 --s3.auth_method=aws_credentials_file \
 --s3.aws_shared_credentials_file=/aws-config/credentials \
 --s3.endpoint=s3.eu-central-1.amazonaws.com \

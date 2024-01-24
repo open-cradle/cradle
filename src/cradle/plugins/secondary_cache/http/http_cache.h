@@ -1,11 +1,12 @@
 #ifndef CRADLE_PLUGINS_SECONDARY_CACHE_HTTP_HTTP_CACHE_H
 #define CRADLE_PLUGINS_SECONDARY_CACHE_HTTP_HTTP_CACHE_H
 
-#include <cradle/inner/service/config.h>
-#include <cradle/inner/service/resources.h>
 #include <cradle/inner/service/secondary_storage_intf.h>
 
 namespace cradle {
+
+class http_cache_impl;
+class inner_resources;
 
 // Implements a remote cache via HTTP requests to a local server.
 // Assumptions:
@@ -32,6 +33,8 @@ class http_cache : public secondary_storage_intf
  public:
     http_cache(inner_resources& resources);
 
+    ~http_cache();
+
     // Not (yet?) implemented
     void
     clear() override;
@@ -45,8 +48,7 @@ class http_cache : public secondary_storage_intf
     write(std::string key, blob value) override;
 
  private:
-    inner_resources& resources_;
-    int port_;
+    std::unique_ptr<http_cache_impl> impl_;
 };
 
 } // namespace cradle
