@@ -56,8 +56,9 @@ struct ll_disk_cache_impl
     std::chrono::time_point<std::chrono::system_clock> latest_activity;
 
     // ac_id's for actions records that were read, but whose usage has not
-    // been written to the database. It is expected that the memory cache will
-    // prevent duplicates, and a vector is slightly faster than a set.
+    // been written to the database. This container should not contain
+    // duplicates, but replacing the vector with a set or unordered_set makes
+    // look-up measurably slower.
     std::vector<int64_t> ac_ids_to_flush;
 
     // Protects all access to the cache. The ll_disk_cache member functions
@@ -447,7 +448,19 @@ look_up_ac_and_cas_ids(ll_disk_cache_impl& cache, std::string const& ac_key)
         return std::nullopt;
     }
 
-    cache.ac_ids_to_flush.push_back(ac_id);
+    // Add ac_id to ac_ids_to_flush, ensuring no duplicates appear. In a
+    // production environment, the memory cache will (or should) already ensure
+    // this, but benchmark tests that measure just disk cache performance
+    // do not.
+    // A compromise is to first check on ac_id's presence. This has no
+    // measurable performance impact, and prevents negative impact on benchmark
+    // output.
+    if (std::find(
+            cache.ac_ids_to_flush.begin(), cache.ac_ids_to_flush.end(), ac_id)
+        == cache.ac_ids_to_flush.end())
+    {
+        cache.ac_ids_to_flush.push_back(ac_id);
+    }
 
     return std::make_pair(ac_id, cas_id);
 }
