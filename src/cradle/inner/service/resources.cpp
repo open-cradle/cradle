@@ -98,6 +98,30 @@ inner_resources::clear_secondary_cache()
     secondary_cache().clear();
 }
 
+void
+inner_resources::set_requests_storage(
+    std::unique_ptr<secondary_storage_intf> requests_storage)
+{
+    auto& impl{*impl_};
+    if (impl.requests_storage_)
+    {
+        throw std::logic_error(
+            "attempt to change requests storage in inner_resources");
+    }
+    impl.requests_storage_ = std::move(requests_storage);
+}
+
+secondary_storage_intf&
+inner_resources::requests_storage()
+{
+    auto& impl{*impl_};
+    if (!impl.requests_storage_)
+    {
+        throw std::logic_error("inner_resources has no requests storage");
+    }
+    return *impl.requests_storage_;
+}
+
 http_connection_interface&
 inner_resources::http_connection_for_thread()
 {

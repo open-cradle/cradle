@@ -40,7 +40,7 @@ template<Request Req>
 cppcoro::task<void>
 store_request(Req const& req, inner_resources& resources)
 {
-    auto& storage{resources.secondary_cache()};
+    auto& storage{resources.requests_storage()};
     return storage.write(
         get_request_key(req), make_blob(serialize_request(req)));
 }
@@ -54,7 +54,7 @@ template<Request Req>
 cppcoro::task<Req>
 load_request(std::string key, inner_resources& resources)
 {
-    auto& storage{resources.secondary_cache()};
+    auto& storage{resources.requests_storage()};
     auto opt_req_blob{co_await storage.read(key)};
     if (!opt_req_blob)
     {

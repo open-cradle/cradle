@@ -43,6 +43,7 @@ class inner_resources_impl
     service_config config_;
     std::unique_ptr<immutable_cache> memory_cache_;
     std::unique_ptr<secondary_storage_intf> secondary_cache_;
+    std::unique_ptr<secondary_storage_intf> requests_storage_;
     std::unique_ptr<blob_file_directory> blob_dir_;
     std::unique_ptr<async_db> the_async_db_;
     std::unordered_map<std::string, std::unique_ptr<domain>> domains_;

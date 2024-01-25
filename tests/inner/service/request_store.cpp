@@ -87,7 +87,7 @@ TEST_CASE("store request in storage", tag)
     inner_resources resources{make_inner_tests_config()};
     auto owned_storage{std::make_unique<mock_storage>()};
     auto& storage{*owned_storage};
-    resources.set_secondary_cache(std::move(owned_storage));
+    resources.set_requests_storage(std::move(owned_storage));
     seri_catalog cat{resources.get_seri_registry()};
     request_props<caching_level_type::full> props{make_test_uuid(200)};
 
@@ -106,7 +106,7 @@ TEST_CASE("store request in storage", tag)
 TEST_CASE("load request from storage (hit)", tag)
 {
     inner_resources resources{make_inner_tests_config()};
-    resources.set_secondary_cache(std::make_unique<mock_storage>());
+    resources.set_requests_storage(std::make_unique<mock_storage>());
     seri_catalog cat{resources.get_seri_registry()};
 
     request_props<caching_level_type::full> props{make_test_uuid(300)};
@@ -123,7 +123,7 @@ TEST_CASE("load request from storage (hit)", tag)
 TEST_CASE("load request from storage (miss)", tag)
 {
     inner_resources resources{make_inner_tests_config()};
-    resources.set_secondary_cache(std::make_unique<mock_storage>());
+    resources.set_requests_storage(std::make_unique<mock_storage>());
     seri_catalog cat{resources.get_seri_registry()};
     request_props<caching_level_type::full> props{make_test_uuid(400)};
     auto req_written{rq_function(props, add2, 1, 2)};
