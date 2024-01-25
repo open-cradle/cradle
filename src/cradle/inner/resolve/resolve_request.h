@@ -170,35 +170,6 @@ resolve_request_on_memory_cache_miss(
     }
 }
 
-// co_await's ptr's shared_task, ensuring that its value is available, and
-// co_returns that value.
-// ptr has a move constructor, so is moved to the coroutine frame.
-template<typename Value>
-cppcoro::task<Value>
-eval_ptr(std::unique_ptr<immutable_cache_ptr<Value>> ptr)
-{
-    co_await ptr->ensure_value_task();
-    co_return ptr->get_value();
-}
-
-// co_await's ptr's shared_task, with introspection (in the form of a
-// dedicated tasklet) tracking that co_await, and co_returns ptr's value.
-template<typename Value>
-cppcoro::task<Value>
-eval_ptr_introspective(
-    std::unique_ptr<immutable_cache_ptr<Value>> ptr,
-    introspective_context_intf& ctx,
-    std::string title)
-{
-    // Ensure that the tasklet's first timestamp coincides (almost) with
-    // the "co_await shared_task".
-    co_await dummy_coroutine();
-    coawait_introspection guard{ctx, "resolve_request", title};
-    co_await ptr->ensure_value_task();
-    co_return ptr->get_value();
-}
-
-// This is not a coroutine.
 template<Context Ctx, CachedRequest Req, BoolConst Async>
 cppcoro::task<typename Req::value_type>
 resolve_request_cached(Ctx& ctx, Req const& req, Async async)
@@ -206,25 +177,36 @@ resolve_request_cached(Ctx& ctx, Req const& req, Async async)
     using value_type = typename Req::value_type;
     using ptr_type = immutable_cache_ptr<value_type>;
     auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
-    // The immutable_cache_ptr object must outlive this function call, and as
-    // it cannot be copied nor moved, it must be on the heap.
-    auto ptr{std::make_unique<ptr_type>(
+    // While ptr lives, the corresponding cache record lives too.
+    // ptr lives until the shared_task has run (on behalf of the current
+    // request, or a previous one), and the value has been retrieved from the
+    // cache record.
+    ptr_type ptr{
         cac_ctx.get_resources().memory_cache(),
         req.get_captured_id(),
         [&](untyped_immutable_cache_ptr& ptr) {
             return resolve_request_on_memory_cache_miss(
                 ctx, req, async, static_cast<ptr_type&>(ptr));
-        })};
+        }};
     if constexpr (IntrospectiveRequest<Req>)
     {
         auto& intr_ctx = cast_ctx_to_ref<introspective_context_intf>(ctx);
-        return eval_ptr_introspective(
-            std::move(ptr), intr_ctx, req.get_introspection_title());
+        // Have a dedicated tasklet track the co_await on ptr's shared_task.
+        // Ensure that the tasklet's first timestamp coincides (almost) with
+        // the "co_await shared_task".
+        co_await dummy_coroutine();
+        coawait_introspection guard{
+            intr_ctx, "resolve_request", req.get_introspection_title()};
+        // co_await' ptr's shared_task, ensuring that its value is available.
+        co_await ptr.ensure_value_task();
     }
     else
     {
-        return eval_ptr(std::move(ptr));
+        // co_await' ptr's shared_task, ensuring that its value is available.
+        co_await ptr.ensure_value_task();
     }
+    // Finally, return the shared_task's value.
+    co_return ptr.get_value();
 }
 
 template<Context Ctx, CachedRequest Req>
