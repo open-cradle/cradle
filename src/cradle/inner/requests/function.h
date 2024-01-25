@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <tuple>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 
 #include <cereal/types/memory.hpp>
@@ -323,14 +324,16 @@ class function_request_impl : public function_request_intf<Value>,
         }
         else
         {
-            if (auto other_impl
-                = dynamic_cast<function_request_impl const*>(&other))
+            // Comparing std::type_info's is much faster than a dynamic_cast.
+            if (typeid(*this) == typeid(other))
             {
                 // *this and other are the same type, so their function types
                 // (i.e., typeid(Function)) are identical. The functions
                 // themselves might still differ, in which case the uuid's
                 // should be different. Likewise, argument types will be
                 // identical, but their values might differ.
+                auto const* other_impl
+                    = static_cast<function_request_impl const*>(&other);
                 if (this == other_impl)
                 {
                     return true;
@@ -356,9 +359,10 @@ class function_request_impl : public function_request_intf<Value>,
         }
         else
         {
-            if (auto other_impl
-                = dynamic_cast<function_request_impl const*>(&other))
+            if (typeid(*this) == typeid(other))
             {
+                auto const* other_impl
+                    = static_cast<function_request_impl const*>(&other);
                 if (this == other_impl)
                 {
                     return false;
