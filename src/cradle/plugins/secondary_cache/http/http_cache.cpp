@@ -80,10 +80,10 @@ make_cache_put_request(
 }
 
 http_request
-make_ac_put_request(
-    int port, std::string const& key, std::string const& digest)
+make_ac_put_request(int port, std::string const& key, std::string digest)
 {
-    return make_cache_put_request(port, "ac", key, make_blob(digest));
+    return make_cache_put_request(
+        port, "ac", key, make_blob(std::move(digest)));
 }
 
 http_request
