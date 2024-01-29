@@ -21,7 +21,7 @@ jobs:
       with:
         fetch-depth: 0
 
-    - uses: friendlyanon/setup-vcpkg@v1
+    - uses: friendlyanon/setup-vcpkg@v1.5.1
       with:
         committish: 7032c5759f823fc8699a5c37d5f7072464ccb9a8
 
