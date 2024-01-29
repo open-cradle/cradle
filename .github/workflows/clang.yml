@@ -17,13 +17,13 @@ jobs:
         config: [Debug, Release]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     - uses: friendlyanon/setup-vcpkg@v1
       with:
-        committish: 0c20b2a97c390e106150837042d921b0939e7ecb
+        committish: a434eb202b2fe5fac1a40c0cfafa98ceb87f92a1
 
     - name: Install
       run: |
