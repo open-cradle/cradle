@@ -76,19 +76,12 @@ using DefaultResolutionConstraints = ResolutionConstraints<
     DefinitelySyncContext<Ctx>,
     DefinitelyAsyncContext<Ctx>>;
 
-// Holds for std::true_type and std::false_type only
-template<typename T>
-concept BoolConst
-    = requires {
-          requires std::same_as<std::remove_const_t<decltype(T::value)>, bool>;
-      };
-
-template<Context Ctx, Request Req, BoolConst Async>
+template<bool Async, Context Ctx, Request Req>
 cppcoro::task<typename Req::value_type>
-resolve_request_uncached(Ctx& ctx, Req const& req, Async async)
+resolve_request_uncached(Ctx& ctx, Req const& req)
 {
     // TODO maybe let req.resolve_*sync() return cppcoro::task
-    if constexpr (Async::value)
+    if constexpr (Async)
     {
         auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
         co_return co_await req.resolve_async(actx);
@@ -103,11 +96,11 @@ resolve_request_uncached(Ctx& ctx, Req const& req, Async async)
 // Resolves a memory-cached request using some sort of secondary cache.
 // A memory-cached request needs no secondary cache, so it can be resolved
 // right away (by calling the request's function).
-template<Context Ctx, MemoryCachedRequest Req, BoolConst Async>
+template<bool Async, Context Ctx, MemoryCachedRequest Req>
 cppcoro::task<typename Req::value_type>
-resolve_secondary_cached(Ctx& ctx, Req const& req, Async async)
+resolve_secondary_cached(Ctx& ctx, Req const& req)
 {
-    if constexpr (Async::value)
+    if constexpr (Async)
     {
         auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
         return req.resolve_async(actx);
@@ -121,15 +114,15 @@ resolve_secondary_cached(Ctx& ctx, Req const& req, Async async)
 
 // Resolves a fully-cached request using some sort of secondary cache, and some
 // sort of serialization.
-template<Context Ctx, FullyCachedRequest Req, BoolConst Async>
+template<bool Async, Context Ctx, FullyCachedRequest Req>
 cppcoro::task<typename Req::value_type>
-resolve_secondary_cached(Ctx& ctx, Req const& req, Async async)
+resolve_secondary_cached(Ctx& ctx, Req const& req)
 {
     using Value = typename Req::value_type;
     auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
     inner_resources& resources{cac_ctx.get_resources()};
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
-        if constexpr (Async::value)
+        if constexpr (Async)
         {
             auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
             co_return serialize_secondary_cache_value(
@@ -151,17 +144,16 @@ resolve_secondary_cached(Ctx& ctx, Req const& req, Async async)
 // Resolves the request, stores the result in the CAS, updates the action
 // cache. The cache is accessed via ptr. The caller should ensure that ctx, req
 // and ptr outlive the coroutine.
-template<Context Ctx, CachedRequest Req, BoolConst Async>
+template<bool Async, Context Ctx, CachedRequest Req>
 cppcoro::shared_task<void>
 resolve_request_on_memory_cache_miss(
     Ctx& ctx,
     Req const& req,
-    Async async,
     immutable_cache_ptr<typename Req::value_type>& ptr)
 {
     try
     {
-        ptr.record_value(co_await resolve_secondary_cached(ctx, req, async));
+        ptr.record_value(co_await resolve_secondary_cached<Async>(ctx, req));
     }
     catch (...)
     {
@@ -170,9 +162,9 @@ resolve_request_on_memory_cache_miss(
     }
 }
 
-template<Context Ctx, CachedRequest Req, BoolConst Async>
+template<bool Async, Context Ctx, CachedRequest Req>
 cppcoro::task<typename Req::value_type>
-resolve_request_cached(Ctx& ctx, Req const& req, Async async)
+resolve_request_cached(Ctx& ctx, Req const& req)
 {
     using value_type = typename Req::value_type;
     using ptr_type = immutable_cache_ptr<value_type>;
@@ -184,9 +176,9 @@ resolve_request_cached(Ctx& ctx, Req const& req, Async async)
     ptr_type ptr{
         cac_ctx.get_resources().memory_cache(),
         req.get_captured_id(),
-        [&](untyped_immutable_cache_ptr& ptr) {
-            return resolve_request_on_memory_cache_miss(
-                ctx, req, async, static_cast<ptr_type&>(ptr));
+        [&ctx, &req](untyped_immutable_cache_ptr& ptr) {
+            return resolve_request_on_memory_cache_miss<Async>(
+                ctx, req, static_cast<ptr_type&>(ptr));
         }};
     if constexpr (IntrospectiveRequest<Req>)
     {
@@ -213,7 +205,7 @@ template<Context Ctx, CachedRequest Req>
 cppcoro::task<typename Req::value_type>
 resolve_request_async_cached(Ctx& ctx, Req const& req)
 {
-    auto result = co_await resolve_request_cached(ctx, req, std::true_type{});
+    auto result = co_await resolve_request_cached<true>(ctx, req);
     // If function ran, status already will be FINISHED
     // If result came from cache, it will not yet be
     auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
@@ -228,11 +220,11 @@ resolve_request_sync(Ctx& ctx, Req const& req)
     // Third decision: cached or not
     if constexpr (UncachedRequest<Req>)
     {
-        return resolve_request_uncached(ctx, req, std::false_type{});
+        return resolve_request_uncached<false>(ctx, req);
     }
     else
     {
-        return resolve_request_cached(ctx, req, std::false_type{});
+        return resolve_request_cached<false>(ctx, req);
     }
 }
 
@@ -248,7 +240,7 @@ resolve_request_async(Ctx& ctx, Req const& req)
     // Third decision: cached or not
     else if constexpr (UncachedRequest<Req>)
     {
-        return resolve_request_uncached(ctx, req, std::true_type{});
+        return resolve_request_uncached<true>(ctx, req);
     }
     else
     {
