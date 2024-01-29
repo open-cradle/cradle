@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 
+#include <boost/intrusive/list.hpp>
 #include <cppcoro/shared_task.hpp>
 
 #include <cradle/inner/caching/immutable/cache.h>
@@ -23,7 +24,7 @@ class cas_record_base;
 /*
  * A record in the Action Cache.
  */
-struct immutable_cache_record
+struct immutable_cache_record : public boost::intrusive::list_base_hook<>
 {
     // These remain constant for the life of the record.
     immutable_cache_impl* owner_cache;
@@ -39,7 +40,8 @@ struct immutable_cache_record
     unsigned ref_count = 0;
 
     // (See :ref_count comment.)
-    std::list<immutable_cache_record*>::iterator eviction_list_iterator;
+    boost::intrusive::list<immutable_cache_record>::iterator
+        eviction_list_iterator;
 
     // Is the data ready?
     immutable_cache_entry_state state = immutable_cache_entry_state::LOADING;
@@ -69,12 +71,11 @@ typedef std::unordered_map<
     cache_record_map;
 
 /*
- * AC records in the eviction list, in an LRU order.
+ * The eviction list contains AC records in an LRU order.
+ * Record ownership lies with the unordered map, not this list.
  */
-struct cache_record_eviction_list
-{
-    std::list<immutable_cache_record*> records;
-};
+using cache_record_eviction_list
+    = boost::intrusive::list<immutable_cache_record>;
 
 /*
  * Untyped base class for a record in the CAS.
