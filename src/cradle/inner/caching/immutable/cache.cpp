@@ -35,7 +35,7 @@ get_summary_info(immutable_cache& cache)
     immutable_cache_info info;
     info.ac_num_records = static_cast<int>(impl.records.size());
     info.ac_num_records_pending_eviction
-        = static_cast<int>(impl.eviction_list.records.size());
+        = static_cast<int>(impl.eviction_list.size());
     info.ac_num_records_in_use
         = info.ac_num_records - info.ac_num_records_pending_eviction;
     info.cas_num_records = impl.cas.num_records();
@@ -86,8 +86,7 @@ get_cache_snapshot(immutable_cache& cache_object)
             record->cas_record ? record->cas_record->deep_size() : 0};
         // Put the entry's info the appropriate list depending on whether
         // or not it's in the eviction list.
-        if (record->eviction_list_iterator
-            != cache.eviction_list.records.end())
+        if (record->eviction_list_iterator != cache.eviction_list.end())
         {
             snapshot.pending_eviction.push_back(std::move(entry));
         }

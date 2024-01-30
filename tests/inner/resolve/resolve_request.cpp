@@ -405,25 +405,26 @@ TEST_CASE("evaluate function request - memory cache behavior", tag)
     CHECK(info0.ac_num_records_pending_eviction == 0);
     CHECK(info0.cas_num_records == 0);
 
-    // Creating the task should create a pointer to a new cache record.
+    // In the current implementation, creating the task does not yet create a
+    // pointer to a new cache record.
     caching_request_resolution_context ctx{*resources};
     auto task = resolve_request(ctx, req);
     auto info1{get_summary_info(mem_cache)};
-    CHECK(info1.ac_num_records_in_use == 1);
+    CHECK(info1.ac_num_records_in_use == 0);
     CHECK(info1.ac_num_records_pending_eviction == 0);
     CHECK(info1.cas_num_records == 0);
 
     // Resolving the request (running the task) should create an entry in the
-    // CAS. The task should still hold a reference to the record-in-use.
+    // CAS. The task holds a reference to the record-in-use while it runs, and
+    // releases the reference when it finishes.
     auto res0 = cppcoro::sync_wait(task);
     REQUIRE(res0 == 9);
     auto info2{get_summary_info(mem_cache)};
-    CHECK(info2.ac_num_records_in_use == 1);
-    CHECK(info2.ac_num_records_pending_eviction == 0);
+    CHECK(info2.ac_num_records_in_use == 0);
+    CHECK(info2.ac_num_records_pending_eviction == 1);
     CHECK(info2.cas_num_records == 1);
 
-    // The task owns the ptr which is the only reference to the record-in-use.
-    // After deleting the task, the record is no longer in use.
+    // Deleting the task doesn't change anything.
     task = decltype(task)();
     auto info3{get_summary_info(mem_cache)};
     CHECK(info3.ac_num_records_in_use == 0);

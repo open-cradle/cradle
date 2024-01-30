@@ -17,11 +17,11 @@ void
 reduce_memory_cache_size_no_lock(
     immutable_cache_impl& cache, uint64_t desired_size)
 {
-    while (!cache.eviction_list.records.empty()
+    while (!cache.eviction_list.empty()
            && cache.cas.total_size() > desired_size)
     {
-        auto const& record = cache.eviction_list.records.front();
-        if (auto* cas_record = record->cas_record)
+        auto const& record = cache.eviction_list.front();
+        if (auto* cas_record = record.cas_record)
         {
             cas_record->del_ref();
             if (cas_record->ref_count() == 0)
@@ -29,8 +29,9 @@ reduce_memory_cache_size_no_lock(
                 cache.cas.del_record(*cas_record);
             }
         }
-        cache.records.erase(&*record->key);
-        cache.eviction_list.records.pop_front();
+        // Unlink the record, then destroy it.
+        cache.eviction_list.pop_front();
+        cache.records.erase(&*record.key);
     }
 }
 

@@ -8,23 +8,22 @@ namespace {
 
 void
 remove_from_eviction_list(
-    immutable_cache_impl& cache, immutable_cache_record* record)
+    cache_record_eviction_list& list, immutable_cache_record& record)
 {
-    auto& list = cache.eviction_list;
-    assert(record->eviction_list_iterator != list.records.end());
-    list.records.erase(record->eviction_list_iterator);
-    record->eviction_list_iterator = list.records.end();
+    assert(record.eviction_list_iterator != list.end());
+    list.erase(record.eviction_list_iterator);
+    record.eviction_list_iterator = list.end();
 }
 
 void
-acquire_cache_record_no_lock(immutable_cache_record* record)
+acquire_cache_record_no_lock(immutable_cache_record& record)
 {
-    ++record->ref_count;
-    auto& evictions = record->owner_cache->eviction_list.records;
-    if (record->eviction_list_iterator != evictions.end())
+    ++record.ref_count;
+    auto& evictions = record.owner_cache->eviction_list;
+    if (record.eviction_list_iterator != evictions.end())
     {
-        assert(record->ref_count == 1);
-        remove_from_eviction_list(*record->owner_cache, record);
+        assert(record.ref_count == 1);
+        remove_from_eviction_list(evictions, record);
     }
 }
 
@@ -43,7 +42,7 @@ acquire_cache_record(
     {
         auto record = std::make_unique<immutable_cache_record>();
         record->owner_cache = &cache;
-        record->eviction_list_iterator = cache.eviction_list.records.end();
+        record->eviction_list_iterator = cache.eviction_list.end();
         record->key = key;
         record->ref_count = 0;
         record->task = create_task(ptr);
@@ -56,29 +55,27 @@ acquire_cache_record(
         record->task = create_task(ptr);
         record->state = immutable_cache_entry_state::LOADING;
     }
-    acquire_cache_record_no_lock(record);
+    acquire_cache_record_no_lock(*record);
     return record;
 }
 
 void
 add_to_eviction_list(
-    immutable_cache_impl& cache, immutable_cache_record* record)
+    cache_record_eviction_list& list, immutable_cache_record& record)
 {
-    auto& list = cache.eviction_list;
-    assert(record->eviction_list_iterator == list.records.end());
-    record->eviction_list_iterator
-        = list.records.insert(list.records.end(), record);
+    assert(record.eviction_list_iterator == list.end());
+    record.eviction_list_iterator = list.insert(list.end(), record);
 }
 
 void
-release_cache_record(immutable_cache_record* record)
+release_cache_record(immutable_cache_record& record)
 {
-    auto& cache = *record->owner_cache;
+    auto& cache = *record.owner_cache;
     std::scoped_lock<std::mutex> lock(cache.mutex);
-    --record->ref_count;
-    if (record->ref_count == 0)
+    --record.ref_count;
+    if (record.ref_count == 0)
     {
-        add_to_eviction_list(cache, record);
+        add_to_eviction_list(cache.eviction_list, record);
         reduce_memory_cache_size_no_lock(
             cache, cache.config.unused_size_limit);
     }
@@ -99,7 +96,7 @@ untyped_immutable_cache_ptr::untyped_immutable_cache_ptr(
 
 untyped_immutable_cache_ptr::~untyped_immutable_cache_ptr()
 {
-    detail::release_cache_record(&record_);
+    detail::release_cache_record(record_);
 }
 
 void

@@ -115,13 +115,7 @@ template<typename Value>
 class immutable_cache_ptr : public untyped_immutable_cache_ptr
 {
  public:
-    immutable_cache_ptr(
-        immutable_cache& cache,
-        captured_id const& key,
-        create_task_function_t const& create_task_function)
-        : untyped_immutable_cache_ptr{cache, key, create_task_function}
-    {
-    }
+    using untyped_immutable_cache_ptr::untyped_immutable_cache_ptr;
 
     void
     record_value(Value&& value)
