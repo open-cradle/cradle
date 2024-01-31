@@ -12,6 +12,7 @@
 #pragma warning(push)
 #pragma warning(disable : 4702)
 #endif
+#include <cradle/inner/requests/cast_ctx.h>
 #include <cradle/inner/requests/generic.h>
 #if defined(_MSC_VER)
 #pragma warning(pop)

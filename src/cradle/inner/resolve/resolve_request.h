@@ -10,6 +10,7 @@
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/caching/secondary_cache_serialization.h>
 #include <cradle/inner/introspection/tasklet.h>
+#include <cradle/inner/requests/cast_ctx.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/resolve/remote.h>
 #include <cradle/inner/resolve/util.h>

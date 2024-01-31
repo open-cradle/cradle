@@ -3,6 +3,7 @@
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/remote/wait_async.h>
+#include <cradle/inner/requests/cast_ctx.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/resolve/remote.h>
 

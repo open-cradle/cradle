@@ -5,6 +5,7 @@
 #include <cradle/inner/blob_file/blob_file.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/core/type_interfaces.h>
+#include <cradle/inner/requests/cast_ctx.h>
 #include <cradle/plugins/domain/testing/requests.h>
 
 namespace cradle {
