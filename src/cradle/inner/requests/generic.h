@@ -81,10 +81,62 @@ class req_visitor_intf
 /*
  * Generic context interface
  */
+class local_context_intf;
+class remote_context_intf;
+class sync_context_intf;
+class async_context_intf;
+class local_async_context_intf;
+class remote_async_context_intf;
+class caching_context_intf;
+class introspective_context_intf;
+
 class context_intf
 {
  public:
     virtual ~context_intf() = default;
+
+    // Functions to cast to each context_intf derived class defined in this
+    // file, avoiding expensive dynamic_cast's for these special cases.
+    virtual local_context_intf*
+    to_local_context_intf()
+    {
+        return nullptr;
+    }
+    virtual remote_context_intf*
+    to_remote_context_intf()
+    {
+        return nullptr;
+    }
+    virtual sync_context_intf*
+    to_sync_context_intf()
+    {
+        return nullptr;
+    }
+    virtual async_context_intf*
+    to_async_context_intf()
+    {
+        return nullptr;
+    }
+    virtual local_async_context_intf*
+    to_local_async_context_intf()
+    {
+        return nullptr;
+    }
+    virtual remote_async_context_intf*
+    to_remote_async_context_intf()
+    {
+        return nullptr;
+    }
+    virtual caching_context_intf*
+    to_caching_context_intf()
+    {
+        return nullptr;
+    }
+    virtual introspective_context_intf*
+    to_introspective_context_intf()
+    {
+        return nullptr;
+    }
 
     // Returns the resources available for resolving a request.
     virtual inner_resources&
@@ -119,6 +171,12 @@ class local_context_intf : public virtual context_intf
  public:
     virtual ~local_context_intf() = default;
 
+    local_context_intf*
+    to_local_context_intf() override
+    {
+        return this;
+    }
+
     // A request function _must_ call this for creating a blob using shared
     // memory, and _should_ call it otherwise.
     // The returned object has a non-throwing data() implementation.
@@ -152,6 +210,12 @@ class remote_context_intf : public virtual context_intf
  public:
     virtual ~remote_context_intf() = default;
 
+    remote_context_intf*
+    to_remote_context_intf() override
+    {
+        return this;
+    }
+
     // The proxy name identifies the proxy that will forward requests to a
     // remote executioner.
     virtual std::string const&
@@ -180,6 +244,12 @@ class sync_context_intf : public virtual context_intf
 {
  public:
     virtual ~sync_context_intf() = default;
+
+    sync_context_intf*
+    to_sync_context_intf() override
+    {
+        return this;
+    }
 };
 
 // Thrown when an asynchronous request resolution is cancelled
@@ -202,6 +272,12 @@ class async_context_intf : public virtual context_intf
 {
  public:
     virtual ~async_context_intf() = default;
+
+    async_context_intf*
+    to_async_context_intf() override
+    {
+        return this;
+    }
 
     // Gets a unique id for this task
     virtual async_id
@@ -248,6 +324,24 @@ class local_async_context_intf : public local_context_intf,
 {
  public:
     virtual ~local_async_context_intf() = default;
+
+    local_async_context_intf*
+    to_local_async_context_intf() override
+    {
+        return this;
+    }
+
+    // Some redundant redefinitions to prevent MSVC C4250
+    local_context_intf*
+    to_local_context_intf() override
+    {
+        return this;
+    }
+    async_context_intf*
+    to_async_context_intf() override
+    {
+        return this;
+    }
 
     // Returns the number of subtasks
     // Differs from get_sub() by not being a coroutine.
@@ -374,6 +468,24 @@ class remote_async_context_intf : public remote_context_intf,
  public:
     virtual ~remote_async_context_intf() = default;
 
+    remote_async_context_intf*
+    to_remote_async_context_intf() override
+    {
+        return this;
+    }
+
+    // Some redundant redefinitions to prevent MSVC C4250
+    remote_context_intf*
+    to_remote_context_intf() override
+    {
+        return this;
+    }
+    async_context_intf*
+    to_async_context_intf() override
+    {
+        return this;
+    }
+
     // Sets the id identifying this context on the remote server
     // (after this id has been retrieved from the server).
     virtual void
@@ -400,6 +512,12 @@ class caching_context_intf : public virtual context_intf
 {
  public:
     virtual ~caching_context_intf() = default;
+
+    caching_context_intf*
+    to_caching_context_intf() override
+    {
+        return this;
+    }
 };
 
 // Context interface needed for resolving an introspective request.
@@ -409,6 +527,12 @@ class introspective_context_intf : public virtual context_intf
 {
  public:
     virtual ~introspective_context_intf() = default;
+
+    introspective_context_intf*
+    to_introspective_context_intf() override
+    {
+        return this;
+    }
 
     // Should return "most recent tasklet for this context" or nullptr
     virtual tasklet_tracker*

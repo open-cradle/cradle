@@ -47,6 +47,33 @@ class sync_context_base : public local_context_intf,
         tasklet_tracker* tasklet,
         std::string proxy_name);
 
+    // Some redundant redefinitions to prevent MSVC C4250
+    local_context_intf*
+    to_local_context_intf() override
+    {
+        return this;
+    }
+    remote_context_intf*
+    to_remote_context_intf() override
+    {
+        return this;
+    }
+    sync_context_intf*
+    to_sync_context_intf() override
+    {
+        return this;
+    }
+    caching_context_intf*
+    to_caching_context_intf() override
+    {
+        return this;
+    }
+    introspective_context_intf*
+    to_introspective_context_intf() override
+    {
+        return this;
+    }
+
     // context_intf
     inner_resources&
     get_resources() override
@@ -189,6 +216,33 @@ class local_async_context_base : public local_async_context_intf,
         std::shared_ptr<local_tree_context_base> tree_ctx,
         local_async_context_base* parent,
         bool is_req);
+
+    // Some redundant redefinitions to prevent MSVC C4250
+    local_context_intf*
+    to_local_context_intf() override
+    {
+        return this;
+    }
+    async_context_intf*
+    to_async_context_intf() override
+    {
+        return this;
+    }
+    local_async_context_intf*
+    to_local_async_context_intf() override
+    {
+        return this;
+    }
+    caching_context_intf*
+    to_caching_context_intf() override
+    {
+        return this;
+    }
+    introspective_context_intf*
+    to_introspective_context_intf() override
+    {
+        return this;
+    }
 
     // Once created, these objects should not be moved.
     local_async_context_base(local_async_context_base const&) = delete;

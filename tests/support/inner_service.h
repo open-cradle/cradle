@@ -26,6 +26,18 @@ class non_caching_request_resolution_context final : public local_context_intf,
     // TODO these resources should not have caches
     non_caching_request_resolution_context(inner_resources& resources);
 
+    // Some redundant redefinitions to prevent MSVC C4250
+    local_context_intf*
+    to_local_context_intf() override
+    {
+        return this;
+    }
+    sync_context_intf*
+    to_sync_context_intf() override
+    {
+        return this;
+    }
+
     // context_intf
     inner_resources&
     get_resources() override
@@ -70,6 +82,23 @@ class caching_request_resolution_context final : public local_context_intf,
 {
  public:
     caching_request_resolution_context(inner_resources& resources);
+
+    // Some redundant redefinitions to prevent MSVC C4250
+    local_context_intf*
+    to_local_context_intf() override
+    {
+        return this;
+    }
+    sync_context_intf*
+    to_sync_context_intf() override
+    {
+        return this;
+    }
+    caching_context_intf*
+    to_caching_context_intf() override
+    {
+        return this;
+    }
 
     // context_intf
     inner_resources&

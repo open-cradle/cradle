@@ -9,6 +9,100 @@
 
 namespace cradle {
 
+// Casts a context_intf* to another element in the context_intf class tree.
+// By default uses a slow dynamic_cast.
+// Uses a much faster to_..._context_intf() member function if available for
+// the destination class.
+template<typename DestCtx>
+struct dynamic_ctx_caster
+{
+    static DestCtx*
+    cast_ptr(context_intf* ctx)
+    {
+        return dynamic_cast<DestCtx*>(ctx);
+    }
+};
+
+template<>
+struct dynamic_ctx_caster<local_context_intf>
+{
+    static local_context_intf*
+    cast_ptr(context_intf* ctx)
+    {
+        return ctx->to_local_context_intf();
+    }
+};
+
+template<>
+struct dynamic_ctx_caster<remote_context_intf>
+{
+    static remote_context_intf*
+    cast_ptr(context_intf* ctx)
+    {
+        return ctx->to_remote_context_intf();
+    }
+};
+
+template<>
+struct dynamic_ctx_caster<sync_context_intf>
+{
+    static sync_context_intf*
+    cast_ptr(context_intf* ctx)
+    {
+        return ctx->to_sync_context_intf();
+    }
+};
+
+template<>
+struct dynamic_ctx_caster<async_context_intf>
+{
+    static async_context_intf*
+    cast_ptr(context_intf* ctx)
+    {
+        return ctx->to_async_context_intf();
+    }
+};
+
+template<>
+struct dynamic_ctx_caster<local_async_context_intf>
+{
+    static local_async_context_intf*
+    cast_ptr(context_intf* ctx)
+    {
+        return ctx->to_local_async_context_intf();
+    }
+};
+
+template<>
+struct dynamic_ctx_caster<remote_async_context_intf>
+{
+    static remote_async_context_intf*
+    cast_ptr(context_intf* ctx)
+    {
+        return ctx->to_remote_async_context_intf();
+    }
+};
+
+template<>
+struct dynamic_ctx_caster<caching_context_intf>
+{
+    static caching_context_intf*
+    cast_ptr(context_intf* ctx)
+    {
+        return ctx->to_caching_context_intf();
+    }
+};
+
+template<>
+struct dynamic_ctx_caster<introspective_context_intf>
+{
+    static introspective_context_intf*
+    cast_ptr(context_intf* ctx)
+    {
+        return ctx->to_introspective_context_intf();
+    }
+};
+
 // Casts a context_intf reference to DestCtx*.
 // Returns nullptr if the runtime type doesn't match.
 // Retains the original type if no cast is needed.
@@ -23,7 +117,7 @@ template<Context DestCtx, Context SrcCtx>
     requires(!std::convertible_to<SrcCtx&, DestCtx&>)
 DestCtx* cast_ctx_to_ptr_base(SrcCtx& ctx) noexcept
 {
-    return dynamic_cast<DestCtx*>(&ctx);
+    return dynamic_ctx_caster<DestCtx>::cast_ptr(&ctx);
 }
 
 // Casts a context_intf reference to DestCtx*.
@@ -104,7 +198,7 @@ template<Context DestCtx, Context SrcCtx>
     requires(!std::convertible_to<SrcCtx&, DestCtx&>)
 DestCtx& cast_ctx_to_ref_base(SrcCtx& ctx)
 {
-    return dynamic_cast<DestCtx&>(ctx);
+    return *dynamic_ctx_caster<DestCtx>::cast_ptr(&ctx);
 }
 
 /*
