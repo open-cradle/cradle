@@ -1,5 +1,6 @@
 #include <regex>
 
+#include <cradle/inner/requests/cast_ctx.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/resolve/remote.h>

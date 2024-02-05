@@ -3,7 +3,6 @@
 
 #include <concepts>
 #include <memory>
-#include <stdexcept>
 #include <string>
 
 #include <cppcoro/task.hpp>
@@ -82,10 +81,62 @@ class req_visitor_intf
 /*
  * Generic context interface
  */
+class local_context_intf;
+class remote_context_intf;
+class sync_context_intf;
+class async_context_intf;
+class local_async_context_intf;
+class remote_async_context_intf;
+class caching_context_intf;
+class introspective_context_intf;
+
 class context_intf
 {
  public:
     virtual ~context_intf() = default;
+
+    // Functions to cast to each context_intf derived class defined in this
+    // file, avoiding expensive dynamic_cast's for these special cases.
+    virtual local_context_intf*
+    to_local_context_intf()
+    {
+        return nullptr;
+    }
+    virtual remote_context_intf*
+    to_remote_context_intf()
+    {
+        return nullptr;
+    }
+    virtual sync_context_intf*
+    to_sync_context_intf()
+    {
+        return nullptr;
+    }
+    virtual async_context_intf*
+    to_async_context_intf()
+    {
+        return nullptr;
+    }
+    virtual local_async_context_intf*
+    to_local_async_context_intf()
+    {
+        return nullptr;
+    }
+    virtual remote_async_context_intf*
+    to_remote_async_context_intf()
+    {
+        return nullptr;
+    }
+    virtual caching_context_intf*
+    to_caching_context_intf()
+    {
+        return nullptr;
+    }
+    virtual introspective_context_intf*
+    to_introspective_context_intf()
+    {
+        return nullptr;
+    }
 
     // Returns the resources available for resolving a request.
     virtual inner_resources&
@@ -120,6 +171,12 @@ class local_context_intf : public virtual context_intf
  public:
     virtual ~local_context_intf() = default;
 
+    local_context_intf*
+    to_local_context_intf() override
+    {
+        return this;
+    }
+
     // A request function _must_ call this for creating a blob using shared
     // memory, and _should_ call it otherwise.
     // The returned object has a non-throwing data() implementation.
@@ -153,6 +210,12 @@ class remote_context_intf : public virtual context_intf
  public:
     virtual ~remote_context_intf() = default;
 
+    remote_context_intf*
+    to_remote_context_intf() override
+    {
+        return this;
+    }
+
     // The proxy name identifies the proxy that will forward requests to a
     // remote executioner.
     virtual std::string const&
@@ -181,6 +244,12 @@ class sync_context_intf : public virtual context_intf
 {
  public:
     virtual ~sync_context_intf() = default;
+
+    sync_context_intf*
+    to_sync_context_intf() override
+    {
+        return this;
+    }
 };
 
 // Thrown when an asynchronous request resolution is cancelled
@@ -203,6 +272,12 @@ class async_context_intf : public virtual context_intf
 {
  public:
     virtual ~async_context_intf() = default;
+
+    async_context_intf*
+    to_async_context_intf() override
+    {
+        return this;
+    }
 
     // Gets a unique id for this task
     virtual async_id
@@ -249,6 +324,24 @@ class local_async_context_intf : public local_context_intf,
 {
  public:
     virtual ~local_async_context_intf() = default;
+
+    local_async_context_intf*
+    to_local_async_context_intf() override
+    {
+        return this;
+    }
+
+    // Some redundant redefinitions to prevent MSVC C4250
+    local_context_intf*
+    to_local_context_intf() override
+    {
+        return this;
+    }
+    async_context_intf*
+    to_async_context_intf() override
+    {
+        return this;
+    }
 
     // Returns the number of subtasks
     // Differs from get_sub() by not being a coroutine.
@@ -375,6 +468,24 @@ class remote_async_context_intf : public remote_context_intf,
  public:
     virtual ~remote_async_context_intf() = default;
 
+    remote_async_context_intf*
+    to_remote_async_context_intf() override
+    {
+        return this;
+    }
+
+    // Some redundant redefinitions to prevent MSVC C4250
+    remote_context_intf*
+    to_remote_context_intf() override
+    {
+        return this;
+    }
+    async_context_intf*
+    to_async_context_intf() override
+    {
+        return this;
+    }
+
     // Sets the id identifying this context on the remote server
     // (after this id has been retrieved from the server).
     virtual void
@@ -401,6 +512,12 @@ class caching_context_intf : public virtual context_intf
 {
  public:
     virtual ~caching_context_intf() = default;
+
+    caching_context_intf*
+    to_caching_context_intf() override
+    {
+        return this;
+    }
 };
 
 // Context interface needed for resolving an introspective request.
@@ -410,6 +527,12 @@ class introspective_context_intf : public virtual context_intf
 {
  public:
     virtual ~introspective_context_intf() = default;
+
+    introspective_context_intf*
+    to_introspective_context_intf() override
+    {
+        return this;
+    }
 
     // Should return "most recent tasklet for this context" or nullptr
     virtual tasklet_tracker*
@@ -574,214 +697,6 @@ struct arg_type_struct
 // Yields the type of an argument to an rq_function-like call
 template<typename T>
 using arg_type = typename arg_type_struct<std::decay_t<T>>::value_type;
-
-// Casts a context_intf reference to DestCtx*.
-// Returns nullptr if the runtime type doesn't match.
-// Retains the original type if no cast is needed.
-template<Context DestCtx, Context SrcCtx>
-    requires(std::convertible_to<SrcCtx&, DestCtx&>)
-SrcCtx* cast_ctx_to_ptr_base(SrcCtx& ctx) noexcept
-{
-    return &ctx;
-}
-
-template<Context DestCtx, Context SrcCtx>
-    requires(!std::convertible_to<SrcCtx&, DestCtx&>)
-DestCtx* cast_ctx_to_ptr_base(SrcCtx& ctx) noexcept
-{
-    return dynamic_cast<DestCtx*>(&ctx);
-}
-
-// Casts a context_intf reference to DestCtx*.
-// Returns nullptr if the runtime type doesn't match.
-// Returns nullptr if the remotely() and/or is_async() return values don't
-// match; see comments on throw_on_ctx_mismatch() for details;
-// these function are not called when compile-time information suffices.
-// Retains the original type if no cast is needed.
-template<Context DestCtx, Context SrcCtx>
-DestCtx*
-cast_ctx_to_ptr(SrcCtx& ctx) noexcept
-{
-    if constexpr (
-        RemoteContext<DestCtx> && !LocalContext<DestCtx>
-        && !DefinitelyRemoteContext<SrcCtx>)
-    {
-        if constexpr (DefinitelyLocalContext<SrcCtx>)
-        {
-            return nullptr;
-        }
-        else if (!ctx.remotely())
-        {
-            return nullptr;
-        }
-    }
-    if constexpr (
-        LocalContext<DestCtx> && !RemoteContext<DestCtx>
-        && !DefinitelyLocalContext<SrcCtx>)
-    {
-        if constexpr (DefinitelyRemoteContext<SrcCtx>)
-        {
-            return nullptr;
-        }
-        else if (ctx.remotely())
-        {
-            return nullptr;
-        }
-    }
-    if constexpr (
-        AsyncContext<DestCtx> && !SyncContext<DestCtx>
-        && !DefinitelyAsyncContext<SrcCtx>)
-    {
-        if constexpr (DefinitelySyncContext<SrcCtx>)
-        {
-            return nullptr;
-        }
-        else if (!ctx.is_async())
-        {
-            return nullptr;
-        }
-    }
-    if constexpr (
-        SyncContext<DestCtx> && !AsyncContext<DestCtx>
-        && !DefinitelySyncContext<SrcCtx>)
-    {
-        if constexpr (DefinitelyAsyncContext<SrcCtx>)
-        {
-            return nullptr;
-        }
-        else if (ctx.is_async())
-        {
-            return nullptr;
-        }
-    }
-    return cast_ctx_to_ptr_base<DestCtx>(ctx);
-}
-
-// Casts a context_intf reference to DestCtx&.
-// Retains the original type if no cast is needed.
-template<Context DestCtx, Context SrcCtx>
-    requires(std::convertible_to<SrcCtx&, DestCtx&>)
-SrcCtx& cast_ctx_to_ref_base(SrcCtx& ctx)
-{
-    return ctx;
-}
-
-template<Context DestCtx, Context SrcCtx>
-    requires(!std::convertible_to<SrcCtx&, DestCtx&>)
-DestCtx& cast_ctx_to_ref_base(SrcCtx& ctx)
-{
-    return dynamic_cast<DestCtx&>(ctx);
-}
-
-/*
- * Throws when ctx.remotely() or ctx.is_async() return values conflict with
- * a specified context cast.
- *
- * E.g., when we have a cast like
- *   auto& lctx = cast_ctx_to_ref<local_context_intf>(ctx);
- * we want resolution to happen locally only, so ctx.remotely() should be
- * returning false.
- *
- * The remotely() return value need not be checked in three situations:
- * - When casting to a context type covering both local and remote
- *   execution, then either return value is OK, and the cast will succeed.
- * - When the source context is definitely remote-only, we already know that
- *   ctx.remotely() should be returning true, so the the cast will succeed.
- * - When the source context is definitely local-only, we already know that
- *   ctx.remotely() should be returning false, so the cast is not possible.
- *
- * The type of the thrown exceptions is std::logic_error. std::bad_cast looks
- * more appropriate but has no constructor taking a string.
- */
-template<Context DestCtx, Context SrcCtx>
-void
-throw_on_ctx_mismatch(SrcCtx& ctx)
-{
-    if constexpr (
-        RemoteContext<DestCtx> && !LocalContext<DestCtx>
-        && !DefinitelyRemoteContext<SrcCtx>)
-    {
-        // The first throw depends on constexpr values only.
-        //   static_assert(!DefinitelyLocalContext<SrcCtx>);
-        // would also be possible but cannot be unit tested
-        // (as the test code won't compile).
-        if constexpr (DefinitelyLocalContext<SrcCtx>)
-        {
-            throw std::logic_error("DefinitelyLocalContext");
-        }
-        else if (!ctx.remotely())
-        {
-            throw std::logic_error("remotely() returning false");
-        }
-    }
-    if constexpr (
-        LocalContext<DestCtx> && !RemoteContext<DestCtx>
-        && !DefinitelyLocalContext<SrcCtx>)
-    {
-        if constexpr (DefinitelyRemoteContext<SrcCtx>)
-        {
-            throw std::logic_error("DefinitelyRemoteContext");
-        }
-        else if (ctx.remotely())
-        {
-            throw std::logic_error("remotely() returning true");
-        }
-    }
-    if constexpr (
-        AsyncContext<DestCtx> && !SyncContext<DestCtx>
-        && !DefinitelyAsyncContext<SrcCtx>)
-    {
-        if constexpr (DefinitelySyncContext<SrcCtx>)
-        {
-            throw std::logic_error("DefinitelySyncContext");
-        }
-        else if (!ctx.is_async())
-        {
-            throw std::logic_error("is_async() returning false");
-        }
-    }
-    if constexpr (
-        SyncContext<DestCtx> && !AsyncContext<DestCtx>
-        && !DefinitelySyncContext<SrcCtx>)
-    {
-        if constexpr (DefinitelyAsyncContext<SrcCtx>)
-        {
-            throw std::logic_error("DefinitelyAsyncContext");
-        }
-        else if (ctx.is_async())
-        {
-            throw std::logic_error("is_async() returning true");
-        }
-    }
-}
-
-// Casts a context_intf reference to DestCtx&.
-// Throws if the runtime type doesn't match.
-// Throws if the remotely() and/or is_async() return values don't match.
-// These function are not called when compile-time information suffices,
-// leading to a throw depending on constexpr values only, and a C4702
-// warning in a VS2019 release build.
-// Retains the original type if no cast is needed.
-template<Context DestCtx, Context SrcCtx>
-DestCtx&
-cast_ctx_to_ref(SrcCtx& ctx)
-{
-    throw_on_ctx_mismatch<DestCtx>(ctx);
-    return cast_ctx_to_ref_base<DestCtx>(ctx);
-}
-
-// Casts a shared_ptr<context_intf> to shared_ptr<DestCtx>.
-// Throws if the source shared_ptr is empty.
-// Throws if the runtime type doesn't match.
-// Throws if the remotely() and/or is_async() return values don't match;
-// these function are not called when compile-time information suffices.
-template<Context DestCtx, Context SrcCtx>
-std::shared_ptr<DestCtx>
-cast_ctx_to_shared_ptr(std::shared_ptr<SrcCtx> const& ctx)
-{
-    throw_on_ctx_mismatch<DestCtx>(*ctx);
-    return std::dynamic_pointer_cast<DestCtx>(ctx);
-}
 
 } // namespace cradle
 

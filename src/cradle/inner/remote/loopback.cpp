@@ -8,6 +8,7 @@
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/remote/loopback.h>
+#include <cradle/inner/requests/cast_ctx.h>
 #include <cradle/inner/requests/domain.h>
 #include <cradle/inner/requests/test_context.h>
 #include <cradle/inner/resolve/seri_req.h>

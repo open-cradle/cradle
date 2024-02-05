@@ -10,6 +10,7 @@
 
 #include <cppcoro/task.hpp>
 
+#include <cradle/inner/requests/cast_ctx.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/resolve/resolve_request.h>

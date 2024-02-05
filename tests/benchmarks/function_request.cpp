@@ -245,6 +245,23 @@ BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory, 6>)
     ->Name("BM_resolve_function_request_mem_cached_tri_tree H=6")
     ->Apply(thousand_loops);
 
+template<caching_level_type level, int H>
+void
+BM_resolve_tri_tree_erased_unk_ctx(benchmark::State& state)
+{
+    auto resources{make_inner_test_resources()};
+    request_resolution_context<level> ctx{*resources};
+    // Don't tell the framework what the actual context type is,
+    // making some optimizations impossible.
+    context_intf& unk_ctx{ctx};
+    BM_resolve_request(
+        state, unk_ctx, create_triangular_tree_erased<level, H>());
+}
+
+BENCHMARK(BM_resolve_tri_tree_erased_unk_ctx<caching_level_type::memory, 6>)
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree unk ctx H=6")
+    ->Apply(thousand_loops);
+
 template<int H>
 void
 BM_resolve_triangular_tree_erased_full(benchmark::State& state)
