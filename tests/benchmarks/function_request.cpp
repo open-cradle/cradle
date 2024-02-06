@@ -54,7 +54,7 @@ create_thin_tree_erased()
 }
 
 template<caching_level_type level, int H>
-    requires(level != caching_level_type::full)
+    requires(!is_fully_cached(level))
 auto create_triangular_tree_erased()
 {
     request_props<level> props{make_uuid()};
@@ -73,7 +73,7 @@ auto create_triangular_tree_erased()
 }
 
 template<caching_level_type level, int H>
-    requires(level == caching_level_type::full)
+    requires(is_fully_cached(level))
 auto create_triangular_tree_erased()
 {
     request_props<level, request_function_t::plain, false> props{make_uuid()};

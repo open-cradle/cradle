@@ -55,7 +55,7 @@ resolve_request_loop(
 {
     constexpr auto caching_level = Req::element_type::caching_level;
     auto loop = [&]() -> cppcoro::task<void> {
-        if constexpr (caching_level == caching_level_type::full)
+        if constexpr (is_fully_cached(caching_level))
         {
             state.PauseTiming();
             ctx.reset_memory_cache();
@@ -65,7 +65,7 @@ resolve_request_loop(
         }
         for (int i = 0; i < num_loops; ++i)
         {
-            if constexpr (caching_level == caching_level_type::full)
+            if constexpr (is_fully_cached(caching_level))
             {
                 state.PauseTiming();
                 ctx.reset_memory_cache();

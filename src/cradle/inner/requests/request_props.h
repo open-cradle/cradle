@@ -86,7 +86,7 @@ class request_props : public introspection_mixin<Introspective>
           || FunctionType == request_function_t::proxy_coro;
     static constexpr bool introspective = Introspective;
 
-    static_assert(!for_proxy || level == caching_level_type::none);
+    static_assert(!for_proxy || is_uncached(level));
 
     // Constructor for a request that does not support introspection
     explicit request_props(request_uuid uuid)

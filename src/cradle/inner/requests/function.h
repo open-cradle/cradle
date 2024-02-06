@@ -257,11 +257,10 @@ template<
     bool AsCoro,
     typename Function,
     typename... Args>
-class function_request_impl : public function_request_intf<Value>,
-                              private function_request_memory_cache_data<
-                                  Level >= caching_level_type::memory>,
-                              private function_request_secondary_cache_data<
-                                  Level >= caching_level_type::full>
+class function_request_impl
+    : public function_request_intf<Value>,
+      private function_request_memory_cache_data<is_cached(Level)>,
+      private function_request_secondary_cache_data<is_fully_cached(Level)>
 {
  public:
     static_assert(!std::is_reference_v<Function>);
@@ -318,7 +317,7 @@ class function_request_impl : public function_request_intf<Value>,
     bool
     equals(id_interface const& other) const override
     {
-        if constexpr (caching_level < caching_level_type::memory)
+        if constexpr (!is_cached(caching_level))
         {
             throw not_implemented_error{"function_request_impl::equals"};
         }
@@ -353,7 +352,7 @@ class function_request_impl : public function_request_intf<Value>,
     bool
     less_than(id_interface const& other) const override
     {
-        if constexpr (caching_level < caching_level_type::memory)
+        if constexpr (!is_cached(caching_level))
         {
             throw not_implemented_error{"function_request_impl::less_than"};
         }
@@ -381,7 +380,7 @@ class function_request_impl : public function_request_intf<Value>,
     size_t
     hash() const override
     {
-        if constexpr (caching_level < caching_level_type::memory)
+        if constexpr (!is_cached(caching_level))
         {
             throw not_implemented_error{"function_request_impl::hash"};
         }
@@ -404,7 +403,7 @@ class function_request_impl : public function_request_intf<Value>,
     void
     update_hash(unique_hasher& hasher) const override
     {
-        if constexpr (caching_level < caching_level_type::full)
+        if constexpr (!is_fully_cached(caching_level))
         {
             throw not_implemented_error{"function_request_impl::update_hash"};
         }
@@ -657,7 +656,7 @@ class function_request_impl : public function_request_intf<Value>,
 
     void
     calc_unique_hash() const
-        requires(caching_level >= caching_level_type::full)
+        requires(is_fully_cached(caching_level))
     {
         unique_hasher hasher;
         update_unique_hash(hasher, uuid_);
@@ -808,35 +807,35 @@ class function_request
     // differ (especially if these are subrequests).
     bool
     equals(function_request const& other) const
-        requires(caching_level >= caching_level_type::memory)
+        requires(is_cached(caching_level))
     {
         return impl_->equals(*other.impl_);
     }
 
     bool
     less_than(function_request const& other) const
-        requires(caching_level >= caching_level_type::memory)
+        requires(is_cached(caching_level))
     {
         return impl_->less_than(*other.impl_);
     }
 
     size_t
     hash() const
-        requires(caching_level >= caching_level_type::memory)
+        requires(is_cached(caching_level))
     {
         return impl_->hash();
     }
 
     void
     update_hash(unique_hasher& hasher) const
-        requires(caching_level >= caching_level_type::memory)
+        requires(is_cached(caching_level))
     {
         impl_->update_hash(hasher);
     }
 
     captured_id
     get_captured_id() const
-        requires(caching_level >= caching_level_type::memory)
+        requires(is_cached(caching_level))
     {
         return captured_id{impl_};
     }
@@ -975,7 +974,7 @@ class proxy_request : public detail::request_title_mixin<Props::introspective>
  public:
     static_assert(!std::is_reference_v<Value>);
     static_assert(Props::for_proxy);
-    static_assert(Props::level == caching_level_type::none);
+    static_assert(is_uncached(Props::level));
 
     using mixin_type = detail::request_title_mixin<Props::introspective>;
     using element_type = proxy_request;

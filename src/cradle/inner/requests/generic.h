@@ -28,6 +28,50 @@ enum class caching_level_type
     full // Caching in local memory, plus some secondary storage
 };
 
+// Disallow relational comparisons between caching_level_type values.
+// Also, the is_...() functions below are preferred over == or !=.
+bool
+operator<(caching_level_type x, caching_level_type y)
+    = delete;
+bool
+operator<=(caching_level_type x, caching_level_type y)
+    = delete;
+bool
+operator>(caching_level_type x, caching_level_type y)
+    = delete;
+bool
+operator>=(caching_level_type x, caching_level_type y)
+    = delete;
+std::strong_ordering
+operator<=>(caching_level_type x, caching_level_type y)
+    = delete;
+
+inline constexpr bool
+is_uncached(caching_level_type level)
+{
+    return level == caching_level_type::none;
+}
+
+inline constexpr bool
+is_cached(caching_level_type level)
+{
+    return level != caching_level_type::none;
+}
+
+inline constexpr bool
+is_memory_cached(caching_level_type level)
+{
+    return static_cast<int>(level)
+           == static_cast<int>(caching_level_type::memory);
+}
+
+inline constexpr bool
+is_fully_cached(caching_level_type level)
+{
+    return static_cast<int>(level)
+           == static_cast<int>(caching_level_type::full);
+}
+
 /*
  * Visits a request's arguments (which may be subrequests themselves).
  *
@@ -633,12 +677,11 @@ concept Request
 // TODO say something about resolve_sync()/_async() as we used to do
 
 template<typename T>
-concept UncachedRequest = Request<T> && T::caching_level ==
-caching_level_type::none;
+concept UncachedRequest = Request<T> && is_uncached(T::caching_level);
 
 template<typename Req>
-concept CachedRequest = Request<Req> && Req::caching_level !=
-caching_level_type::none&& requires(Req const& req) {
+concept CachedRequest = Request<Req> && is_cached(Req::caching_level)
+                        && requires(Req const& req) {
                                {
                                    req.get_captured_id()
                                    }
@@ -646,12 +689,12 @@ caching_level_type::none&& requires(Req const& req) {
                            };
 
 template<typename Req>
-concept MemoryCachedRequest = CachedRequest<Req> && Req::caching_level ==
-caching_level_type::memory;
+concept MemoryCachedRequest
+    = CachedRequest<Req> && is_memory_cached(Req::caching_level);
 
 template<typename Req>
-concept FullyCachedRequest = CachedRequest<Req> && Req::caching_level ==
-caching_level_type::full;
+concept FullyCachedRequest
+    = CachedRequest<Req> && is_fully_cached(Req::caching_level);
 
 template<typename Req>
 concept IntrospectiveRequest
