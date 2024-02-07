@@ -25,6 +25,7 @@ class value_request
 
     static constexpr caching_level_type caching_level{
         caching_level_type::none};
+    static constexpr bool value_based_caching{false};
     static constexpr bool is_proxy{false};
     static constexpr bool introspective{false};
 
@@ -87,12 +88,6 @@ class value_request
 
  private:
     Value value_;
-};
-
-template<typename Value>
-struct arg_type_struct<value_request<Value>>
-{
-    using value_type = Value;
 };
 
 template<typename Value>

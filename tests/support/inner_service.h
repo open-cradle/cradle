@@ -132,10 +132,6 @@ class caching_request_resolution_context final : public local_context_intf,
         throw not_implemented_error();
     }
 
-    // other
-    void
-    reset_memory_cache();
-
  private:
     inner_resources& resources_;
 };

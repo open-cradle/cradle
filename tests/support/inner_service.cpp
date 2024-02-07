@@ -22,6 +22,7 @@ service_config_map const inner_config_map{
     {local_disk_cache_config_keys::NUM_THREADS_READ_POOL, 2U},
     {local_disk_cache_config_keys::NUM_THREADS_WRITE_POOL, 2U},
     {local_disk_cache_config_keys::START_EMPTY, true},
+    {local_disk_cache_config_keys::POLL_INTERVAL, 20U},
     {blob_cache_config_keys::DIRECTORY, tests_cache_dir},
     {http_requests_storage_config_keys::PORT, 9092U},
 };
@@ -55,12 +56,6 @@ caching_request_resolution_context::caching_request_resolution_context(
     inner_resources& resources)
     : resources_{resources}
 {
-}
-
-void
-caching_request_resolution_context::reset_memory_cache()
-{
-    resources_.reset_memory_cache();
 }
 
 } // namespace cradle

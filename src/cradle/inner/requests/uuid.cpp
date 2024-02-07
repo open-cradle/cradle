@@ -7,6 +7,22 @@
 
 namespace cradle {
 
+namespace {
+
+std::string
+make_base_string(std::string const& orig)
+{
+    auto ext_pos = orig.find_first_of('+');
+    if (ext_pos == std::string::npos)
+    {
+        return orig;
+    }
+    // Strip away the extension(s)
+    return orig.substr(0, ext_pos);
+}
+
+} // namespace
+
 request_uuid::request_uuid(std::string base) : str_{std::move(base)}
 {
     // Check the base string for validity:
@@ -23,6 +39,21 @@ request_uuid::request_uuid(std::string base) : str_{std::move(base)}
     }
 }
 
+request_uuid
+request_uuid::clone() const
+{
+    request_uuid res{make_base_string(str_)};
+    if (include_level_)
+    {
+        res.set_level(level_);
+    }
+    if (flattened_)
+    {
+        res.set_flattened();
+    }
+    return res;
+}
+
 request_uuid&
 request_uuid::set_level(caching_level_type level)
 {
@@ -32,12 +63,26 @@ request_uuid::set_level(caching_level_type level)
     return *this;
 }
 
+request_uuid&
+request_uuid::set_flattened()
+{
+    check_not_finalized();
+    // Catch attempts to clone a cloned request.
+    // Flattening a flattened uuid could also be a no-op.
+    if (flattened_)
+    {
+        throw std::logic_error("request_uuid object already flattened");
+    }
+    flattened_ = true;
+    return *this;
+}
+
 void
 request_uuid::check_not_finalized() const
 {
     if (finalized_)
     {
-        throw std::logic_error("request_id object already finalized");
+        throw std::logic_error("request_uuid object already finalized");
     }
 }
 
@@ -46,8 +91,14 @@ request_uuid::do_finalize() const
 {
     if (include_level_)
     {
-        static const char* const level_exts[] = {"+none", "+mem", "+full"};
+        // level_exts should match the caching_level_type definition.
+        static const char* const level_exts[]
+            = {"+none", "+mem", "+full", "+mem_vb", "+full_vb"};
         str_ += level_exts[static_cast<int>(level_)];
+    }
+    if (flattened_)
+    {
+        str_ += "+flattened";
     }
     finalized_ = true;
 }

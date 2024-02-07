@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include <cppcoro/static_thread_pool.hpp>
+#include <spdlog/spdlog.h>
 
 #include <cradle/inner/dll/dll_collection.h>
 #include <cradle/inner/io/http_requests.h>
@@ -41,6 +42,7 @@ class inner_resources_impl
 
     std::mutex mutex_;
     service_config config_;
+    std::shared_ptr<spdlog::logger> logger_;
     std::unique_ptr<immutable_cache> memory_cache_;
     std::unique_ptr<secondary_storage_intf> secondary_cache_;
     std::unique_ptr<secondary_storage_intf> requests_storage_;

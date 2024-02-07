@@ -14,6 +14,8 @@ testing_seri_catalog::testing_seri_catalog(
     register_resolver(rq_make_some_blob<caching_level_type::none>(1, false));
     register_resolver(rq_make_some_blob<caching_level_type::memory>(1, false));
     register_resolver(rq_make_some_blob<caching_level_type::full>(1, false));
+    register_resolver(
+        rq_make_some_blob<caching_level_type::full_vb>(1, false));
     register_resolver(rq_cancellable_coro<caching_level_type::memory>(0, 0));
     register_resolver(rq_non_cancellable_func<caching_level_type::none>(0, 0));
 }

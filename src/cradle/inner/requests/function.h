@@ -126,6 +126,20 @@ class function_request_intf : public id_interface
 
     virtual cppcoro::task<Value>
     resolve_async(local_async_context_intf& ctx) const = 0;
+
+    // Makes a "flattened" clone of the current value-based request:
+    // - Composition-based instead of value-based
+    // - Any subrequests have been resolved to values
+    // So starting with a request tree, we get just one request.
+    virtual cppcoro::task<std::shared_ptr<function_request_intf>>
+    make_flattened_clone(caching_context_intf& ctx) const = 0;
+
+    // Returns the uuid for a "flattened clone" request derived from this one.
+    // Having different uuid's for the original request and its clone may
+    // not (yet?) really be needed, but even then it's safer.
+    virtual request_uuid
+    make_clone_uuid() const
+        = 0;
 };
 
 template<typename Ctx, typename Args, std::size_t... Ix>
@@ -265,7 +279,14 @@ class function_request_impl
  public:
     static_assert(!std::is_reference_v<Function>);
 
+    using intf_type = function_request_intf<Value>;
     using this_type = function_request_impl;
+    using clone_type = function_request_impl<
+        Value,
+        to_composition_based(Level),
+        AsCoro,
+        std::remove_cvref_t<Function>,
+        std::remove_cvref_t<arg_type<Args>>...>;
     using stored_function_t = std::decay_t<Function>;
     using ArgIndices = std::index_sequence_for<Args...>;
 
@@ -487,6 +508,22 @@ class function_request_impl
         {
             return resolve_async_coro(ctx);
         }
+    }
+
+    cppcoro::task<std::shared_ptr<intf_type>>
+    make_flattened_clone(caching_context_intf& ctx) const override
+    {
+        auto sub_tasks = make_sync_sub_tasks(ctx, args_, ArgIndices{});
+        auto sub_results
+            = co_await when_all_wrapper(std::move(sub_tasks), ArgIndices{});
+        co_return std::make_shared<clone_type>(
+            make_clone_uuid(), *function_, std::move(sub_results));
+    }
+
+    request_uuid
+    make_clone_uuid() const override
+    {
+        return uuid_.clone().set_flattened();
     }
 
  private:
@@ -771,9 +808,15 @@ class function_request
     using value_type = Value;
     using intf_type = function_request_intf<Value>;
     using props_type = Props;
+    using clone_props_type = request_props<
+        to_composition_based(Props::level),
+        Props::function_type,
+        Props::introspective>;
+    using clone_type = function_request<value_type, clone_props_type>;
 
-    static constexpr caching_level_type caching_level = Props::level;
-    static constexpr bool introspective = Props::introspective;
+    static constexpr caching_level_type caching_level{Props::level};
+    static constexpr bool value_based_caching{Props::value_based_caching};
+    static constexpr bool introspective{Props::introspective};
     static constexpr bool is_proxy{false};
 
     // It is not possible to pass a C-style string as argument.
@@ -792,6 +835,13 @@ class function_request
             std::forward<CtorProps>(props).get_uuid(),
             std::forward<Function>(function),
             std::forward<Args>(args)...);
+    }
+
+    // Called from make_flattened_clone() (only)
+    template<typename CtorProps>
+    function_request(CtorProps&& props, std::shared_ptr<intf_type> impl)
+        : mixin_type{props}, impl_{std::move(impl)}
+    {
     }
 
     void
@@ -858,6 +908,13 @@ class function_request
         return impl_->resolve_async(ctx);
     }
 
+    cppcoro::task<clone_type>
+    make_flattened_clone(caching_context_intf& ctx) const
+    {
+        co_return clone_type{
+            make_clone_props(), co_await impl_->make_flattened_clone(ctx)};
+    }
+
  public:
     // Interface for cereal
 
@@ -904,6 +961,21 @@ class function_request
 
  private:
     std::shared_ptr<intf_type> impl_;
+
+    auto
+    make_clone_props() const
+        requires(!introspective)
+    {
+        return clone_props_type{impl_->make_clone_uuid()};
+    }
+
+    auto
+    make_clone_props() const
+        requires(introspective)
+    {
+        return clone_props_type{
+            impl_->make_clone_uuid(), this->get_introspection_title()};
+    }
 };
 
 /*
@@ -975,6 +1047,7 @@ class proxy_request : public detail::request_title_mixin<Props::introspective>
     static_assert(!std::is_reference_v<Value>);
     static_assert(Props::for_proxy);
     static_assert(is_uncached(Props::level));
+    static_assert(!is_value_based(Props::level));
 
     using mixin_type = detail::request_title_mixin<Props::introspective>;
     using element_type = proxy_request;
@@ -982,9 +1055,10 @@ class proxy_request : public detail::request_title_mixin<Props::introspective>
     using intf_type = proxy_request_intf<Value>;
     using props_type = Props;
 
-    static constexpr caching_level_type caching_level
-        = caching_level_type::none;
-    static constexpr bool introspective = Props::introspective;
+    static constexpr caching_level_type caching_level{
+        caching_level_type::none};
+    static constexpr bool value_based_caching{false};
+    static constexpr bool introspective{Props::introspective};
     static constexpr bool is_proxy{true};
 
     template<typename... Args>
@@ -1012,13 +1086,6 @@ class proxy_request : public detail::request_title_mixin<Props::introspective>
  private:
     request_uuid uuid_;
     std::shared_ptr<intf_type> impl_;
-};
-
-// arg_type_struct specialization for function_request types
-template<typename Value, typename Props>
-struct arg_type_struct<function_request<Value, Props>>
-{
-    using value_type = Value;
 };
 
 // register_uuid_for_normalized_arg() specialization for function_request types

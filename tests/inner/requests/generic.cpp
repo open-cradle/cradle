@@ -326,12 +326,86 @@ static_assert(ValidContext<my_generic_context>);
 
 } // namespace
 
+TEST_CASE("is_uncached", tag)
+{
+    REQUIRE(is_uncached(caching_level_type::none));
+    REQUIRE(!is_uncached(caching_level_type::memory));
+    REQUIRE(!is_uncached(caching_level_type::full));
+    REQUIRE(!is_uncached(caching_level_type::memory_vb));
+    REQUIRE(!is_uncached(caching_level_type::full_vb));
+}
+
+TEST_CASE("is_cached", tag)
+{
+    REQUIRE(!is_cached(caching_level_type::none));
+    REQUIRE(is_cached(caching_level_type::memory));
+    REQUIRE(is_cached(caching_level_type::full));
+    REQUIRE(is_cached(caching_level_type::memory_vb));
+    REQUIRE(is_cached(caching_level_type::full_vb));
+}
+
+TEST_CASE("is_memory_cached", tag)
+{
+    REQUIRE(!is_memory_cached(caching_level_type::none));
+    REQUIRE(is_memory_cached(caching_level_type::memory));
+    REQUIRE(!is_memory_cached(caching_level_type::full));
+    REQUIRE(is_memory_cached(caching_level_type::memory_vb));
+    REQUIRE(!is_memory_cached(caching_level_type::full_vb));
+}
+
+TEST_CASE("is_fully_cached", tag)
+{
+    REQUIRE(!is_fully_cached(caching_level_type::none));
+    REQUIRE(!is_fully_cached(caching_level_type::memory));
+    REQUIRE(is_fully_cached(caching_level_type::full));
+    REQUIRE(!is_fully_cached(caching_level_type::memory_vb));
+    REQUIRE(is_fully_cached(caching_level_type::full_vb));
+}
+
+TEST_CASE("is_composition_based", tag)
+{
+    REQUIRE(!is_composition_based(caching_level_type::none));
+    REQUIRE(is_composition_based(caching_level_type::memory));
+    REQUIRE(is_composition_based(caching_level_type::full));
+    REQUIRE(!is_composition_based(caching_level_type::memory_vb));
+    REQUIRE(!is_composition_based(caching_level_type::full_vb));
+}
+
+TEST_CASE("is_value_based", tag)
+{
+    REQUIRE(!is_value_based(caching_level_type::none));
+    REQUIRE(!is_value_based(caching_level_type::memory));
+    REQUIRE(!is_value_based(caching_level_type::full));
+    REQUIRE(is_value_based(caching_level_type::memory_vb));
+    REQUIRE(is_value_based(caching_level_type::full_vb));
+}
+
+TEST_CASE("to_composition_based", tag)
+{
+    REQUIRE(
+        to_composition_based(caching_level_type::none)
+        == caching_level_type::none);
+    REQUIRE(
+        to_composition_based(caching_level_type::memory)
+        == caching_level_type::memory);
+    REQUIRE(
+        to_composition_based(caching_level_type::full)
+        == caching_level_type::full);
+    REQUIRE(
+        to_composition_based(caching_level_type::memory_vb)
+        == caching_level_type::memory);
+    REQUIRE(
+        to_composition_based(caching_level_type::full_vb)
+        == caching_level_type::full);
+}
+
 TEST_CASE("convert async_status to string", tag)
 {
     REQUIRE(to_string(async_status::CREATED) == "CREATED");
     REQUIRE(to_string(async_status::SUBS_RUNNING) == "SUBS_RUNNING");
     REQUIRE(to_string(async_status::SELF_RUNNING) == "SELF_RUNNING");
     REQUIRE(to_string(async_status::CANCELLED) == "CANCELLED");
+    REQUIRE(to_string(async_status::AWAITING_RESULT) == "AWAITING_RESULT");
     REQUIRE(to_string(async_status::FINISHED) == "FINISHED");
     REQUIRE(to_string(async_status::ERROR) == "ERROR");
     REQUIRE(

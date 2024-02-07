@@ -16,10 +16,10 @@ namespace {
 
 static char const tag[] = "[inner][remote][loopback]";
 
+template<caching_level_type caching_level>
 void
 test_make_some_blob(bool async, bool shared)
 {
-    constexpr auto caching_level{caching_level_type::full};
     std::string proxy_name{"loopback"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
@@ -50,22 +50,32 @@ test_make_some_blob(bool async, bool shared)
 
 // TODO loopback tests with complex request (already have this in async.cpp?)
 
-TEST_CASE("loopback: make some plain blob, sync", tag)
+TEST_CASE("loopback: make some plain blob, sync, CBC", tag)
 {
-    test_make_some_blob(false, false);
+    test_make_some_blob<caching_level_type::full>(false, false);
+}
+
+TEST_CASE("loopback: make some plain blob, sync, VBC", tag)
+{
+    test_make_some_blob<caching_level_type::full_vb>(false, false);
 }
 
 TEST_CASE("loopback: make some blob file, sync", tag)
 {
-    test_make_some_blob(false, true);
+    test_make_some_blob<caching_level_type::full>(false, true);
 }
 
-TEST_CASE("loopback: make some plain blob, async", tag)
+TEST_CASE("loopback: make some plain blob, async, CBC", tag)
 {
-    test_make_some_blob(true, false);
+    test_make_some_blob<caching_level_type::full>(true, false);
+}
+
+TEST_CASE("loopback: make some plain blob, async, VBC", tag)
+{
+    test_make_some_blob<caching_level_type::full_vb>(true, false);
 }
 
 TEST_CASE("loopback: make some blob file, async", tag)
 {
-    test_make_some_blob(true, true);
+    test_make_some_blob<caching_level_type::full>(true, true);
 }

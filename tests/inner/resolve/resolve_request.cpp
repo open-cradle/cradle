@@ -10,6 +10,7 @@
 #include "../../support/request.h"
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/service/resources.h>
+#include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 
 using namespace cradle;
@@ -216,7 +217,7 @@ TEST_CASE("evaluate function request V+V - fully cached", tag)
     REQUIRE(num_add_calls == 1);
 
     // New memory cache, same disk cache
-    ctx.reset_memory_cache();
+    resources->reset_memory_cache();
 
     // The result still comes from a cache; this time, we know it must be the
     // disk cache.
@@ -354,7 +355,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     auto dc0 = disk_cache.get_summary_info();
     REQUIRE(dc0.ac_entry_count == num_requests);
 
-    ctx.reset_memory_cache();
+    resources->reset_memory_cache();
     REQUIRE(get_summary_info(mem_cache).ac_num_records == 0);
     auto res1 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
 
@@ -430,4 +431,175 @@ TEST_CASE("evaluate function request - memory cache behavior", tag)
     CHECK(info3.ac_num_records_in_use == 0);
     CHECK(info3.ac_num_records_pending_eviction == 1);
     CHECK(info3.cas_num_records == 1);
+}
+
+template<caching_level_type Level, template<typename Req> class CtxMaker>
+static void
+test_composition_or_value_based()
+{
+    auto resources{make_inner_test_resources()};
+    using props_type = request_props<Level>;
+    props_type props_inner{make_test_uuid(100)};
+    props_type props_main{make_test_uuid(101)};
+
+    int num_add_calls = 0;
+    auto add = create_adder(num_add_calls);
+    int num_mul_calls = 0;
+    auto mul = create_multiplier(num_mul_calls);
+
+    auto inner0{rq_function(props_inner, add, 6, 8)};
+    auto req0{rq_function(props_main, mul, inner0, 3)};
+    CtxMaker<decltype(req0)> ctx_maker{*resources};
+    auto ctx0 = ctx_maker(req0);
+    auto res0 = cppcoro::sync_wait(resolve_request(*ctx0, req0));
+    REQUIRE(res0 == 42);
+    REQUIRE(num_add_calls == 1);
+    REQUIRE(num_mul_calls == 1);
+
+    if constexpr (is_fully_cached(Level))
+    {
+        sync_wait_write_disk_cache(*resources);
+        resources->reset_memory_cache();
+    }
+
+    auto inner1{rq_function(props_inner, add, 2, 12)};
+    auto req1{rq_function(props_main, mul, inner1, 3)};
+    auto ctx10 = ctx_maker(req1);
+    auto res10 = cppcoro::sync_wait(resolve_request(*ctx10, req1));
+    REQUIRE(res10 == 42);
+    REQUIRE(num_add_calls == 2);
+    // Value-based caching detects that the 14 * 3 result is already cached.
+    REQUIRE(num_mul_calls == (is_value_based(Level) ? 1 : 2));
+
+    if constexpr (is_fully_cached(Level))
+    {
+        sync_wait_write_disk_cache(*resources);
+        resources->reset_memory_cache();
+    }
+
+    auto ctx11 = ctx_maker(req1);
+    auto res11 = cppcoro::sync_wait(resolve_request(*ctx11, req1));
+    REQUIRE(res11 == 42);
+    REQUIRE(num_add_calls == 2);
+    REQUIRE(num_mul_calls == (is_value_based(Level) ? 1 : 2));
+
+    if constexpr (is_fully_cached(Level))
+    {
+        auto& disk_cache{
+            static_cast<local_disk_cache&>(resources->secondary_cache())};
+        auto dc = disk_cache.get_summary_info();
+        // Composition-based has four AC entries, for
+        // - 6+8
+        // - (6+8)*3
+        // - 2+12
+        // - (2+12)*3
+        // Value-based has three AC entries, for
+        // - 6+8
+        // - 14*3 (used for both requests)
+        // - 2+12
+        CHECK(dc.ac_entry_count == (is_value_based(Level) ? 3 : 4));
+        CHECK(dc.cas_entry_count == 2);
+    }
+}
+
+// Creates a context for sync resolving Req objects
+template<typename Req>
+class SyncCtxMaker
+{
+ public:
+    SyncCtxMaker(inner_resources& resources) : resources_{resources}
+    {
+    }
+
+    auto
+    operator()(Req const& req)
+    {
+        // Sync: context does not depend on the request; use the same context
+        // for all requests
+        if (!ctx_)
+        {
+            ctx_ = std::make_shared<caching_request_resolution_context>(
+                resources_);
+        }
+        return ctx_;
+    }
+
+ private:
+    inner_resources& resources_;
+    std::shared_ptr<caching_request_resolution_context> ctx_;
+};
+
+template<caching_level_type Level>
+static void
+test_composition_or_value_based_sync()
+{
+    return test_composition_or_value_based<Level, SyncCtxMaker>();
+}
+
+TEST_CASE("evaluate function request - memory cached, CBC, sync", tag)
+{
+    test_composition_or_value_based_sync<caching_level_type::memory>();
+}
+
+TEST_CASE("evaluate function request - memory cached, VBC, sync", tag)
+{
+    test_composition_or_value_based_sync<caching_level_type::memory_vb>();
+}
+
+TEST_CASE("evaluate function request - disk cached, CBC, sync", tag)
+{
+    test_composition_or_value_based_sync<caching_level_type::full>();
+}
+
+TEST_CASE("evaluate function request - disk cached, VBC, sync", tag)
+{
+    test_composition_or_value_based_sync<caching_level_type::full_vb>();
+}
+
+// Creates a context for async resolving Req objects
+template<typename Req>
+class AsyncCtxMaker
+{
+ public:
+    AsyncCtxMaker(inner_resources& resources) : resources_{resources}
+    {
+    }
+
+    auto
+    operator()(Req const& req)
+    {
+        // Async: use a fresh context for each request
+        auto tree_ctx = std::make_shared<local_atst_tree_context>(resources_);
+        return make_local_async_ctx_tree(tree_ctx, req);
+    }
+
+ private:
+    inner_resources& resources_;
+};
+
+template<caching_level_type Level>
+static void
+test_composition_or_value_based_async()
+{
+    return test_composition_or_value_based<Level, AsyncCtxMaker>();
+}
+
+TEST_CASE("evaluate function request - memory cached, CBC, async", tag)
+{
+    test_composition_or_value_based_async<caching_level_type::memory>();
+}
+
+TEST_CASE("evaluate function request - memory cached, VBC, async", tag)
+{
+    test_composition_or_value_based_async<caching_level_type::memory_vb>();
+}
+
+TEST_CASE("evaluate function request - disk cached, CBC, async", tag)
+{
+    test_composition_or_value_based_async<caching_level_type::full>();
+}
+
+TEST_CASE("evaluate function request - disk cached, VBC, async", tag)
+{
+    test_composition_or_value_based_async<caching_level_type::full_vb>();
 }

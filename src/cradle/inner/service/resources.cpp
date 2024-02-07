@@ -22,6 +22,7 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/service/resources_impl.h>
 #include <cradle/inner/service/secondary_storage_intf.h>
+#include <cradle/inner/utilities/logging.h>
 
 namespace cradle {
 
@@ -65,6 +66,7 @@ void
 inner_resources::reset_memory_cache()
 {
     auto& impl{*impl_};
+    impl.logger_->info("reset memory cache");
     impl.memory_cache_->reset(make_immutable_cache_config(impl.config_));
 }
 
@@ -248,6 +250,7 @@ inner_resources::get_seri_registry()
 inner_resources_impl::inner_resources_impl(
     inner_resources& wrapper, service_config const& config)
     : config_{config},
+      logger_{ensure_logger("svc")},
       memory_cache_{create_memory_cache(config)},
       blob_dir_{std::make_unique<blob_file_directory>(config)},
       the_seri_registry_{std::make_unique<seri_registry>()},

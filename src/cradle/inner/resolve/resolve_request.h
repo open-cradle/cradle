@@ -163,7 +163,7 @@ resolve_request_on_memory_cache_miss(
     }
 }
 
-template<bool Async, Context Ctx, CachedRequest Req>
+template<bool Async, Context Ctx, CompositionBasedCachedRequest Req>
 cppcoro::task<typename Req::value_type>
 resolve_request_cached(Ctx& ctx, Req const& req)
 {
@@ -200,6 +200,18 @@ resolve_request_cached(Ctx& ctx, Req const& req)
     }
     // Finally, return the shared_task's value.
     co_return ptr.get_value();
+}
+
+template<bool Async, Context Ctx, ValueBasedCachedRequest Req>
+cppcoro::task<typename Req::value_type>
+resolve_request_cached(Ctx& ctx, Req const& req)
+{
+    // Make a CompositionBasedCachedRequest variant of req that has all
+    // subrequests resolved and replaced by resulting values; then resolve
+    // that request as any other request, using composition-based caching.
+    auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
+    co_return co_await resolve_request_cached<Async>(
+        ctx, co_await req.make_flattened_clone(cac_ctx));
 }
 
 template<Context Ctx, CachedRequest Req>

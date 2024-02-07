@@ -85,6 +85,7 @@ class request_props : public introspection_mixin<Introspective>
         = FunctionType == request_function_t::proxy_plain
           || FunctionType == request_function_t::proxy_coro;
     static constexpr bool introspective = Introspective;
+    static constexpr bool value_based_caching = is_value_based(Level);
 
     static_assert(!for_proxy || is_uncached(level));
 

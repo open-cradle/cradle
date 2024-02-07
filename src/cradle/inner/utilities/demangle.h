@@ -3,6 +3,7 @@
 
 #include <string>
 #include <typeindex>
+#include <typeinfo>
 
 namespace cradle {
 
@@ -10,6 +11,19 @@ namespace cradle {
 // Returns the original name if the attempt fails.
 std::string
 demangle(std::type_index key);
+
+inline std::string
+demangle(std::type_info const& key)
+{
+    return demangle(std::type_index{key});
+}
+
+template<typename T>
+std::string
+demangled_type_name()
+{
+    return demangle(typeid(T));
+}
 
 } // namespace cradle
 
