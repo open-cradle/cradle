@@ -60,12 +60,20 @@ class request_uuid
     // The base string should be universally unique.
     explicit request_uuid(std::string base);
 
+    request_uuid
+    clone() const;
+
     // Causes the base uuid to be extended with something depending on the
     // caching level.
     // To be called when the corresponding request is a function class having
     // the caching level as template parameter.
     request_uuid&
     set_level(caching_level_type level);
+
+    // Lets this uuid refer to a request that is a "flattened clone" of an
+    // original one.
+    request_uuid&
+    set_flattened();
 
     // Returns the full uuid (base + any extensions)
     std::string const&
@@ -121,6 +129,7 @@ class request_uuid
     // Modifiers
     bool include_level_{false};
     caching_level_type level_{};
+    bool flattened_{false};
 
     void
     check_not_finalized() const;

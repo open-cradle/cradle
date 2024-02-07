@@ -53,8 +53,8 @@ create_thin_tree_erased()
     }
 }
 
-template<caching_level_type level, int H>
-    requires(level != caching_level_type::full)
+template<caching_level_type level, int H, bool recursive_vbc = false>
+    requires(!is_fully_cached(level))
 auto create_triangular_tree_erased()
 {
     request_props<level> props{make_uuid()};
@@ -64,16 +64,18 @@ auto create_triangular_tree_erased()
     }
     else
     {
+        constexpr auto next_level
+            = recursive_vbc ? level : to_composition_based(level);
         return rq_function(
             props,
             add,
-            create_triangular_tree_erased<level, H - 1>(),
-            create_triangular_tree_erased<level, H - 1>());
+            create_triangular_tree_erased<next_level, H - 1, recursive_vbc>(),
+            create_triangular_tree_erased<next_level, H - 1, recursive_vbc>());
     }
 }
 
 template<caching_level_type level, int H>
-    requires(level == caching_level_type::full)
+    requires(is_fully_cached(level))
 auto create_triangular_tree_erased()
 {
     request_props<level, request_function_t::plain, false> props{make_uuid()};
@@ -203,13 +205,14 @@ BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::none, 64>)
     ->Name("BM_resolve_function_request_uncached_thin_tree H=64")
     ->Apply(thousand_loops);
 
-template<caching_level_type level, int H>
+template<caching_level_type level, int H, bool recursive_vbc = false>
 void
 BM_resolve_tri_tree_erased(benchmark::State& state)
 {
     auto resources{make_inner_test_resources()};
     request_resolution_context<level> ctx{*resources};
-    BM_resolve_request(state, ctx, create_triangular_tree_erased<level, H>());
+    BM_resolve_request(
+        state, ctx, create_triangular_tree_erased<level, H, recursive_vbc>());
 }
 
 BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::none, 2>)
@@ -235,14 +238,36 @@ BENCHMARK(BM_resolve_thin_tree_erased<caching_level_type::memory, 64>)
     ->Name("BM_resolve_function_request_mem_cached_thin_tree H=64")
     ->Apply(thousand_loops);
 
+// The VBC-top benchmarks apply value-based caching to the topmost root
+// request only, which probably is how it should be used in practice.
+// The VBC-all benchmarks apply value-based caching recursively to all
+// requests, basically defeating the caching mechanism.
 BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory, 2>)
-    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=2")
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=2 CBC")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory_vb, 2, false>)
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=2 VBC-top")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory_vb, 2, true>)
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=2 VBC-all")
     ->Apply(thousand_loops);
 BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory, 4>)
-    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=4")
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=4 CBC")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory_vb, 4, false>)
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=4 VBC-top")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory_vb, 4, true>)
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=4 VBC-all")
     ->Apply(thousand_loops);
 BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory, 6>)
-    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=6")
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=6 CBC")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory_vb, 6, false>)
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=6 VBC-top")
+    ->Apply(thousand_loops);
+BENCHMARK(BM_resolve_tri_tree_erased<caching_level_type::memory_vb, 6, true>)
+    ->Name("BM_resolve_function_request_mem_cached_tri_tree H=6 VBC-all")
     ->Apply(thousand_loops);
 
 template<caching_level_type level, int H>

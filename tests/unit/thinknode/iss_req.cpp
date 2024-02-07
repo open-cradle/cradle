@@ -250,14 +250,14 @@ test_post_iss_requests_parallel(
         REQUIRE(infos[1].title() == "HTTP: post https://mgh.thinknode.io/api/v1.0/iss/string?context=123");
     }
 
-    if constexpr (level >= caching_level_type::memory)
+    if constexpr (is_cached(level))
     {
         // Resolve using memory cache
         auto res1 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
         REQUIRE(res1 == results);
     }
 
-    if constexpr (level >= caching_level_type::full)
+    if constexpr (is_fully_cached(level))
     {
         sync_wait_write_disk_cache(resources);
         resources.reset_memory_cache();
@@ -497,14 +497,14 @@ test_retrieve_immutable_object_parallel(
     // Order unspecified so don't check mock_http.is_in_order()
 
     // TODO only local?
-    if constexpr (level >= caching_level_type::memory)
+    if constexpr (is_cached(level))
     {
         // Resolve using memory cache
         auto res1 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
         REQUIRE(res1 == results);
     }
 
-    if constexpr (level >= caching_level_type::full)
+    if constexpr (is_fully_cached(level))
     {
         sync_wait_write_disk_cache(resources);
         resources.reset_memory_cache();

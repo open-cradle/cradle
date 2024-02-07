@@ -53,22 +53,23 @@ void
 resolve_request_loop(
     benchmark::State& state, Ctx& ctx, Req const& req, int num_loops = 1000)
 {
+    auto& resources{ctx.get_resources()};
     constexpr auto caching_level = Req::element_type::caching_level;
     auto loop = [&]() -> cppcoro::task<void> {
-        if constexpr (caching_level == caching_level_type::full)
+        if constexpr (is_fully_cached(caching_level))
         {
             state.PauseTiming();
-            ctx.reset_memory_cache();
+            resources.reset_memory_cache();
             benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
             sync_wait_write_disk_cache(ctx.get_resources());
             state.ResumeTiming();
         }
         for (int i = 0; i < num_loops; ++i)
         {
-            if constexpr (caching_level == caching_level_type::full)
+            if constexpr (is_fully_cached(caching_level))
             {
                 state.PauseTiming();
-                ctx.reset_memory_cache();
+                resources.reset_memory_cache();
                 state.ResumeTiming();
             }
             benchmark::DoNotOptimize(co_await resolve_request(ctx, req));

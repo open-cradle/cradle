@@ -83,10 +83,10 @@ BM_try_resolve_thinknode_request(
 
     // Fill the appropriate cache if any
     auto init = [&]() -> cppcoro::task<void> {
-        if constexpr (caching_level != caching_level_type::none)
+        if constexpr (is_cached(caching_level))
         {
             benchmark::DoNotOptimize(co_await resolve_request(ctx, req));
-            if constexpr (caching_level == caching_level_type::full)
+            if constexpr (is_fully_cached(caching_level))
             {
                 sync_wait_write_disk_cache(resources);
             }
@@ -109,18 +109,17 @@ BM_try_resolve_thinknode_request(
 #pragma warning(disable : 4189)
 #endif
                 constexpr bool need_empty_memory_cache
-                    = caching_level == caching_level_type::full || storing;
+                    = is_fully_cached(caching_level) || storing;
                 constexpr bool need_empty_disk_cache
-                    = caching_level == caching_level_type::full && storing;
+                    = is_fully_cached(caching_level) && storing;
                 if constexpr (need_empty_memory_cache || need_empty_disk_cache)
                 {
                     // Some scenarios are problematic for some reason
                     // (huge CPU times, only one iteration).
                     // Not stopping and resuming timing gives some improvement.
                     constexpr bool problematic
-                        = caching_level == caching_level_type::none
-                          || (caching_level == caching_level_type::memory
-                              && storing);
+                        = is_uncached(caching_level)
+                          || (is_memory_cached(caching_level) && storing);
                     constexpr bool pause_timing = !problematic;
                     if constexpr (pause_timing)
                     {

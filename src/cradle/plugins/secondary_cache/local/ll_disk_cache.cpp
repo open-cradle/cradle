@@ -417,6 +417,8 @@ static void
 insert_ac_entry(
     ll_disk_cache_impl& cache, std::string const& ac_key, int64_t cas_id)
 {
+    cache.logger->debug(
+        " insert_ac_entry: ac_key {}, cas_id {}", ac_key, cas_id);
     auto* stmt = cache.insert_ac_entry_statement;
     bind_string(stmt, 1, ac_key);
     bind_int64(stmt, 2, cas_id);
@@ -561,10 +563,6 @@ insert_cas_entry(
     blob const& value,
     std::size_t original_size)
 {
-    cache.logger->debug(
-        " insert_cas_entry: digest {}, original_size {}",
-        digest,
-        original_size);
     auto* stmt = cache.cas_insert_statement;
     bind_string(stmt, 1, digest);
     bind_blob(stmt, 2, value);
@@ -573,6 +571,11 @@ insert_cas_entry(
     execute_prepared_statement(cache, stmt);
     // Alternative: use a RETURNING clause
     auto cas_id = sqlite3_last_insert_rowid(cache.db);
+    cache.logger->debug(
+        " insert_cas_entry: digest {}, original_size {} -> cas_id {}",
+        digest,
+        original_size,
+        cas_id);
     if (cas_id == 0)
     {
         // Since we checked that the insert succeeded, we really shouldn't
@@ -1300,6 +1303,8 @@ ll_disk_cache::insert(
     if (opt_cas_id_for_cas)
     {
         cas_id = *opt_cas_id_for_cas;
+        cache.logger->debug(
+            " insert: cas_id {} already there for digest {}", cas_id, digest);
     }
     else
     {

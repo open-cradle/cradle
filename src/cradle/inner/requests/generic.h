@@ -20,13 +20,104 @@ class inner_resources;
 class request_uuid;
 class tasklet_tracker;
 
-// Specifies how request resolution results should be cached
+// Specifies how request resolution results should be cached.
+// The specification consists of two parts:
+// - Caching level (no caching, memory only, or memory + disk)
+// - Type, which is one of
+//   - Composition-based: the cache key is based on the argument specifications
+//     (subrequests or values).
+//   - Value-based: the cache key is based on the argument values.
+// Value-based caching probably should be applied to the topmost request in a
+// request tree only, as it tends to basically disable caching at lower levels.
 enum class caching_level_type
 {
-    none, // No caching
-    memory, // Caching in local memory only
-    full // Caching in local memory, plus some secondary storage
+    // No caching
+    none,
+    // Caching in local memory only; composition-based
+    memory,
+    // Caching in local memory, plus some secondary storage; composition-based
+    full,
+    // Like memory; value-based
+    memory_vb,
+    // Like full; value-based
+    full_vb,
 };
+
+// Disallow relational comparisons between caching_level_type values;
+// e.g. "full < full_vb" doesn't make sense.
+// Also, the is_...() functions below are preferred over == or !=.
+bool
+operator<(caching_level_type x, caching_level_type y)
+    = delete;
+bool
+operator<=(caching_level_type x, caching_level_type y)
+    = delete;
+bool
+operator>(caching_level_type x, caching_level_type y)
+    = delete;
+bool
+operator>=(caching_level_type x, caching_level_type y)
+    = delete;
+std::strong_ordering
+operator<=>(caching_level_type x, caching_level_type y)
+    = delete;
+
+inline constexpr bool
+is_uncached(caching_level_type level)
+{
+    return level == caching_level_type::none;
+}
+
+inline constexpr bool
+is_cached(caching_level_type level)
+{
+    return level != caching_level_type::none;
+}
+
+inline constexpr bool
+is_memory_cached(caching_level_type level)
+{
+    return level == caching_level_type::memory
+           || level == caching_level_type::memory_vb;
+}
+
+inline constexpr bool
+is_fully_cached(caching_level_type level)
+{
+    return level == caching_level_type::full
+           || level == caching_level_type::full_vb;
+}
+
+inline constexpr bool
+is_composition_based(caching_level_type level)
+{
+    return level == caching_level_type::memory
+           || level == caching_level_type::full;
+}
+
+inline constexpr bool
+is_value_based(caching_level_type level)
+{
+    return level == caching_level_type::memory_vb
+           || level == caching_level_type::full_vb;
+}
+
+inline constexpr caching_level_type
+to_composition_based(caching_level_type level)
+{
+    if (level == caching_level_type::memory_vb)
+    {
+        return caching_level_type::memory;
+    }
+    else if (level == caching_level_type::full_vb)
+    {
+        return caching_level_type::full;
+    }
+    else
+    {
+        return level;
+    }
+}
 
 /*
  * Visits a request's arguments (which may be subrequests themselves).
@@ -625,6 +716,9 @@ concept Request
           requires std::same_as<
               std::remove_const_t<decltype(T::caching_level)>,
               caching_level_type>;
+          requires std::same_as<
+              std::remove_const_t<decltype(T::value_based_caching)>,
+              bool>;
           requires std::
               same_as<std::remove_const_t<decltype(T::is_proxy)>, bool>;
           requires std::
@@ -633,12 +727,11 @@ concept Request
 // TODO say something about resolve_sync()/_async() as we used to do
 
 template<typename T>
-concept UncachedRequest = Request<T> && T::caching_level ==
-caching_level_type::none;
+concept UncachedRequest = Request<T> && is_uncached(T::caching_level);
 
 template<typename Req>
-concept CachedRequest = Request<Req> && Req::caching_level !=
-caching_level_type::none&& requires(Req const& req) {
+concept CachedRequest = Request<Req> && is_cached(Req::caching_level)
+                        && requires(Req const& req) {
                                {
                                    req.get_captured_id()
                                    }
@@ -646,12 +739,20 @@ caching_level_type::none&& requires(Req const& req) {
                            };
 
 template<typename Req>
-concept MemoryCachedRequest = CachedRequest<Req> && Req::caching_level ==
-caching_level_type::memory;
+concept MemoryCachedRequest
+    = CachedRequest<Req> && is_memory_cached(Req::caching_level);
 
 template<typename Req>
-concept FullyCachedRequest = CachedRequest<Req> && Req::caching_level ==
-caching_level_type::full;
+concept FullyCachedRequest
+    = CachedRequest<Req> && is_fully_cached(Req::caching_level);
+
+template<typename Req>
+concept CompositionBasedCachedRequest = CachedRequest<Req> && !
+Req::value_based_caching;
+
+template<typename Req>
+concept ValueBasedCachedRequest
+    = CachedRequest<Req> && Req::value_based_caching;
 
 template<typename Req>
 concept IntrospectiveRequest
@@ -686,17 +787,28 @@ concept VisitableRequest
                       };
 
 // Contains the type of an argument to an rq_function-like call.
-// Primary template, used for non-request types; should be specialized
-// for each kind of request (in other .h files).
-template<typename T>
-struct arg_type_struct
+template<typename Value, bool IsReq>
+struct arg_type_struct;
+
+// Non-request argument: type is that of the argument itself.
+template<typename Arg>
+struct arg_type_struct<Arg, false>
 {
-    using value_type = T;
+    using value_type = Arg;
+};
+
+// Request argument: type is that of the request's return value.
+template<typename Arg>
+struct arg_type_struct<Arg, true>
+{
+    using value_type = typename Arg::value_type;
 };
 
 // Yields the type of an argument to an rq_function-like call
 template<typename T>
-using arg_type = typename arg_type_struct<std::decay_t<T>>::value_type;
+using arg_type =
+    typename arg_type_struct<std::decay_t<T>, Request<std::decay_t<T>>>::
+        value_type;
 
 } // namespace cradle
 
