@@ -33,7 +33,6 @@
         "simdjson",
         "spdlog",
         "sqlite3",
-        "tomlplusplus",
         "vcpkg-cmake",
         "websocketpp",
         "yaml-cpp",

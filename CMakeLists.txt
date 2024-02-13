@@ -179,8 +179,17 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
 find_package(lz4 CONFIG REQUIRED)
 find_package(cereal CONFIG REQUIRED)
-find_package(tomlplusplus CONFIG REQUIRED)
 find_path(BSHOSHANY_THREAD_POOL_INCLUDE_DIRS "BS_thread_pool.hpp")
+
+# The vcpkg tomlplusplus port now requires using pkg-config, which requires a
+# separate install step on Windows, so to avoid that, just include it via
+# FetchContent.
+FetchContent_Declare(
+    fetched_tomlplusplus
+    GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
+    GIT_TAG        v3.4.0
+)
+FetchContent_MakeAvailable(fetched_tomlplusplus)
 
 # The patch command may not be idempotent; if anything changes (like GIT_TAG),
 # all build-directory/_deps/fetched_rpclib* should be removed before rebuilding.
