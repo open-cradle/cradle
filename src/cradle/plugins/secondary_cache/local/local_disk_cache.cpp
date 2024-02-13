@@ -164,10 +164,10 @@ local_disk_cache::decompress_file_data(
 cppcoro::task<void>
 local_disk_cache::write(std::string key, blob value)
 {
-    write_pool_.push_task([&ll_cache = ll_cache_,
-                           &logger = *logger_,
-                           key,
-                           value] {
+    write_pool_.detach_task([&ll_cache = ll_cache_,
+                             &logger = *logger_,
+                             key,
+                             value] {
         try
         {
             auto digest{get_unique_string_tmpl(value)};
