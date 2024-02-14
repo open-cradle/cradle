@@ -191,12 +191,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(fetched_tomlplusplus)
 
+find_package(Git REQUIRED)
 # The patch command may not be idempotent; if anything changes (like GIT_TAG),
 # all build-directory/_deps/fetched_rpclib* should be removed before rebuilding.
 FetchContent_Declare(fetched_rpclib
     GIT_REPOSITORY https://github.com/rpclib/rpclib.git
     GIT_TAG "v2.3.0"
-    PATCH_COMMAND git apply ${CMAKE_CURRENT_SOURCE_DIR}/patches/rpclib.patch
+    PATCH_COMMAND ${GIT_EXECUTABLE} apply ${CMAKE_CURRENT_SOURCE_DIR}/patches/rpclib.patch
     UPDATE_DISCONNECTED TRUE)
 FetchContent_MakeAvailable(fetched_rpclib)
 
@@ -335,7 +336,6 @@ elseif("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "GitCache" OR
        "${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "External")
     if("${CRADLE_PREPROCESSOR_USAGE}" STREQUAL "GitCache")
         message(STATUS "Retrieving preprocessed files from Git cache")
-        find_package(Git)
         if("${CRADLE_COMMIT_HASH}" STREQUAL "")
             # Get the current commit hash for the CRADLE repository.
             execute_process(COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
