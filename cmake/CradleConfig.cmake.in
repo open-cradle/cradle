@@ -18,7 +18,6 @@ find_dependency(simdjson CONFIG REQUIRED)
 find_dependency(lz4 CONFIG REQUIRED)
 find_dependency(cereal CONFIG REQUIRED)
 find_dependency(rpclib CONFIG REQUIRED)
-find_dependency(tomlplusplus CONFIG REQUIRED)
 
 # TODO: Don't bring this along as a transitive/non-testing dependency.
 find_dependency(Catch2 CONFIG REQUIRED)

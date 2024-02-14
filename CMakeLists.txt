@@ -658,6 +658,7 @@ if(CRADLE_INSTALL)
             cradle_inner cradle_typing lib_third_party cradle_plugins_inner
             cradle_plugins_typing cradle_thinknode
             cradle_rpclib_client cradle_websocket cradle_external cppcoro
+            tomlplusplus
         EXPORT CradleTargets
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
