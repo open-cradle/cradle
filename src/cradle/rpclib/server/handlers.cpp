@@ -256,8 +256,10 @@ try
     // This function should return asap.
     // Need to dispatch a thread calling the blocking cppcoro::sync_wait().
     // TODO actx writes before now should synchronize with the pool thread
-    hctx.async_request_pool().push_task(
-        resolve_async, std::ref(hctx), actx, std::move(seri_req));
+    hctx.async_request_pool().detach_task(
+        [&hctx, actx, seri_req = std::move(seri_req)] {
+            resolve_async(hctx, actx, seri_req);
+        });
     async_id aid = actx->get_id();
     logger.info("async_id {}", aid);
     return aid;

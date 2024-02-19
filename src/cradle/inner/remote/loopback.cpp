@@ -108,7 +108,8 @@ loopback_service::submit_async(service_config config, std::string seri_req)
     // TODO update status to SUBMITTED
     // This function should return asap, but cppcoro::sync_wait() is blocking,
     // so need to dispatch to another thread.
-    async_pool_.push_task(resolve_async, this, actx, seri_req);
+    async_pool_.detach_task(
+        [=, this] { resolve_async(this, actx, seri_req); });
     async_id aid = actx->get_id();
     logger_->info("async_id {}", aid);
     return aid;
