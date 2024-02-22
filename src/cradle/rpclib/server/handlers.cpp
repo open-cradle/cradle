@@ -193,10 +193,6 @@ catch (std::exception& e)
 
 // Resolves an async request, running on a dedicated thread from the
 // async_request_pool_.
-// Note that any std::shared_ptr passed to this function currently won't be
-// destroyed until the thread starts processing its next task from the queue.
-// This is due to https://github.com/bshoshany/thread-pool/issues/124;
-// the solution has been implemented but not yet released.
 static void
 resolve_async(
     rpclib_handler_context& hctx,
