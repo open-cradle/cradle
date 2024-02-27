@@ -452,21 +452,21 @@ TEST_CASE("cache CAS entry list", tag)
         db_entry = &entries[1];
     }
     {
-        REQUIRE(
+        CHECK(
             file_entry->digest
-            == get_unique_string_tmpl(generate_value_string(1)));
-        REQUIRE(
+            == get_unique_string_tmpl(make_blob(generate_value_string(1))));
+        CHECK(
             std::size_t(file_entry->size)
             == generate_value_string(1).length());
-        REQUIRE(!file_entry->in_db);
+        CHECK(!file_entry->in_db);
     }
     {
-        REQUIRE(
+        CHECK(
             db_entry->digest
-            == get_unique_string_tmpl(generate_value_string(2)));
-        REQUIRE(
+            == get_unique_string_tmpl(make_blob(generate_value_string(2))));
+        CHECK(
             std::size_t(db_entry->size) == generate_value_string(2).length());
-        REQUIRE(db_entry->in_db);
+        CHECK(db_entry->in_db);
     }
 }
 

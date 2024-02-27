@@ -47,7 +47,22 @@ update_unique_hash(unique_hasher& hasher, char const* val)
 void
 update_unique_hash(unique_hasher& hasher, blob const& val)
 {
-    hasher.encode_bytes(val.data(), val.size());
+    // A tag byte is used to distinguish between:
+    // - A plain blob, where the hash is calculated over the blob data.
+    // - A blob file, where the hash is calculated over the file path.
+    // Without the tag, a hash over a plain blob containing something that
+    // looks like a file path might be equal to the hash over a blob file.
+    if (auto const* owner = val.mapped_file_data_owner())
+    {
+        update_unique_hash(hasher, uint8_t{0x01});
+        auto path{owner->mapped_file()};
+        hasher.encode_bytes(path.data(), path.size());
+    }
+    else
+    {
+        update_unique_hash(hasher, uint8_t{0x00});
+        hasher.encode_bytes(val.data(), val.size());
+    }
 }
 
 void
