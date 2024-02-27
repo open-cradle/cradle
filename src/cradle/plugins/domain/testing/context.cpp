@@ -176,6 +176,12 @@ root_proxy_atst_context::make_config() const
         config_map[testing_config_keys::SET_RESULT_DELAY]
             = static_cast<std::size_t>(set_result_delay_);
     }
+    if (!tasklets_.empty())
+    {
+        config_map.insert(std::pair{
+            remote_config_keys::TASKLET_ID,
+            static_cast<std::size_t>(tasklets_.back()->own_id())});
+    }
     return service_config{config_map};
 }
 

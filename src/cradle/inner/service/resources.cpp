@@ -14,6 +14,7 @@
 #include <cradle/inner/fs/file_io.h>
 #include <cradle/inner/fs/types.h>
 #include <cradle/inner/fs/utilities.h>
+#include <cradle/inner/introspection/config.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/remote/async_db.h>
@@ -137,7 +138,8 @@ inner_resources::async_http_request(
     auto& impl{*impl_};
     std::ostringstream s;
     s << "HTTP: " << request.method << " " << request.url;
-    auto tasklet = create_tasklet_tracker("HTTP", s.str(), client);
+    auto tasklet
+        = create_tasklet_tracker(the_tasklet_admin(), "HTTP", s.str(), client);
     if (!impl.http_is_synchronous_)
     {
         co_await impl.http_pool_.schedule();
@@ -247,6 +249,12 @@ inner_resources::get_seri_registry()
     return impl_->the_seri_registry_;
 }
 
+tasklet_admin&
+inner_resources::the_tasklet_admin()
+{
+    return impl_->the_tasklet_admin_;
+}
+
 inner_resources_impl::inner_resources_impl(
     inner_resources& wrapper, service_config const& config)
     : config_{config},
@@ -255,6 +263,8 @@ inner_resources_impl::inner_resources_impl(
       blob_dir_{std::make_unique<blob_file_directory>(config)},
       the_seri_registry_{std::make_unique<seri_registry>()},
       the_dlls_{wrapper},
+      the_tasklet_admin_{config.get_bool_or_default(
+          introspection_config_keys::FORCE_FINISH, false)},
       http_pool_{cppcoro::static_thread_pool(
           static_cast<uint32_t>(config.get_number_or_default(
               inner_config_keys::HTTP_CONCURRENCY, 36)))},

@@ -76,6 +76,8 @@ class tasklet_tracker
         = 0;
 };
 
+class tasklet_admin;
+
 /**
  * Start tracking a new tasklet, possibly on behalf of another one (the client)
  *
@@ -83,6 +85,7 @@ class tasklet_tracker
  */
 tasklet_tracker*
 create_tasklet_tracker(
+    tasklet_admin& admin,
     std::string const& pool_name,
     std::string const& title,
     tasklet_tracker* client = nullptr);
@@ -96,7 +99,7 @@ create_tasklet_tracker(
  * positive.
  */
 tasklet_tracker*
-create_tasklet_tracker(int rpc_client_id);
+create_tasklet_tracker(tasklet_admin& admin, int rpc_client_id);
 
 /**
  * Tracks the major states of a tasklet (running / finished)

@@ -562,6 +562,28 @@ root_proxy_async_context_base::wait_on_remote_id()
     }
 }
 
+tasklet_tracker*
+root_proxy_async_context_base::get_tasklet()
+{
+    if (tasklets_.empty())
+    {
+        return nullptr;
+    }
+    return tasklets_.back();
+}
+
+void
+root_proxy_async_context_base::push_tasklet(tasklet_tracker& tasklet)
+{
+    tasklets_.push_back(&tasklet);
+}
+
+void
+root_proxy_async_context_base::pop_tasklet()
+{
+    tasklets_.pop_back();
+}
+
 non_root_proxy_async_context_base::non_root_proxy_async_context_base(
     std::shared_ptr<proxy_async_tree_context_base> tree_ctx, bool is_req)
     : proxy_async_context_base{tree_ctx}, is_req_{is_req}

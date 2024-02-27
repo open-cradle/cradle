@@ -27,13 +27,12 @@ make_config_from_json(std::string json_text)
 static thinknode_request_context
 make_thinknode_request_context(api_session& session, char const* title)
 {
+    auto& resources{session.impl().get_service_core()};
+    auto& admin{resources.the_tasklet_admin()};
     static string const pool_name("ext");
-    auto tasklet{create_tasklet_tracker(pool_name, title)};
+    auto tasklet{create_tasklet_tracker(admin, pool_name, title)};
     return thinknode_request_context{
-        session.impl().get_service_core(),
-        session.impl().get_thinknode_session(),
-        tasklet,
-        ""};
+        resources, session.impl().get_thinknode_session(), tasklet, ""};
 }
 
 api_service::api_service(std::string json_text)

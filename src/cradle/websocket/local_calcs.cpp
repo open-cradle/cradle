@@ -58,8 +58,11 @@ perform_local_function_calc(
         ctx.service, std::make_pair(app, image))
         .schedule();
 
-    auto tasklet
-        = create_tasklet_tracker(pool_name, "local calc", ctx.get_tasklet());
+    auto tasklet = create_tasklet_tracker(
+        ctx.service.the_tasklet_admin(),
+        pool_name,
+        "local calc",
+        ctx.get_tasklet());
     auto run_guard = tasklet_run(tasklet);
     co_return supervise_thinknode_calculation(
         ctx.service, account, app, image, name, std::move(args));

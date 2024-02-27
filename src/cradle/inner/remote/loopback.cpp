@@ -12,6 +12,7 @@
 #include <cradle/inner/requests/domain.h>
 #include <cradle/inner/requests/test_context.h>
 #include <cradle/inner/resolve/seri_req.h>
+#include <cradle/inner/resolve/util.h>
 #include <cradle/inner/utilities/logging.h>
 
 namespace cradle {
@@ -25,6 +26,8 @@ loopback_service::loopback_service(std::unique_ptr<inner_resources> resources)
           resources_->config().get_number_or_default(
               loopback_config_keys::ASYNC_CONCURRENCY, 16))}
 {
+    // TODO enable introspection only on demand
+    introspection_set_capturing_enabled(resources_->the_tasklet_admin(), true);
 }
 
 std::string
@@ -44,12 +47,33 @@ loopback_service::resolve_sync(service_config config, std::string seri_req)
 {
     auto domain_name{
         config.get_mandatory_string(remote_config_keys::DOMAIN_NAME)};
-    logger_->debug("resolve_sync({}): request {}", domain_name, seri_req);
     auto& dom = resources_->find_domain(domain_name);
     auto ctx{dom.make_local_sync_context(config)};
-    auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(*ctx)};
-    auto result = cppcoro::sync_wait(
-        resolve_serialized_local(loc_ctx, std::move(seri_req)));
+    auto optional_client_tasklet_id
+        = config.get_optional_number(remote_config_keys::TASKLET_ID);
+    auto* intr_ctx = cast_ctx_to_ptr<introspective_context_intf>(*ctx);
+    bool introspective = optional_client_tasklet_id && intr_ctx;
+    logger_->debug(
+        "resolve_sync{} {}: request {}",
+        introspective ? " (introspective)" : "",
+        domain_name,
+        seri_req);
+    cppcoro::task<serialized_result> task;
+    if (introspective)
+    {
+        auto* client_tasklet = create_tasklet_tracker(
+            resources_->the_tasklet_admin(),
+            static_cast<int>(*optional_client_tasklet_id));
+        intr_ctx->push_tasklet(*client_tasklet);
+        task = resolve_serialized_introspective(
+            *intr_ctx, "loopback", "resolve_sync", std::move(seri_req));
+    }
+    else
+    {
+        auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(*ctx)};
+        task = resolve_serialized_local(loc_ctx, std::move(seri_req));
+    }
+    auto result{cppcoro::sync_wait(std::move(task))};
     logger_->debug("response {}", result.value());
     return result;
 }
@@ -58,20 +82,33 @@ static void
 resolve_async(
     loopback_service* loopback,
     std::shared_ptr<local_async_context_intf> actx,
-    std::string seri_req)
+    std::string seri_req,
+    bool introspective)
 {
     auto& logger{loopback->get_logger()};
     if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
     {
         test_ctx->apply_resolve_async_delay();
     }
-    logger.info("resolve_async start");
+    logger.info(
+        "resolve_async start{}", introspective ? " (introspective)" : "");
     // TODO update status to STARTED or so
+    cppcoro::task<serialized_result> task;
+    if (introspective)
+    {
+        task = resolve_serialized_introspective(
+            cast_ctx_to_ref<introspective_context_intf>(*actx),
+            "loopback",
+            "resolve_async",
+            std::move(seri_req));
+    }
+    else
+    {
+        task = resolve_serialized_local(*actx, std::move(seri_req));
+    }
     try
     {
-        blob res = cppcoro::sync_wait(
-                       resolve_serialized_local(*actx, std::move(seri_req)))
-                       .value();
+        blob res = cppcoro::sync_wait(task).value();
         logger.info("resolve_async done: {}", res);
         actx->set_result(std::move(res));
     }
@@ -108,8 +145,21 @@ loopback_service::submit_async(service_config config, std::string seri_req)
     // TODO update status to SUBMITTED
     // This function should return asap, but cppcoro::sync_wait() is blocking,
     // so need to dispatch to another thread.
-    async_pool_.detach_task(
-        [=, this] { resolve_async(this, actx, seri_req); });
+    bool introspective{false};
+    auto optional_client_tasklet_id
+        = config.get_optional_number(remote_config_keys::TASKLET_ID);
+    auto* intr_ctx = cast_ctx_to_ptr<introspective_context_intf>(*ctx);
+    if (optional_client_tasklet_id && intr_ctx)
+    {
+        auto* client_tasklet = create_tasklet_tracker(
+            resources_->the_tasklet_admin(),
+            static_cast<int>(*optional_client_tasklet_id));
+        intr_ctx->push_tasklet(*client_tasklet);
+        introspective = true;
+    }
+    async_pool_.detach_task([=, this] {
+        resolve_async(this, actx, std::move(seri_req), introspective);
+    });
     async_id aid = actx->get_id();
     logger_->info("async_id {}", aid);
     return aid;
@@ -181,11 +231,12 @@ loopback_service::finish_async(async_id root_aid)
     get_async_db().remove_tree(root_aid);
 }
 
-tasklet_info_tuple_list
+tasklet_info_list
 loopback_service::get_tasklet_infos(bool include_finished)
 {
     logger_->info("get_tasklet_infos {}", include_finished);
-    throw not_implemented_error("TODO loopback_service::get_tasklet_infos");
+    return cradle::get_tasklet_infos(
+        resources_->the_tasklet_admin(), include_finished);
 }
 
 void

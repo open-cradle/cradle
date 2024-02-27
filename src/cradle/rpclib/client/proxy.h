@@ -56,7 +56,7 @@ class rpclib_client : public remote_proxy
     void
     finish_async(async_id root_aid) override;
 
-    tasklet_info_tuple_list
+    tasklet_info_list
     get_tasklet_infos(bool include_finished) override;
 
     void

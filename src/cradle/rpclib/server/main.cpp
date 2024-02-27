@@ -153,7 +153,7 @@ run_server(cli_options const& options)
     my_logger->info("listening on port {}", srv.port());
 
     // TODO enable introspection only on demand
-    introspection_set_capturing_enabled(true);
+    introspection_set_capturing_enabled(service.the_tasklet_admin(), true);
 
     // TODO we need a session concept and a "start session" / "register"
     // (notification) message

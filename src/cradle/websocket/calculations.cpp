@@ -49,8 +49,11 @@ perform_lambda_calc(
         ctx.service, std::make_pair(app, image))
         .schedule();
 
-    auto tasklet
-        = create_tasklet_tracker(pool_name, "lambda func", ctx.get_tasklet());
+    auto tasklet = create_tasklet_tracker(
+        ctx.service.the_tasklet_admin(),
+        pool_name,
+        "lambda func",
+        ctx.get_tasklet());
     auto run_guard = tasklet_run(tasklet);
     co_return function.object(std::move(args), tasklet);
 }

@@ -5,7 +5,6 @@
 #include <cppcoro/sync_wait.hpp>
 
 #include "../../support/inner_service.h"
-#include "../../support/tasklet_testing.h"
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/introspection/tasklet_impl.h>
 #include <cradle/inner/introspection/tasklet_info.h>
@@ -13,30 +12,33 @@
 
 using namespace cradle;
 
+static char const tag[] = "[introspection]";
+
 // A newly created tasklet will be the latest one for which
 // info can be retrieved.
 tasklet_info
-latest_tasklet_info()
+latest_tasklet_info(tasklet_admin& admin)
 {
-    auto all_infos = get_tasklet_infos(true);
+    auto all_infos = get_tasklet_infos(admin, true);
     REQUIRE(all_infos.size() > 0);
     return all_infos[all_infos.size() - 1];
 }
 
-TEST_CASE("create_tasklet_tracker", "[introspection]")
+TEST_CASE("create_tasklet_tracker", tag)
 {
-    clean_tasklet_admin_fixture fixture;
+    tasklet_admin admin{true};
+    admin.set_capturing_enabled(true);
 
-    auto t0 = create_tasklet_tracker("my_pool", "my_title");
+    auto t0 = create_tasklet_tracker(admin, "my_pool", "my_title");
     REQUIRE(t0 != nullptr);
-    auto info0 = latest_tasklet_info();
+    auto info0 = latest_tasklet_info(admin);
     // Assume the clock has at least millisecond precision, causing
     // the two time_point's to differ
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    auto t1 = create_tasklet_tracker("other_pool", "other_title");
+    auto t1 = create_tasklet_tracker(admin, "other_pool", "other_title");
     REQUIRE(t1 != nullptr);
     REQUIRE(t1->own_id() != t0->own_id());
-    auto info1 = latest_tasklet_info();
+    auto info1 = latest_tasklet_info(admin);
 
     // Test info0 (first tasklet)
     REQUIRE(info0.own_id() == t0->own_id());
@@ -67,15 +69,16 @@ TEST_CASE("create_tasklet_tracker", "[introspection]")
     REQUIRE(event10.when() != event00.when());
 }
 
-TEST_CASE("create_tasklet_tracker with client", "[introspection]")
+TEST_CASE("create_tasklet_tracker with client", tag)
 {
-    clean_tasklet_admin_fixture fixture;
+    tasklet_admin admin{true};
+    admin.set_capturing_enabled(true);
 
-    auto client = create_tasklet_tracker("client_pool", "client_title");
-    auto client_info = latest_tasklet_info();
+    auto client = create_tasklet_tracker(admin, "client_pool", "client_title");
+    auto client_info = latest_tasklet_info(admin);
 
-    create_tasklet_tracker("my_pool", "my_title", client);
-    auto my_info = latest_tasklet_info();
+    create_tasklet_tracker(admin, "my_pool", "my_title", client);
+    auto my_info = latest_tasklet_info(admin);
 
     REQUIRE(!client_info.have_client());
     REQUIRE(my_info.own_id() != client_info.own_id());
@@ -83,20 +86,21 @@ TEST_CASE("create_tasklet_tracker with client", "[introspection]")
     REQUIRE(my_info.client_id() == client_info.own_id());
 }
 
-TEST_CASE("tasklet_run", "[introspection]")
+TEST_CASE("tasklet_run", tag)
 {
-    clean_tasklet_admin_fixture fixture;
+    tasklet_admin admin{true};
+    admin.set_capturing_enabled(true);
 
-    auto me = create_tasklet_tracker("my_pool", "my_title");
+    auto me = create_tasklet_tracker(admin, "my_pool", "my_title");
     {
         tasklet_run run_tracker{me};
-        auto events0 = latest_tasklet_info().events();
+        auto events0 = latest_tasklet_info(admin).events();
         REQUIRE(events0.size() == 2);
         REQUIRE(events0[0].what() == tasklet_event_type::SCHEDULED);
         REQUIRE(events0[1].what() == tasklet_event_type::RUNNING);
         REQUIRE(events0[1].details() == "");
     }
-    auto events1 = latest_tasklet_info().events();
+    auto events1 = latest_tasklet_info(admin).events();
     REQUIRE(events1.size() == 3);
     REQUIRE(events1[0].what() == tasklet_event_type::SCHEDULED);
     REQUIRE(events1[1].what() == tasklet_event_type::RUNNING);
@@ -105,22 +109,23 @@ TEST_CASE("tasklet_run", "[introspection]")
     REQUIRE(events1[2].details() == "");
 }
 
-TEST_CASE("tasklet_await", "[introspection]")
+TEST_CASE("tasklet_await", tag)
 {
-    clean_tasklet_admin_fixture fixture;
+    tasklet_admin admin{true};
+    admin.set_capturing_enabled(true);
 
-    auto me = create_tasklet_tracker("my_pool", "my_title");
+    auto me = create_tasklet_tracker(admin, "my_pool", "my_title");
     tasklet_run run_tracker{me};
     {
         tasklet_await await_tracker{me, "awaiting...", make_id(87)};
-        auto events0 = latest_tasklet_info().events();
+        auto events0 = latest_tasklet_info(admin).events();
         REQUIRE(events0.size() == 3);
         REQUIRE(events0[0].what() == tasklet_event_type::SCHEDULED);
         REQUIRE(events0[1].what() == tasklet_event_type::RUNNING);
         REQUIRE(events0[2].what() == tasklet_event_type::BEFORE_CO_AWAIT);
         REQUIRE(events0[2].details() == "awaiting... 87");
     }
-    auto events1 = latest_tasklet_info().events();
+    auto events1 = latest_tasklet_info(admin).events();
     REQUIRE(events1.size() == 4);
     REQUIRE(events1[0].what() == tasklet_event_type::SCHEDULED);
     REQUIRE(events1[1].what() == tasklet_event_type::RUNNING);

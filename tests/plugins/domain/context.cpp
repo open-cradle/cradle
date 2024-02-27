@@ -44,7 +44,8 @@ TEST_CASE("no initial tasklet", "[testing][context]")
 TEST_CASE("with initial tasklet", "[testing][context]")
 {
     auto resources{make_inner_test_resources()};
-    auto t0 = create_tasklet_tracker("pool", "t0");
+    auto& admin{resources->the_tasklet_admin()};
+    auto t0 = create_tasklet_tracker(admin, "pool", "t0");
     testing_request_context ctx{*resources, t0, ""};
 
     REQUIRE(ctx.get_tasklet() == t0);
@@ -53,8 +54,9 @@ TEST_CASE("with initial tasklet", "[testing][context]")
 TEST_CASE("push/pop tasklet", "[testing][context]")
 {
     auto resources{make_inner_test_resources()};
-    auto t0 = create_tasklet_tracker("pool", "t0");
-    auto t1 = create_tasklet_tracker("pool", "t1");
+    auto& admin{resources->the_tasklet_admin()};
+    auto t0 = create_tasklet_tracker(admin, "pool", "t0");
+    auto t1 = create_tasklet_tracker(admin, "pool", "t1");
     testing_request_context ctx{*resources, nullptr, ""};
 
     REQUIRE(ctx.get_tasklet() == nullptr);

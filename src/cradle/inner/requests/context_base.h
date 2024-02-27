@@ -643,13 +643,51 @@ class proxy_async_context_base : public remote_async_context_intf
  * Context that can be used to asynchronously resolve root requests on a remote
  * machine.
  */
-class root_proxy_async_context_base : public proxy_async_context_base
+class root_proxy_async_context_base : public proxy_async_context_base,
+                                      public introspective_context_intf
 {
  public:
     root_proxy_async_context_base(
         std::shared_ptr<proxy_async_tree_context_base> tree_ctx);
 
     virtual ~root_proxy_async_context_base();
+
+    // Some redundant redefinitions to prevent MSVC C4250
+    remote_context_intf*
+    to_remote_context_intf() override
+    {
+        return this;
+    }
+    async_context_intf*
+    to_async_context_intf() override
+    {
+        return this;
+    }
+    remote_async_context_intf*
+    to_remote_async_context_intf() override
+    {
+        return this;
+    }
+    introspective_context_intf*
+    to_introspective_context_intf() override
+    {
+        return this;
+    }
+    inner_resources&
+    get_resources() override
+    {
+        return proxy_async_context_base::get_resources();
+    }
+    bool
+    remotely() const override
+    {
+        return proxy_async_context_base::remotely();
+    }
+    bool
+    is_async() const override
+    {
+        return proxy_async_context_base::is_async();
+    }
 
     // remote_context_intf
     std::string const&
@@ -669,6 +707,19 @@ class root_proxy_async_context_base : public proxy_async_context_base
 
     void
     fail_remote_id() noexcept override;
+
+    // introspective_context_intf
+    tasklet_tracker*
+    get_tasklet() override;
+
+    void
+    push_tasklet(tasklet_tracker& tasklet) override;
+
+    void
+    pop_tasklet() override;
+
+ protected:
+    std::vector<tasklet_tracker*> tasklets_;
 
  private:
     std::promise<async_id> remote_id_promise_;

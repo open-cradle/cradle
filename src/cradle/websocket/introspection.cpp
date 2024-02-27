@@ -1,6 +1,7 @@
 #include <chrono>
 
 #include <cradle/inner/introspection/tasklet_info.h>
+#include <cradle/inner/remote/proxy.h>
 #include <cradle/websocket/introspection.h>
 
 namespace cradle {
@@ -17,14 +18,14 @@ to_millis(TimePoint time_point)
 }
 
 tasklet_msg_event
-make_tasklet_msg_event_for_local(tasklet_event const& event)
+make_tasklet_msg_event_from_event(tasklet_event const& event)
 {
     return make_tasklet_msg_event(
         to_millis(event.when()), to_string(event.what()), event.details());
 }
 
 tasklet_overview
-make_tasklet_overview_for_local(tasklet_info const& info)
+make_tasklet_overview(tasklet_info const& info)
 {
     omissible<integer> client_id;
     if (info.have_client())
@@ -34,7 +35,7 @@ make_tasklet_overview_for_local(tasklet_info const& info)
     std::vector<tasklet_msg_event> msg_events;
     for (auto const& e : info.events())
     {
-        msg_events.push_back(make_tasklet_msg_event_for_local(e));
+        msg_events.push_back(make_tasklet_msg_event_from_event(e));
     }
     return make_tasklet_overview(
         info.pool_name(),
@@ -44,58 +45,24 @@ make_tasklet_overview_for_local(tasklet_info const& info)
         std::move(msg_events));
 }
 
-tasklet_info_tuple_list
-get_tasklet_infos_from_remote(remote_proxy& proxy, bool include_finished)
-{
-    return proxy.get_tasklet_infos(include_finished);
-}
-
-tasklet_msg_event
-make_tasklet_msg_event_for_remote(tasklet_event_tuple const& event)
-{
-    return make_tasklet_msg_event(
-        std::get<0>(event), std::get<1>(event), std::get<2>(event));
-}
-
-tasklet_overview
-make_tasklet_overview_for_remote(tasklet_info_tuple const& info)
-{
-    auto own_id = std::get<0>(info);
-    auto pool_name = std::get<1>(info);
-    auto title = std::get<2>(info);
-    auto client_id = std::get<3>(info);
-    omissible<integer> omissible_client_id;
-    if (client_id != NO_TASKLET_ID)
-    {
-        omissible_client_id = client_id;
-    }
-    auto events = std::get<4>(info);
-    std::vector<tasklet_msg_event> msg_events;
-    for (auto const& e : events)
-    {
-        msg_events.push_back(make_tasklet_msg_event_for_remote(e));
-    }
-    return make_tasklet_overview(
-        pool_name, own_id, omissible_client_id, title, std::move(msg_events));
-}
-
 } // namespace
 
 introspection_status_response
-make_introspection_status_response(remote_proxy& proxy, bool include_finished)
+make_introspection_status_response(
+    tasklet_admin& admin, remote_proxy& proxy, bool include_finished)
 {
     std::vector<tasklet_machine_overview> machines;
     std::vector<tasklet_overview> local_overviews;
-    for (auto t : get_tasklet_infos(include_finished))
+    for (auto t : get_tasklet_infos(admin, include_finished))
     {
-        local_overviews.push_back(make_tasklet_overview_for_local(t));
+        local_overviews.push_back(make_tasklet_overview(t));
     }
     machines.push_back(
         make_tasklet_machine_overview("local", std::move(local_overviews)));
     std::vector<tasklet_overview> rpclib_overviews;
-    for (auto t : get_tasklet_infos_from_remote(proxy, include_finished))
+    for (auto t : proxy.get_tasklet_infos(include_finished))
     {
-        rpclib_overviews.push_back(make_tasklet_overview_for_remote(t));
+        rpclib_overviews.push_back(make_tasklet_overview(t));
     }
     machines.push_back(
         make_tasklet_machine_overview("rpclib", std::move(rpclib_overviews)));
@@ -105,18 +72,19 @@ make_introspection_status_response(remote_proxy& proxy, bool include_finished)
 }
 
 void
-introspection_control(cradle::introspection_control_request const& request)
+introspection_control(
+    tasklet_admin& admin, cradle::introspection_control_request const& request)
 {
     switch (get_tag(request))
     {
         case introspection_control_request_tag::ENABLED: {
             bool enabled = as_enabled(request);
-            introspection_set_capturing_enabled(enabled);
-            introspection_set_logging_enabled(enabled);
+            introspection_set_capturing_enabled(admin, enabled);
+            introspection_set_logging_enabled(admin, enabled);
             break;
         }
         case introspection_control_request_tag::CLEAR_ADMIN:
-            introspection_clear_info();
+            introspection_clear_info(admin);
             break;
         default:
             CRADLE_THROW(

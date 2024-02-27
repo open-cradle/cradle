@@ -16,6 +16,8 @@
 
 namespace cradle {
 
+class tasklet_admin;
+
 /**
  * (The only) implementation of the tasklet_tracker interface
  *
@@ -37,15 +39,22 @@ class tasklet_impl : public tasklet_tracker
 
     // Normal constructor
     tasklet_impl(
+        bool logging_enabled,
         std::string const& pool_name,
         std::string const& title,
         tasklet_impl* client = nullptr);
 
     // Constructor for a placeholder object on an RPC server, representing the
     // corresponding tasklet on the RPC client
-    tasklet_impl(int rpc_client_id);
+    tasklet_impl(bool logging_enabled, int rpc_client_id);
 
     ~tasklet_impl();
+
+    bool
+    is_placeholder() const
+    {
+        return is_placeholder_;
+    }
 
     bool
     finished() const
@@ -111,6 +120,12 @@ class tasklet_impl : public tasklet_tracker
  private:
     static int next_id;
     int id_;
+    bool is_placeholder_;
+    // logging_enabled_ is as configured when this object is created.
+    // Live updates to the admin's setting are not tracked due to race
+    // conditions that could occur when the admin is destroyed while this
+    // object survives (due to not having finished).
+    bool logging_enabled_;
     std::string pool_name_;
     std::string title_;
     tasklet_impl* client_;
@@ -129,7 +144,7 @@ class tasklet_impl : public tasklet_tracker
 };
 
 /**
- * Container of all active tasklet_impl objects; singleton
+ * Container of active tasklet_impl objects
  *
  * Synchronization concerns are similar to the ones for tasklet_impl:
  * - Access to the tasklets_ variable requires locking mutex_.
@@ -137,19 +152,10 @@ class tasklet_impl : public tasklet_tracker
  */
 class tasklet_admin
 {
-    std::atomic<bool> capturing_enabled_;
-    std::atomic<bool> logging_enabled_;
-    std::mutex mutex_;
-    std::list<tasklet_impl*> tasklets_;
-
-    tasklet_admin();
-
  public:
-    /**
-     * Returns the singleton
-     */
-    static tasklet_admin&
-    instance();
+    tasklet_admin(bool force_finish = false);
+
+    ~tasklet_admin();
 
     /**
      * Creates a new tracker, possibly on behalf of another tasklet (the
@@ -192,11 +198,15 @@ class tasklet_admin
     void
     clear_info();
 
-    std::vector<tasklet_info>
+    tasklet_info_list
     get_tasklet_infos(bool include_finished);
 
-    void
-    hard_reset_testing_only(bool enabled = true);
+ private:
+    std::atomic<bool> capturing_enabled_;
+    std::atomic<bool> logging_enabled_;
+    bool force_finish_;
+    std::mutex mutex_;
+    std::list<tasklet_impl*> tasklets_;
 };
 
 } // namespace cradle

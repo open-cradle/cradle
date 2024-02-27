@@ -21,13 +21,17 @@ enum class tasklet_event_type
     RUNNING,
     BEFORE_CO_AWAIT,
     AFTER_CO_AWAIT,
-    FINISHED
+    FINISHED,
+    UNKNOWN
 };
 constexpr int num_tasklet_event_types
-    = static_cast<int>(tasklet_event_type::FINISHED) + 1;
+    = static_cast<int>(tasklet_event_type::UNKNOWN) + 1;
 
 std::string
 to_string(tasklet_event_type what);
+
+tasklet_event_type
+to_tasklet_event_type(std::string const& what_string);
 
 /**
  * An event in a tasklet's lifecycle
@@ -40,7 +44,13 @@ class tasklet_event
 
  public:
     explicit tasklet_event(tasklet_event_type what);
+
     tasklet_event(tasklet_event_type what, std::string const& details);
+
+    tasklet_event(
+        std::chrono::time_point<std::chrono::system_clock> when,
+        tasklet_event_type what,
+        std::string const& details);
 
     std::chrono::time_point<std::chrono::system_clock>
     when() const
@@ -74,6 +84,13 @@ class tasklet_info
 
  public:
     tasklet_info(const tasklet_impl& impl);
+
+    tasklet_info(
+        int own_id,
+        std::string pool_name,
+        std::string title,
+        int client_id,
+        std::vector<tasklet_event> events);
 
     int
     own_id() const
@@ -113,6 +130,8 @@ class tasklet_info
     }
 };
 
+using tasklet_info_list = std::vector<tasklet_info>;
+
 /**
  * Retrieves information on all introspective tasklets
  *
@@ -120,20 +139,20 @@ class tasklet_info
  * the threads on which the coroutines run, that generate this information. One
  * or more mutexes will be needed.
  */
-std::vector<tasklet_info>
-get_tasklet_infos(bool include_finished);
+tasklet_info_list
+get_tasklet_infos(tasklet_admin& admin, bool include_finished);
 
 /**
  * Enables or disables capturing of introspection events
  */
 void
-introspection_set_capturing_enabled(bool enabled);
+introspection_set_capturing_enabled(tasklet_admin& admin, bool enabled);
 
 /**
  * Enables or disables introspection logging
  */
 void
-introspection_set_logging_enabled(bool enabled);
+introspection_set_logging_enabled(tasklet_admin& admin, bool enabled);
 
 /**
  * Clears captured introspection information
@@ -141,7 +160,7 @@ introspection_set_logging_enabled(bool enabled);
  * Objects currently being captured may be excluded from being cleared.
  */
 void
-introspection_clear_info();
+introspection_clear_info(tasklet_admin& admin);
 
 } // namespace cradle
 

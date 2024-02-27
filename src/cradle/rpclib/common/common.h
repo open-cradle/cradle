@@ -1,8 +1,14 @@
 #ifndef CRADLE_RPCLIB_COMMON_COMMON_H
 #define CRADLE_RPCLIB_COMMON_COMMON_H
 
+#include <iostream>
+#include <ostream>
 #include <string>
 #include <tuple>
+#include <vector>
+
+#include <cradle/inner/core/type_definitions.h>
+#include <cradle/inner/introspection/tasklet_info.h>
 
 namespace cradle {
 
@@ -34,6 +40,33 @@ struct rpclib_config_keys
 // The first element is the response id; 0 if unused.
 // The second element is the response data itself.
 using rpclib_response = std::tuple<int, blob>;
+
+using tasklet_event_tuple = std::tuple<uint64_t, std::string, std::string>;
+// 1. millis since epoch (note: won't fit in uint32_t)
+// 2. tasklet_event_type converted to string
+// 3. details
+
+using tasklet_event_tuple_list = std::vector<tasklet_event_tuple>;
+
+using tasklet_info_tuple
+    = std::tuple<int, std::string, std::string, int, tasklet_event_tuple_list>;
+// 1. own tasklet id
+// 2. pool name
+// 3. tasklet title
+// 4. client tasklet id
+// 5. tasklet events
+
+using tasklet_info_tuple_list = std::vector<tasklet_info_tuple>;
+
+tasklet_info_tuple_list
+make_info_tuples(tasklet_info_list const& infos);
+
+tasklet_info_list
+make_tasklet_infos(tasklet_info_tuple_list const& tuples);
+
+void
+dump_tasklet_infos(
+    tasklet_info_tuple_list const& tuples, std::ostream& os = std::cout);
 
 } // namespace cradle
 

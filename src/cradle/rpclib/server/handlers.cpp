@@ -94,18 +94,6 @@ handle_exception(rpclib_handler_context& hctx, std::exception& e)
     rpc::this_handler().respond_error(e.what());
 }
 
-cppcoro::task<serialized_result>
-resolve_serialized_introspective(
-    introspective_context_intf& ctx, std::string seri_req)
-{
-    // Ensure that the tasklet's first timestamp coincides (almost) with the
-    // "co_await shared_task".
-    co_await dummy_coroutine();
-    coawait_introspection guard{ctx, "rpclib", "resolve_sync"};
-    auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(ctx)};
-    co_return co_await resolve_serialized_local(loc_ctx, std::move(seri_req));
-}
-
 static rpclib_response
 resolve_sync(
     rpclib_handler_context& hctx,
@@ -126,10 +114,11 @@ resolve_sync(
     if (optional_client_tasklet_id && intr_ctx)
     {
         auto* client_tasklet = create_tasklet_tracker(
+            hctx.service().the_tasklet_admin(),
             static_cast<int>(*optional_client_tasklet_id));
         intr_ctx->push_tasklet(*client_tasklet);
-        task
-            = resolve_serialized_introspective(*intr_ctx, std::move(seri_req));
+        task = resolve_serialized_introspective(
+            *intr_ctx, "rpclib", "resolve_sync", std::move(seri_req));
     }
     else
     {
@@ -384,66 +373,12 @@ catch (std::exception& e)
     return int{};
 }
 
-namespace {
-
-template<typename TimePoint>
-static decltype(auto)
-to_millis(TimePoint time_point)
-{
-    auto duration = duration_cast<std::chrono::milliseconds>(
-        time_point.time_since_epoch());
-    return duration.count();
-}
-
-static tasklet_event_tuple
-make_event_tuple(tasklet_event const& event)
-{
-    return tasklet_event_tuple{
-        to_millis(event.when()), to_string(event.what()), event.details()};
-}
-
-bool
-is_placeholder_info(tasklet_info const& info)
-{
-    return info.pool_name() == "client";
-}
-
-tasklet_info_tuple
-make_info_tuple(tasklet_info const& info)
-{
-    int client_id{NO_TASKLET_ID};
-    if (info.have_client())
-    {
-        client_id = info.client_id();
-    }
-    std::vector<tasklet_event_tuple> events;
-    for (auto const& e : info.events())
-    {
-        events.push_back(make_event_tuple(e));
-    }
-    return tasklet_info_tuple{
-        info.own_id(),
-        info.pool_name(),
-        info.title(),
-        client_id,
-        std::move(events)};
-}
-
-} // namespace
-
 tasklet_info_tuple_list
 handle_get_tasklet_infos(rpclib_handler_context& hctx, bool include_finished)
 try
 {
-    tasklet_info_tuple_list result;
-    for (auto info : get_tasklet_infos(include_finished))
-    {
-        if (!is_placeholder_info(info))
-        {
-            result.push_back(make_info_tuple(info));
-        }
-    }
-    return result;
+    return make_info_tuples(get_tasklet_infos(
+        hctx.service().the_tasklet_admin(), include_finished));
 }
 catch (std::exception& e)
 {

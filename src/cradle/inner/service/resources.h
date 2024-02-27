@@ -22,6 +22,7 @@ struct mock_http_session;
 class remote_proxy;
 class secondary_storage_intf;
 class seri_registry;
+class tasklet_admin;
 class tasklet_tracker;
 
 // Configuration keys for the inner resources
@@ -70,6 +71,7 @@ struct inner_config_keys
  * - Thread pools
  * - An optional mock_http_session object
  * - A registry of templates of requests that can be (de-)serialized
+ * - A collection of introspection tasklets
  *
  * TODO make resources optional? E.g. cacheless resolving doesn't need much.
  * service_config could indicate what to provide.
@@ -173,6 +175,9 @@ class inner_resources
     // Supporting CG R.37
     std::shared_ptr<seri_registry>
     get_seri_registry();
+
+    tasklet_admin&
+    the_tasklet_admin();
 
  private:
     std::unique_ptr<inner_resources_impl> impl_;

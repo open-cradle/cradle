@@ -1,6 +1,7 @@
 #include "inner_service.h"
 #include <cradle/deploy_dir.h>
 #include <cradle/inner/blob_file/blob_file_dir.h>
+#include <cradle/inner/introspection/config.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/requests_storage/http/http_requests_storage.h>
@@ -25,6 +26,7 @@ service_config_map const inner_config_map{
     {local_disk_cache_config_keys::POLL_INTERVAL, 20U},
     {blob_cache_config_keys::DIRECTORY, tests_cache_dir},
     {http_requests_storage_config_keys::PORT, 9092U},
+    {introspection_config_keys::FORCE_FINISH, true},
 };
 
 } // namespace

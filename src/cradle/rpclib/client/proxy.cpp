@@ -180,15 +180,15 @@ rpclib_client::finish_async(async_id root_aid)
     logger.debug("finish_async done");
 }
 
-tasklet_info_tuple_list
+tasklet_info_list
 rpclib_client::get_tasklet_infos(bool include_finished)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("get_tasklet_infos {}", include_finished);
-    auto infos = pimpl_->do_rpc_call("get_tasklet_infos", include_finished)
-                     .as<tasklet_info_tuple_list>();
+    auto tuples = pimpl_->do_rpc_call("get_tasklet_infos", include_finished)
+                      .as<tasklet_info_tuple_list>();
     logger.debug("get_tasklet_infos done");
-    return infos;
+    return make_tasklet_infos(tuples);
 }
 
 void

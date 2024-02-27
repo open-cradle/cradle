@@ -79,7 +79,7 @@ class test_proxy : public remote_proxy
         throw not_implemented_error{"test_proxy::finish_async()"};
     }
 
-    tasklet_info_tuple_list
+    tasklet_info_list
     get_tasklet_infos(bool include_finished) override
     {
         throw not_implemented_error{"test_proxy::get_tasklet_infos()"};

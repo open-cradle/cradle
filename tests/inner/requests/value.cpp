@@ -8,7 +8,6 @@
 
 #include "../../support/inner_service.h"
 #include "../../support/request.h"
-#include "../../support/tasklet_testing.h"
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/service/resources.h>
