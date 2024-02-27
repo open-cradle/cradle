@@ -84,6 +84,8 @@ struct immutable_cache_info
     int cas_num_records;
     // Total deep size of the values stored in the CAS.
     std::size_t cas_total_size;
+    // Total deep size of CAS entries with locked referrers.
+    std::size_t cas_total_locked_size;
 };
 
 struct immutable_cache
@@ -135,7 +137,7 @@ struct immutable_cache_entry_snapshot
 std::ostream&
 operator<<(std::ostream& os, immutable_cache_entry_snapshot const& entry);
 
-// Extended information on the AC and CAS contents.
+// Snapshot of the AC entries.
 struct immutable_cache_snapshot
 {
     // AC entries that are currently in use
@@ -143,9 +145,6 @@ struct immutable_cache_snapshot
 
     // AC entries that are no longer in use and will be evicted when necessary
     std::vector<immutable_cache_entry_snapshot> pending_eviction;
-
-    // Total deep size of the values in the CAS.
-    std::size_t total_size{0};
 
     bool
     operator==(immutable_cache_snapshot const& other) const;

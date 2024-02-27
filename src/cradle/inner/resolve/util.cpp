@@ -39,14 +39,16 @@ resolve_serialized_introspective(
     introspective_context_intf& ctx,
     std::string proxy_name,
     std::string title,
-    std::string seri_req)
+    std::string seri_req,
+    seri_cache_record_lock_t seri_lock)
 {
     // Ensure that the tasklet's first timestamp coincides (almost) with the
     // "co_await shared_task".
     co_await dummy_coroutine();
     coawait_introspection guard{ctx, proxy_name, title};
     auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(ctx)};
-    co_return co_await resolve_serialized_local(loc_ctx, std::move(seri_req));
+    co_return co_await resolve_serialized_local(
+        loc_ctx, std::move(seri_req), std::move(seri_lock));
 }
 
 } // namespace cradle

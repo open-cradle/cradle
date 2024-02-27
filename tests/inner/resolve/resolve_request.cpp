@@ -433,6 +433,50 @@ TEST_CASE("evaluate function request - memory cache behavior", tag)
     CHECK(info3.cas_num_records == 1);
 }
 
+TEST_CASE("evaluate function request - lock cache record", tag)
+{
+    auto resources{make_inner_test_resources()};
+    caching_request_resolution_context ctx{*resources};
+    auto& mem_cache{resources->memory_cache()};
+    request_props<caching_level_type::memory> props{make_test_uuid(10)};
+    int num_add_calls{};
+    auto add{create_adder(num_add_calls)};
+    auto req{rq_function(props, add, 6, 3)};
+
+    // Resolve the request while obtaining a lock on the memory cache record.
+    auto lock0{std::make_unique<cache_record_lock>()};
+    auto res0 = cppcoro::sync_wait(resolve_request(ctx, req, &*lock0));
+    REQUIRE(res0 == 9);
+
+    // Due to the lock, the AC record is still in use, and can't be evicted.
+    clear_unused_entries(mem_cache);
+    auto info0{get_summary_info(mem_cache)};
+    CHECK(info0.ac_num_records_in_use == 1);
+    CHECK(info0.ac_num_records_pending_eviction == 0);
+    CHECK(info0.cas_num_records == 1);
+
+    // Obtain a second lock on the same AC record.
+    auto lock1{std::make_unique<cache_record_lock>()};
+    auto res1 = cppcoro::sync_wait(resolve_request(ctx, req, &*lock1));
+    REQUIRE(res1 == 9);
+
+    // The AC record now has two locks. Deleting one has no effect.
+    lock0.reset();
+    clear_unused_entries(mem_cache);
+    auto info1{get_summary_info(mem_cache)};
+    CHECK(info1.ac_num_records_in_use == 1);
+    CHECK(info1.ac_num_records_pending_eviction == 0);
+    CHECK(info1.cas_num_records == 1);
+
+    // After all locks are gone, the AC record can be evicted.
+    lock1.reset();
+    clear_unused_entries(mem_cache);
+    auto info2{get_summary_info(mem_cache)};
+    CHECK(info2.ac_num_records_in_use == 0);
+    CHECK(info2.ac_num_records_pending_eviction == 0);
+    CHECK(info2.cas_num_records == 0);
+}
+
 template<caching_level_type Level, template<typename Req> class CtxMaker>
 static void
 test_composition_or_value_based()

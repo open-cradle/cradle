@@ -249,6 +249,31 @@ inner_resources::get_seri_registry()
     return impl_->the_seri_registry_;
 }
 
+seri_cache_record_lock_t
+inner_resources::alloc_cache_record_lock()
+{
+    auto& impl{*impl_};
+    std::scoped_lock lock{impl.mutex_};
+    auto record_id = impl_->next_remote_record_id_++;
+    auto record_lock = std::make_unique<cache_record_lock>();
+    auto lock_ptr = &*record_lock;
+    impl_->cache_record_locks_.insert(
+        std::make_pair(record_id.value(), std::move(record_lock)));
+    return seri_cache_record_lock_t{lock_ptr, record_id};
+}
+
+void
+inner_resources::release_cache_record_lock(remote_cache_record_id record_id)
+{
+    auto key = record_id.value();
+    auto num_removed = impl_->cache_record_locks_.erase(key);
+    if (num_removed == 0)
+    {
+        impl_->logger_->error(
+            "release_cache_record_lock(): invalid record_id {}", key);
+    }
+}
+
 tasklet_admin&
 inner_resources::the_tasklet_admin()
 {

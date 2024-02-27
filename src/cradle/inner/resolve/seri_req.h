@@ -8,7 +8,9 @@
 
 #include <cppcoro/task.hpp>
 
+#include <cradle/inner/remote/types.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/resolve/seri_lock.h>
 #include <cradle/inner/resolve/seri_result.h>
 
 namespace cradle {
@@ -25,21 +27,39 @@ namespace cradle {
  * Anywhere we have a serialized request, the response should also be
  * serialized. So, this function's return type is the serialized value;
  * currently(?), this will be a MessagePack string.
+ *
+ * If resolution happens on the same machine, then seri_lock.record_id will be
+ * put in the returned serialized_result value.
+ * If resolution is dispatched to another machine, then seri_lock.record_id
+ * will be ignored.
  */
 cppcoro::task<serialized_result>
-resolve_serialized_request(context_intf& ctx, std::string seri_req);
+resolve_serialized_request(
+    context_intf& ctx,
+    std::string seri_req,
+    seri_cache_record_lock_t seri_lock = seri_cache_record_lock_t{});
 
 /**
  * Resolves a serialized request to a serialized response, remotely
+ *
+ * seri_lock.record_id is ignored.
  */
 cppcoro::task<serialized_result>
-resolve_serialized_remote(remote_context_intf& ctx, std::string seri_req);
+resolve_serialized_remote(
+    remote_context_intf& ctx,
+    std::string seri_req,
+    seri_cache_record_lock_t seri_lock = seri_cache_record_lock_t{});
 
 /**
  * Resolves a serialized request to a serialized response, locally
+ *
+ * seri_lock.record_id will be put in the returned serialized_result value.
  */
 cppcoro::task<serialized_result>
-resolve_serialized_local(local_context_intf& ctx, std::string seri_req);
+resolve_serialized_local(
+    local_context_intf& ctx,
+    std::string seri_req,
+    seri_cache_record_lock_t seri_lock = seri_cache_record_lock_t{});
 
 } // namespace cradle
 

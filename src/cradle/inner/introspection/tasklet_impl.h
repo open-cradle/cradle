@@ -144,7 +144,7 @@ class tasklet_impl : public tasklet_tracker
 };
 
 /**
- * Container of active tasklet_impl objects
+ * Container of all active tasklet_impl objects
  *
  * Synchronization concerns are similar to the ones for tasklet_impl:
  * - Access to the tasklets_ variable requires locking mutex_.

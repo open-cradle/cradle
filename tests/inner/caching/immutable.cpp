@@ -5,6 +5,7 @@
 #include <cppcoro/sync_wait.hpp>
 
 #include <cradle/inner/caching/immutable.h>
+#include <cradle/inner/caching/immutable/local_locked_record.h>
 #include <cradle/inner/core/get_unique_string.h>
 
 using namespace cradle;
@@ -266,6 +267,161 @@ TEST_CASE("immutable cache LRU eviction", tag)
     REQUIRE(await_cache_value(s) == std::string(1024, 'b'));
 }
 
+TEST_CASE("immutable cache record locking", tag)
+{
+    immutable_cache cache(immutable_cache_config{1024});
+    auto p_key = make_captured_id(1);
+    auto q_key = make_captured_id(2);
+
+    // Declare an interest in ID(1).
+    bool p0_needed_creation = false;
+    auto p0 = std::make_unique<immutable_cache_ptr<int>>(
+        cache, p_key, [&](untyped_immutable_cache_ptr& ptr) {
+            p0_needed_creation = true;
+            return test_task(ptr, 111);
+        });
+    REQUIRE(p0_needed_creation);
+    REQUIRE(await_cache_value(*p0) == 111);
+
+    // Declare an interest in ID(2).
+    bool q0_needed_creation = false;
+    auto q0 = std::make_unique<immutable_cache_ptr<int>>(
+        cache, q_key, [&](untyped_immutable_cache_ptr& ptr) {
+            q0_needed_creation = true;
+            return test_task(ptr, 222);
+        });
+    REQUIRE(q0_needed_creation);
+    REQUIRE(await_cache_value(*q0) == 222);
+
+    // Lock the cache record for ID(2).
+    auto q_lock = std::make_unique<cache_record_lock>();
+    q_lock->set_record(
+        std::make_unique<local_locked_cache_record>(q0->get_record()));
+
+    auto info0a{get_summary_info(cache)};
+    CHECK(info0a.ac_num_records_in_use == 2);
+    CHECK(info0a.ac_num_records_pending_eviction == 0);
+    CHECK(info0a.cas_num_records == 2);
+    CHECK(info0a.cas_total_size == 2 * sizeof(int));
+    CHECK(info0a.cas_total_locked_size == sizeof(int));
+
+    // Revoke interest in both IDs.
+    // This should make ID(1) pending-eviction, but not ID(2) due to the lock.
+    p0.reset();
+    q0.reset();
+    auto info0b{get_summary_info(cache)};
+    CHECK(info0b.ac_num_records_in_use == 1);
+    CHECK(info0b.ac_num_records_pending_eviction == 1);
+    CHECK(info0b.cas_num_records == 2);
+    CHECK(info0b.cas_total_size == 2 * sizeof(int));
+    CHECK(info0b.cas_total_locked_size == sizeof(int));
+
+    // Purging the eviction entries should remove ID(1) but not ID(2).
+    clear_unused_entries(cache);
+    auto info0c{get_summary_info(cache)};
+    CHECK(info0c.ac_num_records_in_use == 1);
+    CHECK(info0c.ac_num_records_pending_eviction == 0);
+    CHECK(info0c.cas_num_records == 1);
+    CHECK(info0c.cas_total_size == sizeof(int));
+    CHECK(info0c.cas_total_locked_size == sizeof(int));
+
+    // If we redeclare interest in ID(1), it should require creation.
+    bool p1_needed_creation = false;
+    auto p1 = std::make_unique<immutable_cache_ptr<int>>(
+        cache, p_key, [&](untyped_immutable_cache_ptr& ptr) {
+            p1_needed_creation = true;
+            return test_task(ptr, 111);
+        });
+    REQUIRE(p1_needed_creation);
+    REQUIRE(await_cache_value(*p1) == 111);
+
+    // If we redeclare interest in ID(2), it should NOT require creation.
+    bool q1_needed_creation = false;
+    auto q1 = std::make_unique<immutable_cache_ptr<int>>(
+        cache, q_key, [&](untyped_immutable_cache_ptr& ptr) {
+            q1_needed_creation = true;
+            return test_task(ptr, 222);
+        });
+    REQUIRE(!q1_needed_creation);
+    REQUIRE(await_cache_value(*q1) == 222);
+
+    auto info1a{get_summary_info(cache)};
+    CHECK(info1a.ac_num_records_in_use == 2);
+    CHECK(info1a.ac_num_records_pending_eviction == 0);
+    CHECK(info1a.cas_num_records == 2);
+    CHECK(info1a.cas_total_size == 2 * sizeof(int));
+    CHECK(info1a.cas_total_locked_size == sizeof(int));
+
+    // Remove the lock and revoke interest in both IDs.
+    // No entry remains in use.
+    q_lock.reset();
+    p1.reset();
+    q1.reset();
+    auto info1b{get_summary_info(cache)};
+    CHECK(info1b.ac_num_records_in_use == 0);
+    CHECK(info1b.ac_num_records_pending_eviction == 2);
+    CHECK(info1b.cas_num_records == 2);
+    CHECK(info1b.cas_total_size == 2 * sizeof(int));
+    CHECK(info1b.cas_total_locked_size == 0);
+
+    // All entries can be removed from the cache.
+    clear_unused_entries(cache);
+    auto info1c{get_summary_info(cache)};
+    CHECK(info1c.ac_num_records_in_use == 0);
+    CHECK(info1c.ac_num_records_pending_eviction == 0);
+    CHECK(info1c.cas_num_records == 0);
+    CHECK(info1c.cas_total_size == 0);
+    CHECK(info1c.cas_total_locked_size == 0);
+}
+
+TEST_CASE("immutable cache - record locking with delayed task run", tag)
+{
+    immutable_cache cache(immutable_cache_config{1024});
+    auto p_key = make_captured_id(1);
+    immutable_cache_ptr<int> p{
+        cache, p_key, [&](untyped_immutable_cache_ptr& ptr) {
+            return test_task(ptr, 9);
+        }};
+    cache_record_lock p_lock;
+    p_lock.set_record(
+        std::make_unique<local_locked_cache_record>(p.get_record()));
+
+    // The task has not run, so there is no CAS record yet.
+    auto info0{get_summary_info(cache)};
+    CHECK(info0.ac_num_records_in_use == 1);
+    CHECK(info0.ac_num_records_pending_eviction == 0);
+    CHECK(info0.cas_num_records == 0);
+    CHECK(info0.cas_total_size == 0);
+    CHECK(info0.cas_total_locked_size == 0);
+
+    REQUIRE(await_cache_value(p) == 9);
+
+    auto info1{get_summary_info(cache)};
+    CHECK(info1.ac_num_records_in_use == 1);
+    CHECK(info1.ac_num_records_pending_eviction == 0);
+    CHECK(info1.cas_num_records == 1);
+    CHECK(info1.cas_total_size == sizeof(int));
+    CHECK(info1.cas_total_locked_size == sizeof(int));
+}
+
+TEST_CASE("immutable cache - re-obtain lock", tag)
+{
+    immutable_cache cache(immutable_cache_config{1024});
+    auto p_key = make_captured_id(1);
+    immutable_cache_ptr<int> p(
+        cache, p_key, [&](untyped_immutable_cache_ptr& ptr) {
+            return test_task(ptr, 1);
+        });
+
+    cache_record_lock p_lock;
+    REQUIRE_NOTHROW(p_lock.set_record(
+        std::make_unique<local_locked_cache_record>(p.get_record())));
+    REQUIRE_THROWS_AS(
+        p_lock.set_record(
+            std::make_unique<local_locked_cache_record>(p.get_record())),
+        std::logic_error);
+}
+
 namespace detail {
 
 // Similar to resolve_request.h code, but not using requests.
@@ -414,7 +570,6 @@ TEST_CASE("immutable cache - snapshotting", tag)
     auto snapshot0{get_cache_snapshot(cache)};
     CHECK(snapshot0.in_use.size() == 2);
     CHECK(snapshot0.pending_eviction.size() == 0);
-    CHECK(snapshot0.total_size == sizeof(int));
     CHECK(snapshot0 == snapshot0);
     std::ostringstream oss0;
     oss0 << snapshot0;
@@ -428,7 +583,6 @@ TEST_CASE("immutable cache - snapshotting", tag)
     auto snapshot1{get_cache_snapshot(cache)};
     CHECK(snapshot1.in_use.size() == 1);
     CHECK(snapshot1.pending_eviction.size() == 1);
-    CHECK(snapshot1.total_size == sizeof(int));
     CHECK(snapshot1 == snapshot1);
     std::ostringstream oss1;
     oss1 << snapshot1;
@@ -462,7 +616,8 @@ TEST_CASE("immutable caching - retry failure", tag)
     CHECK(snapshot0.in_use.size() == 1);
     CHECK(snapshot0.in_use[0].state == immutable_cache_entry_state::FAILED);
     CHECK(snapshot0.pending_eviction.size() == 0);
-    CHECK(snapshot0.total_size == 0);
+    auto info0{get_summary_info(cache)};
+    CHECK(info0.cas_total_size == 0);
 
     // Retry the failed task, and let it succeed: the existing AC record
     // becomes "ready", and the result is stored as a CAS record.
@@ -473,5 +628,6 @@ TEST_CASE("immutable caching - retry failure", tag)
     CHECK(snapshot1.in_use.size() == 1);
     CHECK(snapshot1.in_use[0].state == immutable_cache_entry_state::READY);
     CHECK(snapshot1.pending_eviction.size() == 0);
-    CHECK(snapshot1.total_size == sizeof(int));
+    auto info1{get_summary_info(cache)};
+    CHECK(info1.cas_total_size == sizeof(int));
 }

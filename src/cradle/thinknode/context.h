@@ -30,7 +30,7 @@ struct thinknode_request_context final : public sync_context_base
     domain_name() const override;
 
     service_config
-    make_config() const override;
+    make_config(bool need_record_lock) const override;
 
     std::string const&
     api_url() const

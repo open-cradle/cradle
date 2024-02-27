@@ -209,6 +209,15 @@ run_server(cli_options const& options)
     srv.bind("unload_shared_library", [&](std::string dll_name) {
         handle_unload_shared_library(hctx, std::move(dll_name));
     });
+    srv.bind("clear_unused_mem_cache_entries", [&]() {
+        handle_clear_unused_mem_cache_entries(hctx);
+    });
+    srv.bind(
+        "release_cache_record_lock",
+        [&](remote_cache_record_id::value_type record_id_value) {
+            handle_release_cache_record_lock(
+                hctx, remote_cache_record_id{record_id_value});
+        });
 
     auto num_threads{hctx.handler_pool_size()};
     assert(num_threads >= 2);

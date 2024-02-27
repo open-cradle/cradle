@@ -68,6 +68,12 @@ class rpclib_client : public remote_proxy
     void
     mock_http(std::string const& response_body) override;
 
+    void
+    clear_unused_mem_cache_entries() override;
+
+    void
+    release_cache_record_lock(remote_cache_record_id record_id) override;
+
     // Tests if the rpclib server is running, throws rpc::system_error if not.
     // Returns a compatibility identifier.
     std::string

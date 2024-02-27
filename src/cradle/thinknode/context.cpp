@@ -51,10 +51,11 @@ thinknode_request_context::domain_name() const
 }
 
 service_config
-thinknode_request_context::make_config() const
+thinknode_request_context::make_config(bool need_record_lock) const
 {
     service_config_map config_map{
         {remote_config_keys::DOMAIN_NAME, domain_name()},
+        {remote_config_keys::NEED_RECORD_LOCK, need_record_lock},
         {thinknode_config_keys::API_URL, session.api_url},
         {thinknode_config_keys::ACCESS_TOKEN, session.access_token},
     };

@@ -5,6 +5,8 @@
 
 #include <cppcoro/task.hpp>
 
+#include <cradle/inner/resolve/seri_lock.h>
+
 namespace cradle {
 
 class introspective_context;
@@ -38,7 +40,8 @@ resolve_serialized_introspective(
     introspective_context_intf& ctx,
     std::string proxy_name,
     std::string title,
-    std::string seri_req);
+    std::string seri_req,
+    seri_cache_record_lock_t seri_lock);
 
 } // namespace cradle
 

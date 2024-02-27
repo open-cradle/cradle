@@ -5,6 +5,7 @@
 #include <utility>
 
 #include <cradle/inner/core/type_definitions.h>
+#include <cradle/inner/remote/types.h>
 
 namespace cradle {
 
@@ -19,18 +20,24 @@ class deserialization_observer
         = 0;
 };
 
-// Contains a serialized value obtained from resolving a request, and
-// optionally a deserialization observer.
+// Result from resolving a request to a serialized value, consisting of:
+// - The serialized value itself;
+// - Optionally a deserialization observer;
+// - An identification of the memory cache record, if any, that was locked
+//   when resolving the request.
 class serialized_result
 {
  public:
-    serialized_result(blob value) : value_{value}
+    serialized_result(blob value, remote_cache_record_id record_id)
+        : value_{value}, record_id_{record_id}
     {
     }
 
     serialized_result(
-        blob value, std::unique_ptr<deserialization_observer> observer)
-        : value_{value}, observer_{std::move(observer)}
+        blob value,
+        std::unique_ptr<deserialization_observer> observer,
+        remote_cache_record_id record_id)
+        : value_{value}, observer_{std::move(observer)}, record_id_{record_id}
     {
     }
 
@@ -38,6 +45,12 @@ class serialized_result
     value()
     {
         return value_;
+    }
+
+    remote_cache_record_id
+    get_cache_record_id() const
+    {
+        return record_id_;
     }
 
     void
@@ -52,6 +65,7 @@ class serialized_result
  private:
     blob value_;
     std::unique_ptr<deserialization_observer> observer_;
+    remote_cache_record_id record_id_;
 };
 
 } // namespace cradle

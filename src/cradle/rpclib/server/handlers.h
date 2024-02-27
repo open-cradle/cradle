@@ -12,6 +12,7 @@
 #include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/remote/proxy.h>
+#include <cradle/inner/remote/types.h>
 #include <cradle/rpclib/common/common.h>
 #include <cradle/thinknode/service/core.h>
 
@@ -179,6 +180,13 @@ handle_load_shared_library(
 void
 handle_unload_shared_library(
     rpclib_handler_context& hctx, std::string dll_name);
+
+void
+handle_clear_unused_mem_cache_entries(rpclib_handler_context& hctx);
+
+void
+handle_release_cache_record_lock(
+    rpclib_handler_context& hctx, remote_cache_record_id record_id);
 
 } // namespace cradle
 

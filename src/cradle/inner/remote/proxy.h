@@ -8,6 +8,7 @@
 #include <spdlog/spdlog.h>
 
 #include <cradle/inner/introspection/tasklet_info.h>
+#include <cradle/inner/remote/types.h>
 #include <cradle/inner/requests/types.h>
 #include <cradle/inner/resolve/seri_result.h>
 #include <cradle/inner/service/config.h>
@@ -148,8 +149,20 @@ class remote_proxy
 
     // Instructs the server to mock all HTTP requests, returning a 200
     // response with response_body for each.
+    // Intended for test purposes only.
     virtual void
     mock_http(std::string const& response_body)
+        = 0;
+
+    // Clears unused entries in the memory cache on the server.
+    // Intended for test purposes only.
+    virtual void
+    clear_unused_mem_cache_entries()
+        = 0;
+
+    // Releases a lock on the given memory cache record on the server.
+    virtual void
+    release_cache_record_lock(remote_cache_record_id record_id)
         = 0;
 };
 

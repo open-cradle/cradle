@@ -52,7 +52,8 @@ eval_tasks(
     {
         auto snapshot0 = get_cache_snapshot(cache);
         REQUIRE(snapshot0.pending_eviction.size() == 1);
-        REQUIRE(snapshot0.total_size == B);
+        auto info0{get_summary_info(cache)};
+        REQUIRE(info0.cas_total_size == B);
     }
 
     auto res1 = co_await task1;
@@ -71,7 +72,8 @@ eval_tasks(
     {
         auto snapshot1 = get_cache_snapshot(cache);
         REQUIRE(snapshot1.pending_eviction.size() == 2);
-        REQUIRE(snapshot1.total_size == 2 * B);
+        auto info1{get_summary_info(cache)};
+        REQUIRE(info1.cas_total_size == 2 * B);
     }
 
     // Simulate another thread kicking in and cleaning up the eviction list.
@@ -82,7 +84,8 @@ eval_tasks(
     {
         auto snapshot2 = get_cache_snapshot(cache);
         REQUIRE(snapshot2.pending_eviction.size() == 0);
-        REQUIRE(snapshot2.total_size == 0);
+        auto info2{get_summary_info(cache)};
+        REQUIRE(info2.cas_total_size == 0);
     }
 
     auto res0 = co_await task0;

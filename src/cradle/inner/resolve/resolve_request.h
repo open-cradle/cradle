@@ -6,8 +6,10 @@
 
 #include <cppcoro/task.hpp>
 
-#include <cradle/inner/caching/immutable.h>
 #include <cradle/inner/caching/immutable/cache.h>
+#include <cradle/inner/caching/immutable/local_locked_record.h>
+#include <cradle/inner/caching/immutable/lock.h>
+#include <cradle/inner/caching/immutable/ptr.h>
 #include <cradle/inner/caching/secondary_cache_serialization.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/requests/cast_ctx.h>
@@ -165,7 +167,7 @@ resolve_request_on_memory_cache_miss(
 
 template<bool Async, Context Ctx, CompositionBasedCachedRequest Req>
 cppcoro::task<typename Req::value_type>
-resolve_request_cached(Ctx& ctx, Req const& req)
+resolve_request_cached(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
 {
     using value_type = typename Req::value_type;
     using ptr_type = immutable_cache_ptr<value_type>;
@@ -181,6 +183,11 @@ resolve_request_cached(Ctx& ctx, Req const& req)
             return resolve_request_on_memory_cache_miss<Async>(
                 ctx, req, static_cast<ptr_type&>(ptr));
         }};
+    if (lock_ptr != nullptr)
+    {
+        lock_ptr->set_record(
+            std::make_unique<local_locked_cache_record>(ptr.get_record()));
+    }
     if constexpr (IntrospectiveRequest<Req>)
     {
         auto& intr_ctx = cast_ctx_to_ref<introspective_context_intf>(ctx);
@@ -204,21 +211,22 @@ resolve_request_cached(Ctx& ctx, Req const& req)
 
 template<bool Async, Context Ctx, ValueBasedCachedRequest Req>
 cppcoro::task<typename Req::value_type>
-resolve_request_cached(Ctx& ctx, Req const& req)
+resolve_request_cached(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
 {
     // Make a CompositionBasedCachedRequest variant of req that has all
     // subrequests resolved and replaced by resulting values; then resolve
     // that request as any other request, using composition-based caching.
     auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
     co_return co_await resolve_request_cached<Async>(
-        ctx, co_await req.make_flattened_clone(cac_ctx));
+        ctx, co_await req.make_flattened_clone(cac_ctx), lock_ptr);
 }
 
 template<Context Ctx, CachedRequest Req>
 cppcoro::task<typename Req::value_type>
-resolve_request_async_cached(Ctx& ctx, Req const& req)
+resolve_request_async_cached(
+    Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
 {
-    auto result = co_await resolve_request_cached<true>(ctx, req);
+    auto result = co_await resolve_request_cached<true>(ctx, req, lock_ptr);
     // If function ran, status already will be FINISHED
     // If result came from cache, it will not yet be
     auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
@@ -228,7 +236,7 @@ resolve_request_async_cached(Ctx& ctx, Req const& req)
 
 template<Context Ctx, Request Req>
 cppcoro::task<typename Req::value_type>
-resolve_request_sync(Ctx& ctx, Req const& req)
+resolve_request_sync(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
 {
     // Third decision: cached or not
     if constexpr (UncachedRequest<Req>)
@@ -237,13 +245,13 @@ resolve_request_sync(Ctx& ctx, Req const& req)
     }
     else
     {
-        return resolve_request_cached<false>(ctx, req);
+        return resolve_request_cached<false>(ctx, req, lock_ptr);
     }
 }
 
 template<Context Ctx, Request Req>
 cppcoro::task<typename Req::value_type>
-resolve_request_async(Ctx& ctx, Req const& req)
+resolve_request_async(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
 {
     // Cf. the similar construct in seri_resolver_impl::resolve()
     if constexpr (!VisitableRequest<Req>)
@@ -257,14 +265,17 @@ resolve_request_async(Ctx& ctx, Req const& req)
     }
     else
     {
-        return resolve_request_async_cached(ctx, req);
+        return resolve_request_async_cached(ctx, req, lock_ptr);
     }
 }
 
 template<Context Ctx, typename Val, typename Constraints>
     requires(!Request<Val>)
 cppcoro::task<Val> resolve_request_local(
-    Ctx& ctx, Val const& val, Constraints constraints)
+    Ctx& ctx,
+    Val const& val,
+    cache_record_lock* lock_ptr,
+    Constraints constraints)
 {
     // async status, if appropriate, should already be FINISHED
     co_return val;
@@ -272,37 +283,42 @@ cppcoro::task<Val> resolve_request_local(
 
 template<Context Ctx, Request Req, typename Constraints>
 cppcoro::task<typename Req::value_type>
-resolve_request_local(Ctx& ctx, Req const& req, Constraints constraints)
+resolve_request_local(
+    Ctx& ctx,
+    Req const& req,
+    cache_record_lock* lock_ptr,
+    Constraints constraints)
 {
     // TODO static_assert(!req.is_proxy);
     // Second decision (based on constraints if possible): sync or async
     // This is the last time that constraints are used.
     if constexpr (constraints.force_async)
     {
-        return resolve_request_async(ctx, req);
+        return resolve_request_async(ctx, req, lock_ptr);
     }
     else if constexpr (constraints.force_sync)
     {
-        return resolve_request_sync(ctx, req);
+        return resolve_request_sync(ctx, req, lock_ptr);
     }
     else
     {
         if (ctx.is_async())
         {
-            return resolve_request_async(ctx, req);
+            return resolve_request_async(ctx, req, lock_ptr);
         }
         else
         {
-            return resolve_request_sync(ctx, req);
+            return resolve_request_sync(ctx, req, lock_ptr);
         }
     }
 }
 
 template<Request Req>
 cppcoro::task<typename Req::value_type>
-resolve_request_remote(remote_context_intf& ctx, Req const& req)
+resolve_request_remote(
+    remote_context_intf& ctx, Req const& req, cache_record_lock* lock_ptr)
 {
-    co_return resolve_remote_to_value(ctx, req);
+    co_return resolve_remote_to_value(ctx, req, lock_ptr);
 }
 
 /*****************************************************************************
@@ -334,6 +350,11 @@ cppcoro::task<Val> resolve_request(
  * Resolves a request; remotely or locally, synchronously or asynchronously,
  * depending on context and contraints.
  *
+ * If lock_ptr is not nullptr, the call causes *lock_ptr to lock the associated
+ * memory cache record. While the *lock_ptr object exists, the lock stays
+ * active, and the cache record will not be evicted (so the cache keeps the
+ * result in memory).
+ *
  * Notes:
  * - The caller must ensure that the actual ctx type implements all needed
  *   context interfaces; if not, resolution will throw a "bad cast" exception.
@@ -345,6 +366,7 @@ cppcoro::task<Val> resolve_request(
  *   if Req is a request.
  * - It seems likely that for multiple calls for the same Request, Ctx will be
  *   the same in each case (so just one template instantiation).
+ * - Passing a non-nullptr lock_ptr is useless for uncached requests.
  */
 template<
     Context Ctx,
@@ -352,7 +374,10 @@ template<
     typename Constraints = DefaultResolutionConstraints<Ctx>>
 auto
 resolve_request(
-    Ctx& ctx, Req const& req, Constraints constraints = Constraints())
+    Ctx& ctx,
+    Req const& req,
+    Constraints constraints = Constraints(),
+    cache_record_lock* lock_ptr = nullptr)
 {
     static_assert(ValidContext<Ctx>);
     static_assert(!(Req::is_proxy && constraints.force_local));
@@ -364,25 +389,41 @@ resolve_request(
     {
         // Cast here to be like the runtime decision below
         auto& rem_ctx{cast_ctx_to_ref<remote_context_intf>(ctx)};
-        return resolve_request_remote(rem_ctx, req);
+        return resolve_request_remote(rem_ctx, req, lock_ptr);
     }
     else if constexpr (constraints.force_local)
     {
         // Call one of the two resolve_request_local() versions, depending on
         // Req being a plain value or a Request
-        return resolve_request_local(ctx, req, constraints);
+        return resolve_request_local(ctx, req, lock_ptr, constraints);
     }
     else
     {
         if (auto* rem_ctx = cast_ctx_to_ptr<remote_context_intf>(ctx))
         {
-            return resolve_request_remote(*rem_ctx, req);
+            return resolve_request_remote(*rem_ctx, req, lock_ptr);
         }
         else
         {
-            return resolve_request_local(ctx, req, constraints);
+            return resolve_request_local(ctx, req, lock_ptr, constraints);
         }
     }
+}
+
+// Maybe a more convenient parameter order, but not backward compatible with
+// the pre-cache_record_lock situation.
+template<
+    Context Ctx,
+    Request Req,
+    typename Constraints = DefaultResolutionConstraints<Ctx>>
+auto
+resolve_request(
+    Ctx& ctx,
+    Req const& req,
+    cache_record_lock* lock_ptr,
+    Constraints constraints = Constraints())
+{
+    return resolve_request(ctx, req, constraints, lock_ptr);
 }
 
 } // namespace cradle

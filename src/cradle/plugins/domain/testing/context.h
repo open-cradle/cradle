@@ -31,7 +31,7 @@ class testing_request_context final : public sync_context_base
     domain_name() const override;
 
     service_config
-    make_config() const override;
+    make_config(bool need_record_lock) const override;
 };
 static_assert(ValidContext<testing_request_context>);
 
@@ -164,7 +164,7 @@ class root_proxy_atst_context final : public root_proxy_async_context_base
     domain_name() const override;
 
     service_config
-    make_config() const override;
+    make_config(bool need_record_lock) const override;
 
     // Other
 
@@ -226,7 +226,7 @@ class non_root_proxy_atst_context final
     domain_name() const override;
 
     service_config
-    make_config() const override;
+    make_config(bool need_record_lock) const override;
 
  private:
     // proxy_async_context_base

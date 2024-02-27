@@ -10,6 +10,7 @@
 #include <cradle/inner/core/id.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/remote/proxy.h>
+#include <cradle/inner/remote/types.h>
 #include <cradle/inner/requests/types.h>
 #include <cradle/inner/service/config.h>
 
@@ -324,8 +325,9 @@ class remote_context_intf : public virtual context_intf
         = 0;
 
     // Creates the configuration to be passed to the remote.
+    // need_record_lock is copied to the NEED_RECORD_LOCK config value.
     virtual service_config
-    make_config() const
+    make_config(bool need_record_lock) const
         = 0;
 };
 
@@ -518,6 +520,20 @@ class local_async_context_intf : public local_context_intf,
     // - get_status() returns FINISHED
     virtual blob
     get_result()
+        = 0;
+
+    // Sets the id of the memory cache record on the remote, if any, that was
+    // locked while resolving the async request.
+    // The id is stored here so that it can later be retrieved through a
+    // get_cache_record_id() call.
+    virtual void
+    set_cache_record_id(remote_cache_record_id record_id)
+        = 0;
+
+    // Gets the id of the memory cache record on the remote, if any, that was
+    // locked while resolving the async request.
+    virtual remote_cache_record_id
+    get_cache_record_id() const
         = 0;
 
     // Requests cancellation of all tasks in the same context tree.
