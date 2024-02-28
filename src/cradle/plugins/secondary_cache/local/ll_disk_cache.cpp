@@ -3,6 +3,7 @@
 #include <chrono>
 #include <filesystem>
 #include <mutex>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -43,7 +44,6 @@ struct ll_disk_cache_impl
     sqlite3_stmt* cas_lookup_query = nullptr;
     sqlite3_stmt* cas_entry_count_query = nullptr;
     sqlite3_stmt* total_cas_size_query = nullptr;
-    sqlite3_stmt* cas_entry_list_query = nullptr;
     sqlite3_stmt* count_cas_entry_refs_query = nullptr;
     sqlite3_stmt* remove_cas_entry_statement = nullptr;
 
@@ -255,6 +255,68 @@ execute_prepared_statement(
     check_sqlite_code(sqlite3_clear_bindings(statement));
 }
 
+// STORAGE
+
+// A value may be stored in several ways, and the "storage" column in the "cas"
+// table defines which of them applies. The column contains one of:
+// - 'D'. The value is stored in the "value" column.
+// - 'F'. The value is stored (possibly compressed) in an external file, whose
+//   name is derived from the "digest". The "value" column is unused.
+// - 'X'. The value is intended to be stored in an external file, but the write
+//   operation has not (yet) completed; thus, there currently is no value.
+//   The "value" column is unused.
+// - 'B'. The value is stored in shared memory, accessed via a blob file whose
+//   absolute path is in the "value" column.
+enum class storage_t
+{
+    in_db, // 'D'
+    in_file, // 'F'
+    invalid, // 'X'
+    blob_file, // 'B'
+};
+
+storage_t
+to_storage_t(std::string const& s)
+{
+    char s0 = s.size() == 1 ? s[0] : '?';
+    switch (s0)
+    {
+        case 'D':
+            return storage_t::in_db;
+        case 'F':
+            return storage_t::in_file;
+        case 'X':
+            return storage_t::invalid;
+        case 'B':
+            return storage_t::blob_file;
+        default:
+            break;
+    }
+    throw std::domain_error{fmt::format("invalid storage {}", s)};
+}
+
+std::string
+from_storage_t(storage_t storage)
+{
+    char const* s{};
+    switch (storage)
+    {
+        case storage_t::in_db:
+            s = "D";
+            break;
+        case storage_t::in_file:
+            s = "F";
+            break;
+        case storage_t::invalid:
+            s = "X";
+            break;
+        case storage_t::blob_file:
+            s = "B";
+            break;
+    }
+    return std::string{s};
+}
+
 // ROWS
 
 struct sqlite_row
@@ -266,12 +328,6 @@ static bool
 has_value(sqlite_row& row, int column_index)
 {
     return sqlite3_column_type(row.statement, column_index) != SQLITE_NULL;
-}
-
-static bool
-read_bool(sqlite_row& row, int column_index)
-{
-    return sqlite3_column_int(row.statement, column_index) != 0;
 }
 
 static int
@@ -651,13 +707,12 @@ look_up_cas_id_by_digest(
 }
 
 // internal_cas_entry_t differs from ll_disk_cache_cas_entry by having an extra
-// "valid" field.
+// "storage" field.
 struct internal_cas_entry_t
 {
     int64_t cas_id;
     std::string digest;
-    bool valid;
-    bool in_db;
+    storage_t storage;
     std::optional<blob> value;
     int64_t size;
     int64_t original_size;
@@ -672,18 +727,17 @@ look_up_internal_cas_entry(ll_disk_cache_impl const& cache, int64_t cas_id)
     execute_prepared_statement(
         cache,
         stmt,
-        expected_column_count{6},
+        expected_column_count{5},
         single_row_result{true},
         [&](sqlite_row& row) {
             entry.cas_id = cas_id;
             entry.digest = read_string(row, 0);
-            entry.valid = read_bool(row, 1);
-            entry.in_db = read_bool(row, 2);
-            entry.value = has_value(row, 3)
-                              ? std::make_optional(read_blob(row, 3))
+            entry.storage = to_storage_t(read_string(row, 1));
+            entry.value = has_value(row, 2)
+                              ? std::make_optional(read_blob(row, 2))
                               : std::nullopt;
-            entry.size = has_value(row, 4) ? read_int64(row, 4) : 0;
-            entry.original_size = has_value(row, 5) ? read_int64(row, 5) : 0;
+            entry.size = has_value(row, 3) ? read_int64(row, 3) : 0;
+            entry.original_size = has_value(row, 4) ? read_int64(row, 4) : 0;
         });
     return entry;
 }
@@ -692,14 +746,14 @@ static std::optional<ll_disk_cache_cas_entry>
 look_up_cas_entry(ll_disk_cache_impl const& cache, int64_t cas_id)
 {
     auto internal_entry = look_up_internal_cas_entry(cache, cas_id);
-    if (!internal_entry.valid)
+    if (internal_entry.storage == storage_t::invalid)
     {
         return std::nullopt;
     }
+    // TODO handle blob_file case here
     return ll_disk_cache_cas_entry{
         .cas_id = internal_entry.cas_id,
         .digest = std::move(internal_entry.digest),
-        .in_db = internal_entry.in_db,
         .value = std::move(internal_entry.value),
         .size = internal_entry.size,
         .original_size = internal_entry.original_size};
@@ -731,29 +785,6 @@ get_total_cas_size(ll_disk_cache_impl& cache)
         single_row_result{true},
         [&](sqlite_row& row) { size = read_int64(row, 0); });
     return size;
-}
-
-// Returns a list of valid entries in the CAS.
-// The "value" members are left as std::nullopt.
-static std::vector<ll_disk_cache_cas_entry>
-get_cas_entry_list(ll_disk_cache_impl& cache)
-{
-    std::vector<ll_disk_cache_cas_entry> entries;
-    execute_prepared_statement(
-        cache,
-        cache.cas_entry_list_query,
-        expected_column_count{5},
-        single_row_result{false},
-        [&](sqlite_row& row) {
-            ll_disk_cache_cas_entry e;
-            e.cas_id = read_int64(row, 0);
-            e.digest = read_string(row, 1);
-            e.in_db = read_bool(row, 2);
-            e.size = has_value(row, 3) ? read_int64(row, 3) : 0;
-            e.original_size = has_value(row, 4) ? read_int64(row, 4) : 0;
-            entries.push_back(e);
-        });
-    return entries;
 }
 
 // Returns the number of AC records referring to the specified CAS record.
@@ -801,7 +832,7 @@ remove_cas_entry_db_and_file(ll_disk_cache_impl& cache, int64_t cas_id)
     auto entry = look_up_internal_cas_entry(cache, cas_id);
     auto size_diff = entry.size;
     remove_cas_entry_db_only(cache, cas_id);
-    if (!entry.in_db)
+    if (entry.storage == storage_t::in_file)
     {
         auto path{get_path_for_digest(cache, entry.digest)};
         if (exists(path))
@@ -899,9 +930,9 @@ remove_invalid_entries(ll_disk_cache_impl& cache)
     execute_sql(
         cache,
         "delete from actions where cas_id in"
-        " (select cas_id from cas where not valid);");
+        " (select cas_id from cas where storage == 'X');");
     // Delete the invalid CAS entries themselves.
-    execute_sql(cache, "delete from cas where not valid;");
+    execute_sql(cache, "delete from cas where storage == 'X';");
 }
 
 // OTHER UTILITIES
@@ -987,7 +1018,6 @@ shut_down(ll_disk_cache_impl& cache)
         sqlite3_finalize(cache.cas_lookup_query);
         sqlite3_finalize(cache.cas_entry_count_query);
         sqlite3_finalize(cache.total_cas_size_query);
-        sqlite3_finalize(cache.cas_entry_list_query);
         sqlite3_finalize(cache.count_cas_entry_refs_query);
         sqlite3_finalize(cache.remove_cas_entry_statement);
 
@@ -1001,7 +1031,7 @@ shut_down(ll_disk_cache_impl& cache)
 static void
 open_and_check_db(ll_disk_cache_impl& cache)
 {
-    int const expected_database_version = 4;
+    int const expected_database_version = 5;
 
     open_db(&cache.db, cache.dir / "index.db");
 
@@ -1020,15 +1050,14 @@ open_and_check_db(ll_disk_cache_impl& cache)
     if (database_version == 0)
     {
         cache.logger->info("creating tables on fresh database");
-        // Create the CAS part of the cache
+        // Create the CAS part of the cache.
         execute_sql(
             cache,
             "create table cas("
             " cas_id integer primary key,"
             " digest text unique not null,"
-            " valid boolean not null,"
-            " in_db boolean not null,"
-            " value blob," // used only if in_db
+            " storage text not null,"
+            " value blob,"
             " size integer,"
             " original_size integer);");
         // Create the AC part of the cache
@@ -1140,28 +1169,24 @@ initialize(ll_disk_cache_impl& cache, ll_disk_cache_config const& config)
 
     cache.cas_insert_statement = prepare_statement(
         cache,
-        "insert into cas(digest, valid, in_db, value, size, original_size) "
-        "values (?1, 1, 1, ?2, ?3, ?4);");
+        "insert into cas(digest, storage, value, size, original_size) "
+        "values (?1, 'D', ?2, ?3, ?4);");
     cache.initiate_cas_insert_statement = prepare_statement(
-        cache, "insert into cas(digest, valid, in_db) values (?1, 0, 0);");
+        cache, "insert into cas(digest, storage) values (?1, 'X');");
     cache.finish_cas_insert_statement = prepare_statement(
         cache,
-        "update cas set valid=1, in_db=0, size=?1, original_size=?2"
+        "update cas set storage='F', size=?1, original_size=?2"
         " where cas_id=?3;");
     cache.cas_lookup_by_digest_query
         = prepare_statement(cache, "select cas_id from cas where digest=?1;");
     cache.cas_lookup_query = prepare_statement(
         cache,
-        "select digest, valid, in_db, value, size, original_size"
+        "select digest, storage, value, size, original_size"
         " from cas where cas_id=?1;");
     cache.cas_entry_count_query
         = prepare_statement(cache, "select count(*) from cas;");
     cache.total_cas_size_query
         = prepare_statement(cache, "select sum(size) from cas;");
-    cache.cas_entry_list_query = prepare_statement(
-        cache,
-        "select cas_id, digest, in_db, size, original_size from cas"
-        " where valid=1;");
     cache.count_cas_entry_refs_query = prepare_statement(
         cache, "select count(*) from actions where cas_id=?1;");
     cache.remove_cas_entry_statement
@@ -1220,15 +1245,6 @@ ll_disk_cache::get_summary_info()
     info.cas_entry_count = get_cas_entry_count(cache);
     info.total_size = get_total_cas_size(cache);
     return info;
-}
-
-std::vector<ll_disk_cache_cas_entry>
-ll_disk_cache::get_cas_entry_list()
-{
-    auto& cache = *this->impl_;
-    std::scoped_lock<std::mutex> lock(cache.mutex);
-
-    return cradle::get_cas_entry_list(cache);
 }
 
 void

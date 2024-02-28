@@ -420,56 +420,6 @@ TEST_CASE("cache summary info", tag)
     check_summary_info();
 }
 
-TEST_CASE("cache CAS entry list", tag)
-{
-    auto cache{create_disk_cache()};
-    test_item_access(cache, 0);
-    test_item_access(cache, 1);
-    test_item_access(cache, 2);
-    // Remove an entry (AC and CAS).
-    {
-        auto opt_ac_id = cache.look_up_ac_id(generate_key_string(0));
-        if (opt_ac_id)
-        {
-            cache.remove_entry(*opt_ac_id);
-        }
-    }
-    // Check the entry list.
-    auto entries = cache.get_cas_entry_list();
-    // One entry has its value stored in the database, the other one in a file,
-    // but the returned order is unspecified.
-    REQUIRE(entries.size() == 2);
-    ll_disk_cache_cas_entry* file_entry{nullptr};
-    ll_disk_cache_cas_entry* db_entry{nullptr};
-    if (entries[0].in_db)
-    {
-        file_entry = &entries[1];
-        db_entry = &entries[0];
-    }
-    else
-    {
-        file_entry = &entries[0];
-        db_entry = &entries[1];
-    }
-    {
-        CHECK(
-            file_entry->digest
-            == get_unique_string_tmpl(make_blob(generate_value_string(1))));
-        CHECK(
-            std::size_t(file_entry->size)
-            == generate_value_string(1).length());
-        CHECK(!file_entry->in_db);
-    }
-    {
-        CHECK(
-            db_entry->digest
-            == get_unique_string_tmpl(make_blob(generate_value_string(2))));
-        CHECK(
-            std::size_t(db_entry->size) == generate_value_string(2).length());
-        CHECK(db_entry->in_db);
-    }
-}
-
 TEST_CASE("corrupt cache", tag)
 {
     // Set up an invalid cache directory.
