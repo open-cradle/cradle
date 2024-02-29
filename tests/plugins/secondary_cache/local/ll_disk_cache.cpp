@@ -5,6 +5,7 @@
 #include <catch2/catch.hpp>
 #include <sqlite3.h>
 
+#include <cradle/inner/blob_file/blob_file.h>
 #include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/encodings/base64.h>
@@ -516,4 +517,35 @@ TEST_CASE("recover from a missing finish_insert", tag)
         REQUIRE(info.ac_entry_count == 2);
         REQUIRE(info.cas_entry_count == 2);
     }
+}
+
+TEST_CASE("disk cache - blob file", tag)
+{
+    namespace fs = std::filesystem;
+    std::string cache_dir{"disk_cache"};
+    fs::path cache_dir_path{cache_dir};
+    reset_directory(cache_dir_path);
+    fs::path path{cache_dir_path / "blob_23"};
+    ll_disk_cache cache{create_config(cache_dir)};
+
+    auto writer{std::make_shared<blob_file_writer>(path, 5)};
+    std::memcpy(writer->data(), "abcde", 5);
+    writer->on_write_completed();
+    blob written_value{writer, writer->bytes(), writer->size()};
+    auto key = generate_key_string(3);
+    auto digest = get_unique_string_tmpl(written_value);
+    cache.insert(key, digest, written_value);
+
+    auto opt_entry{cache.find(key)};
+    REQUIRE(opt_entry);
+    auto& entry{*opt_entry};
+    REQUIRE(entry.digest == digest);
+    REQUIRE(entry.size == 5);
+    REQUIRE(entry.original_size == 5);
+    REQUIRE(entry.value);
+    blob read_value{*entry.value};
+    REQUIRE(read_value.size() == 5);
+    auto* reader{read_value.mapped_file_data_owner()};
+    REQUIRE(reader != nullptr);
+    REQUIRE(reader->mapped_file() == writer->mapped_file());
 }

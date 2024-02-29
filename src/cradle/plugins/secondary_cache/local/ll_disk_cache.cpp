@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 #include <sqlite3.h>
 
+#include <cradle/inner/blob_file/blob_file.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/utilities.h>
@@ -620,10 +621,22 @@ insert_cas_entry(
     std::size_t original_size)
 {
     auto* stmt = cache.cas_insert_statement;
+    auto storage{from_storage_t(storage_t::in_db)};
+    auto const* bound_blob{&value};
+    blob blob_file_path;
+    if (auto const* owner = value.mapped_file_data_owner())
+    {
+        cache.logger->debug(
+            " insert_cas_entry: blob file {}", owner->mapped_file());
+        storage = from_storage_t(storage_t::blob_file);
+        blob_file_path = make_blob(owner->mapped_file());
+        bound_blob = &blob_file_path;
+    }
     bind_string(stmt, 1, digest);
-    bind_blob(stmt, 2, value);
-    bind_int64(stmt, 3, value.size());
-    bind_int64(stmt, 4, original_size);
+    bind_string(stmt, 2, storage);
+    bind_blob(stmt, 3, *bound_blob);
+    bind_int64(stmt, 4, value.size());
+    bind_int64(stmt, 5, original_size);
     execute_prepared_statement(cache, stmt);
     // Alternative: use a RETURNING clause
     auto cas_id = sqlite3_last_insert_rowid(cache.db);
@@ -750,11 +763,18 @@ look_up_cas_entry(ll_disk_cache_impl const& cache, int64_t cas_id)
     {
         return std::nullopt;
     }
-    // TODO handle blob_file case here
+    auto opt_value = std::move(internal_entry.value);
+    if (internal_entry.storage == storage_t::blob_file)
+    {
+        cache.logger->debug(" looked up blob file {}", to_string(*opt_value));
+        file_path path{to_string(*opt_value)};
+        auto owner = std::make_shared<blob_file_reader>(path);
+        opt_value = blob{owner, owner->bytes(), owner->size()};
+    }
     return ll_disk_cache_cas_entry{
         .cas_id = internal_entry.cas_id,
         .digest = std::move(internal_entry.digest),
-        .value = std::move(internal_entry.value),
+        .value = std::move(opt_value),
         .size = internal_entry.size,
         .original_size = internal_entry.original_size};
 }
@@ -824,7 +844,7 @@ get_path_for_digest(ll_disk_cache_impl& cache, std::string const& digest)
 // OPERATIONS ON THE CAS (DB AND FILE)
 
 // Removes the given CAS entry from the database, and removes the corresponding
-// file if any.
+// file if any. Does not remove a blob file.
 // Returns the size of the removed CAS entry.
 static int64_t
 remove_cas_entry_db_and_file(ll_disk_cache_impl& cache, int64_t cas_id)
@@ -1106,6 +1126,7 @@ initialize(ll_disk_cache_impl& cache, ll_disk_cache_config const& config)
     // Prepare the directory.
     if (config.start_empty)
     {
+        cache.logger->info("ensuring empty disk cache directory");
         reset_directory(cache.dir);
     }
     else if (!exists(cache.dir))
@@ -1170,7 +1191,7 @@ initialize(ll_disk_cache_impl& cache, ll_disk_cache_config const& config)
     cache.cas_insert_statement = prepare_statement(
         cache,
         "insert into cas(digest, storage, value, size, original_size) "
-        "values (?1, 'D', ?2, ?3, ?4);");
+        "values (?1, ?2, ?3, ?4, ?5);");
     cache.initiate_cas_insert_statement = prepare_statement(
         cache, "insert into cas(digest, storage) values (?1, 'X');");
     cache.finish_cas_insert_statement = prepare_statement(

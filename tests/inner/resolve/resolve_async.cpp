@@ -244,7 +244,7 @@ TEST_CASE("resolve async on rpclib", tag)
     test_resolve_async_across_rpc(*resources, proxy_name);
 }
 
-TEST_CASE("resolve async with value_request locally", "[A]")
+TEST_CASE("resolve async with value_request locally", tag)
 {
     constexpr int loops = 3;
     int delay0 = 5;

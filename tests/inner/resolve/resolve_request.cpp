@@ -704,14 +704,10 @@ TEST_CASE("resolve request - blob file or not - full, loopback", tag)
     test_resolve_blob_file_or_not<caching_level_type::full>("loopback");
 }
 
-#if 0
-// Currently failing if the blob is already present in the disk cache, when
-// it will be returned by value, not as a blob file.
 TEST_CASE("resolve request - blob file or not - full, rpclib", tag)
 {
     test_resolve_blob_file_or_not<caching_level_type::full>("rpclib");
 }
-#endif
 
 // If test_remove_blob_file is:
 // - false: verify that the cache stores a blob file by path, not by value
@@ -739,8 +735,9 @@ test_resolve_to_blob_file(bool test_remove_blob_file)
     {
         remove(file_path(file0));
     }
-    if constexpr (caching_level == caching_level_type::full)
+    if constexpr (is_fully_cached(caching_level))
     {
+        sync_wait_write_disk_cache(*resources);
         resources->reset_memory_cache();
     }
 
@@ -750,7 +747,27 @@ test_resolve_to_blob_file(bool test_remove_blob_file)
     auto* res1_owner = res1.mapped_file_data_owner();
     REQUIRE(res1_owner != nullptr);
     std::string file1{res1_owner->mapped_file()};
-    REQUIRE(file1 == file0);
+    if (!test_remove_blob_file)
+    {
+        // The second resolve should return the cached blob file.
+        REQUIRE(file1 == file0);
+    }
+    else
+    {
+        if constexpr (!is_fully_cached(caching_level))
+        {
+            // The memory cache entry should hold on to the original shared
+            // memory region, even though that can no longer be accessed via
+            // the removed blob file.
+            REQUIRE(file1 == file0);
+        }
+        else
+        {
+            // The disk cache cannot hold on to the shared memory region, so
+            // the second resolve should have created a new blob file.
+            REQUIRE(file1 != file0);
+        }
+    }
 }
 
 TEST_CASE("resolve request - blob file storage in cache - mem", tag)
@@ -758,25 +775,17 @@ TEST_CASE("resolve request - blob file storage in cache - mem", tag)
     test_resolve_to_blob_file<caching_level_type::memory>(false);
 }
 
-#if 0
-// Currently failing as the disk cache stores all blobs by value
 TEST_CASE("resolve request - blob file storage in cache - full", tag)
 {
     test_resolve_to_blob_file<caching_level_type::full>(false);
 }
-#endif
 
 TEST_CASE("resolve request - disappearing blob file - mem", tag)
 {
     test_resolve_to_blob_file<caching_level_type::memory>(true);
 }
 
-#if 0
-// Currently failing as the disk cache stores all blobs by value, _and_ the
-// disk cache cannot cope with disappearing blob files (which shouldn't be
-// possible).
 TEST_CASE("resolve request - disappearing blob file - full", tag)
 {
     test_resolve_to_blob_file<caching_level_type::full>(true);
 }
-#endif

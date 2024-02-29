@@ -116,7 +116,7 @@ local_disk_cache::read(std::string key)
     {
         // Something went wrong trying to load the cached value, so just
         // pretend it's not there. (It will be overwritten.)
-        logger_->error("error reading disk cache file {}: {}", key, e.what());
+        logger_->error("error reading disk cache entry {}: {}", key, e.what());
     }
     co_return std::nullopt;
 }
