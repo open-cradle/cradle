@@ -399,9 +399,10 @@ resolve_request(
     }
     else
     {
-        if (auto* rem_ctx = cast_ctx_to_ptr<remote_context_intf>(ctx))
+        if (ctx.remotely())
         {
-            return resolve_request_remote(*rem_ctx, req, lock_ptr);
+            auto& rem_ctx = cast_ctx_to_ref<remote_context_intf>(ctx);
+            return resolve_request_remote(rem_ctx, req, lock_ptr);
         }
         else
         {
