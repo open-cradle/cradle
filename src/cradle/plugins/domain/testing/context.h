@@ -131,8 +131,11 @@ make_local_async_ctx_tree(
     auto root_ctx{
         std::make_shared<local_atst_context>(tree_ctx, nullptr, true)};
     register_local_async_ctx(root_ctx);
+#if 0
+    // now in resolve_request()
     local_atst_context_tree_builder builder{*root_ctx};
     root_req.accept(builder);
+#endif
     return root_ctx;
 }
 

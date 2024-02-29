@@ -258,8 +258,19 @@ resolve_request_async(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
     {
         throw std::logic_error{"request is not visitable"};
     }
+    auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
     // Third decision: cached or not
-    else if constexpr (UncachedRequest<Req>)
+    // TODO move to coroutines?!
+    // Avoid unused code being generated for subrequests: introduce
+    // resolve_request_sub() and pass compile-time bool through the chain
+    if (actx.get_local_num_subs() == 0) // Temp hack testing for root req/ctx
+    {
+        // TODO (re-)create ctx tree, root ctx
+        // ctx.prepare_for_resolution();
+        // Populate ctx with sub ctx's
+        req.accept(*actx.make_ctx_tree_builder());
+    }
+    if constexpr (UncachedRequest<Req>)
     {
         return resolve_request_uncached<true>(ctx, req);
     }
@@ -367,6 +378,7 @@ cppcoro::task<Val> resolve_request(
  * - It seems likely that for multiple calls for the same Request, Ctx will be
  *   the same in each case (so just one template instantiation).
  * - Passing a non-nullptr lock_ptr is useless for uncached requests.
+ * - TODO lock_ptr will be nullptr for subrequest?!
  */
 template<
     Context Ctx,

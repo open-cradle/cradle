@@ -61,6 +61,8 @@ class seri_resolver_impl : public seri_resolver_intf
         assert(!ctx.remotely());
         auto req{deserialize_request<Req>(
             ctx.get_resources(), std::move(seri_req))};
+#if 0
+        // moved to resolve_request()
         // The intention of the "if constexpr" is to:
         // - Prevent build errors should Req not be visitable
         // - Generate less object code should Req not need async resolving
@@ -76,6 +78,7 @@ class seri_resolver_impl : public seri_resolver_intf
                 req.accept(*builder);
             }
         }
+#endif
         ResolutionConstraintsLocal constraints;
         auto value = co_await resolve_request(
             ctx, req, seri_lock.lock_ptr, constraints);
