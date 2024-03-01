@@ -496,6 +496,7 @@ target_link_libraries(cradle_plugins_inner PUBLIC
 
 # The library for the rpclib client
 file(GLOB_RECURSE srcs_rpclib_client CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/common/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/client/*.cpp")
 add_library(cradle_rpclib_client SHARED)
 target_sources(cradle_rpclib_client PRIVATE
@@ -605,6 +606,7 @@ target_link_libraries(websocket_server
 
 # The rpclib server
 file(GLOB_RECURSE srcs_rpclib_server CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/common/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/server/*.cpp")
 add_executable(rpclib_server ${srcs_rpclib_server})
 target_link_libraries(rpclib_server PRIVATE

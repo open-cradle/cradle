@@ -6,6 +6,7 @@
 #include "inner_service.h"
 #include "thinknode.h"
 #include <cradle/deploy_dir.h>
+#include <cradle/inner/introspection/config.h>
 #include <cradle/inner/remote/loopback.h>
 #include <cradle/inner/utilities/environment.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
@@ -26,7 +27,9 @@ service_config_map const thinknode_config_map{
     {local_disk_cache_config_keys::DIRECTORY, tests_cache_dir},
     {local_disk_cache_config_keys::SIZE_LIMIT, 0x40'00'00'00U},
     {local_disk_cache_config_keys::START_EMPTY, true},
-    {inner_config_keys::HTTP_CONCURRENCY, 2U}};
+    {inner_config_keys::HTTP_CONCURRENCY, 2U},
+    {introspection_config_keys::FORCE_FINISH, true},
+};
 
 service_config
 make_thinknode_tests_config()

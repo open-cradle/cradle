@@ -44,17 +44,29 @@ blob_file_writer::on_write_completed()
 
 blob_file_reader::blob_file_reader(file_path path) : path_{std::move(path)}
 {
-    spdlog::get("cradle")->info("blob_file_reader({})", path_.string());
+    auto& logger{*spdlog::get("cradle")};
+    logger.info("blob_file_reader({})", path_.string());
 
-    bi::file_mapping mapping{path_.c_str(), bi::read_only};
-    bi::mapped_region region{mapping, bi::read_only};
+    try
+    {
+        bi::file_mapping mapping{path_.c_str(), bi::read_only};
+        bi::mapped_region region{mapping, bi::read_only};
 
-    region_.swap(region);
+        region_.swap(region);
+    }
+    catch (std::exception const& e)
+    {
+        logger.error(
+            "error creating blob_file_reader for {}: {}",
+            path_.string(),
+            e.what());
+        throw;
+    }
 
     size_ = region_.get_size();
     data_ = reinterpret_cast<std::uint8_t*>(region_.get_address());
 
-    spdlog::get("cradle")->info("blob_file_reader(): size {}", size_);
+    logger.info("blob_file_reader(): size {}", size_);
 }
 
 } // namespace cradle

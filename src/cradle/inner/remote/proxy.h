@@ -7,6 +7,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cradle/inner/introspection/tasklet_info.h>
+#include <cradle/inner/remote/types.h>
 #include <cradle/inner/requests/types.h>
 #include <cradle/inner/resolve/seri_result.h>
 #include <cradle/inner/service/config.h>
@@ -39,23 +41,6 @@ using remote_context_spec = std::tuple<async_id, bool>;
 // Minimal descriptor for the children of a node in an asynchronous context
 // tree on a remote.
 using remote_context_spec_list = std::vector<remote_context_spec>;
-
-using tasklet_event_tuple = std::tuple<uint64_t, std::string, std::string>;
-// 1. millis since epoch (note: won't fit in uint32_t)
-// 2. tasklet_event_type converted to string
-// 3. details
-
-using tasklet_event_tuple_list = std::vector<tasklet_event_tuple>;
-
-using tasklet_info_tuple
-    = std::tuple<int, std::string, std::string, int, tasklet_event_tuple_list>;
-// 1. own tasklet id
-// 2. pool name
-// 3. tasklet title
-// 4. client tasklet id
-// 5. tasklet events
-
-using tasklet_info_tuple_list = std::vector<tasklet_info_tuple>;
 
 /*
  * Proxy for a remote (server) capable of resolving requests, synchronously
@@ -133,7 +118,7 @@ class remote_proxy
         = 0;
 
     // Retrieve introspection info
-    virtual tasklet_info_tuple_list
+    virtual tasklet_info_list
     get_tasklet_infos(bool include_finished)
         = 0;
 
@@ -164,8 +149,20 @@ class remote_proxy
 
     // Instructs the server to mock all HTTP requests, returning a 200
     // response with response_body for each.
+    // Intended for test purposes only.
     virtual void
     mock_http(std::string const& response_body)
+        = 0;
+
+    // Clears unused entries in the memory cache on the server.
+    // Intended for test purposes only.
+    virtual void
+    clear_unused_mem_cache_entries()
+        = 0;
+
+    // Releases a lock on the given memory cache record on the server.
+    virtual void
+    release_cache_record_lock(remote_cache_record_id record_id)
         = 0;
 };
 

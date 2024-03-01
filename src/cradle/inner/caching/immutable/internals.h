@@ -33,11 +33,16 @@ struct immutable_cache_record : public boost::intrusive::list_base_hook<>
     // All of the following fields are protected by the cache mutex, i.e.,
     // should be accessed only while holding that mutex.
 
-    // This is a count of how many active pointers reference this data.
+    // This is a count of how many active pointers (immutable_cache_pointer or
+    // cache_record_lock) reference this data.
     // If this is 0, the data is no longer actively in use and is queued for
     // eviction. In this case, :eviction_list_iterator points to this record's
     // entry in the eviction list.
-    unsigned ref_count = 0;
+    int ref_count = 0;
+
+    // The number of cache_record_lock objects referencing this record;
+    // at most ref_count.
+    int lock_count = 0;
 
     // (See :ref_count comment.)
     boost::intrusive::list<immutable_cache_record>::iterator
@@ -47,7 +52,7 @@ struct immutable_cache_record : public boost::intrusive::list_base_hook<>
     immutable_cache_entry_state state = immutable_cache_entry_state::LOADING;
 
     // Resolves the request, stores the value in the CAS, updates this record's
-    // cas_record reference; only peformed for the first pointer referring to
+    // cas_record reference; only performed for the first pointer referring to
     // the record.
     cppcoro::shared_task<void> task;
 
@@ -55,6 +60,24 @@ struct immutable_cache_record : public boost::intrusive::list_base_hook<>
     // (i.e., a co_await on the task has finished).
     cas_record_base* cas_record{nullptr};
 };
+
+// Indicates that a pointer started referring to the given record.
+void
+add_ref_to_cache_record(immutable_cache_record& record);
+
+// Indicates that a pointer stopped referring to the given record.
+void
+del_ref_from_cache_record(immutable_cache_record& record);
+
+// Adds a lock to the given record. Must be paired with an
+// add_ref_to_cache_record() call.
+void
+add_lock_to_cache_record(immutable_cache_record& record);
+
+// Removes a lock from the given record. Must be paired with a
+// del_ref_to_cache_record() call.
+void
+del_lock_from_cache_record(immutable_cache_record& record);
 
 /*
  * Unordered map storing the AC records in the AC cache.
@@ -80,7 +103,8 @@ using cache_record_eviction_list
 /*
  * Untyped base class for a record in the CAS.
  *
- * This holds a reference count of AC records referencing this CAS record.
+ * This holds a reference count of AC records referencing this CAS record,
+ * and a count of how many of those AC records are locked.
  * It does not hold the (typed) value itself.
  */
 class cas_record_base
@@ -88,8 +112,9 @@ class cas_record_base
  public:
     using digest_type = unique_hasher::result_t;
 
+    // Creates a CAS record on behalf of an initial referring AC record.
     cas_record_base(digest_type const& digest, std::size_t deep_size)
-        : digest_{digest}, deep_size_{deep_size}, ref_count_{1}
+        : digest_{digest}, deep_size_{deep_size}
     {
     }
 
@@ -107,6 +132,8 @@ class cas_record_base
         return deep_size_;
     }
 
+    // Returns the number of AC records (locked or not) referencing this CAS
+    // record.
     int
     ref_count() const
     {
@@ -126,10 +153,31 @@ class cas_record_base
         ref_count_ -= 1;
     }
 
+    // Returns the number of locked AC records referencing this CAS record.
+    int
+    lock_count() const
+    {
+        return lock_count_;
+    }
+
+    void
+    add_lock()
+    {
+        lock_count_ += 1;
+    }
+
+    void
+    del_lock()
+    {
+        assert(lock_count_ >= 1);
+        lock_count_ -= 1;
+    }
+
  private:
     digest_type digest_;
     std::size_t deep_size_;
-    int ref_count_;
+    int ref_count_{1};
+    int lock_count_{0};
 };
 
 /*
@@ -214,8 +262,8 @@ class cas_record_maker : public cas_record_maker_intf
 };
 
 /*
- * Content-addressable storage, storing the cache values, indexed by a digest
- * over the value.
+ * Content-addressable storage (CAS), storing the cache values, indexed by a
+ * digest over the value.
  */
 class cas_cache
 {
@@ -230,6 +278,8 @@ class cas_cache
     // reference count and returns a reference to that object.
     // Otherwise, lets record_maker create a new record (with reference
     // count 1) and returns a reference to that new record.
+    // If the new referrer is locked, an add_lock() follow-up call should
+    // occur.
     cas_record_base&
     ensure_record(
         digest_type const& digest, cas_record_maker_intf const& record_maker);
@@ -237,21 +287,45 @@ class cas_cache
     void
     del_record(cas_record_base const& record);
 
+    void
+    add_lock(cas_record_base& record);
+
+    void
+    del_lock(cas_record_base& record);
+
     int
     num_records() const
     {
         return static_cast<int>(map_.size());
     }
 
+    // Returns the total deep size of all records in the CAS.
     std::size_t
     total_size() const
     {
         return total_size_;
     }
 
+    // Returns the total deep size of all records in the CAS, that are referred
+    // to by at least one locked AC record.
+    std::size_t
+    total_locked_size() const
+    {
+        return total_locked_size_;
+    }
+
+    // Returns the total deep size of all records in the CAS, that are referred
+    // to by unlocked AC records only.
+    std::size_t
+    total_unlocked_size() const
+    {
+        return total_size_ - total_locked_size_;
+    }
+
  private:
     map_type map_;
     std::size_t total_size_{0};
+    std::size_t total_locked_size_{0};
 };
 
 struct immutable_cache_impl
@@ -266,13 +340,10 @@ struct immutable_cache_impl
 // Evict unused entries (in LRU order) until the total size of unused entries
 // in the cache is at most :desired_size (in bytes).
 // The cache doesn't know which entries are in use, so the criterion is instead
-// based on the total size of all entries.
+// based on the total size of all unlocked entries (entries that are not
+// referred to by a locked AC record).
 void
 reduce_memory_cache_size(immutable_cache_impl& cache, uint64_t desired_size);
-
-void
-reduce_memory_cache_size_no_lock(
-    immutable_cache_impl& cache, uint64_t desired_size);
 
 } // namespace detail
 } // namespace cradle

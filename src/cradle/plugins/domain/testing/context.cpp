@@ -25,10 +25,11 @@ testing_request_context::domain_name() const
 }
 
 service_config
-testing_request_context::make_config() const
+testing_request_context::make_config(bool need_record_lock) const
 {
     service_config_map config_map{
         {remote_config_keys::DOMAIN_NAME, the_domain_name},
+        {remote_config_keys::NEED_RECORD_LOCK, need_record_lock},
     };
     if (!tasklets_.empty())
     {
@@ -157,10 +158,11 @@ root_proxy_atst_context::domain_name() const
 }
 
 service_config
-root_proxy_atst_context::make_config() const
+root_proxy_atst_context::make_config(bool need_record_lock) const
 {
     service_config_map config_map{
         {remote_config_keys::DOMAIN_NAME, the_domain_name},
+        {remote_config_keys::NEED_RECORD_LOCK, need_record_lock},
     };
     if (fail_submit_async_)
     {
@@ -175,6 +177,12 @@ root_proxy_atst_context::make_config() const
     {
         config_map[testing_config_keys::SET_RESULT_DELAY]
             = static_cast<std::size_t>(set_result_delay_);
+    }
+    if (!tasklets_.empty())
+    {
+        config_map.insert(std::pair{
+            remote_config_keys::TASKLET_ID,
+            static_cast<std::size_t>(tasklets_.back()->own_id())});
     }
     return service_config{config_map};
 }
@@ -204,7 +212,7 @@ non_root_proxy_atst_context::domain_name() const
 }
 
 service_config
-non_root_proxy_atst_context::make_config() const
+non_root_proxy_atst_context::make_config(bool need_record_lock) const
 {
     // Must be called only for a root context
     throw std::logic_error{

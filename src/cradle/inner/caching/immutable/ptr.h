@@ -55,6 +55,14 @@ class untyped_immutable_cache_ptr
     operator=(untyped_immutable_cache_ptr&& other)
         = delete;
 
+    // Get the record that this pointer refers to.
+    // Intended to be opaque outside this module.
+    detail::immutable_cache_record&
+    get_record()
+    {
+        return record_;
+    }
+
     // Should be called while holding the cache's mutex.
     // Used by test code only (also the three is_* functions).
     immutable_cache_entry_state

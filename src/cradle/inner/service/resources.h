@@ -8,6 +8,8 @@
 #include <cppcoro/task.hpp>
 
 #include <cradle/inner/io/http_requests.h>
+#include <cradle/inner/remote/types.h>
+#include <cradle/inner/resolve/seri_lock.h>
 #include <cradle/inner/service/config.h>
 
 namespace cradle {
@@ -22,6 +24,7 @@ struct mock_http_session;
 class remote_proxy;
 class secondary_storage_intf;
 class seri_registry;
+class tasklet_admin;
 class tasklet_tracker;
 
 // Configuration keys for the inner resources
@@ -70,6 +73,8 @@ struct inner_config_keys
  * - Thread pools
  * - An optional mock_http_session object
  * - A registry of templates of requests that can be (de-)serialized
+ * - A collection of cache record locks that can be released
+ * - A collection of introspection tasklets
  *
  * TODO make resources optional? E.g. cacheless resolving doesn't need much.
  * service_config could indicate what to provide.
@@ -173,6 +178,20 @@ class inner_resources
     // Supporting CG R.37
     std::shared_ptr<seri_registry>
     get_seri_registry();
+
+    // Allocates an object that can lock a memory cache record.
+    // Will be called only on a server; the client will use the record_id
+    // member in the returned value to identify the record.
+    seri_cache_record_lock_t
+    alloc_cache_record_lock();
+
+    // Releases a lock on a memory cache record.
+    // record_id must be from a former alloc_cache_record_lock() call.
+    void
+    release_cache_record_lock(remote_cache_record_id record_id);
+
+    tasklet_admin&
+    the_tasklet_admin();
 
  private:
     std::unique_ptr<inner_resources_impl> impl_;

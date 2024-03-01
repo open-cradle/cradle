@@ -1747,7 +1747,7 @@ process_message(websocket_server_impl& server, client_request request)
         }
         case client_message_content_tag::INTROSPECTION_CONTROL: {
             auto const& ic = as_introspection_control(content);
-            introspection_control(ic);
+            introspection_control(server.core.the_tasklet_admin(), ic);
             send_response(
                 server,
                 request,
@@ -1759,7 +1759,7 @@ process_message(websocket_server_impl& server, client_request request)
             auto& proxy{server.core.get_proxy("rpclib")};
             auto const& isq = as_introspection_status_query(content);
             auto response = make_introspection_status_response(
-                proxy, isq.include_finished);
+                server.core.the_tasklet_admin(), proxy, isq.include_finished);
             send_response(
                 server,
                 request,
@@ -1879,7 +1879,8 @@ on_message(
                 auto const& rr = as_resolve_request(message.content);
                 os << (rr.remote ? " (remote)" : " (local)");
             }
-            tasklet = create_tasklet_tracker("server", os.str());
+            tasklet = create_tasklet_tracker(
+                server.core.the_tasklet_admin(), "server", os.str());
             server.async_scope.spawn(schedule_on(
                 server.pool,
                 process_message_with_error_handling(

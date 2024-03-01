@@ -116,7 +116,7 @@ local_disk_cache::read(std::string key)
     {
         // Something went wrong trying to load the cached value, so just
         // pretend it's not there. (It will be overwritten.)
-        logger_->error("error reading disk cache file {}: {}", key, e.what());
+        logger_->error("error reading disk cache entry {}: {}", key, e.what());
     }
     co_return std::nullopt;
 }
@@ -171,7 +171,10 @@ local_disk_cache::write(std::string key, blob value)
         try
         {
             auto digest{get_unique_string_tmpl(value)};
-            if (value.size() > 1024)
+            // A value is stored in an external file only if:
+            // - It's big enough; and
+            // - It's not already stored in a blob file.
+            if (value.size() > 1024 && !value.mapped_file_data_owner())
             {
                 auto optional_cas_id = ll_cache.initiate_insert(key, digest);
                 if (optional_cas_id)

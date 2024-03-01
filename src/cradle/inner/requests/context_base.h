@@ -116,7 +116,7 @@ class sync_context_base : public local_context_intf,
         = 0;
 
     virtual service_config
-    make_config() const override
+    make_config(bool need_record_lock) const override
         = 0;
 
     // introspective_context_intf
@@ -358,6 +358,18 @@ class local_async_context_base : public local_async_context_intf,
     get_result() override;
 
     void
+    set_cache_record_id(remote_cache_record_id record_id) override
+    {
+        cache_record_id_.store(record_id);
+    }
+
+    remote_cache_record_id
+    get_cache_record_id() const override
+    {
+        return cache_record_id_.load();
+    }
+
+    void
     request_cancellation() override
     {
         tree_ctx_->request_cancellation();
@@ -409,6 +421,7 @@ class local_async_context_base : public local_async_context_intf,
     std::string errmsg_;
     bool using_result_{false};
     blob result_;
+    std::atomic<remote_cache_record_id> cache_record_id_;
     // Using shared_ptr ensures that local_async_context_base objects are not
     // relocated during tree build-up / visit.
     // It cannot be unique_ptr because there can be two owners: the parent
@@ -582,7 +595,7 @@ class proxy_async_context_base : public remote_async_context_intf
         = 0;
 
     virtual service_config
-    make_config() const override
+    make_config(bool need_record_lock) const override
         = 0;
 
     // async_context_intf
@@ -643,13 +656,51 @@ class proxy_async_context_base : public remote_async_context_intf
  * Context that can be used to asynchronously resolve root requests on a remote
  * machine.
  */
-class root_proxy_async_context_base : public proxy_async_context_base
+class root_proxy_async_context_base : public proxy_async_context_base,
+                                      public introspective_context_intf
 {
  public:
     root_proxy_async_context_base(
         std::shared_ptr<proxy_async_tree_context_base> tree_ctx);
 
     virtual ~root_proxy_async_context_base();
+
+    // Some redundant redefinitions to prevent MSVC C4250
+    remote_context_intf*
+    to_remote_context_intf() override
+    {
+        return this;
+    }
+    async_context_intf*
+    to_async_context_intf() override
+    {
+        return this;
+    }
+    remote_async_context_intf*
+    to_remote_async_context_intf() override
+    {
+        return this;
+    }
+    introspective_context_intf*
+    to_introspective_context_intf() override
+    {
+        return this;
+    }
+    inner_resources&
+    get_resources() override
+    {
+        return proxy_async_context_base::get_resources();
+    }
+    bool
+    remotely() const override
+    {
+        return proxy_async_context_base::remotely();
+    }
+    bool
+    is_async() const override
+    {
+        return proxy_async_context_base::is_async();
+    }
 
     // remote_context_intf
     std::string const&
@@ -669,6 +720,19 @@ class root_proxy_async_context_base : public proxy_async_context_base
 
     void
     fail_remote_id() noexcept override;
+
+    // introspective_context_intf
+    tasklet_tracker*
+    get_tasklet() override;
+
+    void
+    push_tasklet(tasklet_tracker& tasklet) override;
+
+    void
+    pop_tasklet() override;
+
+ protected:
+    std::vector<tasklet_tracker*> tasklets_;
 
  private:
     std::promise<async_id> remote_id_promise_;

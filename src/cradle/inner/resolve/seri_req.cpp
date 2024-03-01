@@ -30,33 +30,43 @@ extract_uuid_str(std::string const& seri_req)
 } // namespace
 
 cppcoro::task<serialized_result>
-resolve_serialized_remote(remote_context_intf& ctx, std::string seri_req)
+resolve_serialized_remote(
+    remote_context_intf& ctx,
+    std::string seri_req,
+    seri_cache_record_lock_t seri_lock)
 {
-    co_return resolve_remote(ctx, std::move(seri_req));
+    co_return resolve_remote(ctx, std::move(seri_req), seri_lock.lock_ptr);
 }
 
 cppcoro::task<serialized_result>
-resolve_serialized_local(local_context_intf& ctx, std::string seri_req)
+resolve_serialized_local(
+    local_context_intf& ctx,
+    std::string seri_req,
+    seri_cache_record_lock_t seri_lock)
 {
     auto uuid_str{extract_uuid_str(seri_req)};
     auto& resources{ctx.get_resources()};
     auto resolver{resources.get_seri_registry()->find_resolver(uuid_str)};
     // TODO ensure resolver isn't unloaded while it's resolving
-    return resolver->resolve(ctx, std::move(seri_req));
+    return resolver->resolve(ctx, std::move(seri_req), std::move(seri_lock));
 }
 
-// Currently only called from websocket/server.cpp
 cppcoro::task<serialized_result>
-resolve_serialized_request(context_intf& ctx, std::string seri_req)
+resolve_serialized_request(
+    context_intf& ctx,
+    std::string seri_req,
+    seri_cache_record_lock_t seri_lock)
 {
     if (auto* rem_ctx = cast_ctx_to_ptr<remote_context_intf>(ctx))
     {
-        return resolve_serialized_remote(*rem_ctx, std::move(seri_req));
+        return resolve_serialized_remote(
+            *rem_ctx, std::move(seri_req), std::move(seri_lock));
     }
     else
     {
         auto& loc_ctx = cast_ctx_to_ref<local_context_intf>(ctx);
-        return resolve_serialized_local(loc_ctx, std::move(seri_req));
+        return resolve_serialized_local(
+            loc_ctx, std::move(seri_req), std::move(seri_lock));
     }
 }
 

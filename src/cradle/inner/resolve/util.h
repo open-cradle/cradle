@@ -5,10 +5,12 @@
 
 #include <cppcoro/task.hpp>
 
-#include <cradle/inner/introspection/tasklet.h>
-#include <cradle/inner/requests/generic.h>
+#include <cradle/inner/resolve/seri_lock.h>
 
 namespace cradle {
+
+class introspective_context;
+class tasklet_tracker;
 
 // Introspection for a "co_await shared_task" call that is part of a
 // resolve_request()
@@ -32,6 +34,14 @@ dummy_coroutine()
 {
     co_return;
 }
+
+cppcoro::task<serialized_result>
+resolve_serialized_introspective(
+    introspective_context_intf& ctx,
+    std::string proxy_name,
+    std::string title,
+    std::string seri_req,
+    seri_cache_record_lock_t seri_lock);
 
 } // namespace cradle
 

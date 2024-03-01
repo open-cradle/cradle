@@ -8,6 +8,7 @@
 #include <cppcoro/task.hpp>
 #include <rpc/this_handler.h>
 
+#include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/dll/dll_collection.h>
@@ -16,6 +17,7 @@
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/requests/cast_ctx.h>
 #include <cradle/inner/requests/domain.h>
+#include <cradle/inner/resolve/seri_lock.h>
 #include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/resolve/util.h>
 #include <cradle/inner/service/config_map_from_json.h>
@@ -84,6 +86,17 @@ rpclib_handler_context::claim_sync_request_thread()
     return thread_pool_claim{handler_pool_guard_};
 }
 
+static seri_cache_record_lock_t
+alloc_cache_record_lock_if_needed(
+    rpclib_handler_context& hctx, bool need_record_lock)
+{
+    if (!need_record_lock)
+    {
+        return seri_cache_record_lock_t{};
+    }
+    return hctx.service().alloc_cache_record_lock();
+}
+
 // [[noreturn]]
 // Throws something that is handled inside the rpclib library
 static void
@@ -92,18 +105,6 @@ handle_exception(rpclib_handler_context& hctx, std::exception& e)
     auto& logger{hctx.logger()};
     logger.error("caught {}", e.what());
     rpc::this_handler().respond_error(e.what());
-}
-
-cppcoro::task<serialized_result>
-resolve_serialized_introspective(
-    introspective_context_intf& ctx, std::string seri_req)
-{
-    // Ensure that the tasklet's first timestamp coincides (almost) with the
-    // "co_await shared_task".
-    co_await dummy_coroutine();
-    coawait_introspection guard{ctx, "rpclib", "resolve_sync"};
-    auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(ctx)};
-    co_return co_await resolve_serialized_local(loc_ctx, std::move(seri_req));
 }
 
 static rpclib_response
@@ -117,6 +118,9 @@ resolve_sync(
     auto domain_name
         = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
     logger.info("resolve_sync {}: {}", domain_name, seri_req);
+    auto need_record_lock{config.get_bool_or_default(
+        remote_config_keys::NEED_RECORD_LOCK, false)};
+    auto seri_lock{alloc_cache_record_lock_if_needed(hctx, need_record_lock)};
     auto& dom = hctx.service().find_domain(domain_name);
     auto ctx{dom.make_local_sync_context(config)};
     cppcoro::task<serialized_result> task;
@@ -126,15 +130,21 @@ resolve_sync(
     if (optional_client_tasklet_id && intr_ctx)
     {
         auto* client_tasklet = create_tasklet_tracker(
+            hctx.service().the_tasklet_admin(),
             static_cast<int>(*optional_client_tasklet_id));
         intr_ctx->push_tasklet(*client_tasklet);
-        task
-            = resolve_serialized_introspective(*intr_ctx, std::move(seri_req));
+        task = resolve_serialized_introspective(
+            *intr_ctx,
+            "rpclib",
+            "resolve_sync",
+            std::move(seri_req),
+            seri_lock);
     }
     else
     {
         auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(*ctx)};
-        task = resolve_serialized_local(loc_ctx, std::move(seri_req));
+        task = resolve_serialized_local(
+            loc_ctx, std::move(seri_req), seri_lock);
     }
     auto seri_result{cppcoro::sync_wait(std::move(task))};
     // TODO try to get rid of .value()
@@ -144,7 +154,8 @@ resolve_sync(
     // uniquely identifying the set of those files
     static uint32_t response_id = 0;
     response_id += 1;
-    return rpclib_response{response_id, std::move(result)};
+    return rpclib_response{
+        response_id, seri_lock.record_id.value(), std::move(result)};
 }
 
 rpclib_response
@@ -193,15 +204,12 @@ catch (std::exception& e)
 
 // Resolves an async request, running on a dedicated thread from the
 // async_request_pool_.
-// Note that any std::shared_ptr passed to this function currently won't be
-// destroyed until the thread starts processing its next task from the queue.
-// This is due to https://github.com/bshoshany/thread-pool/issues/124;
-// the solution has been implemented but not yet released.
 static void
 resolve_async(
     rpclib_handler_context& hctx,
     std::shared_ptr<local_async_context_intf> actx,
-    std::string seri_req)
+    std::string seri_req,
+    seri_cache_record_lock_t seri_lock)
 {
     auto& logger{hctx.logger()};
     if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*actx))
@@ -212,11 +220,13 @@ resolve_async(
     // TODO update status to STARTED or so
     try
     {
-        blob res = cppcoro::sync_wait(
-                       resolve_serialized_local(*actx, std::move(seri_req)))
-                       .value();
+        blob res
+            = cppcoro::sync_wait(resolve_serialized_local(
+                                     *actx, std::move(seri_req), seri_lock))
+                  .value();
         logger.info("resolve_async done: {}", res);
         actx->set_result(std::move(res));
+        actx->set_cache_record_id(seri_lock.record_id);
     }
     catch (async_cancelled const&)
     {
@@ -256,10 +266,15 @@ try
     // This function should return asap.
     // Need to dispatch a thread calling the blocking cppcoro::sync_wait().
     // TODO actx writes before now should synchronize with the pool thread
-    hctx.async_request_pool().detach_task(
-        [&hctx, actx, seri_req = std::move(seri_req)] {
-            resolve_async(hctx, actx, seri_req);
-        });
+    auto need_record_lock{config.get_bool_or_default(
+        remote_config_keys::NEED_RECORD_LOCK, false)};
+    auto seri_lock{alloc_cache_record_lock_if_needed(hctx, need_record_lock)};
+    hctx.async_request_pool().detach_task([&hctx,
+                                           actx,
+                                           seri_req = std::move(seri_req),
+                                           seri_lock = std::move(seri_lock)] {
+        resolve_async(hctx, actx, std::move(seri_req), std::move(seri_lock));
+    });
     async_id aid = actx->get_id();
     logger.info("async_id {}", aid);
     return aid;
@@ -347,7 +362,8 @@ try
     auto actx{db.find(root_aid)};
     // TODO response_id
     uint32_t response_id = 0;
-    return rpclib_response{response_id, actx->get_result()};
+    return rpclib_response{
+        response_id, actx->get_cache_record_id().value(), actx->get_result()};
 }
 catch (std::exception& e)
 {
@@ -388,66 +404,12 @@ catch (std::exception& e)
     return int{};
 }
 
-namespace {
-
-template<typename TimePoint>
-static decltype(auto)
-to_millis(TimePoint time_point)
-{
-    auto duration = duration_cast<std::chrono::milliseconds>(
-        time_point.time_since_epoch());
-    return duration.count();
-}
-
-static tasklet_event_tuple
-make_event_tuple(tasklet_event const& event)
-{
-    return tasklet_event_tuple{
-        to_millis(event.when()), to_string(event.what()), event.details()};
-}
-
-bool
-is_placeholder_info(tasklet_info const& info)
-{
-    return info.pool_name() == "client";
-}
-
-tasklet_info_tuple
-make_info_tuple(tasklet_info const& info)
-{
-    int client_id{NO_TASKLET_ID};
-    if (info.have_client())
-    {
-        client_id = info.client_id();
-    }
-    std::vector<tasklet_event_tuple> events;
-    for (auto const& e : info.events())
-    {
-        events.push_back(make_event_tuple(e));
-    }
-    return tasklet_info_tuple{
-        info.own_id(),
-        info.pool_name(),
-        info.title(),
-        client_id,
-        std::move(events)};
-}
-
-} // namespace
-
 tasklet_info_tuple_list
 handle_get_tasklet_infos(rpclib_handler_context& hctx, bool include_finished)
 try
 {
-    tasklet_info_tuple_list result;
-    for (auto info : get_tasklet_infos(include_finished))
-    {
-        if (!is_placeholder_info(info))
-        {
-            result.push_back(make_info_tuple(info));
-        }
-    }
-    return result;
+    return make_info_tuples(get_tasklet_infos(
+        hctx.service().the_tasklet_admin(), include_finished));
 }
 catch (std::exception& e)
 {
@@ -481,6 +443,36 @@ try
 
     auto& the_dlls{hctx.service().the_dlls()};
     the_dlls.unload(dll_name);
+}
+catch (std::exception& e)
+{
+    handle_exception(hctx, e);
+}
+
+void
+handle_clear_unused_mem_cache_entries(rpclib_handler_context& hctx)
+try
+{
+    auto& logger{hctx.logger()};
+    logger.info("handle_clear_unused_mem_cache_entries()");
+
+    auto& resources{hctx.service()};
+    clear_unused_entries(resources.memory_cache());
+}
+catch (std::exception& e)
+{
+    handle_exception(hctx, e);
+}
+
+void
+handle_release_cache_record_lock(
+    rpclib_handler_context& hctx, remote_cache_record_id record_id)
+try
+{
+    auto& logger{hctx.logger()};
+    logger.info("handle_release_cache_record_lock({})", record_id.value());
+
+    hctx.service().release_cache_record_lock(record_id);
 }
 catch (std::exception& e)
 {

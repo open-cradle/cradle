@@ -79,7 +79,7 @@ class test_proxy : public remote_proxy
         throw not_implemented_error{"test_proxy::finish_async()"};
     }
 
-    tasklet_info_tuple_list
+    tasklet_info_list
     get_tasklet_infos(bool include_finished) override
     {
         throw not_implemented_error{"test_proxy::get_tasklet_infos()"};
@@ -101,6 +101,19 @@ class test_proxy : public remote_proxy
     mock_http(std::string const& response_body) override
     {
         throw not_implemented_error("test_proxy::mock_http()");
+    }
+
+    void
+    clear_unused_mem_cache_entries() override
+    {
+        throw not_implemented_error(
+            "test_proxy::clear_unused_mem_cache_entries()");
+    }
+
+    void
+    release_cache_record_lock(remote_cache_record_id record_id) override
+    {
+        throw not_implemented_error("test_proxy::release_cache_record_lock()");
     }
 
  private:

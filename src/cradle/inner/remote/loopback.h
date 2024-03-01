@@ -8,6 +8,7 @@
 
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/remote/proxy.h>
+#include <cradle/inner/resolve/seri_lock.h>
 #include <cradle/inner/service/resources.h>
 
 namespace cradle {
@@ -61,7 +62,7 @@ class loopback_service : public remote_proxy
     void
     finish_async(async_id root_aid) override;
 
-    tasklet_info_tuple_list
+    tasklet_info_list
     get_tasklet_infos(bool include_finished) override;
 
     void
@@ -73,6 +74,12 @@ class loopback_service : public remote_proxy
     void
     mock_http(std::string const& response_body) override;
 
+    void
+    clear_unused_mem_cache_entries() override;
+
+    void
+    release_cache_record_lock(remote_cache_record_id record_id) override;
+
  private:
     std::unique_ptr<inner_resources> resources_;
     bool testing_;
@@ -81,6 +88,9 @@ class loopback_service : public remote_proxy
 
     async_db&
     get_async_db();
+
+    seri_cache_record_lock_t
+    alloc_cache_record_lock_if_needed(bool need_record_lock);
 };
 
 } // namespace cradle

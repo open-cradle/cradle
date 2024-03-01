@@ -4,9 +4,9 @@
 
 #include "../../support/concurrency_testing.h"
 #include "../../support/inner_service.h"
-#include "../../support/tasklet_testing.h"
 #include "../../support/thinknode.h"
 #include <cradle/inner/caching/immutable/cache.h>
+#include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/thinknode/caching.h>
 
@@ -19,9 +19,9 @@ static char const tag[] = "[unit][thinknode][caching]";
 // A newly created tasklet will be the latest one for which
 // info can be retrieved.
 tasklet_info
-latest_tasklet_info()
+latest_tasklet_info(tasklet_admin& admin)
 {
-    auto all_infos = get_tasklet_infos(true);
+    auto all_infos = get_tasklet_infos(admin, true);
     REQUIRE(all_infos.size() > 0);
     return all_infos[all_infos.size() - 1];
 }
@@ -52,7 +52,8 @@ eval_tasks(
     {
         auto snapshot0 = get_cache_snapshot(cache);
         REQUIRE(snapshot0.pending_eviction.size() == 1);
-        REQUIRE(snapshot0.total_size == B);
+        auto info0{get_summary_info(cache)};
+        REQUIRE(info0.cas_total_size == B);
     }
 
     auto res1 = co_await task1;
@@ -71,7 +72,8 @@ eval_tasks(
     {
         auto snapshot1 = get_cache_snapshot(cache);
         REQUIRE(snapshot1.pending_eviction.size() == 2);
-        REQUIRE(snapshot1.total_size == 2 * B);
+        auto info1{get_summary_info(cache)};
+        REQUIRE(info1.cas_total_size == 2 * B);
     }
 
     // Simulate another thread kicking in and cleaning up the eviction list.
@@ -82,7 +84,8 @@ eval_tasks(
     {
         auto snapshot2 = get_cache_snapshot(cache);
         REQUIRE(snapshot2.pending_eviction.size() == 0);
-        REQUIRE(snapshot2.total_size == 0);
+        auto info2{get_summary_info(cache)};
+        REQUIRE(info2.cas_total_size == 0);
     }
 
     auto res0 = co_await task0;
@@ -276,20 +279,21 @@ TEST_CASE("lazily generated cached tasks", tag)
 TEST_CASE("shared_task_for_cacheable", tag)
 {
     auto resources{make_inner_test_resources()};
-    clean_tasklet_admin_fixture fixture;
+    auto& admin{resources->the_tasklet_admin()};
+    introspection_set_capturing_enabled(admin, true);
 
     captured_id cache_key{make_captured_id(87)};
     auto task_creator = []() -> cppcoro::task<blob> {
         co_return make_blob(std::string("314"));
     };
-    auto client = create_tasklet_tracker("client_pool", "client_title");
+    auto client = create_tasklet_tracker(admin, "client_pool", "client_title");
     auto me = make_shared_task_for_cacheable<blob>(
         *resources, std::move(cache_key), task_creator, client, "my summary");
     auto res = cppcoro::sync_wait(
         [&]() -> cppcoro::task<blob> { co_return co_await me; }());
 
     REQUIRE(res == make_blob(std::string("314")));
-    auto events = latest_tasklet_info().events();
+    auto events = latest_tasklet_info(admin).events();
     REQUIRE(events.size() == 3);
     REQUIRE(events[0].what() == tasklet_event_type::SCHEDULED);
     REQUIRE(events[1].what() == tasklet_event_type::BEFORE_CO_AWAIT);

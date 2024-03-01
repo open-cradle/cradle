@@ -49,12 +49,9 @@ struct ll_disk_cache_cas_entry
     // The digest is assumed to be unique (no collisions).
     std::string digest;
 
-    // true iff the value is stored directly in the database
-    bool in_db;
-
-    // the value associated with the entry - This may be omitted, depending
-    // on how the entry is stored in the cache and how this info was
-    // queried.
+    // The value associated with the entry. If nullopt, the value is stored
+    // (possibly compressed) in an external file, whose name can be derived
+    // from the digest.
     std::optional<blob> value;
 
     // the size of the entry, as stored in the cache (in bytes)
@@ -92,11 +89,6 @@ class ll_disk_cache
     disk_cache_info
     get_summary_info();
 
-    // Get a list of all entries in the CAS.
-    // None of the returned entries will include values.
-    std::vector<ll_disk_cache_cas_entry>
-    get_cas_entry_list();
-
     // Remove an individual entry from the AC; if the AC entry holds the
     // only reference to a CAS record, remove that too.
     void
@@ -110,10 +102,6 @@ class ll_disk_cache
     //
     // The returned entry is valid iff there's a valid CAS entry associated
     // with :key.
-    //
-    // Note that for entries stored directly in the database, this also
-    // retrieves the value associated with the entry.
-    //
     std::optional<ll_disk_cache_cas_entry>
     find(std::string const& ac_key);
 

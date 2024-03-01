@@ -40,6 +40,7 @@ get_summary_info(immutable_cache& cache)
         = info.ac_num_records - info.ac_num_records_pending_eviction;
     info.cas_num_records = impl.cas.num_records();
     info.cas_total_size = impl.cas.total_size();
+    info.cas_total_locked_size = impl.cas.total_locked_size();
     return info;
 }
 
@@ -54,7 +55,6 @@ operator<<(std::ostream& os, immutable_cache_entry_snapshot const& entry)
 std::ostream&
 operator<<(std::ostream& os, immutable_cache_snapshot const& snapshot)
 {
-    os << "CAS size: " << snapshot.total_size << "\n";
     os << snapshot.in_use.size() << " entries in use\n";
     int i = 0;
     for (auto const& entry : snapshot.in_use)
@@ -95,7 +95,6 @@ get_cache_snapshot(immutable_cache& cache_object)
             snapshot.in_use.push_back(std::move(entry));
         }
     }
-    snapshot.total_size = cache.cas.total_size();
     return snapshot;
 }
 

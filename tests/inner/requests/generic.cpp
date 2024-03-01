@@ -61,7 +61,7 @@ class remote_context_mixin : public remote_context_intf
     }
 
     service_config
-    make_config() const override
+    make_config(bool need_record_lock) const override
     {
         throw not_implemented_error();
     }

@@ -13,7 +13,6 @@
 #include "../../support/concurrency_testing.h"
 #include "../../support/inner_service.h"
 #include "../../support/request.h"
-#include "../../support/tasklet_testing.h"
 #include "../../support/thinknode.h"
 #include "../../thinknode-dll/t0/make_some_blob_t0.h"
 #include "../../thinknode-dll/t0/make_some_blob_t0_impl.h"
@@ -186,7 +185,7 @@ test_post_iss_requests_parallel(
     constexpr caching_level_type level = Request::caching_level;
     scope.clear_caches();
     auto& resources{scope.get_resources()};
-    clean_tasklet_admin_fixture fixture;
+    auto& admin{resources.the_tasklet_admin()};
 
     mock_http_session* mock_http{nullptr};
     if (auto proxy = scope.get_proxy())
@@ -222,7 +221,7 @@ test_post_iss_requests_parallel(
     tasklet_tracker* tasklet = nullptr;
     if (introspective)
     {
-        tasklet = create_tasklet_tracker("my_pool", "my_title");
+        tasklet = create_tasklet_tracker(admin, "my_pool", "my_title");
     }
     auto ctx{scope.make_context(tasklet)};
 
@@ -236,7 +235,7 @@ test_post_iss_requests_parallel(
     // Order unspecified so don't check mock_http.is_in_order()
     if (introspective)
     {
-        auto infos = get_tasklet_infos(true);
+        auto infos = get_tasklet_infos(admin, true);
         // my_post_iss_object_request, HTTP request
         REQUIRE(infos.size() == 2);
         REQUIRE(infos[0].pool_name() == "my_pool");

@@ -180,15 +180,15 @@ rpclib_client::finish_async(async_id root_aid)
     logger.debug("finish_async done");
 }
 
-tasklet_info_tuple_list
+tasklet_info_list
 rpclib_client::get_tasklet_infos(bool include_finished)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("get_tasklet_infos {}", include_finished);
-    auto infos = pimpl_->do_rpc_call("get_tasklet_infos", include_finished)
-                     .as<tasklet_info_tuple_list>();
+    auto tuples = pimpl_->do_rpc_call("get_tasklet_infos", include_finished)
+                      .as<tasklet_info_tuple_list>();
     logger.debug("get_tasklet_infos done");
-    return infos;
+    return make_tasklet_infos(tuples);
 }
 
 void
@@ -216,6 +216,24 @@ rpclib_client::mock_http(std::string const& response_body)
     logger.debug("mock_http start");
     pimpl_->do_rpc_call("mock_http", response_body);
     logger.debug("mock_http finished");
+}
+
+void
+rpclib_client::clear_unused_mem_cache_entries()
+{
+    auto& logger{*pimpl_->logger_};
+    logger.debug("clear_unused_mem_cache_entries start");
+    pimpl_->do_rpc_call("clear_unused_mem_cache_entries");
+    logger.debug("clear_unused_mem_cache_entries finished");
+}
+
+void
+rpclib_client::release_cache_record_lock(remote_cache_record_id record_id)
+{
+    auto& logger{*pimpl_->logger_};
+    logger.debug("release_cache_record_lock start");
+    pimpl_->do_rpc_call("release_cache_record_lock", record_id.value());
+    logger.debug("release_cache_record_lock finished");
 }
 
 // Note is blocking
@@ -425,15 +443,23 @@ serialized_result
 rpclib_client_impl::make_serialized_result(rpclib_response const& response)
 {
     auto response_id = std::get<0>(response);
-    blob value = std::get<1>(response);
+    auto record_lock_id_value = std::get<1>(response);
+    blob value = std::get<2>(response);
     std::unique_ptr<deserialization_observer> observer;
-    logger_->debug("response_id {}, value {}", response_id, value);
+    logger_->debug(
+        "response_id {}, record_lock_id {}, value {}",
+        response_id,
+        record_lock_id_value,
+        value);
     if (response_id != 0)
     {
         observer = std::make_unique<rpclib_deserialization_observer>(
             *this, response_id);
     }
-    return serialized_result(value, std::move(observer));
+    return serialized_result(
+        value,
+        std::move(observer),
+        remote_cache_record_id{record_lock_id_value});
 }
 
 rpclib_deserialization_observer::rpclib_deserialization_observer(

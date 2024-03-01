@@ -14,6 +14,7 @@
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/resolve/resolve_request.h>
+#include <cradle/inner/resolve/seri_lock.h>
 #include <cradle/inner/resolve/seri_result.h>
 #include <cradle/plugins/serialization/response/msgpack.h>
 
@@ -30,7 +31,11 @@ class seri_resolver_intf
     virtual ~seri_resolver_intf() = default;
 
     virtual cppcoro::task<serialized_result>
-    resolve(local_context_intf& ctx, std::string seri_req) = 0;
+    resolve(
+        local_context_intf& ctx,
+        std::string seri_req,
+        seri_cache_record_lock_t seri_lock)
+        = 0;
 };
 
 /**
@@ -48,7 +53,10 @@ class seri_resolver_impl : public seri_resolver_intf
 {
  public:
     cppcoro::task<serialized_result>
-    resolve(local_context_intf& ctx, std::string seri_req) override
+    resolve(
+        local_context_intf& ctx,
+        std::string seri_req,
+        seri_cache_record_lock_t seri_lock) override
     {
         assert(!ctx.remotely());
         auto req{deserialize_request<Req>(
@@ -69,8 +77,10 @@ class seri_resolver_impl : public seri_resolver_intf
             }
         }
         ResolutionConstraintsLocal constraints;
-        auto value = co_await resolve_request(ctx, req, constraints);
-        co_return serialized_result{serialize_response(value)};
+        auto value = co_await resolve_request(
+            ctx, req, seri_lock.lock_ptr, constraints);
+        co_return serialized_result{
+            serialize_response(value), seri_lock.record_id};
     }
 };
 

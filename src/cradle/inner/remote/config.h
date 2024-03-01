@@ -15,6 +15,12 @@ struct remote_config_keys
     // (Optional number)
     // Tasklet id for the client invoking the remote operation
     inline static std::string const TASKLET_ID{"remote/tasklet_id"};
+
+    // (Optional boolean)
+    // If true, the memory cache record for the request being resolved should
+    // be locked on behalf of the caller, until the caller releases the lock.
+    inline static std::string const NEED_RECORD_LOCK{
+        "remote/need_record_lock"};
 };
 
 } // namespace cradle

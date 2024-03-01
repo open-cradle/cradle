@@ -11,6 +11,7 @@
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/context.h>
+#include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 
 using namespace cradle;
@@ -433,6 +434,50 @@ TEST_CASE("evaluate function request - memory cache behavior", tag)
     CHECK(info3.cas_num_records == 1);
 }
 
+TEST_CASE("evaluate function request - lock cache record", tag)
+{
+    auto resources{make_inner_test_resources()};
+    caching_request_resolution_context ctx{*resources};
+    auto& mem_cache{resources->memory_cache()};
+    request_props<caching_level_type::memory> props{make_test_uuid(10)};
+    int num_add_calls{};
+    auto add{create_adder(num_add_calls)};
+    auto req{rq_function(props, add, 6, 3)};
+
+    // Resolve the request while obtaining a lock on the memory cache record.
+    auto lock0{std::make_unique<cache_record_lock>()};
+    auto res0 = cppcoro::sync_wait(resolve_request(ctx, req, &*lock0));
+    REQUIRE(res0 == 9);
+
+    // Due to the lock, the AC record is still in use, and can't be evicted.
+    clear_unused_entries(mem_cache);
+    auto info0{get_summary_info(mem_cache)};
+    CHECK(info0.ac_num_records_in_use == 1);
+    CHECK(info0.ac_num_records_pending_eviction == 0);
+    CHECK(info0.cas_num_records == 1);
+
+    // Obtain a second lock on the same AC record.
+    auto lock1{std::make_unique<cache_record_lock>()};
+    auto res1 = cppcoro::sync_wait(resolve_request(ctx, req, &*lock1));
+    REQUIRE(res1 == 9);
+
+    // The AC record now has two locks. Deleting one has no effect.
+    lock0.reset();
+    clear_unused_entries(mem_cache);
+    auto info1{get_summary_info(mem_cache)};
+    CHECK(info1.ac_num_records_in_use == 1);
+    CHECK(info1.ac_num_records_pending_eviction == 0);
+    CHECK(info1.cas_num_records == 1);
+
+    // After all locks are gone, the AC record can be evicted.
+    lock1.reset();
+    clear_unused_entries(mem_cache);
+    auto info2{get_summary_info(mem_cache)};
+    CHECK(info2.ac_num_records_in_use == 0);
+    CHECK(info2.ac_num_records_pending_eviction == 0);
+    CHECK(info2.cas_num_records == 0);
+}
+
 template<caching_level_type Level, template<typename Req> class CtxMaker>
 static void
 test_composition_or_value_based()
@@ -602,4 +647,145 @@ TEST_CASE("evaluate function request - disk cached, CBC, async", tag)
 TEST_CASE("evaluate function request - disk cached, VBC, async", tag)
 {
     test_composition_or_value_based_async<caching_level_type::full_vb>();
+}
+
+// Verify that caches distinguish between plain blobs and blob files whose
+// values are identical:
+// Resolve a request to a plain blob and store it in the cache(s).
+// Then resolve an almost identical request to a blob file and check that the
+// result was really calculated, and not read from the cache.
+template<caching_level_type caching_level>
+static void
+test_resolve_blob_file_or_not(std::string const& proxy_name)
+{
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option{})};
+    testing_request_context ctx{*resources, nullptr, proxy_name};
+
+    auto req0{rq_make_some_blob<caching_level>(256, false)};
+    auto res0 = cppcoro::sync_wait(resolve_request(ctx, req0));
+
+    REQUIRE(res0.size() == 256);
+    REQUIRE(res0.data()[0xff] == static_cast<std::byte>(0x55));
+    auto* res0_owner = res0.mapped_file_data_owner();
+    REQUIRE(res0_owner == nullptr);
+
+    auto req1{rq_make_some_blob<caching_level>(256, true)};
+    auto res1 = cppcoro::sync_wait(resolve_request(ctx, req1));
+
+    REQUIRE(res1.size() == 256);
+    REQUIRE(res1.data()[0xff] == static_cast<std::byte>(0x55));
+    auto* res1_owner = res1.mapped_file_data_owner();
+    REQUIRE(res1_owner != nullptr);
+}
+
+TEST_CASE("resolve request - blob file or not - mem, local", tag)
+{
+    test_resolve_blob_file_or_not<caching_level_type::memory>("");
+}
+
+TEST_CASE("resolve request - blob file or not - mem, loopback", tag)
+{
+    test_resolve_blob_file_or_not<caching_level_type::memory>("loopback");
+}
+
+TEST_CASE("resolve request - blob file or not - mem, rpclib", tag)
+{
+    test_resolve_blob_file_or_not<caching_level_type::memory>("rpclib");
+}
+
+TEST_CASE("resolve request - blob file or not - full, local", tag)
+{
+    test_resolve_blob_file_or_not<caching_level_type::full>("");
+}
+
+TEST_CASE("resolve request - blob file or not - full, loopback", tag)
+{
+    test_resolve_blob_file_or_not<caching_level_type::full>("loopback");
+}
+
+TEST_CASE("resolve request - blob file or not - full, rpclib", tag)
+{
+    test_resolve_blob_file_or_not<caching_level_type::full>("rpclib");
+}
+
+// If test_remove_blob_file is:
+// - false: verify that the cache stores a blob file by path, not by value
+// - true: verify that the framework is robust against a removed blob file
+//   (even if blob files shouldn't just disappear)
+template<caching_level_type caching_level>
+static void
+test_resolve_to_blob_file(bool test_remove_blob_file)
+{
+    std::string proxy_name{};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option{})};
+    testing_request_context ctx{*resources, nullptr, proxy_name};
+
+    auto req{rq_make_some_blob<caching_level>(256, true)};
+    auto res0 = cppcoro::sync_wait(resolve_request(ctx, req));
+
+    REQUIRE(res0.size() == 256);
+    REQUIRE(res0.data()[0xff] == static_cast<std::byte>(0x55));
+    auto* res0_owner = res0.mapped_file_data_owner();
+    REQUIRE(res0_owner != nullptr);
+    std::string file0{res0_owner->mapped_file()};
+
+    if (test_remove_blob_file)
+    {
+        remove(file_path(file0));
+    }
+    if constexpr (is_fully_cached(caching_level))
+    {
+        sync_wait_write_disk_cache(*resources);
+        resources->reset_memory_cache();
+    }
+
+    auto res1 = cppcoro::sync_wait(resolve_request(ctx, req));
+    REQUIRE(res1.size() == 256);
+    REQUIRE(res1.data()[0xff] == static_cast<std::byte>(0x55));
+    auto* res1_owner = res1.mapped_file_data_owner();
+    REQUIRE(res1_owner != nullptr);
+    std::string file1{res1_owner->mapped_file()};
+    if (!test_remove_blob_file)
+    {
+        // The second resolve should return the cached blob file.
+        REQUIRE(file1 == file0);
+    }
+    else
+    {
+        if constexpr (!is_fully_cached(caching_level))
+        {
+            // The memory cache entry should hold on to the original shared
+            // memory region, even though that can no longer be accessed via
+            // the removed blob file.
+            REQUIRE(file1 == file0);
+        }
+        else
+        {
+            // The disk cache cannot hold on to the shared memory region, so
+            // the second resolve should have created a new blob file.
+            REQUIRE(file1 != file0);
+        }
+    }
+}
+
+TEST_CASE("resolve request - blob file storage in cache - mem", tag)
+{
+    test_resolve_to_blob_file<caching_level_type::memory>(false);
+}
+
+TEST_CASE("resolve request - blob file storage in cache - full", tag)
+{
+    test_resolve_to_blob_file<caching_level_type::full>(false);
+}
+
+TEST_CASE("resolve request - disappearing blob file - mem", tag)
+{
+    test_resolve_to_blob_file<caching_level_type::memory>(true);
+}
+
+TEST_CASE("resolve request - disappearing blob file - full", tag)
+{
+    test_resolve_to_blob_file<caching_level_type::full>(true);
 }

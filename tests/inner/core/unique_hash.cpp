@@ -1,10 +1,14 @@
 #include <cstring>
+#include <filesystem>
 
 #include <catch2/catch.hpp>
 
+#include <cradle/inner/blob_file/blob_file.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/core/unique_hash.h>
+#include <cradle/inner/fs/types.h>
+#include <cradle/inner/fs/utilities.h>
 
 using namespace cradle;
 
@@ -23,54 +27,52 @@ static unique_hasher::result_t const null_result{
 static std::string const null_string{
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"};
 
+// Verify that hasher's result equals the reference, as defined by ref_hasher
+void
+verify_ref_result(unique_hasher& hasher, unique_hasher& ref_hasher)
+{
+    auto actual_string{hasher.get_string()};
+    auto ref_string{ref_hasher.get_string()};
+    REQUIRE(actual_string.size() == SHA256_DIGEST_LENGTH * 2);
+    REQUIRE(actual_string != null_string);
+    REQUIRE(actual_string == ref_string);
+
+    auto actual_result{hasher.get_result()};
+    auto ref_result{ref_hasher.get_result()};
+    REQUIRE(memcmp(&actual_result, &null_result, sizeof(actual_result)) != 0);
+    REQUIRE(memcmp(&actual_result, &ref_result, sizeof(actual_result)) == 0);
+}
+
 static char const ref_data[] = {0x01, 0x02, 0x03, 0x04};
-
-// Get the hash result over the reference input (ref_data)
-unique_hasher::result_t
-get_ref_result()
-{
-    unique_hasher hasher;
-    hasher.encode_bytes(ref_data, 4);
-    return hasher.get_result();
-}
-
-// Get the hash string over the reference input (ref_data)
-std::string
-get_ref_string()
-{
-    unique_hasher hasher;
-    hasher.encode_bytes(ref_data, 4);
-    return hasher.get_string();
-}
 
 // Verify that hasher's result equals the reference
 void
 verify_ref_result(unique_hasher& hasher)
 {
-    auto result{hasher.get_result()};
-    REQUIRE(memcmp(&result, &null_result, sizeof(result)) != 0);
-    auto ref_result{get_ref_result()};
-    REQUIRE(memcmp(&result, &ref_result, sizeof(result)) == 0);
-
-    auto s{hasher.get_string()};
-    REQUIRE(s.size() == SHA256_DIGEST_LENGTH * 2);
-    REQUIRE(s != null_string);
-    REQUIRE(s == get_ref_string());
+    // Calculate a reference hash over the reference data (ref_data)
+    unique_hasher ref_hasher;
+    ref_hasher.encode_bytes(ref_data, sizeof(ref_data));
+    verify_ref_result(hasher, ref_hasher);
 }
 
 // Verify that hasher's result differs from the reference
 void
 verify_non_ref_result(unique_hasher& hasher)
 {
-    auto result{hasher.get_result()};
-    REQUIRE(memcmp(&result, &null_result, sizeof(result)) != 0);
-    auto ref_result{get_ref_result()};
-    REQUIRE(memcmp(&result, &ref_result, sizeof(result)) != 0);
+    // Calculate a reference hash over the reference data (ref_data)
+    unique_hasher ref_hasher;
+    ref_hasher.encode_bytes(ref_data, sizeof(ref_data));
+    auto ref_string{ref_hasher.get_string()};
+    auto ref_result{ref_hasher.get_result()};
 
-    auto s{hasher.get_string()};
-    REQUIRE(s.size() == SHA256_DIGEST_LENGTH * 2);
-    REQUIRE(s != null_string);
-    REQUIRE(s != get_ref_string());
+    auto actual_string{hasher.get_string()};
+    REQUIRE(actual_string.size() == SHA256_DIGEST_LENGTH * 2);
+    REQUIRE(actual_string != null_string);
+    REQUIRE(actual_string != ref_string);
+
+    auto actual_result{hasher.get_result()};
+    REQUIRE(memcmp(&actual_result, &null_result, sizeof(actual_result)) != 0);
+    REQUIRE(memcmp(&actual_result, &ref_result, sizeof(actual_result)) != 0);
 }
 
 } // namespace
@@ -181,12 +183,54 @@ TEST_CASE("update_unique_hash: string", tag)
     verify_ref_result(hasher);
 }
 
-TEST_CASE("update_unique_hash: blob", tag)
+TEST_CASE("update_unique_hash: plain blob", tag)
 {
-    // Assumes that a blob is hashed by hashing its bytes
     unique_hasher hasher;
-    auto val{make_blob(std::string{ref_data, 4})};
-    update_unique_hash(hasher, val);
+    std::string ref_data_string{ref_data, sizeof(ref_data)};
 
-    verify_ref_result(hasher);
+    // Calculate a reference hash over the reference data:
+    // a 0x00 tag, followed by the blob data
+    std::string plain_blob_ref_data{'\x00'};
+    plain_blob_ref_data.append(ref_data_string);
+    unique_hasher ref_hasher;
+    update_unique_hash(ref_hasher, plain_blob_ref_data);
+
+    auto val{make_blob(ref_data_string)};
+    update_unique_hash(hasher, val);
+    verify_ref_result(hasher, ref_hasher);
+}
+
+TEST_CASE("update_unique_hash: blob file", tag)
+{
+    namespace fs = std::filesystem;
+    std::string cache_dir{"tests_cache"};
+    fs::path cache_dir_path{cache_dir};
+    reset_directory(cache_dir_path);
+    fs::path path{cache_dir_path / "blob_19"};
+
+    // Calculate a reference hash over the reference data:
+    // a 0x01 tag, followed by the path.
+    std::string blob_file_ref_data{'\x01'};
+    blob_file_ref_data.append(path.string());
+    unique_hasher ref_hasher;
+    update_unique_hash(ref_hasher, blob_file_ref_data);
+
+    // Test a blob owned by a blob file writer.
+    // Contents of the blob file don't matter for this test.
+    auto shared_writer{std::make_shared<blob_file_writer>(path, 5)};
+    auto& writer{*shared_writer};
+    std::memcpy(writer.data(), "abcde", 5);
+    writer.on_write_completed();
+    blob writer_blob{shared_writer, writer.bytes(), writer.size()};
+    unique_hasher writer_hasher;
+    update_unique_hash(writer_hasher, writer_blob);
+    verify_ref_result(writer_hasher, ref_hasher);
+
+    // Test a blob owned by a blob file reader.
+    auto shared_reader{std::make_shared<blob_file_reader>(path)};
+    auto& reader{*shared_reader};
+    blob reader_blob{shared_reader, reader.bytes(), reader.size()};
+    unique_hasher reader_hasher;
+    update_unique_hash(reader_hasher, reader_blob);
+    verify_ref_result(reader_hasher, ref_hasher);
 }

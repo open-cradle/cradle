@@ -41,6 +41,7 @@
 //
 
 #include <cradle/inner/caching/immutable/cache.h>
+#include <cradle/inner/caching/immutable/lock.h>
 #include <cradle/inner/caching/immutable/ptr.h>
 
 #endif

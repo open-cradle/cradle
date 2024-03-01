@@ -5,6 +5,7 @@
 #include <catch2/catch.hpp>
 #include <sqlite3.h>
 
+#include <cradle/inner/blob_file/blob_file.h>
 #include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/encodings/base64.h>
@@ -420,56 +421,6 @@ TEST_CASE("cache summary info", tag)
     check_summary_info();
 }
 
-TEST_CASE("cache CAS entry list", tag)
-{
-    auto cache{create_disk_cache()};
-    test_item_access(cache, 0);
-    test_item_access(cache, 1);
-    test_item_access(cache, 2);
-    // Remove an entry (AC and CAS).
-    {
-        auto opt_ac_id = cache.look_up_ac_id(generate_key_string(0));
-        if (opt_ac_id)
-        {
-            cache.remove_entry(*opt_ac_id);
-        }
-    }
-    // Check the entry list.
-    auto entries = cache.get_cas_entry_list();
-    // One entry has its value stored in the database, the other one in a file,
-    // but the returned order is unspecified.
-    REQUIRE(entries.size() == 2);
-    ll_disk_cache_cas_entry* file_entry{nullptr};
-    ll_disk_cache_cas_entry* db_entry{nullptr};
-    if (entries[0].in_db)
-    {
-        file_entry = &entries[1];
-        db_entry = &entries[0];
-    }
-    else
-    {
-        file_entry = &entries[0];
-        db_entry = &entries[1];
-    }
-    {
-        REQUIRE(
-            file_entry->digest
-            == get_unique_string_tmpl(generate_value_string(1)));
-        REQUIRE(
-            std::size_t(file_entry->size)
-            == generate_value_string(1).length());
-        REQUIRE(!file_entry->in_db);
-    }
-    {
-        REQUIRE(
-            db_entry->digest
-            == get_unique_string_tmpl(generate_value_string(2)));
-        REQUIRE(
-            std::size_t(db_entry->size) == generate_value_string(2).length());
-        REQUIRE(db_entry->in_db);
-    }
-}
-
 TEST_CASE("corrupt cache", tag)
 {
     // Set up an invalid cache directory.
@@ -566,4 +517,35 @@ TEST_CASE("recover from a missing finish_insert", tag)
         REQUIRE(info.ac_entry_count == 2);
         REQUIRE(info.cas_entry_count == 2);
     }
+}
+
+TEST_CASE("disk cache - blob file", tag)
+{
+    namespace fs = std::filesystem;
+    std::string cache_dir{"disk_cache"};
+    fs::path cache_dir_path{cache_dir};
+    reset_directory(cache_dir_path);
+    fs::path path{cache_dir_path / "blob_23"};
+    ll_disk_cache cache{create_config(cache_dir)};
+
+    auto writer{std::make_shared<blob_file_writer>(path, 5)};
+    std::memcpy(writer->data(), "abcde", 5);
+    writer->on_write_completed();
+    blob written_value{writer, writer->bytes(), writer->size()};
+    auto key = generate_key_string(3);
+    auto digest = get_unique_string_tmpl(written_value);
+    cache.insert(key, digest, written_value);
+
+    auto opt_entry{cache.find(key)};
+    REQUIRE(opt_entry);
+    auto& entry{*opt_entry};
+    REQUIRE(entry.digest == digest);
+    REQUIRE(entry.size == 5);
+    REQUIRE(entry.original_size == 5);
+    REQUIRE(entry.value);
+    blob read_value{*entry.value};
+    REQUIRE(read_value.size() == 5);
+    auto* reader{read_value.mapped_file_data_owner()};
+    REQUIRE(reader != nullptr);
+    REQUIRE(reader->mapped_file() == writer->mapped_file());
 }
