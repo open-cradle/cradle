@@ -267,23 +267,27 @@ resolve_request_async(
     {
         throw std::logic_error{"request is not visitable"};
     }
-    auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
+    auto* actx = &cast_ctx_to_ref<local_async_context_intf>(ctx);
     // Third decision: cached or not
-    // TODO move to coroutines?!
     if constexpr (!constraints.is_sub)
     {
-        // TODO (re-)create ctx tree, root ctx
-        // ctx.prepare_for_resolution();
+        // The following cast should succeed if client uses atst_context or
+        // similar
+        if (auto* owner = cast_ctx_to_ptr<local_async_ctx_owner_intf>(ctx))
+        {
+            // (re-)create ctx tree, root ctx; get root ctx
+            actx = &owner->prepare_for_local_resolution();
+        }
         // Populate ctx with sub ctx's
-        req.accept(*actx.make_ctx_tree_builder());
+        req.accept(*actx->make_ctx_tree_builder());
     }
     if constexpr (UncachedRequest<Req>)
     {
-        return resolve_request_async_uncached(ctx, req);
+        return resolve_request_async_uncached(*actx, req);
     }
     else
     {
-        return resolve_request_async_cached(ctx, req, lock_ptr);
+        return resolve_request_async_cached(*actx, req, lock_ptr);
     }
 }
 
@@ -309,7 +313,6 @@ resolve_request_local(
 {
     // TODO static_assert(!req.is_proxy);
     // Second decision (based on constraints if possible): sync or async
-    // This is the last time that constraints are used.
     if constexpr (constraints.force_async)
     {
         return resolve_request_async(ctx, req, lock_ptr, constraints);
@@ -333,10 +336,21 @@ resolve_request_local(
 
 template<Request Req>
 cppcoro::task<typename Req::value_type>
+resolve_request_remote_coro(
+    remote_context_intf& ctx, Req const& req, cache_record_lock* lock_ptr)
+{
+    // this runs in co_await resolve_request()
+    co_return resolve_remote_to_value(ctx, req, lock_ptr);
+}
+
+template<Request Req>
+cppcoro::task<typename Req::value_type>
 resolve_request_remote(
     remote_context_intf& ctx, Req const& req, cache_record_lock* lock_ptr)
 {
-    co_return resolve_remote_to_value(ctx, req, lock_ptr);
+    // this runs in resolve_request()
+    // TODO must be root request; prepare ctx for resolution
+    return resolve_request_remote_coro(ctx, req, lock_ptr);
 }
 
 /*****************************************************************************

@@ -125,6 +125,7 @@ class local_atst_context_tree_builder : public local_context_tree_builder_base
  * context tree, reflecting the structure of the request tree of which
  * `root_req' is the root request.
  */
+// TODO root_req not used anymore
 template<VisitableRequest Req>
 std::shared_ptr<local_atst_context>
 make_root_local_async_ctx(
@@ -236,6 +237,64 @@ class non_root_proxy_atst_context final
         bool is_req) override;
 };
 static_assert(ValidContext<non_root_proxy_atst_context>);
+
+// Async context that can be used multiple times for resolving a request.
+// Each resolve_request() leads to an active request tree for that resolution;
+// the tree has a root context that is either local or remote.
+// The atst_context functionality is limited: it can be passed to
+// resolve_request(), and a root context object can be retrieved for additional
+// functionality.
+// TODO class atst_context final
+class atst_context : public virtual context_intf,
+                     public virtual local_async_ctx_owner_intf,
+                     public virtual remote_async_ctx_owner_intf
+{
+ public:
+    atst_context(inner_resources& resources, std::string const& proxy_name);
+
+    // context_intf
+    inner_resources&
+    get_resources() override
+    {
+        return resources_;
+    }
+
+    bool
+    remotely() const override
+    {
+        return !proxy_name_.empty();
+    }
+
+    bool
+    is_async() const override
+    {
+        return true;
+    }
+
+    // local_async_ctx_owner_intf
+    local_async_context_intf&
+    prepare_for_local_resolution() override;
+
+    local_async_context_intf*
+    get_active_local_root_context() override;
+
+    // remote_async_ctx_owner_intf : public context_intf
+
+    remote_async_context_intf&
+    prepare_for_remote_resolution() override;
+
+    remote_async_context_intf*
+    get_active_remote_root_context() override;
+
+ private:
+    inner_resources& resources_;
+    std::string proxy_name_;
+    // TODO std::unique_ptr twice
+    std::shared_ptr<local_atst_tree_context> local_tree_;
+    std::shared_ptr<local_atst_context> local_root_;
+    std::unique_ptr<proxy_atst_tree_context> remote_tree_;
+    std::unique_ptr<root_proxy_atst_context> remote_root_;
+};
 
 } // namespace cradle
 

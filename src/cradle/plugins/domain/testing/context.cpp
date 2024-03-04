@@ -227,4 +227,50 @@ non_root_proxy_atst_context::make_sub_ctx(
     return std::make_unique<non_root_proxy_atst_context>(my_tree_ctx, is_req);
 }
 
+atst_context::atst_context(
+    inner_resources& resources, std::string const& proxy_name)
+    : resources_{resources}, proxy_name_{proxy_name}
+{
+}
+
+local_async_context_intf&
+atst_context::prepare_for_local_resolution()
+{
+    local_tree_.reset();
+    local_root_.reset();
+    local_tree_ = std::make_shared<local_atst_tree_context>(resources_);
+    local_root_
+        = std::make_shared<local_atst_context>(local_tree_, nullptr, true);
+    register_local_async_ctx(local_root_);
+    return *local_root_;
+}
+
+local_async_context_intf*
+atst_context::get_active_local_root_context()
+{
+    return local_root_ ? &*local_root_ : nullptr;
+}
+
+remote_async_context_intf&
+atst_context::prepare_for_remote_resolution()
+{
+    throw not_implemented_error{"atst_context::prepare_for_remote_resolution"};
+}
+
+remote_async_context_intf*
+atst_context::get_active_remote_root_context()
+{
+    return remote_root_ ? &*remote_root_ : nullptr;
+}
+
+#if 0
+    inner_resources& resources_;
+    std::string proxy_name_;
+    std::unique_ptr<local_atst_tree_context> local_tree_;
+    std::unique_ptr<local_atst_context> local_root_;
+    std::unique_ptr<proxy_atst_tree_context> remote_tree_;
+    std::unique_ptr<root_proxy_atst_context> remote_root_;
+};
+#endif
+
 } // namespace cradle

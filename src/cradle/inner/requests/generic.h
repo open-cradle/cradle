@@ -660,6 +660,38 @@ class introspective_context_intf : public virtual context_intf
         = 0;
 };
 
+class local_async_ctx_owner_intf : public virtual context_intf
+{
+ public:
+    // virtual ~local_async_ctx_owner_intf() = default;
+
+    virtual local_async_context_intf&
+    prepare_for_local_resolution()
+        = 0;
+
+    // The following available after a resolve_request() call
+    // (i.e., not necessarily a co_await resolve_request()).
+    virtual local_async_context_intf*
+    get_active_local_root_context()
+        = 0;
+};
+
+class remote_async_ctx_owner_intf : public virtual context_intf
+{
+ public:
+    // virtual ~remote_async_ctx_owner_intf() = default;
+
+    virtual remote_async_context_intf&
+    prepare_for_remote_resolution()
+        = 0;
+
+    // The following available after a resolve_request() call
+    // (i.e., not necessarily a co_await resolve_request()).
+    virtual remote_async_context_intf*
+    get_active_remote_root_context()
+        = 0;
+};
+
 // The most generic/minimal context
 template<typename Ctx>
 concept Context = std::convertible_to<Ctx&, context_intf&>;
