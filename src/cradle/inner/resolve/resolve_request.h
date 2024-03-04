@@ -40,7 +40,8 @@ template<
     bool ForceRemote = false,
     bool ForceLocal = false,
     bool ForceSync = false,
-    bool ForceAsync = false>
+    bool ForceAsync = false,
+    bool IsSub = false>
 struct ResolutionConstraints
 {
     static_assert(!(ForceRemote && ForceLocal));
@@ -50,6 +51,7 @@ struct ResolutionConstraints
     static constexpr bool force_local = ForceLocal;
     static constexpr bool force_sync = ForceSync;
     static constexpr bool force_async = ForceAsync;
+    static constexpr bool is_sub = IsSub;
 
     ResolutionConstraints()
     {
@@ -57,17 +59,19 @@ struct ResolutionConstraints
 };
 
 using NoResolutionConstraints
-    = ResolutionConstraints<false, false, false, false>;
+    = ResolutionConstraints<false, false, false, false, false>;
 using ResolutionConstraintsLocal
-    = ResolutionConstraints<false, true, false, false>;
+    = ResolutionConstraints<false, true, false, false, false>;
 using ResolutionConstraintsLocalSync
-    = ResolutionConstraints<false, true, true, false>;
-using ResolutionConstraintsLocalAsync
-    = ResolutionConstraints<false, true, false, true>;
+    = ResolutionConstraints<false, true, true, false, false>;
+using ResolutionConstraintsLocalAsyncRoot
+    = ResolutionConstraints<false, true, false, true, false>;
+using ResolutionConstraintsLocalAsyncSub
+    = ResolutionConstraints<false, true, false, true, true>;
 using ResolutionConstraintsRemoteSync
-    = ResolutionConstraints<true, false, true, false>;
+    = ResolutionConstraints<true, false, true, false, false>;
 using ResolutionConstraintsRemoteAsync
-    = ResolutionConstraints<true, false, false, true>;
+    = ResolutionConstraints<true, false, false, true, false>;
 
 // These defaults should make it superfluous for the caller to specify the
 // constraints, if the actual context class is final and known at the
@@ -77,23 +81,24 @@ using DefaultResolutionConstraints = ResolutionConstraints<
     DefinitelyRemoteContext<Ctx>,
     DefinitelyLocalContext<Ctx>,
     DefinitelySyncContext<Ctx>,
-    DefinitelyAsyncContext<Ctx>>;
+    DefinitelyAsyncContext<Ctx>,
+    false>;
 
-template<bool Async, Context Ctx, Request Req>
+template<Context Ctx, Request Req>
 cppcoro::task<typename Req::value_type>
-resolve_request_uncached(Ctx& ctx, Req const& req)
+resolve_request_sync_uncached(Ctx& ctx, Req const& req)
 {
     // TODO maybe let req.resolve_*sync() return cppcoro::task
-    if constexpr (Async)
-    {
-        auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
-        co_return co_await req.resolve_async(actx);
-    }
-    else
-    {
-        auto& lctx = cast_ctx_to_ref<local_context_intf>(ctx);
-        co_return co_await req.resolve_sync(lctx);
-    }
+    auto& lctx = cast_ctx_to_ref<local_context_intf>(ctx);
+    co_return co_await req.resolve_sync(lctx);
+}
+
+template<Context Ctx, Request Req>
+cppcoro::task<typename Req::value_type>
+resolve_request_async_uncached(Ctx& ctx, Req const& req)
+{
+    auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
+    co_return co_await req.resolve_async(actx);
 }
 
 // Resolves a memory-cached request using some sort of secondary cache.
@@ -241,7 +246,7 @@ resolve_request_sync(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
     // Third decision: cached or not
     if constexpr (UncachedRequest<Req>)
     {
-        return resolve_request_uncached<false>(ctx, req);
+        return resolve_request_sync_uncached(ctx, req);
     }
     else
     {
@@ -249,9 +254,13 @@ resolve_request_sync(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
     }
 }
 
-template<Context Ctx, Request Req>
+template<Context Ctx, Request Req, typename Constraints>
 cppcoro::task<typename Req::value_type>
-resolve_request_async(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
+resolve_request_async(
+    Ctx& ctx,
+    Req const& req,
+    cache_record_lock* lock_ptr,
+    Constraints constraints)
 {
     // Cf. the similar construct in seri_resolver_impl::resolve()
     if constexpr (!VisitableRequest<Req>)
@@ -261,9 +270,7 @@ resolve_request_async(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
     auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
     // Third decision: cached or not
     // TODO move to coroutines?!
-    // Avoid unused code being generated for subrequests: introduce
-    // resolve_request_sub() and pass compile-time bool through the chain
-    if (actx.get_local_num_subs() == 0) // Temp hack testing for root req/ctx
+    if constexpr (!constraints.is_sub)
     {
         // TODO (re-)create ctx tree, root ctx
         // ctx.prepare_for_resolution();
@@ -272,7 +279,7 @@ resolve_request_async(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
     }
     if constexpr (UncachedRequest<Req>)
     {
-        return resolve_request_uncached<true>(ctx, req);
+        return resolve_request_async_uncached(ctx, req);
     }
     else
     {
@@ -305,7 +312,7 @@ resolve_request_local(
     // This is the last time that constraints are used.
     if constexpr (constraints.force_async)
     {
-        return resolve_request_async(ctx, req, lock_ptr);
+        return resolve_request_async(ctx, req, lock_ptr, constraints);
     }
     else if constexpr (constraints.force_sync)
     {
@@ -315,7 +322,7 @@ resolve_request_local(
     {
         if (ctx.is_async())
         {
-            return resolve_request_async(ctx, req, lock_ptr);
+            return resolve_request_async(ctx, req, lock_ptr, constraints);
         }
         else
         {

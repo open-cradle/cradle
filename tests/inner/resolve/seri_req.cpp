@@ -299,9 +299,6 @@ class LocalAsyncCtxMaker
     {
         // Async: use a fresh context for each request
         auto tree_ctx = std::make_shared<local_atst_tree_context>(resources_);
-        // TODO Populating ctx tree here is wrong because
-        // seri_resolver_impl::resolve() also does that
-        // return make_local_async_ctx_tree(tree_ctx, req);
         auto ctx
             = std::make_shared<local_atst_context>(tree_ctx, nullptr, true);
         if (introspective_)

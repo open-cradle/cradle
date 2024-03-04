@@ -615,7 +615,7 @@ class AsyncCtxMaker
     {
         // Async: use a fresh context for each request
         auto tree_ctx = std::make_shared<local_atst_tree_context>(resources_);
-        return make_local_async_ctx_tree(tree_ctx, req);
+        return make_root_local_async_ctx(tree_ctx, req);
     }
 
  private:
