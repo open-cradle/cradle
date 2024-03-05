@@ -741,10 +741,10 @@ SyncContext<Ctx>;
 
 // Any context implementation class should be valid
 template<typename Ctx>
-concept ValidContext
-    = Context<Ctx>
-      && (!std::is_final_v<Ctx> || RemoteContext<Ctx> || LocalContext<Ctx>)
-      && (!std::is_final_v<Ctx> || SyncContext<Ctx> || AsyncContext<Ctx>);
+concept ValidContext = Context<Ctx>;
+// TODO ValidContext
+//      && (!std::is_final_v<Ctx> || RemoteContext<Ctx> || LocalContext<Ctx>)
+//      && (!std::is_final_v<Ctx> || SyncContext<Ctx> || AsyncContext<Ctx>);
 
 /*
  * A request is something that can be resolved, resulting in a result

@@ -246,23 +246,34 @@ static_assert(ValidContext<non_root_proxy_atst_context>);
 // The atst_context functionality is limited: it can be passed to
 // resolve_request(), and a root context object can be retrieved for additional
 // functionality.
-// TODO class atst_context final
-class atst_context final : public virtual context_intf,
-                           public virtual remote_async_context_intf,
-                           public virtual local_async_ctx_owner_intf,
-                           public virtual remote_async_ctx_owner_intf
+class atst_context final : public local_async_context_intf,
+                           public remote_async_context_intf,
+                           public local_async_ctx_owner_intf,
+                           public remote_async_ctx_owner_intf
 {
  public:
-    atst_context(inner_resources& resources, std::string const& proxy_name);
+    atst_context(
+        inner_resources& resources, std::string const& proxy_name = "");
 
     // Some redundant redefinitions to prevent MSVC C4250
-    remote_context_intf*
-    to_remote_context_intf() override
+    async_context_intf*
+    to_async_context_intf() override
+    {
+        // TODO async_context_intf ambiguous base class
+        return static_cast<local_async_context_intf*>(this);
+    }
+    local_context_intf*
+    to_local_context_intf() override
     {
         return this;
     }
-    async_context_intf*
-    to_async_context_intf() override
+    local_async_context_intf*
+    to_local_async_context_intf() override
+    {
+        return this;
+    }
+    remote_context_intf*
+    to_remote_context_intf() override
     {
         return this;
     }
@@ -326,6 +337,116 @@ class atst_context final : public virtual context_intf,
     request_cancellation_coro() override
     {
         return get_async_root().request_cancellation_coro();
+    }
+
+    // local_async_context_intf
+    std::size_t
+    get_local_num_subs() const override
+    {
+        return get_local_root().get_local_num_subs();
+    }
+
+    local_async_context_base&
+    get_local_sub(std::size_t ix) override
+    {
+        return get_local_root().get_local_sub(ix);
+    }
+
+    std::unique_ptr<req_visitor_intf>
+    make_ctx_tree_builder() override
+    {
+        return get_local_root().make_ctx_tree_builder();
+    }
+
+    cppcoro::task<void>
+    reschedule_if_opportune() override
+    {
+        return get_local_root().reschedule_if_opportune();
+    }
+
+    async_status
+    get_status() override
+    {
+        return get_local_root().get_status();
+    }
+
+    std::string
+    get_error_message() override
+    {
+        return get_local_root().get_error_message();
+    }
+
+    void
+    update_status(async_status status) override
+    {
+        get_local_root().update_status(status);
+    }
+
+    void
+    update_status_error(std::string const& errmsg) override
+    {
+        get_local_root().update_status_error(errmsg);
+    }
+
+    void
+    using_result() override
+    {
+        get_local_root().using_result();
+    }
+
+    void
+    set_result(blob result) override
+    {
+        get_local_root().set_result(std::move(result));
+    }
+
+    blob
+    get_result() override
+    {
+        return get_local_root().get_result();
+    }
+
+    void
+    set_cache_record_id(remote_cache_record_id record_id) override
+    {
+        get_local_root().set_cache_record_id(record_id);
+    }
+
+    remote_cache_record_id
+    get_cache_record_id() const override
+    {
+        return get_local_root().get_cache_record_id();
+    }
+
+    void
+    request_cancellation() override
+    {
+        get_local_root().request_cancellation();
+    }
+
+    bool
+    is_cancellation_requested() const noexcept override
+    {
+        return get_local_root().is_cancellation_requested();
+    }
+
+    void
+    throw_async_cancelled() const override
+    {
+        get_local_root().throw_async_cancelled();
+    }
+
+    // local_context_intf
+    std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory) override
+    {
+        return get_local_root().make_data_owner(size, use_shared_memory);
+    }
+
+    void
+    on_value_complete() override
+    {
+        get_local_root().on_value_complete();
     }
 
     // remote_context_intf
@@ -405,6 +526,12 @@ class atst_context final : public virtual context_intf,
     std::shared_ptr<local_atst_context> local_root_;
     std::shared_ptr<proxy_atst_tree_context> remote_tree_;
     std::shared_ptr<root_proxy_atst_context> remote_root_;
+
+    local_atst_context&
+    get_local_root();
+
+    local_atst_context const&
+    get_local_root() const;
 
     root_proxy_atst_context&
     get_remote_root();

@@ -269,6 +269,22 @@ atst_context::get_active_remote_root_context()
     return remote_root_ ? &*remote_root_ : nullptr;
 }
 
+local_atst_context&
+atst_context::get_local_root()
+{
+    if (!local_root_)
+    {
+        throw std::logic_error{"atst_context object has no local_root"};
+    }
+    return *local_root_;
+}
+
+local_atst_context const&
+atst_context::get_local_root() const
+{
+    return const_cast<atst_context*>(this)->get_local_root();
+}
+
 root_proxy_atst_context&
 atst_context::get_remote_root()
 {

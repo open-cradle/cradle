@@ -23,7 +23,7 @@ using namespace cradle;
 
 namespace {
 
-static char const tag[] = "[inner][resolve][async]";
+static char const tag[] = "[NEW]"; //"[inner][resolve][async]";
 
 request_uuid
 make_test_uuid(int ext)
@@ -150,7 +150,7 @@ test_resolve_async_across_rpc(
 
 } // namespace
 
-TEST_CASE("NEW resolve async locally - raw args, coro", "[B][0]")
+TEST_CASE("NEW resolve async locally - raw args, coro", tag)
 {
     constexpr int loops = 3;
     int delay0 = 5;
@@ -170,14 +170,13 @@ TEST_CASE("NEW resolve async locally - raw args, coro", "[B][0]")
         rq_function(props1, cancellable_coro, loops, delay0),
         rq_function(props2, cancellable_coro, loops, delay1))};
     auto resources{make_inner_test_resources()};
-    std::string proxy_name;
-    atst_context ctx{*resources, proxy_name};
+    atst_context ctx{*resources};
 
     ResolutionConstraintsLocalAsyncRoot constraints;
     test_resolve_async(ctx, req, constraints, false, loops, delay0, delay1);
 }
 
-TEST_CASE("NEW resolve async locally - raw args, non-coro", "[B][1]")
+TEST_CASE("NEW resolve async locally - raw args, non-coro", tag)
 {
     constexpr int loops = 3;
     int delay0 = 5;
@@ -195,14 +194,13 @@ TEST_CASE("NEW resolve async locally - raw args, non-coro", "[B][1]")
         rq_function(props1, non_cancellable_func, loops, delay0),
         rq_function(props2, non_cancellable_func, loops, delay1))};
     auto resources{make_inner_test_resources()};
-    std::string proxy_name;
-    atst_context ctx{*resources, proxy_name};
+    atst_context ctx{*resources};
 
     ResolutionConstraintsLocalAsyncRoot constraints;
     test_resolve_async(ctx, req, constraints, false, loops, delay0, delay1);
 }
 
-TEST_CASE("NEW resolve async locally - normalized args", "[B][2]")
+TEST_CASE("NEW resolve async locally - normalized args", tag)
 {
     constexpr int loops = 3;
     int delay0 = 5;
@@ -212,14 +210,13 @@ TEST_CASE("NEW resolve async locally - normalized args", "[B][2]")
         rq_cancellable_coro<level>(loops, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
     auto resources{make_inner_test_resources()};
-    std::string proxy_name;
-    atst_context ctx{*resources, proxy_name};
+    atst_context ctx{*resources};
 
     ResolutionConstraintsLocalAsyncRoot constraints;
     test_resolve_async(ctx, req, constraints, true, loops, delay0, delay1);
 }
 
-TEST_CASE("NEW resolve async on loopback", "[C][0]")
+TEST_CASE("NEW resolve async on loopback", tag)
 {
     std::string proxy_name{"loopback"};
     auto resources{
@@ -228,7 +225,6 @@ TEST_CASE("NEW resolve async on loopback", "[C][0]")
     test_resolve_async_across_rpc(*resources, proxy_name);
 }
 
-#if 0
 TEST_CASE("NEW resolve async on rpclib", tag)
 {
     std::string proxy_name{"rpclib"};
@@ -247,18 +243,14 @@ TEST_CASE("NEW resolve async with value_request locally", tag)
     auto req{rq_cancellable_coro<level>(
         rq_cancellable_coro<level>(loops, delay0), rq_value(val1))};
     auto resources{make_inner_test_resources()};
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
+    atst_context ctx{*resources};
 
     ResolutionConstraintsLocalAsyncRoot constraints;
-    auto root_ctx0{make_root_local_async_ctx(tree_ctx, req)};
-    auto res0
-        = cppcoro::sync_wait(resolve_request(*root_ctx0, req, constraints));
+    auto res0 = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
     REQUIRE(res0 == 14);
 
     resources->reset_memory_cache();
-    auto root_ctx1{make_root_local_async_ctx(tree_ctx, req)};
-    auto res1
-        = cppcoro::sync_wait(resolve_request(*root_ctx1, req, constraints));
+    auto res1 = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
     REQUIRE(res1 == 14);
 }
 
@@ -316,10 +308,9 @@ TEST_CASE("NEW error async request locally - coro", tag)
         rq_cancellable_coro<level>(-1, 11),
         rq_cancellable_coro<level>(2, 24))};
     auto resources{make_inner_test_resources()};
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
-    auto root_ctx = make_root_local_async_ctx(tree_ctx, req);
+    atst_context ctx{*resources};
 
-    test_error_async(*root_ctx, req);
+    test_error_async(ctx, req);
 }
 
 TEST_CASE("NEW error async request locally - non-coro", tag)
@@ -329,10 +320,9 @@ TEST_CASE("NEW error async request locally - non-coro", tag)
         rq_non_cancellable_func<level>(-1, 11),
         rq_non_cancellable_func<level>(2, 24))};
     auto resources{make_inner_test_resources()};
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
-    auto root_ctx = make_root_local_async_ctx(tree_ctx, req);
+    atst_context ctx{*resources};
 
-    test_error_async_plain(*root_ctx, req);
+    test_error_async_plain(ctx, req);
 }
 
 TEST_CASE("NEW error async request on loopback", tag)
@@ -353,6 +343,7 @@ TEST_CASE("NEW error async request on rpclib", tag)
     test_error_async_across_rpc(*resources, proxy_name);
 }
 
+#if 0
 namespace {
 
 // Requests cancellation of all coroutines sharing the context resources

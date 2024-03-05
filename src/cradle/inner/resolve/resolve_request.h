@@ -267,7 +267,7 @@ resolve_request_async(
     {
         throw std::logic_error{"request is not visitable"};
     }
-    auto* actx = &cast_ctx_to_ref<local_async_context_intf>(ctx);
+    local_async_context_intf* actx{};
     // Third decision: cached or not
     if constexpr (!constraints.is_sub)
     {
@@ -278,8 +278,16 @@ resolve_request_async(
             // (re-)create ctx tree, root ctx; get root ctx
             actx = &owner->prepare_for_local_resolution();
         }
+        else
+        {
+            actx = &cast_ctx_to_ref<local_async_context_intf>(ctx);
+        }
         // Populate ctx with sub ctx's
         req.accept(*actx->make_ctx_tree_builder());
+    }
+    else
+    {
+        actx = &cast_ctx_to_ref<local_async_context_intf>(ctx);
     }
     if constexpr (UncachedRequest<Req>)
     {
