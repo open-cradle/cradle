@@ -516,6 +516,12 @@ class atst_context final : public local_async_context_intf,
     async_context_intf const&
     get_async_root() const;
 
+    root_proxy_atst_context&
+    get_remote_root();
+
+    root_proxy_atst_context const&
+    get_remote_root() const;
+
  private:
     inner_resources& resources_;
     std::string proxy_name_;
@@ -532,12 +538,6 @@ class atst_context final : public local_async_context_intf,
 
     local_atst_context const&
     get_local_root() const;
-
-    root_proxy_atst_context&
-    get_remote_root();
-
-    root_proxy_atst_context const&
-    get_remote_root() const;
 };
 
 } // namespace cradle

@@ -347,7 +347,7 @@ cppcoro::task<typename Req::value_type>
 resolve_request_remote_coro(
     remote_context_intf& ctx, Req const& req, cache_record_lock* lock_ptr)
 {
-    // this runs in co_await resolve_request()
+    // This runs in co_await resolve_request().
     co_return resolve_remote_to_value(ctx, req, lock_ptr);
 }
 
@@ -356,7 +356,7 @@ cppcoro::task<typename Req::value_type>
 resolve_request_remote(
     remote_context_intf& ctx, Req const& req, cache_record_lock* lock_ptr)
 {
-    // this runs in resolve_request()
+    // This runs in resolve_request().
     if (auto* owner = cast_ctx_to_ptr<remote_async_ctx_owner_intf>(ctx))
     {
         // (re-)create ctx tree, root ctx
