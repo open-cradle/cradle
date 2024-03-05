@@ -43,9 +43,7 @@ test_resolve_async_coro(
     int delay1)
 {
     auto res = co_await resolve_request(main_ctx, req, constraints);
-    auto* ctx_ptr = main_ctx.get_active_local_root_context();
-    REQUIRE(ctx_ptr != nullptr);
-    auto& ctx{*ctx_ptr};
+    auto& ctx = main_ctx.get_async_root();
 
     REQUIRE(res == (loops + delay0) + (loops + delay1));
     REQUIRE(ctx.is_req());
@@ -128,7 +126,6 @@ test_resolve_async(
         delay1));
 }
 
-#if 0
 void
 test_resolve_async_across_rpc(
     inner_resources& resources, std::string const& proxy_name)
@@ -141,25 +138,19 @@ test_resolve_async_across_rpc(
         rq_cancellable_coro<level>(loops, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
     ResolutionConstraintsRemoteAsync constraints;
+    atst_context ctx{resources, proxy_name};
 
     // TODO clear the memory cache on the remote and check the duration
-    auto tree_ctx0{
-        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
-    auto ctx0{root_proxy_atst_context{tree_ctx0}};
-    test_resolve_async(ctx0, req, constraints, true, loops, delay0, delay1);
+    test_resolve_async(ctx, req, constraints, true, loops, delay0, delay1);
 
     // TODO check the duration which should be fast because the result now
     // comes from the memory cache on the remote
-    auto tree_ctx1{
-        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
-    auto ctx1{root_proxy_atst_context{tree_ctx1}};
-    test_resolve_async(ctx1, req, constraints, true, loops, delay0, delay1);
+    test_resolve_async(ctx, req, constraints, true, loops, delay0, delay1);
 }
-#endif
 
 } // namespace
 
-TEST_CASE("resolve async locally - raw args, coro, - new", "[B]")
+TEST_CASE("NEW resolve async locally - raw args, coro", "[B][0]")
 {
     constexpr int loops = 3;
     int delay0 = 5;
@@ -180,16 +171,13 @@ TEST_CASE("resolve async locally - raw args, coro, - new", "[B]")
         rq_function(props2, cancellable_coro, loops, delay1))};
     auto resources{make_inner_test_resources()};
     std::string proxy_name;
-    // auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
-    // auto root_ctx{make_root_local_async_ctx(tree_ctx, req)};
     atst_context ctx{*resources, proxy_name};
 
     ResolutionConstraintsLocalAsyncRoot constraints;
     test_resolve_async(ctx, req, constraints, false, loops, delay0, delay1);
 }
 
-#if 0
-TEST_CASE("resolve async locally - raw args, non-coro", tag)
+TEST_CASE("NEW resolve async locally - raw args, non-coro", "[B][1]")
 {
     constexpr int loops = 3;
     int delay0 = 5;
@@ -207,15 +195,14 @@ TEST_CASE("resolve async locally - raw args, non-coro", tag)
         rq_function(props1, non_cancellable_func, loops, delay0),
         rq_function(props2, non_cancellable_func, loops, delay1))};
     auto resources{make_inner_test_resources()};
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
-    auto root_ctx{make_root_local_async_ctx(tree_ctx, req)};
+    std::string proxy_name;
+    atst_context ctx{*resources, proxy_name};
 
     ResolutionConstraintsLocalAsyncRoot constraints;
-    test_resolve_async(
-        *root_ctx, req, constraints, false, loops, delay0, delay1);
+    test_resolve_async(ctx, req, constraints, false, loops, delay0, delay1);
 }
 
-TEST_CASE("resolve async locally - normalized args", tag)
+TEST_CASE("NEW resolve async locally - normalized args", "[B][2]")
 {
     constexpr int loops = 3;
     int delay0 = 5;
@@ -225,15 +212,14 @@ TEST_CASE("resolve async locally - normalized args", tag)
         rq_cancellable_coro<level>(loops, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
     auto resources{make_inner_test_resources()};
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
-    auto root_ctx{make_root_local_async_ctx(tree_ctx, req)};
+    std::string proxy_name;
+    atst_context ctx{*resources, proxy_name};
 
     ResolutionConstraintsLocalAsyncRoot constraints;
-    test_resolve_async(
-        *root_ctx, req, constraints, true, loops, delay0, delay1);
+    test_resolve_async(ctx, req, constraints, true, loops, delay0, delay1);
 }
 
-TEST_CASE("resolve async on loopback", "[A]")
+TEST_CASE("NEW resolve async on loopback", "[C][0]")
 {
     std::string proxy_name{"loopback"};
     auto resources{
@@ -242,7 +228,8 @@ TEST_CASE("resolve async on loopback", "[A]")
     test_resolve_async_across_rpc(*resources, proxy_name);
 }
 
-TEST_CASE("resolve async on rpclib", tag)
+#if 0
+TEST_CASE("NEW resolve async on rpclib", tag)
 {
     std::string proxy_name{"rpclib"};
     auto resources{
@@ -251,7 +238,7 @@ TEST_CASE("resolve async on rpclib", tag)
     test_resolve_async_across_rpc(*resources, proxy_name);
 }
 
-TEST_CASE("resolve async with value_request locally", tag)
+TEST_CASE("NEW resolve async with value_request locally", tag)
 {
     constexpr int loops = 3;
     int delay0 = 5;
@@ -322,7 +309,7 @@ test_error_async_across_rpc(
 
 } // namespace
 
-TEST_CASE("error async request locally - coro", tag)
+TEST_CASE("NEW error async request locally - coro", tag)
 {
     constexpr auto level = caching_level_type::none;
     auto req{rq_cancellable_coro<level>(
@@ -335,7 +322,7 @@ TEST_CASE("error async request locally - coro", tag)
     test_error_async(*root_ctx, req);
 }
 
-TEST_CASE("error async request locally - non-coro", tag)
+TEST_CASE("NEW error async request locally - non-coro", tag)
 {
     constexpr auto level = caching_level_type::none;
     auto req{rq_non_cancellable_func<level>(
@@ -348,7 +335,7 @@ TEST_CASE("error async request locally - non-coro", tag)
     test_error_async_plain(*root_ctx, req);
 }
 
-TEST_CASE("error async request on loopback", tag)
+TEST_CASE("NEW error async request on loopback", tag)
 {
     std::string proxy_name{"loopback"};
     auto resources{
@@ -357,7 +344,7 @@ TEST_CASE("error async request on loopback", tag)
     test_error_async_across_rpc(*resources, proxy_name);
 }
 
-TEST_CASE("error async request on rpclib", tag)
+TEST_CASE("NEW error async request on rpclib", tag)
 {
     std::string proxy_name{"rpclib"};
     auto resources{
@@ -447,7 +434,7 @@ test_cancel_async_across_rpc(
 
 } // namespace
 
-TEST_CASE("cancel async request locally", tag)
+TEST_CASE("NEW cancel async request locally", tag)
 {
     constexpr auto level{caching_level_type::none};
     auto req{rq_cancellable_coro<level>(
@@ -460,7 +447,7 @@ TEST_CASE("cancel async request locally", tag)
     test_cancel_async(*root_ctx, req);
 }
 
-TEST_CASE("cancel async request on loopback", tag)
+TEST_CASE("NEW cancel async request on loopback", tag)
 {
     std::string proxy_name{"loopback"};
     auto resources{
@@ -469,7 +456,7 @@ TEST_CASE("cancel async request on loopback", tag)
     test_cancel_async_across_rpc(*resources, proxy_name);
 }
 
-TEST_CASE("cancel async request on rpclib", tag)
+TEST_CASE("NEW cancel async request on rpclib", tag)
 {
     std::string proxy_name{"rpclib"};
     auto resources{
@@ -527,7 +514,7 @@ test_failing_get_num_subs(
 
 } // namespace
 
-TEST_CASE("get_num_subs failure on loopback", tag)
+TEST_CASE("NEW get_num_subs failure on loopback", tag)
 {
     std::string proxy_name{"loopback"};
     auto resources{make_inner_test_resources(proxy_name, no_domain_option())};
@@ -535,7 +522,7 @@ TEST_CASE("get_num_subs failure on loopback", tag)
     test_failing_get_num_subs(*resources, proxy_name);
 }
 
-TEST_CASE("get_num_subs failure on rpclib", tag)
+TEST_CASE("NEW get_num_subs failure on rpclib", tag)
 {
     std::string proxy_name{"rpclib"};
     auto resources{make_inner_test_resources(proxy_name, no_domain_option())};
@@ -599,7 +586,7 @@ test_delayed_get_num_subs(
 // resolve_async() is forced to have a startup delay.
 // The information that get_num_subs needs is available only after
 // resolve_async has started, so get_num_subs needs to wait.
-TEST_CASE("delayed get_num_subs on loopback", tag)
+TEST_CASE("NEW delayed get_num_subs on loopback", tag)
 {
     std::string proxy_name{"loopback"};
     auto resources{
@@ -608,7 +595,7 @@ TEST_CASE("delayed get_num_subs on loopback", tag)
     test_delayed_get_num_subs(*resources, proxy_name);
 }
 
-TEST_CASE("delayed get_num_subs on rpclib", tag)
+TEST_CASE("NEW delayed get_num_subs on rpclib", tag)
 {
     std::string proxy_name{"rpclib"};
     auto resources{
@@ -677,7 +664,7 @@ test_delayed_set_result(
 
 // set_result() is forced to have a 200ms delay going from AWAITING_RESULT to
 // FINISHED
-TEST_CASE("delayed set_result on loopback", tag)
+TEST_CASE("NEW delayed set_result on loopback", tag)
 {
     std::string proxy_name{"loopback"};
     auto resources{
@@ -686,7 +673,7 @@ TEST_CASE("delayed set_result on loopback", tag)
     test_delayed_set_result(*resources, proxy_name);
 }
 
-TEST_CASE("delayed set_result on rpclib", tag)
+TEST_CASE("NEW delayed set_result on rpclib", tag)
 {
     std::string proxy_name{"rpclib"};
     auto resources{
@@ -695,20 +682,20 @@ TEST_CASE("delayed set_result on rpclib", tag)
     test_delayed_set_result(*resources, proxy_name);
 }
 
-TEST_CASE("create rq_cancellable_coro with different caching levels", tag)
+TEST_CASE("NEW create rq_cancellable_coro with different caching levels", tag)
 {
     REQUIRE_NOTHROW(rq_cancellable_coro<caching_level_type::none>(0, 0));
     REQUIRE_NOTHROW(rq_cancellable_coro<caching_level_type::memory>(0, 0));
     REQUIRE_NOTHROW(rq_cancellable_coro<caching_level_type::full>(0, 0));
 }
 
-TEST_CASE("create rq_cancellable_coro with different loop/delay values", tag)
+TEST_CASE("NEW create rq_cancellable_coro with different loop/delay values", tag)
 {
     REQUIRE_NOTHROW(rq_cancellable_coro<caching_level_type::full>(0, 1));
     REQUIRE_NOTHROW(rq_cancellable_coro<caching_level_type::full>(1, 0));
 }
 
-TEST_CASE("create rq_cancellable_coro with different loop/delay types", tag)
+TEST_CASE("NEW create rq_cancellable_coro with different loop/delay types", tag)
 {
     REQUIRE_NOTHROW(
         rq_cancellable_coro<caching_level_type::full, unsigned, int>(0, 0));

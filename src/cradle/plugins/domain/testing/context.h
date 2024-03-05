@@ -1,6 +1,8 @@
 #ifndef CRADLE_PLUGINS_DOMAIN_TESTING_CONTEXT_H
 #define CRADLE_PLUGINS_DOMAIN_TESTING_CONTEXT_H
 
+#include <spdlog/spdlog.h>
+
 #include <cradle/inner/requests/context_base.h>
 
 /*
@@ -245,12 +247,30 @@ static_assert(ValidContext<non_root_proxy_atst_context>);
 // resolve_request(), and a root context object can be retrieved for additional
 // functionality.
 // TODO class atst_context final
-class atst_context : public virtual context_intf,
-                     public virtual local_async_ctx_owner_intf,
-                     public virtual remote_async_ctx_owner_intf
+class atst_context final : public virtual context_intf,
+                           public virtual remote_async_context_intf,
+                           public virtual local_async_ctx_owner_intf,
+                           public virtual remote_async_ctx_owner_intf
 {
  public:
     atst_context(inner_resources& resources, std::string const& proxy_name);
+
+    // Some redundant redefinitions to prevent MSVC C4250
+    remote_context_intf*
+    to_remote_context_intf() override
+    {
+        return this;
+    }
+    async_context_intf*
+    to_async_context_intf() override
+    {
+        return this;
+    }
+    remote_async_context_intf*
+    to_remote_async_context_intf() override
+    {
+        return this;
+    }
 
     // context_intf
     inner_resources&
@@ -271,6 +291,88 @@ class atst_context : public virtual context_intf,
         return true;
     }
 
+    // async_context_intf
+    async_id
+    get_id() const override
+    {
+        return get_async_root().get_id();
+    }
+
+    bool
+    is_req() const override
+    {
+        return get_async_root().is_req();
+    }
+
+    std::size_t
+    get_num_subs() const override
+    {
+        return get_async_root().get_num_subs();
+    }
+
+    async_context_intf&
+    get_sub(std::size_t ix) override
+    {
+        return get_async_root().get_sub(ix);
+    }
+
+    cppcoro::task<async_status>
+    get_status_coro() override
+    {
+        return get_async_root().get_status_coro();
+    }
+
+    cppcoro::task<void>
+    request_cancellation_coro() override
+    {
+        return get_async_root().request_cancellation_coro();
+    }
+
+    // remote_context_intf
+    std::string const&
+    proxy_name() const override
+    {
+        return get_remote_root().proxy_name();
+        // TODO or simply: return proxy_name_
+    }
+
+    virtual remote_proxy&
+    get_proxy() const override
+    {
+        return get_remote_root().get_proxy();
+    }
+
+    std::string const&
+    domain_name() const override
+    {
+        return get_remote_root().domain_name();
+    }
+
+    service_config
+    make_config(bool need_record_lock) const override
+    {
+        return get_remote_root().make_config(need_record_lock);
+    }
+
+    // remote_async_context_intf
+    void
+    set_remote_id(async_id remote_id) override
+    {
+        get_remote_root().set_remote_id(remote_id);
+    }
+
+    void
+    fail_remote_id() noexcept override
+    {
+        get_remote_root().fail_remote_id();
+    }
+
+    async_id
+    get_remote_id() override
+    {
+        return get_remote_root().get_remote_id();
+    }
+
     // local_async_ctx_owner_intf
     local_async_context_intf&
     prepare_for_local_resolution() override;
@@ -278,22 +380,37 @@ class atst_context : public virtual context_intf,
     local_async_context_intf*
     get_active_local_root_context() override;
 
-    // remote_async_ctx_owner_intf : public context_intf
-
+    // remote_async_ctx_owner_intf
     remote_async_context_intf&
     prepare_for_remote_resolution() override;
 
     remote_async_context_intf*
     get_active_remote_root_context() override;
 
+    // other
+    // TODO should these be in (local|remote)_async_ctx_owner_intf?
+    async_context_intf&
+    get_async_root();
+
+    async_context_intf const&
+    get_async_root() const;
+
  private:
     inner_resources& resources_;
     std::string proxy_name_;
-    // TODO std::unique_ptr twice
+    std::shared_ptr<spdlog::logger> logger_;
+    // TODO std::unique_ptr x4
+    // TODO hide tree_context in root_context
     std::shared_ptr<local_atst_tree_context> local_tree_;
     std::shared_ptr<local_atst_context> local_root_;
-    std::unique_ptr<proxy_atst_tree_context> remote_tree_;
-    std::unique_ptr<root_proxy_atst_context> remote_root_;
+    std::shared_ptr<proxy_atst_tree_context> remote_tree_;
+    std::shared_ptr<root_proxy_atst_context> remote_root_;
+
+    root_proxy_atst_context&
+    get_remote_root();
+
+    root_proxy_atst_context const&
+    get_remote_root() const;
 };
 
 } // namespace cradle

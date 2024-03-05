@@ -3,6 +3,7 @@
 
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/remote/config.h>
+#include <cradle/inner/utilities/logging.h>
 #include <cradle/plugins/domain/testing/config.h>
 #include <cradle/plugins/domain/testing/context.h>
 
@@ -229,15 +230,16 @@ non_root_proxy_atst_context::make_sub_ctx(
 
 atst_context::atst_context(
     inner_resources& resources, std::string const& proxy_name)
-    : resources_{resources}, proxy_name_{proxy_name}
+    : resources_{resources},
+      proxy_name_{proxy_name},
+      logger_{ensure_logger("atst")}
 {
 }
 
 local_async_context_intf&
 atst_context::prepare_for_local_resolution()
 {
-    local_tree_.reset();
-    local_root_.reset();
+    logger_->info("prepare_for_local_resolution");
     local_tree_ = std::make_shared<local_atst_tree_context>(resources_);
     local_root_
         = std::make_shared<local_atst_context>(local_tree_, nullptr, true);
@@ -254,7 +256,11 @@ atst_context::get_active_local_root_context()
 remote_async_context_intf&
 atst_context::prepare_for_remote_resolution()
 {
-    throw not_implemented_error{"atst_context::prepare_for_remote_resolution"};
+    logger_->info("prepare_for_remote_resolution");
+    remote_tree_
+        = std::make_shared<proxy_atst_tree_context>(resources_, proxy_name_);
+    remote_root_ = std::make_shared<root_proxy_atst_context>(remote_tree_);
+    return *remote_root_;
 }
 
 remote_async_context_intf*
@@ -263,14 +269,45 @@ atst_context::get_active_remote_root_context()
     return remote_root_ ? &*remote_root_ : nullptr;
 }
 
-#if 0
-    inner_resources& resources_;
-    std::string proxy_name_;
-    std::unique_ptr<local_atst_tree_context> local_tree_;
-    std::unique_ptr<local_atst_context> local_root_;
-    std::unique_ptr<proxy_atst_tree_context> remote_tree_;
-    std::unique_ptr<root_proxy_atst_context> remote_root_;
-};
-#endif
+root_proxy_atst_context&
+atst_context::get_remote_root()
+{
+    if (!remote_root_)
+    {
+        throw std::logic_error{"atst_context object has no remote_root"};
+    }
+    return *remote_root_;
+}
+
+root_proxy_atst_context const&
+atst_context::get_remote_root() const
+{
+    return const_cast<atst_context*>(this)->get_remote_root();
+}
+
+async_context_intf&
+atst_context::get_async_root()
+{
+    async_context_intf* root{};
+    if (proxy_name_.empty())
+    {
+        root = local_root_ ? &*local_root_ : nullptr;
+    }
+    else
+    {
+        root = remote_root_ ? &*remote_root_ : nullptr;
+    }
+    if (!root)
+    {
+        throw std::logic_error{"atst_context object has no async root"};
+    }
+    return *root;
+}
+
+async_context_intf const&
+atst_context::get_async_root() const
+{
+    return const_cast<atst_context*>(this)->get_async_root();
+}
 
 } // namespace cradle
