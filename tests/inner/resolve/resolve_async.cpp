@@ -292,9 +292,7 @@ test_error_async_across_rpc(
     auto req{rq_cancellable_coro<level>(
         rq_cancellable_coro<level>(-1, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
-    auto tree_ctx{
-        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
-    auto ctx{root_proxy_atst_context{tree_ctx}};
+    atst_context ctx{resources, proxy_name};
 
     test_error_async(ctx, req);
 }
