@@ -122,24 +122,6 @@ class local_atst_context_tree_builder : public local_context_tree_builder_base
 };
 
 /*
- * Creates a root local_atst_context object, corresponding to the given root
- * request. resolve_request() will create the other context objects in the
- * context tree, reflecting the structure of the request tree of which
- * `root_req' is the root request.
- */
-// TODO root_req not used anymore
-template<VisitableRequest Req>
-std::shared_ptr<local_atst_context>
-make_root_local_async_ctx(
-    std::shared_ptr<local_atst_tree_context> tree_ctx, Req const& root_req)
-{
-    auto root_ctx{
-        std::make_shared<local_atst_context>(tree_ctx, nullptr, true)};
-    register_local_async_ctx(root_ctx);
-    return root_ctx;
-}
-
-/*
  * Tree-level context, shared by all proxy_atst_context objects in the same
  * context tree (relating to the same root request), in the "testing" domain.
  *
