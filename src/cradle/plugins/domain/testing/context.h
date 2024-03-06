@@ -124,7 +124,8 @@ class local_atst_context_tree_builder : public local_context_tree_builder_base
 
 /*
  * Tree-level context, shared by all proxy_atst_context objects in the same
- * context tree (relating to the same root request), in the "testing" domain.
+ * context tree (relating to the same root request), in the "testing" domain;
+ * owned by the root_proxy_atst_context object.
  *
  * Note that an object of this class should not be re-used across multiple
  * context trees.
@@ -143,7 +144,9 @@ class proxy_atst_tree_context : public proxy_async_tree_context_base
 class root_proxy_atst_context final : public root_proxy_async_context_base
 {
  public:
-    root_proxy_atst_context(std::shared_ptr<proxy_atst_tree_context> tree_ctx);
+    root_proxy_atst_context(std::unique_ptr<proxy_atst_tree_context> tree_ctx);
+
+    ~root_proxy_atst_context();
 
     // remote_context_intf
     std::string const&
@@ -182,6 +185,7 @@ class root_proxy_atst_context final : public root_proxy_async_context_base
     }
 
  private:
+    std::unique_ptr<proxy_atst_tree_context> tree_ctx_;
     bool fail_submit_async_{false};
     int resolve_async_delay_{0};
     int set_result_delay_{0};
@@ -189,8 +193,7 @@ class root_proxy_atst_context final : public root_proxy_async_context_base
     // proxy_async_context_base
     std::unique_ptr<proxy_async_context_base>
     make_sub_ctx(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx,
-        bool is_req) override;
+        proxy_async_tree_context_base& tree_ctx, bool is_req) override;
 };
 static_assert(ValidContext<root_proxy_atst_context>);
 
@@ -203,7 +206,7 @@ class non_root_proxy_atst_context final
 {
  public:
     non_root_proxy_atst_context(
-        std::shared_ptr<proxy_atst_tree_context> tree_ctx, bool is_req);
+        proxy_atst_tree_context& tree_ctx, bool is_req);
 
     ~non_root_proxy_atst_context();
 
@@ -218,8 +221,7 @@ class non_root_proxy_atst_context final
     // proxy_async_context_base
     std::unique_ptr<proxy_async_context_base>
     make_sub_ctx(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx,
-        bool is_req) override;
+        proxy_async_tree_context_base& tree_ctx, bool is_req) override;
 };
 static_assert(ValidContext<non_root_proxy_atst_context>);
 
@@ -515,9 +517,10 @@ class atst_context final : public local_async_context_intf,
     // TODO std::unique_ptr x4
     // TODO hide tree_context in root_context
     std::shared_ptr<local_atst_tree_context> local_tree_;
+    // local_root_ ownership shared between this object and async db
     std::shared_ptr<local_atst_context> local_root_;
-    std::shared_ptr<proxy_atst_tree_context> remote_tree_;
-    std::shared_ptr<root_proxy_atst_context> remote_root_;
+    // remote_root_ exclusively owned by this object
+    std::unique_ptr<root_proxy_atst_context> remote_root_;
 
     local_atst_context&
     get_local_root();

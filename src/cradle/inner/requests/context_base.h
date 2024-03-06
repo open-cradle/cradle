@@ -545,8 +545,9 @@ class proxy_async_tree_context_base
 class proxy_async_context_base : public remote_async_context_intf
 {
  public:
-    proxy_async_context_base(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx);
+    // tree_ctx will be owned by a derived object, so may not exist in
+    // ~proxy_async_context_base().
+    proxy_async_context_base(proxy_async_tree_context_base& tree_ctx);
 
     // Once created, these objects should not be moved.
     proxy_async_context_base(proxy_async_context_base const&) = delete;
@@ -562,7 +563,7 @@ class proxy_async_context_base : public remote_async_context_intf
     inner_resources&
     get_resources() override
     {
-        return tree_ctx_->get_resources();
+        return tree_ctx_.get_resources();
     }
 
     bool
@@ -581,13 +582,13 @@ class proxy_async_context_base : public remote_async_context_intf
     std::string const&
     proxy_name() const override
     {
-        return tree_ctx_->get_proxy_name();
+        return tree_ctx_.get_proxy_name();
     }
 
     remote_proxy&
     get_proxy() const override
     {
-        return tree_ctx_->get_proxy();
+        return tree_ctx_.get_proxy();
     }
 
     virtual std::string const&
@@ -625,7 +626,7 @@ class proxy_async_context_base : public remote_async_context_intf
     }
 
  protected:
-    std::shared_ptr<proxy_async_tree_context_base> tree_ctx_;
+    proxy_async_tree_context_base& tree_ctx_;
     async_id id_;
     std::atomic<async_id> remote_id_{NO_ASYNC_ID};
 
@@ -637,9 +638,7 @@ class proxy_async_context_base : public remote_async_context_intf
     std::vector<std::unique_ptr<proxy_async_context_base>> subs_;
 
     virtual std::unique_ptr<proxy_async_context_base>
-    make_sub_ctx(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx, bool is_req)
-        = 0;
+    make_sub_ctx(proxy_async_tree_context_base& tree_ctx, bool is_req) = 0;
 
     void
     ensure_subs() const;
@@ -660,10 +659,7 @@ class root_proxy_async_context_base : public proxy_async_context_base,
                                       public introspective_context_intf
 {
  public:
-    root_proxy_async_context_base(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx);
-
-    virtual ~root_proxy_async_context_base();
+    root_proxy_async_context_base(proxy_async_tree_context_base& tree_ctx);
 
     // Some redundant redefinitions to prevent MSVC C4250
     remote_context_intf*
@@ -732,6 +728,12 @@ class root_proxy_async_context_base : public proxy_async_context_base,
     pop_tasklet() override;
 
  protected:
+    // To be called from derived object's destructor. The functionality cannot
+    // be in ~root_proxy_async_context_base() as the tree_ctx_ object may no
+    // longer exist at that time.
+    void
+    finish_remote() noexcept;
+
     std::vector<tasklet_tracker*> tasklets_;
 
  private:
@@ -744,9 +746,7 @@ class root_proxy_async_context_base : public proxy_async_context_base,
 
     // proxy_async_context_base
     std::unique_ptr<proxy_async_context_base>
-    make_sub_ctx(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx,
-        bool is_req) override
+    make_sub_ctx(proxy_async_tree_context_base& tree_ctx, bool is_req) override
         = 0;
 };
 
@@ -758,9 +758,7 @@ class non_root_proxy_async_context_base : public proxy_async_context_base
 {
  public:
     non_root_proxy_async_context_base(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx, bool is_req);
-
-    virtual ~non_root_proxy_async_context_base();
+        proxy_async_tree_context_base& tree_ctx, bool is_req);
 
     // remote_context_intf
     std::string const&
@@ -789,9 +787,7 @@ class non_root_proxy_async_context_base : public proxy_async_context_base
 
     // proxy_async_context_base
     std::unique_ptr<proxy_async_context_base>
-    make_sub_ctx(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx,
-        bool is_req) override
+    make_sub_ctx(proxy_async_tree_context_base& tree_ctx, bool is_req) override
         = 0;
 };
 

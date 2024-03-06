@@ -414,8 +414,8 @@ proxy_async_tree_context_base::proxy_async_tree_context_base(
 }
 
 proxy_async_context_base::proxy_async_context_base(
-    std::shared_ptr<proxy_async_tree_context_base> tree_ctx)
-    : tree_ctx_{std::move(tree_ctx)}, id_{allocate_async_id()}
+    proxy_async_tree_context_base& tree_ctx)
+    : tree_ctx_{tree_ctx}, id_{allocate_async_id()}
 {
 }
 
@@ -468,7 +468,7 @@ proxy_async_context_base::ensure_subs_no_const()
     auto& proxy{get_proxy()};
     // Wait until the get_sub_contexts precondition holds
     wait_until_async_status_matches(
-        proxy, remote_id_, subs_available_matcher(tree_ctx_->get_logger()));
+        proxy, remote_id_, subs_available_matcher(tree_ctx_.get_logger()));
     auto specs = proxy.get_sub_contexts(remote_id_);
     for (auto& spec : specs)
     {
@@ -481,20 +481,21 @@ proxy_async_context_base::ensure_subs_no_const()
 }
 
 root_proxy_async_context_base::root_proxy_async_context_base(
-    std::shared_ptr<proxy_async_tree_context_base> tree_ctx)
+    proxy_async_tree_context_base& tree_ctx)
     : proxy_async_context_base{tree_ctx},
       remote_id_future_{remote_id_promise_.get_future()}
 {
 }
 
-root_proxy_async_context_base::~root_proxy_async_context_base()
+void
+root_proxy_async_context_base::finish_remote() noexcept
 {
     // Clean up the context tree on the server once per proxy context tree.
     // There must have been a set_remote_id() or fail_remote_id() call for this
     // root context.
     if (remote_id_ != NO_ASYNC_ID)
     {
-        // Destructor must not throw
+        // Must not throw
         try
         {
             auto& proxy{get_proxy()};
@@ -502,7 +503,7 @@ root_proxy_async_context_base::~root_proxy_async_context_base()
         }
         catch (std::exception& e)
         {
-            auto& logger{tree_ctx_->get_logger()};
+            auto& logger{tree_ctx_.get_logger()};
             try
             {
                 logger.error(
@@ -535,7 +536,7 @@ root_proxy_async_context_base::fail_remote_id() noexcept
         try
         {
             // Everything must be noexcept here
-            auto& logger(tree_ctx_->get_logger());
+            auto& logger(tree_ctx_.get_logger());
             logger.warn(
                 "root_proxy_async_context_base::fail_remote_id caught {}",
                 e.what());
@@ -585,12 +586,8 @@ root_proxy_async_context_base::pop_tasklet()
 }
 
 non_root_proxy_async_context_base::non_root_proxy_async_context_base(
-    std::shared_ptr<proxy_async_tree_context_base> tree_ctx, bool is_req)
+    proxy_async_tree_context_base& tree_ctx, bool is_req)
     : proxy_async_context_base{tree_ctx}, is_req_{is_req}
-{
-}
-
-non_root_proxy_async_context_base::~non_root_proxy_async_context_base()
 {
 }
 

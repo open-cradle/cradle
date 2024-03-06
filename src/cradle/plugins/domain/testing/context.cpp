@@ -152,9 +152,14 @@ proxy_atst_tree_context::proxy_atst_tree_context(
 }
 
 root_proxy_atst_context::root_proxy_atst_context(
-    std::shared_ptr<proxy_atst_tree_context> tree_ctx)
-    : root_proxy_async_context_base{tree_ctx}
+    std::unique_ptr<proxy_atst_tree_context> tree_ctx)
+    : root_proxy_async_context_base{*tree_ctx}, tree_ctx_{std::move(tree_ctx)}
 {
+}
+
+root_proxy_atst_context::~root_proxy_atst_context()
+{
+    finish_remote();
 }
 
 std::string const&
@@ -195,14 +200,14 @@ root_proxy_atst_context::make_config(bool need_record_lock) const
 
 std::unique_ptr<proxy_async_context_base>
 root_proxy_atst_context::make_sub_ctx(
-    std::shared_ptr<proxy_async_tree_context_base> tree_ctx, bool is_req)
+    proxy_async_tree_context_base& tree_ctx, bool is_req)
 {
-    auto my_tree_ctx{static_pointer_cast<proxy_atst_tree_context>(tree_ctx)};
+    auto& my_tree_ctx{static_cast<proxy_atst_tree_context&>(tree_ctx)};
     return std::make_unique<non_root_proxy_atst_context>(my_tree_ctx, is_req);
 }
 
 non_root_proxy_atst_context::non_root_proxy_atst_context(
-    std::shared_ptr<proxy_atst_tree_context> tree_ctx, bool is_req)
+    proxy_atst_tree_context& tree_ctx, bool is_req)
     : non_root_proxy_async_context_base{tree_ctx, is_req}
 {
 }
@@ -227,9 +232,9 @@ non_root_proxy_atst_context::make_config(bool need_record_lock) const
 
 std::unique_ptr<proxy_async_context_base>
 non_root_proxy_atst_context::make_sub_ctx(
-    std::shared_ptr<proxy_async_tree_context_base> tree_ctx, bool is_req)
+    proxy_async_tree_context_base& tree_ctx, bool is_req)
 {
-    auto my_tree_ctx{static_pointer_cast<proxy_atst_tree_context>(tree_ctx)};
+    auto& my_tree_ctx{static_cast<proxy_atst_tree_context&>(tree_ctx)};
     return std::make_unique<non_root_proxy_atst_context>(my_tree_ctx, is_req);
 }
 
@@ -271,9 +276,8 @@ remote_async_context_intf&
 atst_context::prepare_for_remote_resolution()
 {
     logger_->info("prepare_for_remote_resolution");
-    remote_tree_
-        = std::make_shared<proxy_atst_tree_context>(resources_, proxy_name_);
-    remote_root_ = std::make_shared<root_proxy_atst_context>(remote_tree_);
+    remote_root_ = std::make_unique<root_proxy_atst_context>(
+        std::make_unique<proxy_atst_tree_context>(resources_, proxy_name_));
     auto* tasklet = create_optional_root_tasklet(
         resources_.the_tasklet_admin(), opt_tasklet_spec_);
     if (tasklet)
