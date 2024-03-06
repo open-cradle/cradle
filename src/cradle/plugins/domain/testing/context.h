@@ -236,7 +236,9 @@ class atst_context final : public local_async_context_intf,
 {
  public:
     atst_context(
-        inner_resources& resources, std::string const& proxy_name = "");
+        inner_resources& resources,
+        std::string proxy_name = "",
+        std::optional<root_tasklet_spec> opt_tasklet_spec = std::nullopt);
 
     // Some redundant redefinitions to prevent MSVC C4250
     async_context_intf*
@@ -508,6 +510,7 @@ class atst_context final : public local_async_context_intf,
  private:
     inner_resources& resources_;
     std::string proxy_name_;
+    std::optional<root_tasklet_spec> opt_tasklet_spec_;
     std::shared_ptr<spdlog::logger> logger_;
     // TODO std::unique_ptr x4
     // TODO hide tree_context in root_context

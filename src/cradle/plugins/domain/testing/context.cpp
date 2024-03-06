@@ -234,9 +234,12 @@ non_root_proxy_atst_context::make_sub_ctx(
 }
 
 atst_context::atst_context(
-    inner_resources& resources, std::string const& proxy_name)
+    inner_resources& resources,
+    std::string proxy_name,
+    std::optional<root_tasklet_spec> opt_tasklet_spec)
     : resources_{resources},
-      proxy_name_{proxy_name},
+      proxy_name_{std::move(proxy_name)},
+      opt_tasklet_spec_{std::move(opt_tasklet_spec)},
       logger_{ensure_logger("atst")}
 {
 }
@@ -248,6 +251,12 @@ atst_context::prepare_for_local_resolution()
     local_tree_ = std::make_shared<local_atst_tree_context>(resources_);
     local_root_
         = std::make_shared<local_atst_context>(local_tree_, nullptr, true);
+    auto* tasklet = create_optional_root_tasklet(
+        resources_.the_tasklet_admin(), opt_tasklet_spec_);
+    if (tasklet)
+    {
+        local_root_->push_tasklet(*tasklet);
+    }
     register_local_async_ctx(local_root_);
     return *local_root_;
 }
@@ -265,6 +274,12 @@ atst_context::prepare_for_remote_resolution()
     remote_tree_
         = std::make_shared<proxy_atst_tree_context>(resources_, proxy_name_);
     remote_root_ = std::make_shared<root_proxy_atst_context>(remote_tree_);
+    auto* tasklet = create_optional_root_tasklet(
+        resources_.the_tasklet_admin(), opt_tasklet_spec_);
+    if (tasklet)
+    {
+        remote_root_->push_tasklet(*tasklet);
+    }
     return *remote_root_;
 }
 

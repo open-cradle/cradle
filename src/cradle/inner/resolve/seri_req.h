@@ -44,6 +44,7 @@ resolve_serialized_request(
  *
  * seri_lock.record_id is ignored.
  */
+// TODO make resolve_serialized_remote() internal to seri_req.cpp?
 cppcoro::task<serialized_result>
 resolve_serialized_remote(
     remote_context_intf& ctx,
@@ -55,6 +56,7 @@ resolve_serialized_remote(
  *
  * seri_lock.record_id will be put in the returned serialized_result value.
  */
+// TODO make resolve_serialized_local() internal to seri_req.cpp?
 cppcoro::task<serialized_result>
 resolve_serialized_local(
     local_context_intf& ctx,
