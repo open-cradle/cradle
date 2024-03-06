@@ -125,7 +125,7 @@ resolve_make_some_blob_file_seri(
     return resp_owner->mapped_file();
 }
 
-template<typename CtxMaker>
+template<typename Ctx>
 static void
 test_resolve_with_lock(std::string const& proxy_name, bool introspective)
 {
@@ -141,23 +141,30 @@ test_resolve_with_lock(std::string const& proxy_name, bool introspective)
     auto req{rq_make_some_blob<caching_level>(256, true)};
     std::string seri_req{serialize_request(req)};
     auto lock_ptr{std::make_unique<cache_record_lock>()};
+    std::optional<root_tasklet_spec> opt_spec;
+    if (introspective)
+    {
+        auto& admin{resources->the_tasklet_admin()};
+        introspection_set_capturing_enabled(admin, true);
+        introspection_set_logging_enabled(admin, true);
+        opt_spec = root_tasklet_spec{"test", "make_some_blob"};
+    }
+    Ctx ctx{*resources, proxy_name, std::move(opt_spec)};
 
     // Resolve the serialized request, obtaining a memory cache lock.
-    CtxMaker ctx_maker{*resources, proxy_name, introspective};
-    auto ctx = ctx_maker();
-    auto file0 = resolve_make_some_blob_file_seri(*ctx, seri_req, &*lock_ptr);
+    auto file0 = resolve_make_some_blob_file_seri(ctx, seri_req, &*lock_ptr);
 
-    clear_unused_mem_cache_entries(*ctx);
+    clear_unused_mem_cache_entries(ctx);
     // The memory cache should still hold the entry referring to file0, so
     // re-resolving the request should return the same blob file.
-    auto file1 = resolve_make_some_blob_file_seri(*ctx, seri_req, nullptr);
+    auto file1 = resolve_make_some_blob_file_seri(ctx, seri_req, nullptr);
     CHECK(file1 == file0);
 
     lock_ptr.reset();
-    clear_unused_mem_cache_entries(*ctx);
+    clear_unused_mem_cache_entries(ctx);
     // The memory cache no longer refers to file0; re-resolving the request
     // will create a new blob file.
-    auto file2 = resolve_make_some_blob_file_seri(*ctx, seri_req, nullptr);
+    auto file2 = resolve_make_some_blob_file_seri(ctx, seri_req, nullptr);
     CHECK(file2 != file0);
 
     // TODO make this work for rpclib; need some kind of session for
@@ -199,45 +206,11 @@ test_resolve_with_lock(std::string const& proxy_name, bool introspective)
     }
 }
 
-// Creates a context for synchronously resolving requests
-class SyncCtxMaker
-{
- public:
-    SyncCtxMaker(
-        inner_resources& resources,
-        std::string const& proxy_name,
-        bool introspective)
-        : resources_{resources},
-          proxy_name_{proxy_name},
-          introspective_{introspective}
-    {
-    }
-
-    auto
-    operator()()
-    {
-        std::optional<root_tasklet_spec> opt_spec;
-        if (introspective_)
-        {
-            auto& admin{resources_.the_tasklet_admin()};
-            introspection_set_capturing_enabled(admin, true);
-            introspection_set_logging_enabled(admin, true);
-            opt_spec = root_tasklet_spec{"test", "make_some_blob"};
-        }
-        return std::make_unique<testing_request_context>(
-            resources_, proxy_name_, std::move(opt_spec));
-    }
-
- private:
-    inner_resources& resources_;
-    std::string proxy_name_;
-    bool introspective_;
-};
-
 static void
 test_resolve_with_lock_sync(std::string const& proxy_name, bool introspective)
 {
-    return test_resolve_with_lock<SyncCtxMaker>(proxy_name, introspective);
+    return test_resolve_with_lock<testing_request_context>(
+        proxy_name, introspective);
 }
 
 TEST_CASE("resolve serialized request with lock, sync, locally", tag)
@@ -270,67 +243,32 @@ TEST_CASE("resolve seri request with lock; sync, intrsp, rpclib", tag)
     test_resolve_with_lock_sync("rpclib", true);
 }
 
-// Creates a context for asynchronously resolving requests
-class AsyncCtxMaker
-{
- public:
-    AsyncCtxMaker(
-        inner_resources& resources,
-        std::string const& proxy_name,
-        bool introspective)
-        : resources_{resources},
-          proxy_name_{proxy_name},
-          introspective_{introspective}
-    {
-    }
-
-    auto
-    operator()()
-    {
-        std::optional<root_tasklet_spec> opt_spec;
-        if (introspective_)
-        {
-            auto& admin{resources_.the_tasklet_admin()};
-            introspection_set_capturing_enabled(admin, true);
-            introspection_set_logging_enabled(admin, true);
-            opt_spec = root_tasklet_spec{"test", "make_some_blob"};
-        }
-        return std::make_unique<atst_context>(
-            resources_, proxy_name_, std::move(opt_spec));
-    }
-
- private:
-    inner_resources& resources_;
-    std::string proxy_name_;
-    bool introspective_;
-};
-
 TEST_CASE("resolve serialized request with lock, async, locally", tag)
 {
-    return test_resolve_with_lock<AsyncCtxMaker>("", false);
+    return test_resolve_with_lock<atst_context>("", false);
 }
 
 TEST_CASE("resolve serialized request with lock, async, loopback", tag)
 {
-    return test_resolve_with_lock<AsyncCtxMaker>("loopback", false);
+    return test_resolve_with_lock<atst_context>("loopback", false);
 }
 
 TEST_CASE("resolve serialized request with lock, async, rpclib", tag)
 {
-    return test_resolve_with_lock<AsyncCtxMaker>("rpclib", false);
+    return test_resolve_with_lock<atst_context>("rpclib", false);
 }
 
 TEST_CASE("resolve serialized request with lock; async, intrsp, locally", tag)
 {
-    return test_resolve_with_lock<AsyncCtxMaker>("", true);
+    return test_resolve_with_lock<atst_context>("", true);
 }
 
 TEST_CASE("resolve serialized request with lock; async, intrsp, loopback", tag)
 {
-    return test_resolve_with_lock<AsyncCtxMaker>("loopback", true);
+    return test_resolve_with_lock<atst_context>("loopback", true);
 }
 
 TEST_CASE("resolve serialized request with lock; async, intrsp, rpclib", tag)
 {
-    return test_resolve_with_lock<AsyncCtxMaker>("rpclib", true);
+    return test_resolve_with_lock<atst_context>("rpclib", true);
 }
