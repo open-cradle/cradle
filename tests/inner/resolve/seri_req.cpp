@@ -28,7 +28,7 @@ test_resolve(std::string const& proxy_name)
 {
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    testing_request_context ctx{*resources, nullptr, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
 
     constexpr auto caching_level{caching_level_type::full};
     auto req{rq_make_some_blob<caching_level>(256, false)};
@@ -223,17 +223,16 @@ class SyncCtxMaker
         // for all requests
         if (!ctx_)
         {
-            tasklet_tracker* tasklet{};
+            std::optional<root_tasklet_spec> opt_spec;
             if (introspective_)
             {
                 auto& admin{resources_.the_tasklet_admin()};
                 introspection_set_capturing_enabled(admin, true);
                 introspection_set_logging_enabled(admin, true);
-                tasklet
-                    = create_tasklet_tracker(admin, "test", "make_some_blob");
+                opt_spec = root_tasklet_spec{"test", "make_some_blob"};
             }
             ctx_ = std::make_shared<testing_request_context>(
-                resources_, tasklet, proxy_name_);
+                resources_, proxy_name_, std::move(opt_spec));
         }
         return ctx_;
     }

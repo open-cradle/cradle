@@ -3,6 +3,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/requests/context_base.h>
 
 /*
@@ -25,8 +26,8 @@ class testing_request_context final : public sync_context_base
  public:
     testing_request_context(
         inner_resources& resources,
-        tasklet_tracker* tasklet,
-        std::string proxy_name);
+        std::string proxy_name,
+        std::optional<root_tasklet_spec> opt_tasklet_spec = std::nullopt);
 
     // remote_context_intf
     std::string const&

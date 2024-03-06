@@ -31,8 +31,7 @@ TEST_CASE("evaluate proxy request, plain args", tag)
     auto req{rq_test_adder_v1p(7, 2)};
     int expected{7 + 2};
 
-    tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{*resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     REQUIRE_THROWS_WITH(
@@ -56,8 +55,7 @@ TEST_CASE("evaluate proxy request, normalized args", tag)
     auto req{rq_test_adder_v1n(7, 2)};
     int expected{7 + 2};
 
-    tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{*resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     REQUIRE_THROWS_WITH(
@@ -78,8 +76,7 @@ TEST_CASE("attempt to resolve proxy request locally", tag)
 
     auto req{rq_test_adder_v1p(7, 2)};
 
-    tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{*resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
 
     REQUIRE_THROWS_AS(
         cppcoro::sync_wait(resolve_request(ctx, req)), std::logic_error);
@@ -159,8 +156,7 @@ TEST_CASE("rpclib server busy on many parallel resolve_sync requests", tag)
     std::string proxy_name{"rpclib"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{*resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
 
     // Send lots of resolve_sync requests to the server, until it starts
     // responding with "busy" errors.

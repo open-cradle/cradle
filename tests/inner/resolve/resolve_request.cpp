@@ -611,7 +611,7 @@ test_resolve_blob_file_or_not(std::string const& proxy_name)
 {
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option{})};
-    testing_request_context ctx{*resources, nullptr, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
 
     auto req0{rq_make_some_blob<caching_level>(256, false)};
     auto res0 = cppcoro::sync_wait(resolve_request(ctx, req0));
@@ -671,7 +671,7 @@ test_resolve_to_blob_file(bool test_remove_blob_file)
     std::string proxy_name{};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option{})};
-    testing_request_context ctx{*resources, nullptr, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
 
     auto req{rq_make_some_blob<caching_level>(256, true)};
     auto res0 = cppcoro::sync_wait(resolve_request(ctx, req));

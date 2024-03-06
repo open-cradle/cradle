@@ -1,5 +1,6 @@
 #include <chrono>
 #include <thread>
+#include <utility>
 
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/remote/config.h>
@@ -13,9 +14,13 @@ std::string const the_domain_name{"testing"};
 
 testing_request_context::testing_request_context(
     inner_resources& resources,
-    tasklet_tracker* tasklet,
-    std::string proxy_name)
-    : sync_context_base{resources, tasklet, std::move(proxy_name)}
+    std::string proxy_name,
+    std::optional<root_tasklet_spec> opt_tasklet_spec)
+    : sync_context_base{
+        resources,
+        create_optional_root_tasklet(
+            resources.the_tasklet_admin(), std::move(opt_tasklet_spec)),
+        std::move(proxy_name)}
 {
 }
 

@@ -18,7 +18,7 @@ testing_domain::name() const
 std::shared_ptr<sync_context_intf>
 testing_domain::make_local_sync_context(service_config const& config) const
 {
-    return std::make_shared<testing_request_context>(resources_, nullptr, "");
+    return std::make_shared<testing_request_context>(resources_, "");
 }
 
 std::shared_ptr<async_context_intf>

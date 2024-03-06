@@ -1,6 +1,7 @@
 #ifndef CRADLE_INNER_INTROSPECTION_TASKLET_H
 #define CRADLE_INNER_INTROSPECTION_TASKLET_H
 
+#include <optional>
 #include <string>
 
 #include <cradle/inner/core/id.h>
@@ -100,6 +101,25 @@ create_tasklet_tracker(
  */
 tasklet_tracker*
 create_tasklet_tracker(tasklet_admin& admin, int rpc_client_id);
+
+/**
+ * Specifies a root tasklet (not having a client).
+ */
+struct root_tasklet_spec
+{
+    std::string pool_name;
+    std::string title;
+};
+
+/**
+ * Optionally creates and returns a root tasklet from an optional spec.
+ *
+ * Returns nullptr if opt_spec is nullopt.
+ * Returns nullptr if tracking is disabled.
+ */
+tasklet_tracker*
+create_optional_root_tasklet(
+    tasklet_admin& admin, std::optional<root_tasklet_spec> opt_spec);
 
 /**
  * Tracks the major states of a tasklet (running / finished)

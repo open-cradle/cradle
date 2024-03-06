@@ -28,7 +28,7 @@ test_make_some_blob(bool async, bool shared)
     blob response;
     if (!async)
     {
-        testing_request_context ctx{*resources, nullptr, proxy_name};
+        testing_request_context ctx{*resources, proxy_name};
         ResolutionConstraintsRemoteSync constraints;
         response = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
     }

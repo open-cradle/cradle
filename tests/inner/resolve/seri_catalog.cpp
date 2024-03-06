@@ -53,7 +53,7 @@ TEST_CASE("register seri resolver and call it", tag)
 
     REQUIRE_NOTHROW(cat.register_resolver(req));
 
-    testing_request_context ctx{*resources, nullptr, ""};
+    testing_request_context ctx{*resources, ""};
     std::string seri_req{serialize_request(req)};
     auto seri_resp{
         cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req))};
@@ -68,7 +68,7 @@ TEST_CASE("call unregistered resolver", tag)
     auto resources{make_inner_test_resources()};
     static char const arg[] = "b";
     auto req{rq_local(make_string<arg>{}, arg)};
-    testing_request_context ctx{*resources, nullptr, ""};
+    testing_request_context ctx{*resources, ""};
 
 #if 0
     // Even serialization now fails if the request was not registered:
@@ -92,7 +92,7 @@ TEST_CASE("serialized request lacking uuid", tag)
     auto req{rq_local(make_string<arg>{}, arg)};
     seri_catalog cat{resources->get_seri_registry()};
     cat.register_resolver(req);
-    testing_request_context ctx{*resources, nullptr, ""};
+    testing_request_context ctx{*resources, ""};
     std::string correct{serialize_request(req)};
 
     std::regex re("uuid");
@@ -110,7 +110,7 @@ TEST_CASE("malformed serialized request", tag)
     auto req{rq_local(make_string<arg>{}, arg)};
     seri_catalog cat{resources->get_seri_registry()};
     cat.register_resolver(req);
-    testing_request_context ctx{*resources, nullptr, ""};
+    testing_request_context ctx{*resources, ""};
     std::string seri_req{serialize_request(req)};
 
     seri_req.pop_back();
@@ -153,7 +153,7 @@ TEST_CASE("resolve two C++ functions with the same signature", tag)
 
     REQUIRE(seri_req_e != seri_req_f);
 
-    testing_request_context ctx{*resources, nullptr, ""};
+    testing_request_context ctx{*resources, ""};
 
     auto seri_resp_e{
         cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req_e))};
