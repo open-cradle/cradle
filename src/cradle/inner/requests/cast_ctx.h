@@ -74,6 +74,16 @@ struct dynamic_ctx_caster<local_async_context_intf>
 };
 
 template<>
+struct dynamic_ctx_caster<root_local_async_context_intf>
+{
+    static root_local_async_context_intf*
+    cast_ptr(context_intf* ctx)
+    {
+        return ctx->to_root_local_async_context_intf();
+    }
+};
+
+template<>
 struct dynamic_ctx_caster<remote_async_context_intf>
 {
     static remote_async_context_intf*

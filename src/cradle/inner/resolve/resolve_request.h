@@ -271,19 +271,21 @@ resolve_request_async(
     // Third decision: cached or not
     if constexpr (!constraints.is_sub)
     {
+        root_local_async_context_intf* root_actx{};
         // The following cast should succeed if client uses atst_context or
         // similar
         if (auto* owner = cast_ctx_to_ptr<local_async_ctx_owner_intf>(ctx))
         {
             // (re-)create ctx tree, root ctx; get root ctx
-            actx = &owner->prepare_for_local_resolution();
+            root_actx = &owner->prepare_for_local_resolution();
         }
         else
         {
-            actx = &cast_ctx_to_ref<local_async_context_intf>(ctx);
+            root_actx = &cast_ctx_to_ref<root_local_async_context_intf>(ctx);
         }
         // Populate ctx with sub ctx's
-        req.accept(*actx->make_ctx_tree_builder());
+        req.accept(*root_actx->make_ctx_tree_builder());
+        actx = root_actx;
     }
     else
     {

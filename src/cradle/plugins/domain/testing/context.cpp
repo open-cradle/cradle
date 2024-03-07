@@ -51,10 +51,10 @@ local_atst_tree_context::local_atst_tree_context(inner_resources& resources)
 {
 }
 
-local_atst_context::local_atst_context(
+root_local_atst_context::root_local_atst_context(
     std::shared_ptr<local_atst_tree_context> tree_ctx,
     service_config const& config)
-    : local_async_context_base{tree_ctx, nullptr, true},
+    : root_local_async_context_base{std::move(tree_ctx)},
       fail_submit_async_{config.get_bool_or_default(
           testing_config_keys::FAIL_SUBMIT_ASYNC, false)},
       resolve_async_delay_{static_cast<int>(config.get_number_or_default(
@@ -64,22 +64,20 @@ local_atst_context::local_atst_context(
 {
 }
 
-local_atst_context::local_atst_context(
-    std::shared_ptr<local_atst_tree_context> tree_ctx,
-    local_atst_context* parent,
-    bool is_req)
-    : local_async_context_base{tree_ctx, parent, is_req}
+root_local_atst_context::root_local_atst_context(
+    std::shared_ptr<local_atst_tree_context> tree_ctx)
+    : root_local_async_context_base{std::move(tree_ctx)}
 {
 }
 
 std::unique_ptr<req_visitor_intf>
-local_atst_context::make_ctx_tree_builder()
+root_local_atst_context::make_ctx_tree_builder()
 {
     return std::make_unique<local_atst_context_tree_builder>(*this);
 }
 
 void
-local_atst_context::set_result(blob result)
+root_local_atst_context::set_result(blob result)
 {
     if (set_result_delay_ > 0)
     {
@@ -88,11 +86,11 @@ local_atst_context::set_result(blob result)
         std::this_thread::sleep_for(
             std::chrono::milliseconds(set_result_delay_));
     }
-    local_async_context_base::set_result(std::move(result));
+    root_local_async_context_base::set_result(std::move(result));
 }
 
 void
-local_atst_context::apply_fail_submit_async()
+root_local_atst_context::apply_fail_submit_async()
 {
     if (fail_submit_async_)
     {
@@ -103,7 +101,7 @@ local_atst_context::apply_fail_submit_async()
 }
 
 void
-local_atst_context::apply_resolve_async_delay()
+root_local_atst_context::apply_resolve_async_delay()
 {
     if (resolve_async_delay_ > 0)
     {
@@ -116,7 +114,7 @@ local_atst_context::apply_resolve_async_delay()
 }
 
 local_atst_context_tree_builder::local_atst_context_tree_builder(
-    local_atst_context& ctx)
+    local_async_context_base& ctx)
     : local_context_tree_builder_base{ctx}
 {
 }
@@ -129,7 +127,7 @@ std::unique_ptr<local_context_tree_builder_base>
 local_atst_context_tree_builder::make_sub_builder(
     local_async_context_base& sub_ctx)
 {
-    auto& my_sub_ctx{static_cast<local_atst_context&>(sub_ctx)};
+    auto& my_sub_ctx{static_cast<local_async_context_base&>(sub_ctx)};
     return std::make_unique<local_atst_context_tree_builder>(my_sub_ctx);
 }
 
@@ -140,8 +138,8 @@ local_atst_context_tree_builder::make_sub_ctx(
     bool is_req)
 {
     auto my_tree_ctx{static_pointer_cast<local_atst_tree_context>(tree_ctx)};
-    auto* my_parent{static_cast<local_atst_context*>(&ctx_)};
-    return std::make_shared<local_atst_context>(
+    auto* my_parent{static_cast<local_async_context_base*>(&ctx_)};
+    return std::make_shared<local_async_context_base>(
         my_tree_ctx, my_parent, is_req);
 }
 
@@ -249,13 +247,12 @@ atst_context::atst_context(
 {
 }
 
-local_async_context_intf&
+root_local_async_context_intf&
 atst_context::prepare_for_local_resolution()
 {
     logger_->info("prepare_for_local_resolution");
-    local_tree_ = std::make_shared<local_atst_tree_context>(resources_);
-    local_root_
-        = std::make_shared<local_atst_context>(local_tree_, nullptr, true);
+    auto local_tree = std::make_shared<local_atst_tree_context>(resources_);
+    local_root_ = std::make_shared<root_local_atst_context>(local_tree);
     auto* tasklet = create_optional_root_tasklet(
         resources_.the_tasklet_admin(), opt_tasklet_spec_);
     if (tasklet)
@@ -266,7 +263,7 @@ atst_context::prepare_for_local_resolution()
     return *local_root_;
 }
 
-local_async_context_intf*
+root_local_async_context_intf*
 atst_context::get_active_local_root_context()
 {
     return local_root_ ? &*local_root_ : nullptr;
@@ -293,7 +290,7 @@ atst_context::get_active_remote_root_context()
     return remote_root_ ? &*remote_root_ : nullptr;
 }
 
-local_atst_context&
+root_local_async_context_base&
 atst_context::get_local_root()
 {
     if (!local_root_)
@@ -303,7 +300,7 @@ atst_context::get_local_root()
     return *local_root_;
 }
 
-local_atst_context const&
+root_local_async_context_base const&
 atst_context::get_local_root() const
 {
     return const_cast<atst_context*>(this)->get_local_root();

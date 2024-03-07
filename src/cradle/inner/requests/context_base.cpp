@@ -281,11 +281,6 @@ local_async_context_base::update_status(async_status status)
 {
     assert(status != async_status::AWAITING_RESULT);
     auto& logger{tree_ctx_->get_logger()};
-    auto new_status{status};
-    if (using_result_ && status == async_status::FINISHED)
-    {
-        new_status = async_status::AWAITING_RESULT;
-    }
     logger.info(
         "local_async_context_base {} update_status {} -> {}",
         id_,
@@ -303,7 +298,7 @@ local_async_context_base::update_status(async_status status)
             sub->update_status(status);
         }
     }
-    status_ = new_status;
+    status_ = status;
 }
 
 void
@@ -319,45 +314,6 @@ local_async_context_base::update_status_error(std::string const& errmsg)
     errmsg_ = errmsg;
 }
 
-void
-local_async_context_base::using_result()
-{
-    assert(!parent_);
-    using_result_ = true;
-}
-
-void
-local_async_context_base::check_set_get_result_precondition(bool is_get_result)
-{
-    async_status required_status{
-        is_get_result ? async_status::FINISHED
-                      : async_status::AWAITING_RESULT};
-    if (!using_result_ || status_ != required_status)
-    {
-        throw std::logic_error(fmt::format(
-            "local_async_context_base {} {}() precondition violated ({}, {})",
-            id_,
-            is_get_result ? "is_get_result" : "is_set_result",
-            using_result_,
-            status_.load(std::memory_order_relaxed)));
-    }
-}
-
-void
-local_async_context_base::set_result(blob result)
-{
-    check_set_get_result_precondition(false);
-    result_ = std::move(result);
-    status_ = async_status::FINISHED;
-}
-
-blob
-local_async_context_base::get_result()
-{
-    check_set_get_result_precondition(true);
-    return result_;
-}
-
 bool
 local_async_context_base::is_cancellation_requested() const noexcept
 {
@@ -370,6 +326,62 @@ local_async_context_base::throw_async_cancelled() const
 {
     throw async_cancelled{
         fmt::format("local_async_context_base {} cancelled", id_)};
+}
+
+root_local_async_context_base::root_local_async_context_base(
+    std::shared_ptr<local_tree_context_base> tree_ctx)
+    : local_async_context_base{std::move(tree_ctx), nullptr, true}
+{
+}
+
+void
+root_local_async_context_base::update_status(async_status status)
+{
+    local_async_context_base::update_status(status);
+    if (using_result_ && status == async_status::FINISHED)
+    {
+        // TODO race condition, must not temporarily set to FINISHED
+        set_status(async_status::AWAITING_RESULT);
+    }
+}
+
+void
+root_local_async_context_base::using_result()
+{
+    using_result_ = true;
+}
+
+void
+root_local_async_context_base::check_set_get_result_precondition(
+    bool is_get_result)
+{
+    async_status required_status{
+        is_get_result ? async_status::FINISHED
+                      : async_status::AWAITING_RESULT};
+    if (!using_result_ || get_status() != required_status)
+    {
+        throw std::logic_error(fmt::format(
+            "local_async_context_base {} {}() precondition violated ({}, {})",
+            get_id(),
+            is_get_result ? "is_get_result" : "is_set_result",
+            using_result_,
+            get_status()));
+    }
+}
+
+void
+root_local_async_context_base::set_result(blob result)
+{
+    check_set_get_result_precondition(false);
+    result_ = std::move(result);
+    set_status(async_status::FINISHED);
+}
+
+blob
+root_local_async_context_base::get_result()
+{
+    check_set_get_result_precondition(true);
+    return result_;
 }
 
 local_context_tree_builder_base::local_context_tree_builder_base(

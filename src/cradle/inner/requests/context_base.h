@@ -179,10 +179,9 @@ class local_tree_context_base
  * Relates to a single request, or a non-request argument of such a request,
  * which will be resolved on the local machine.
  */
-class local_async_context_base : public local_async_context_intf,
+class local_async_context_base : public virtual local_async_context_intf,
                                  public caching_context_intf,
-                                 public introspective_context_intf,
-                                 public test_context_intf
+                                 public introspective_context_intf
 {
  public:
     local_async_context_base(
@@ -270,9 +269,6 @@ class local_async_context_base : public local_async_context_intf,
         return *subs_[ix];
     }
 
-    virtual std::unique_ptr<req_visitor_intf>
-    make_ctx_tree_builder() override = 0;
-
     cppcoro::task<void>
     reschedule_if_opportune() override;
 
@@ -293,27 +289,6 @@ class local_async_context_base : public local_async_context_intf,
 
     void
     update_status_error(std::string const& errmsg) override;
-
-    void
-    using_result() override;
-
-    void
-    set_result(blob result) override;
-
-    blob
-    get_result() override;
-
-    void
-    set_cache_record_id(remote_cache_record_id record_id) override
-    {
-        cache_record_id_.store(record_id);
-    }
-
-    remote_cache_record_id
-    get_cache_record_id() const override
-    {
-        return cache_record_id_.load();
-    }
 
     void
     request_cancellation() override
@@ -337,6 +312,81 @@ class local_async_context_base : public local_async_context_intf,
     void
     pop_tasklet() override;
 
+    // Other
+    void
+    add_sub(std::size_t ix, std::shared_ptr<local_async_context_base> sub);
+
+    std::shared_ptr<local_tree_context_base>
+    get_tree_context()
+    {
+        return tree_ctx_;
+    }
+
+ protected:
+    void
+    set_status(async_status status)
+    {
+        status_ = status;
+    }
+
+ private:
+    // TODO tree_ctx_ owned by root; parent_ non-root only
+    std::shared_ptr<local_tree_context_base> tree_ctx_;
+    local_async_context_base* parent_;
+    bool is_req_;
+    async_id const id_;
+    std::atomic<async_status> status_;
+    std::string errmsg_;
+    // Using shared_ptr ensures that local_async_context_base objects are not
+    // relocated during tree build-up / visit.
+    // It cannot be unique_ptr because there can be two owners: the parent
+    // context, and the async_db.
+    std::vector<std::shared_ptr<local_async_context_base>> subs_;
+    std::atomic<int> num_subs_not_running_;
+    std::vector<std::shared_ptr<blob_file_writer>> blob_file_writers_;
+    std::vector<tasklet_tracker*> tasklets_;
+
+    bool
+    decide_reschedule_sub();
+};
+
+class root_local_async_context_base : public local_async_context_base,
+                                      public root_local_async_context_intf,
+                                      public test_context_intf
+{
+ public:
+    root_local_async_context_base(
+        std::shared_ptr<local_tree_context_base> tree_ctx);
+
+    // local_async_context_intf
+    void
+    update_status(async_status status) override;
+
+    // root_local_async_context_intf
+    virtual std::unique_ptr<req_visitor_intf>
+    make_ctx_tree_builder() override = 0;
+
+    void
+    using_result() override;
+
+    void
+    set_result(blob result) override;
+
+    blob
+    get_result() override;
+
+    void
+    set_cache_record_id(remote_cache_record_id record_id) override
+    {
+        cache_record_id_.store(record_id);
+    }
+
+    remote_cache_record_id
+    get_cache_record_id() const override
+    {
+        return cache_record_id_.load();
+    }
+
     // test_context_intf
     virtual void
     apply_fail_submit_async() override
@@ -348,40 +398,19 @@ class local_async_context_base : public local_async_context_intf,
     {
     }
 
-    // Other
-    void
-    add_sub(std::size_t ix, std::shared_ptr<local_async_context_base> sub);
-
-    std::shared_ptr<local_tree_context_base>
-    get_tree_context()
-    {
-        return tree_ctx_;
-    }
-
  private:
-    std::shared_ptr<local_tree_context_base> tree_ctx_;
-    local_async_context_base* parent_;
-    bool is_req_;
-    async_id id_;
-    std::atomic<async_status> status_;
-    std::string errmsg_;
     bool using_result_{false};
     blob result_;
     std::atomic<remote_cache_record_id> cache_record_id_;
-    // Using shared_ptr ensures that local_async_context_base objects are not
-    // relocated during tree build-up / visit.
-    // It cannot be unique_ptr because there can be two owners: the parent
-    // context, and the async_db.
-    std::vector<std::shared_ptr<local_async_context_base>> subs_;
-    std::atomic<int> num_subs_not_running_;
-    std::vector<std::shared_ptr<blob_file_writer>> blob_file_writers_;
-    std::vector<tasklet_tracker*> tasklets_;
 
     void
     check_set_get_result_precondition(bool is_get_result);
+};
 
-    bool
-    decide_reschedule_sub();
+class non_root_local_async_context_base : public local_async_context_base
+{
+ public:
+    using local_async_context_base::local_async_context_base;
 };
 
 /*

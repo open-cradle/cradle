@@ -90,7 +90,7 @@ loopback_service::resolve_sync(service_config config, std::string seri_req)
 static void
 resolve_async(
     loopback_service* loopback,
-    std::shared_ptr<local_async_context_intf> actx,
+    std::shared_ptr<root_local_async_context_intf> actx,
     std::string seri_req,
     seri_cache_record_lock_t seri_lock,
     bool introspective)
@@ -149,7 +149,7 @@ loopback_service::submit_async(service_config config, std::string seri_req)
     {
         test_ctx->apply_fail_submit_async();
     }
-    auto actx = cast_ctx_to_shared_ptr<local_async_context_intf>(ctx);
+    auto actx = cast_ctx_to_shared_ptr<root_local_async_context_intf>(ctx);
     actx->using_result();
     resources_->ensure_async_db();
     get_async_db().add(actx);
@@ -233,7 +233,11 @@ loopback_service::get_async_response(async_id root_aid)
 {
     logger_->info("handle_get_async_response {}", root_aid);
     auto actx{get_async_db().find(root_aid)};
-    return serialized_result{actx->get_result(), actx->get_cache_record_id()};
+    // TODO trust cast_ctx_to_shared_ptr?
+    auto root_actx
+        = cast_ctx_to_shared_ptr<root_local_async_context_intf>(actx);
+    return serialized_result{
+        root_actx->get_result(), root_actx->get_cache_record_id()};
 }
 
 void

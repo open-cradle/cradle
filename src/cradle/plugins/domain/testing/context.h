@@ -39,8 +39,8 @@ class testing_request_context final : public sync_context_base
 static_assert(ValidContext<testing_request_context>);
 
 /*
- * Tree-level context, shared by all local_atst_context objects in the same
- * context tree (relating to the same root request).
+ * Tree-level context, shared by all (non_)root_local_atst_context objects in
+ * the same context tree (relating to the same root request).
  *
  * Note that an object of this class must not be re-used across multiple
  * context trees.
@@ -55,22 +55,19 @@ class local_atst_tree_context : public local_tree_context_base
  * Context that can be used to asynchronously resolve requests on the local
  * machine.
  *
- * Relates to a single request, or a non-request argument of such a request,
- * which will be resolved on the local machine.
+ * Relates to a single root request, which will be resolved on the local
+ * machine.
  */
-class local_atst_context final : public local_async_context_base
+class root_local_atst_context final : public root_local_async_context_base
 {
  public:
     // Constructor called from testing_domain::make_local_async_context()
-    local_atst_context(
+    root_local_atst_context(
         std::shared_ptr<local_atst_tree_context> tree_ctx,
         service_config const& config);
 
     // Other-purposes constructor
-    local_atst_context(
-        std::shared_ptr<local_atst_tree_context> tree_ctx,
-        local_atst_context* parent,
-        bool is_req);
+    root_local_atst_context(std::shared_ptr<local_atst_tree_context> tree_ctx);
 
     // local_async_context_intf
     std::unique_ptr<req_visitor_intf>
@@ -91,22 +88,42 @@ class local_atst_context final : public local_async_context_base
     int resolve_async_delay_{0};
     int set_result_delay_{0};
 };
-static_assert(ValidContext<local_atst_context>);
+static_assert(ValidContext<root_local_atst_context>);
 
 /*
- * Recursively creates subtrees of local_atst_context objects, with the
- * same topology as the corresponding request subtree.
+ * Context that can be used to asynchronously resolve requests on the local
+ * machine.
  *
- * A local_atst_context object will be created for each request in the tree,
- * but also for each value: the resolve_request() variant resolving a value
- * requires a context argument, even though it doesn't access it.
+ * Relates to a single non-root request, or a non-request argument of such a
+ * request, which will be resolved on the local machine.
  */
+// TODO non_root_local_atst_context used nor implemented
+class non_root_local_atst_context final
+    : public non_root_local_async_context_base
+{
+ public:
+    non_root_local_atst_context(
+        std::shared_ptr<local_atst_tree_context> tree_ctx,
+        local_async_context_base* parent,
+        bool is_req);
+};
+static_assert(ValidContext<non_root_local_atst_context>);
+
+/*
+ * Recursively creates subtrees of non_root_local_atst_context objects, with
+ * the same topology as the corresponding request subtree.
+ *
+ * A non_root_local_atst_context object will be created for each request in the
+ * tree, but also for each value: the resolve_request() variant resolving a
+ * value requires a context argument, even though it doesn't access it.
+ */
+// TODO create non_root_local_atst_context
 class local_atst_context_tree_builder : public local_context_tree_builder_base
 {
  public:
     // ctx is the context object corresponding to the request whose arguments
     // will be visited
-    local_atst_context_tree_builder(local_atst_context& ctx);
+    local_atst_context_tree_builder(local_async_context_base& ctx);
 
     ~local_atst_context_tree_builder();
 
@@ -231,7 +248,7 @@ static_assert(ValidContext<non_root_proxy_atst_context>);
 // The atst_context functionality is limited: it can be passed to
 // resolve_request(), and a root context object can be retrieved for additional
 // functionality.
-class atst_context final : public local_async_context_intf,
+class atst_context final : public root_local_async_context_intf,
                            public remote_async_context_intf,
                            public local_async_ctx_owner_intf,
                            public remote_async_ctx_owner_intf
@@ -454,10 +471,10 @@ class atst_context final : public local_async_context_intf,
     }
 
     // local_async_ctx_owner_intf
-    local_async_context_intf&
+    root_local_async_context_intf&
     prepare_for_local_resolution() override;
 
-    local_async_context_intf*
+    root_local_async_context_intf*
     get_active_local_root_context() override;
 
     // remote_async_ctx_owner_intf
@@ -486,18 +503,15 @@ class atst_context final : public local_async_context_intf,
     std::string proxy_name_;
     std::optional<root_tasklet_spec> opt_tasklet_spec_;
     std::shared_ptr<spdlog::logger> logger_;
-    // TODO std::unique_ptr x4
-    // TODO hide tree_context in root_context
-    std::shared_ptr<local_atst_tree_context> local_tree_;
     // local_root_ ownership shared between this object and async db
-    std::shared_ptr<local_atst_context> local_root_;
+    std::shared_ptr<root_local_atst_context> local_root_;
     // remote_root_ exclusively owned by this object
     std::unique_ptr<root_proxy_atst_context> remote_root_;
 
-    local_atst_context&
+    root_local_async_context_base&
     get_local_root();
 
-    local_atst_context const&
+    root_local_async_context_base const&
     get_local_root() const;
 };
 

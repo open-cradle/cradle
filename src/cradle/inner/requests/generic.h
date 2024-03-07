@@ -178,6 +178,7 @@ class remote_context_intf;
 class sync_context_intf;
 class async_context_intf;
 class local_async_context_intf;
+class root_local_async_context_intf;
 class remote_async_context_intf;
 class caching_context_intf;
 class introspective_context_intf;
@@ -211,6 +212,11 @@ class context_intf
     }
     virtual local_async_context_intf*
     to_local_async_context_intf()
+    {
+        return nullptr;
+    }
+    virtual root_local_async_context_intf*
+    to_root_local_async_context_intf()
     {
         return nullptr;
     }
@@ -416,7 +422,6 @@ class async_context_intf : public virtual context_intf
 };
 
 // Context for an asynchronous task running on the local machine
-// TODO create class root_local_async_context_intf containing root-specifics
 class local_async_context_intf : public local_context_intf,
                                  public virtual async_context_intf
 {
@@ -441,13 +446,6 @@ class local_async_context_intf : public local_context_intf,
     virtual local_async_context_intf&
     get_local_sub(std::size_t ix)
         = 0;
-
-    // Returns a visitor that will traverse a request tree and build a
-    // corresponding tree of subcontexts, under the current context object.
-    // Should be called only for a root context (a context that forms the
-    // root of its context tree).
-    virtual std::unique_ptr<req_visitor_intf>
-    make_ctx_tree_builder() = 0;
 
     // Reschedule execution for this context on another thread if this is
     // likely to improve performance due to increased parallelism.
@@ -490,6 +488,52 @@ class local_async_context_intf : public local_context_intf,
     update_status_error(std::string const& errmsg)
         = 0;
 
+    // Requests cancellation of all tasks in the same context tree.
+    // This is a non-coroutine version of
+    // async_context_intf::request_cancellation().
+    //
+    // Note that after this call, tasks can still finish successfully or fail.
+    // Thus, a "cancelling" state would not be meaningful.
+    //
+    // Also note that cancellation depends on cooperation by the request
+    // implementation. In particular, an implementation that has no access to
+    // the context object (such as a non-coroutine function_request) is unable
+    // to cooperate. Thus, a cancellation request just may have no effect.
+    virtual void
+    request_cancellation()
+        = 0;
+
+    // Returns true if cancellation has been requested on this context or
+    // another one in the same context tree.
+    // The intention is that an asynchronous task will all this function on
+    // polling basis, and call throw_async_cancelled() when it returns true.
+    virtual bool
+    is_cancellation_requested() const noexcept
+        = 0;
+
+    // Throws async_cancelled. Should be called (only) when
+    // is_cancellation_requested() returns true.
+    virtual void
+    throw_async_cancelled() const
+        = 0;
+};
+
+// Context for an asynchronous task running on the local machine that forms the
+// root of a context tree.
+class root_local_async_context_intf : public virtual local_async_context_intf
+{
+ public:
+    root_local_async_context_intf*
+    to_root_local_async_context_intf() override
+    {
+        return this;
+    }
+
+    // Returns a visitor that will traverse a request tree and build a
+    // corresponding tree of subcontexts, under the current context object.
+    virtual std::unique_ptr<req_visitor_intf>
+    make_ctx_tree_builder() = 0;
+
     // Calling this function indicates that the context will be used as
     // mailbox between a result producer (calling set_result()) and a result
     // consumer (calling get_result()). This should be done only for the root
@@ -527,35 +571,6 @@ class local_async_context_intf : public local_context_intf,
     // locked while resolving the async request.
     virtual remote_cache_record_id
     get_cache_record_id() const
-        = 0;
-
-    // Requests cancellation of all tasks in the same context tree.
-    // This is a non-coroutine version of
-    // async_context_intf::request_cancellation().
-    //
-    // Note that after this call, tasks can still finish successfully or fail.
-    // Thus, a "cancelling" state would not be meaningful.
-    //
-    // Also note that cancellation depends on cooperation by the request
-    // implementation. In particular, an implementation that has no access to
-    // the context object (such as a non-coroutine function_request) is unable
-    // to cooperate. Thus, a cancellation request just may have no effect.
-    virtual void
-    request_cancellation()
-        = 0;
-
-    // Returns true if cancellation has been requested on this context or
-    // another one in the same context tree.
-    // The intention is that an asynchronous task will all this function on
-    // polling basis, and call throw_async_cancelled() when it returns true.
-    virtual bool
-    is_cancellation_requested() const noexcept
-        = 0;
-
-    // Throws async_cancelled. Should be called (only) when
-    // is_cancellation_requested() returns true.
-    virtual void
-    throw_async_cancelled() const
         = 0;
 };
 
@@ -640,15 +655,13 @@ class introspective_context_intf : public virtual context_intf
 class local_async_ctx_owner_intf : public virtual context_intf
 {
  public:
-    // virtual ~local_async_ctx_owner_intf() = default;
-
-    virtual local_async_context_intf&
+    virtual root_local_async_context_intf&
     prepare_for_local_resolution()
         = 0;
 
     // The following available after a resolve_request() call
     // (i.e., not necessarily a co_await resolve_request()).
-    virtual local_async_context_intf*
+    virtual root_local_async_context_intf*
     get_active_local_root_context()
         = 0;
 };
