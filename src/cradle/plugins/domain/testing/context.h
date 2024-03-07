@@ -246,8 +246,7 @@ class atst_context final : public local_async_context_intf,
     async_context_intf*
     to_async_context_intf() override
     {
-        // TODO async_context_intf ambiguous base class
-        return static_cast<local_async_context_intf*>(this);
+        return this;
     }
     local_context_intf*
     to_local_context_intf() override

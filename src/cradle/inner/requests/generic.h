@@ -416,8 +416,9 @@ class async_context_intf : public virtual context_intf
 };
 
 // Context for an asynchronous task running on the local machine
+// TODO create class root_local_async_context_intf containing root-specifics
 class local_async_context_intf : public local_context_intf,
-                                 public async_context_intf
+                                 public virtual async_context_intf
 {
  public:
     virtual ~local_async_context_intf() = default;
@@ -574,7 +575,7 @@ class local_async_context_intf : public local_context_intf,
 // This object will act as a proxy for a local_async_context_intf object on
 // the server.
 class remote_async_context_intf : public remote_context_intf,
-                                  public async_context_intf
+                                  public virtual async_context_intf
 {
  public:
     virtual ~remote_async_context_intf() = default;
@@ -741,10 +742,10 @@ SyncContext<Ctx>;
 
 // Any context implementation class should be valid
 template<typename Ctx>
-concept ValidContext = Context<Ctx>;
-// TODO ValidContext
-//      && (!std::is_final_v<Ctx> || RemoteContext<Ctx> || LocalContext<Ctx>)
-//      && (!std::is_final_v<Ctx> || SyncContext<Ctx> || AsyncContext<Ctx>);
+concept ValidContext
+    = Context<Ctx>
+      && (!std::is_final_v<Ctx> || RemoteContext<Ctx> || LocalContext<Ctx>)
+      && (!std::is_final_v<Ctx> || SyncContext<Ctx> || AsyncContext<Ctx>);
 
 /*
  * A request is something that can be resolved, resulting in a result
