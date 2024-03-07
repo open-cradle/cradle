@@ -242,33 +242,6 @@ class atst_context final : public local_async_context_intf,
         std::string proxy_name = "",
         std::optional<root_tasklet_spec> opt_tasklet_spec = std::nullopt);
 
-    // Some redundant redefinitions to prevent MSVC C4250
-    async_context_intf*
-    to_async_context_intf() override
-    {
-        return this;
-    }
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    local_async_context_intf*
-    to_local_async_context_intf() override
-    {
-        return this;
-    }
-    remote_context_intf*
-    to_remote_context_intf() override
-    {
-        return this;
-    }
-    remote_async_context_intf*
-    to_remote_async_context_intf() override
-    {
-        return this;
-    }
-
     // context_intf
     inner_resources&
     get_resources() override

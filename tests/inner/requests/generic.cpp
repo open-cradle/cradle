@@ -115,18 +115,6 @@ class my_local_only_context final : public local_context_mixin,
                                     public sync_context_mixin
 {
  public:
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    sync_context_intf*
-    to_sync_context_intf() override
-    {
-        return this;
-    }
-
     inner_resources&
     get_resources() override
     {
@@ -151,18 +139,6 @@ class my_remote_only_context final : public remote_context_mixin,
                                      public sync_context_mixin
 {
  public:
-    // Some redundant redefinitions to prevent MSVC C4250
-    remote_context_intf*
-    to_remote_context_intf() override
-    {
-        return this;
-    }
-    sync_context_intf*
-    to_sync_context_intf() override
-    {
-        return this;
-    }
-
     inner_resources&
     get_resources() override
     {
@@ -187,18 +163,6 @@ class my_sync_only_context final : public local_context_mixin,
                                    public sync_context_mixin
 {
  public:
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    sync_context_intf*
-    to_sync_context_intf() override
-    {
-        return this;
-    }
-
     inner_resources&
     get_resources() override
     {
@@ -223,18 +187,6 @@ class my_async_only_context final : public local_context_mixin,
                                     public async_context_mixin
 {
  public:
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    async_context_intf*
-    to_async_context_intf() override
-    {
-        return this;
-    }
-
     inner_resources&
     get_resources() override
     {
@@ -266,28 +218,6 @@ class my_generic_context : public local_context_mixin,
     my_generic_context(int remotely, int is_async)
         : remotely_{remotely}, is_async_{is_async}
     {
-    }
-
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    remote_context_intf*
-    to_remote_context_intf() override
-    {
-        return this;
-    }
-    sync_context_intf*
-    to_sync_context_intf() override
-    {
-        return this;
-    }
-    async_context_intf*
-    to_async_context_intf() override
-    {
-        return this;
     }
 
     inner_resources&
