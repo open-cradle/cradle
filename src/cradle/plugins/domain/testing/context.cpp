@@ -140,7 +140,7 @@ local_atst_context_tree_builder::make_sub_ctx(
     // TODO can we trust static_cast?
     auto& my_tree_ctx{static_cast<local_atst_tree_context&>(tree_ctx)};
     auto* my_parent{static_cast<local_async_context_base*>(&ctx_)};
-    return std::make_shared<local_async_context_base>(
+    return std::make_shared<non_root_local_atst_context>(
         my_tree_ctx, my_parent, is_req);
 }
 

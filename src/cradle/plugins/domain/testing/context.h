@@ -97,15 +97,11 @@ static_assert(ValidContext<root_local_atst_context>);
  * Relates to a single non-root request, or a non-request argument of such a
  * request, which will be resolved on the local machine.
  */
-// TODO non_root_local_atst_context used nor implemented
 class non_root_local_atst_context final
     : public non_root_local_async_context_base
 {
  public:
-    non_root_local_atst_context(
-        local_atst_tree_context& tree_ctx,
-        local_async_context_base* parent,
-        bool is_req);
+    using non_root_local_async_context_base::non_root_local_async_context_base;
 };
 static_assert(ValidContext<non_root_local_atst_context>);
 
@@ -117,7 +113,6 @@ static_assert(ValidContext<non_root_local_atst_context>);
  * tree, but also for each value: the resolve_request() variant resolving a
  * value requires a context argument, even though it doesn't access it.
  */
-// TODO create non_root_local_atst_context
 class local_atst_context_tree_builder : public local_context_tree_builder_base
 {
  public:
