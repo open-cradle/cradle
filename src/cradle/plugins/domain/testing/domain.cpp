@@ -21,7 +21,7 @@ testing_domain::make_local_sync_context(service_config const& config) const
     return std::make_shared<testing_request_context>(resources_, "");
 }
 
-std::shared_ptr<async_context_intf>
+std::shared_ptr<root_local_async_context_intf>
 testing_domain::make_local_async_context(service_config const& config) const
 {
     // Creating an atst_context object should also work, but its flexibility is

@@ -254,13 +254,11 @@ try
     logger.info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
     auto& dom = hctx.service().find_domain(domain_name);
-    auto ctx{dom.make_local_async_context(config)};
-    // TODO why this cast?
-    if (auto* atst_ctx = cast_ctx_to_ptr<root_local_atst_context>(*ctx))
+    auto actx{dom.make_local_async_context(config)};
+    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
     {
-        atst_ctx->apply_fail_submit_async();
+        test_ctx->apply_fail_submit_async();
     }
-    auto actx = cast_ctx_to_shared_ptr<root_local_async_context_intf>(ctx);
     actx->using_result();
     hctx.get_async_db().add(actx);
     // TODO update status to SUBMITTED

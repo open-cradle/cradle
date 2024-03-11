@@ -28,7 +28,7 @@ class domain
 
     // Creates an async context that can be used for exactly one local request
     // resolution (and has been prepared for that one resolution).
-    virtual std::shared_ptr<async_context_intf>
+    virtual std::shared_ptr<root_local_async_context_intf>
     make_local_async_context(service_config const& config) const = 0;
 };
 

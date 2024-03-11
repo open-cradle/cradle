@@ -144,13 +144,11 @@ loopback_service::submit_async(service_config config, std::string seri_req)
     logger_->info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
     auto& dom = resources_->find_domain(domain_name);
-    auto ctx{dom.make_local_async_context(config)};
-    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*ctx))
+    auto actx{dom.make_local_async_context(config)};
+    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
     {
         test_ctx->apply_fail_submit_async();
     }
-    // TODO dom should create root_local_async_context_intf?
-    auto actx = cast_ctx_to_shared_ptr<root_local_async_context_intf>(ctx);
     actx->using_result();
     resources_->ensure_async_db();
     get_async_db().add(actx);
@@ -160,7 +158,7 @@ loopback_service::submit_async(service_config config, std::string seri_req)
     bool introspective{false};
     auto optional_client_tasklet_id
         = config.get_optional_number(remote_config_keys::TASKLET_ID);
-    auto* intr_ctx = cast_ctx_to_ptr<introspective_context_intf>(*ctx);
+    auto* intr_ctx = cast_ctx_to_ptr<introspective_context_intf>(*actx);
     if (optional_client_tasklet_id && intr_ctx)
     {
         auto* client_tasklet = create_tasklet_tracker(
