@@ -27,7 +27,7 @@ testing_domain::make_local_async_context(service_config const& config) const
     // Creating an atst_context object should also work, but its flexibility is
     // not needed here.
     return std::make_shared<root_local_atst_context>(
-        std::make_unique<local_atst_tree_context>(resources_), config);
+        std::make_unique<local_tree_context_base>(resources_), config);
 }
 
 } // namespace cradle

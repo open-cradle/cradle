@@ -46,13 +46,8 @@ testing_request_context::make_config(bool need_record_lock) const
     return service_config{config_map};
 }
 
-local_atst_tree_context::local_atst_tree_context(inner_resources& resources)
-    : local_tree_context_base{resources}
-{
-}
-
 root_local_atst_context::root_local_atst_context(
-    std::unique_ptr<local_atst_tree_context> tree_ctx,
+    std::unique_ptr<local_tree_context_base> tree_ctx,
     service_config const& config)
     : root_local_async_context_base{*tree_ctx},
       owning_tree_ctx_{std::move(tree_ctx)},
@@ -66,7 +61,7 @@ root_local_atst_context::root_local_atst_context(
 }
 
 root_local_atst_context::root_local_atst_context(
-    std::unique_ptr<local_atst_tree_context> tree_ctx)
+    std::unique_ptr<local_tree_context_base> tree_ctx)
     : root_local_async_context_base{*tree_ctx},
       owning_tree_ctx_{std::move(tree_ctx)}
 {
@@ -129,19 +124,15 @@ std::unique_ptr<local_context_tree_builder_base>
 local_atst_context_tree_builder::make_sub_builder(
     local_async_context_base& sub_ctx)
 {
-    auto& my_sub_ctx{static_cast<local_async_context_base&>(sub_ctx)};
-    return std::make_unique<local_atst_context_tree_builder>(my_sub_ctx);
+    return std::make_unique<local_atst_context_tree_builder>(sub_ctx);
 }
 
 std::shared_ptr<local_async_context_base>
 local_atst_context_tree_builder::make_sub_ctx(
     local_tree_context_base& tree_ctx, std::size_t ix, bool is_req)
 {
-    // TODO can we trust static_cast?
-    auto& my_tree_ctx{static_cast<local_atst_tree_context&>(tree_ctx)};
-    auto* my_parent{static_cast<local_async_context_base*>(&ctx_)};
     return std::make_shared<non_root_local_atst_context>(
-        my_tree_ctx, my_parent, is_req);
+        tree_ctx, &ctx_, is_req);
 }
 
 proxy_atst_tree_context::proxy_atst_tree_context(
@@ -254,7 +245,7 @@ atst_context::prepare_for_local_resolution()
 {
     logger_->info("prepare_for_local_resolution");
     local_root_ = std::make_shared<root_local_atst_context>(
-        std::make_unique<local_atst_tree_context>(resources_));
+        std::make_unique<local_tree_context_base>(resources_));
     auto* tasklet = create_optional_root_tasklet(
         resources_.the_tasklet_admin(), opt_tasklet_spec_);
     if (tasklet)

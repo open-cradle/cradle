@@ -39,19 +39,6 @@ class testing_request_context final : public sync_context_base
 static_assert(ValidContext<testing_request_context>);
 
 /*
- * Tree-level context, shared by all (non_)root_local_atst_context objects in
- * the same context tree (relating to the same root request).
- *
- * Note that an object of this class must not be re-used across multiple
- * context trees.
- */
-class local_atst_tree_context : public local_tree_context_base
-{
- public:
-    local_atst_tree_context(inner_resources& resources);
-};
-
-/*
  * Context that can be used to asynchronously resolve requests on the local
  * machine.
  *
@@ -63,10 +50,10 @@ class root_local_atst_context final : public root_local_async_context_base
  public:
     // Allows special configuration for testing purposes
     root_local_atst_context(
-        std::unique_ptr<local_atst_tree_context> tree_ctx,
+        std::unique_ptr<local_tree_context_base> tree_ctx,
         service_config const& config);
 
-    root_local_atst_context(std::unique_ptr<local_atst_tree_context> tree_ctx);
+    root_local_atst_context(std::unique_ptr<local_tree_context_base> tree_ctx);
 
     // local_async_context_intf
     std::unique_ptr<req_visitor_intf>
@@ -83,7 +70,7 @@ class root_local_atst_context final : public root_local_async_context_base
     apply_resolve_async_delay() override;
 
  private:
-    std::unique_ptr<local_atst_tree_context> owning_tree_ctx_;
+    std::unique_ptr<local_tree_context_base> owning_tree_ctx_;
     bool fail_submit_async_{false};
     int resolve_async_delay_{0};
     int set_result_delay_{0};
@@ -480,7 +467,6 @@ class atst_context final : public root_local_async_context_intf,
     get_active_remote_root_context() override;
 
     // other
-    // TODO should these be in (local|remote)_async_ctx_owner_intf?
     async_context_intf&
     get_async_root();
 
