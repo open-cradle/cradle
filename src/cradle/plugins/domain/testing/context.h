@@ -411,8 +411,7 @@ class atst_context final : public root_local_async_context_intf,
     std::string const&
     proxy_name() const override
     {
-        return get_remote_root().proxy_name();
-        // TODO or simply: return proxy_name_
+        return proxy_name_;
     }
 
     virtual remote_proxy&

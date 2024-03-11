@@ -393,14 +393,12 @@ class async_context_intf : public virtual context_intf
     // yet been retrieved from the server, this call will populate the
     // context subtree, and block while that is happening. The current
     // implementation uses no coroutines, so this function isn't one either.
-    // TODO no calls in production code
     virtual std::size_t
     get_num_subs() const
         = 0;
 
     // Gets the context for the subtask corresponding to the ix'th
     // subrequest (ix=0 representing the first subrequest).
-    // TODO no calls in production code
     virtual async_context_intf&
     get_sub(std::size_t ix)
         = 0;
@@ -408,7 +406,6 @@ class async_context_intf : public virtual context_intf
     // Gets the status of this task.
     // This is a coroutine version of local_async_context_intf::get_status(),
     // and is also available on remote-only contexts.
-    // TODO no calls in production code
     virtual cppcoro::task<async_status>
     get_status_coro() = 0;
 
@@ -416,7 +413,6 @@ class async_context_intf : public virtual context_intf
     // This is a coroutine version of
     // local_async_context_intf::request_cancellation(),
     // and is also available on remote-only contexts.
-    // TODO no calls in production code
     virtual cppcoro::task<void>
     request_cancellation_coro() = 0;
 };
@@ -472,7 +468,7 @@ class local_async_context_intf : public local_context_intf,
     // subtasks (needed if this task's result came from a cache).
     // If status == FINISHED and using_result() was called, the new status
     // will be AWAITING_RESULT.
-    // TODO think of something less tricky
+    // TODO think of something less tricky for update_status()
     // TODO need to the the same if status == ERROR?
     // TODO keep history of an async request e.g.
     // TODO vector<tuple<async_status, timestamp>>
