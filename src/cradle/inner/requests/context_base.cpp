@@ -124,17 +124,17 @@ local_tree_context_base::local_tree_context_base(inner_resources& resources)
 }
 
 local_async_context_base::local_async_context_base(
-    std::shared_ptr<local_tree_context_base> tree_ctx,
+    local_tree_context_base& tree_ctx,
     local_async_context_base* parent,
     bool is_req)
-    : tree_ctx_{std::move(tree_ctx)},
+    : tree_ctx_{tree_ctx},
       parent_{parent},
       is_req_{is_req},
       id_{allocate_async_id()},
       status_{is_req ? async_status::CREATED : async_status::FINISHED},
       num_subs_not_running_{0}
 {
-    auto& logger{tree_ctx_->get_logger()};
+    auto& logger{tree_ctx_.get_logger()};
     auto parent_id = parent ? parent->get_id() : 0;
     logger.info(
         "local_async_context_base {} (parent {}, {}): created, status {}",
@@ -230,7 +230,7 @@ local_async_context_base::request_cancellation_coro()
 cppcoro::task<void>
 local_async_context_base::reschedule_if_opportune()
 {
-    auto& logger{tree_ctx_->get_logger()};
+    auto& logger{tree_ctx_.get_logger()};
     if (!is_req_)
     {
         // Violating this function's precondition
@@ -279,7 +279,7 @@ local_async_context_base::decide_reschedule_sub()
 void
 local_async_context_base::update_status(async_status status)
 {
-    auto& logger{tree_ctx_->get_logger()};
+    auto& logger{tree_ctx_.get_logger()};
     logger.info(
         "local_async_context_base {} update_status {} -> {}",
         id_,
@@ -305,7 +305,7 @@ local_async_context_base::update_status(async_status status)
 void
 local_async_context_base::update_status_error(std::string const& errmsg)
 {
-    auto& logger{tree_ctx_->get_logger()};
+    auto& logger{tree_ctx_.get_logger()};
     logger.info(
         "local_async_context_base {} update_status_error: {} -> ERROR: {}",
         id_,
@@ -318,7 +318,7 @@ local_async_context_base::update_status_error(std::string const& errmsg)
 bool
 local_async_context_base::is_cancellation_requested() const noexcept
 {
-    auto token{tree_ctx_->get_cancellation_token()};
+    auto token{tree_ctx_.get_cancellation_token()};
     return token.is_cancellation_requested();
 }
 
@@ -330,8 +330,8 @@ local_async_context_base::throw_async_cancelled() const
 }
 
 root_local_async_context_base::root_local_async_context_base(
-    std::shared_ptr<local_tree_context_base> tree_ctx)
-    : local_async_context_base{std::move(tree_ctx), nullptr, true}
+    local_tree_context_base& tree_ctx)
+    : local_async_context_base{tree_ctx, nullptr, true}
 {
 }
 
@@ -411,7 +411,7 @@ local_context_tree_builder_base::visit_req_arg(std::size_t ix)
 std::shared_ptr<local_async_context_base>
 local_context_tree_builder_base::make_sub_ctx(std::size_t ix, bool is_req)
 {
-    auto tree_ctx{ctx_.get_tree_context()};
+    auto& tree_ctx{ctx_.get_tree_context()};
     auto sub_ctx{make_sub_ctx(tree_ctx, ix, is_req)};
     ctx_.add_sub(ix, sub_ctx);
     register_local_async_ctx(sub_ctx);
@@ -626,8 +626,8 @@ non_root_proxy_async_context_base::wait_on_remote_id()
 void
 register_local_async_ctx(std::shared_ptr<local_async_context_base> ctx)
 {
-    auto tree_ctx{ctx->get_tree_context()};
-    if (auto* db = get_async_db(*tree_ctx))
+    auto& tree_ctx{ctx->get_tree_context()};
+    if (auto* db = get_async_db(tree_ctx))
     {
         db->add(ctx);
     }

@@ -24,8 +24,8 @@ testing_domain::make_local_sync_context(service_config const& config) const
 std::shared_ptr<async_context_intf>
 testing_domain::make_local_async_context(service_config const& config) const
 {
-    auto tree_ctx{std::make_shared<local_atst_tree_context>(resources_)};
-    return std::make_shared<root_local_atst_context>(tree_ctx, config);
+    return std::make_shared<root_local_atst_context>(
+        std::make_unique<local_atst_tree_context>(resources_), config);
 }
 
 } // namespace cradle

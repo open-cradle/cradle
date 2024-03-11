@@ -61,13 +61,12 @@ class local_atst_tree_context : public local_tree_context_base
 class root_local_atst_context final : public root_local_async_context_base
 {
  public:
-    // Constructor called from testing_domain::make_local_async_context()
+    // Allows special configuration for testing purposes
     root_local_atst_context(
-        std::shared_ptr<local_atst_tree_context> tree_ctx,
+        std::unique_ptr<local_atst_tree_context> tree_ctx,
         service_config const& config);
 
-    // Other-purposes constructor
-    root_local_atst_context(std::shared_ptr<local_atst_tree_context> tree_ctx);
+    root_local_atst_context(std::unique_ptr<local_atst_tree_context> tree_ctx);
 
     // local_async_context_intf
     std::unique_ptr<req_visitor_intf>
@@ -84,6 +83,7 @@ class root_local_atst_context final : public root_local_async_context_base
     apply_resolve_async_delay() override;
 
  private:
+    std::unique_ptr<local_atst_tree_context> owning_tree_ctx_;
     bool fail_submit_async_{false};
     int resolve_async_delay_{0};
     int set_result_delay_{0};
@@ -103,7 +103,7 @@ class non_root_local_atst_context final
 {
  public:
     non_root_local_atst_context(
-        std::shared_ptr<local_atst_tree_context> tree_ctx,
+        local_atst_tree_context& tree_ctx,
         local_async_context_base* parent,
         bool is_req);
 };
@@ -134,7 +134,7 @@ class local_atst_context_tree_builder : public local_context_tree_builder_base
 
     std::shared_ptr<local_async_context_base>
     make_sub_ctx(
-        std::shared_ptr<local_tree_context_base> tree_ctx,
+        local_tree_context_base& tree_ctx,
         std::size_t ix,
         bool is_req) override;
 };
@@ -202,7 +202,7 @@ class root_proxy_atst_context final : public root_proxy_async_context_base
     }
 
  private:
-    std::unique_ptr<proxy_atst_tree_context> tree_ctx_;
+    std::unique_ptr<proxy_atst_tree_context> owning_tree_ctx_;
     bool fail_submit_async_{false};
     int resolve_async_delay_{0};
     int set_result_delay_{0};

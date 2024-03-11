@@ -185,7 +185,7 @@ class local_async_context_base : public virtual local_async_context_intf,
 {
  public:
     local_async_context_base(
-        std::shared_ptr<local_tree_context_base> tree_ctx,
+        local_tree_context_base& tree_ctx,
         local_async_context_base* parent,
         bool is_req);
 
@@ -203,7 +203,7 @@ class local_async_context_base : public virtual local_async_context_intf,
     inner_resources&
     get_resources() override
     {
-        return tree_ctx_->get_resources();
+        return tree_ctx_.get_resources();
     }
 
     bool
@@ -293,7 +293,7 @@ class local_async_context_base : public virtual local_async_context_intf,
     void
     request_cancellation() override
     {
-        tree_ctx_->request_cancellation();
+        tree_ctx_.request_cancellation();
     }
 
     bool
@@ -316,15 +316,14 @@ class local_async_context_base : public virtual local_async_context_intf,
     void
     add_sub(std::size_t ix, std::shared_ptr<local_async_context_base> sub);
 
-    std::shared_ptr<local_tree_context_base>
+    local_tree_context_base&
     get_tree_context()
     {
         return tree_ctx_;
     }
 
  private:
-    // TODO tree_ctx_ owned by root; parent_ non-root only
-    std::shared_ptr<local_tree_context_base> tree_ctx_;
+    local_tree_context_base& tree_ctx_;
     local_async_context_base* parent_;
     bool is_req_;
     async_id const id_;
@@ -348,8 +347,7 @@ class root_local_async_context_base : public local_async_context_base,
                                       public test_context_intf
 {
  public:
-    root_local_async_context_base(
-        std::shared_ptr<local_tree_context_base> tree_ctx);
+    root_local_async_context_base(local_tree_context_base& tree_ctx);
 
     // local_async_context_intf
     void
@@ -440,9 +438,7 @@ class local_context_tree_builder_base : public req_visitor_intf
 
     virtual std::shared_ptr<local_async_context_base>
     make_sub_ctx(
-        std::shared_ptr<local_tree_context_base> tree_ctx,
-        std::size_t ix,
-        bool is_req)
+        local_tree_context_base& tree_ctx, std::size_t ix, bool is_req)
         = 0;
 };
 

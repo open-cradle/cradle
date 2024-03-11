@@ -52,9 +52,10 @@ local_atst_tree_context::local_atst_tree_context(inner_resources& resources)
 }
 
 root_local_atst_context::root_local_atst_context(
-    std::shared_ptr<local_atst_tree_context> tree_ctx,
+    std::unique_ptr<local_atst_tree_context> tree_ctx,
     service_config const& config)
-    : root_local_async_context_base{std::move(tree_ctx)},
+    : root_local_async_context_base{*tree_ctx},
+      owning_tree_ctx_{std::move(tree_ctx)},
       fail_submit_async_{config.get_bool_or_default(
           testing_config_keys::FAIL_SUBMIT_ASYNC, false)},
       resolve_async_delay_{static_cast<int>(config.get_number_or_default(
@@ -65,8 +66,9 @@ root_local_atst_context::root_local_atst_context(
 }
 
 root_local_atst_context::root_local_atst_context(
-    std::shared_ptr<local_atst_tree_context> tree_ctx)
-    : root_local_async_context_base{std::move(tree_ctx)}
+    std::unique_ptr<local_atst_tree_context> tree_ctx)
+    : root_local_async_context_base{*tree_ctx},
+      owning_tree_ctx_{std::move(tree_ctx)}
 {
 }
 
@@ -81,7 +83,7 @@ root_local_atst_context::set_result(blob result)
 {
     if (set_result_delay_ > 0)
     {
-        auto& logger{get_tree_context()->get_logger()};
+        auto& logger{get_tree_context().get_logger()};
         logger.warn("set_result() forced delay {}ms", set_result_delay_);
         std::this_thread::sleep_for(
             std::chrono::milliseconds(set_result_delay_));
@@ -94,7 +96,7 @@ root_local_atst_context::apply_fail_submit_async()
 {
     if (fail_submit_async_)
     {
-        auto& logger{get_tree_context()->get_logger()};
+        auto& logger{get_tree_context().get_logger()};
         logger.warn("submit_async: forced failure");
         throw remote_error{"submit_async forced failure"};
     }
@@ -105,7 +107,7 @@ root_local_atst_context::apply_resolve_async_delay()
 {
     if (resolve_async_delay_ > 0)
     {
-        auto& logger{get_tree_context()->get_logger()};
+        auto& logger{get_tree_context().get_logger()};
         logger.warn(
             "resolve_async() forced startup delay {}ms", resolve_async_delay_);
         std::this_thread::sleep_for(
@@ -133,11 +135,10 @@ local_atst_context_tree_builder::make_sub_builder(
 
 std::shared_ptr<local_async_context_base>
 local_atst_context_tree_builder::make_sub_ctx(
-    std::shared_ptr<local_tree_context_base> tree_ctx,
-    std::size_t ix,
-    bool is_req)
+    local_tree_context_base& tree_ctx, std::size_t ix, bool is_req)
 {
-    auto my_tree_ctx{static_pointer_cast<local_atst_tree_context>(tree_ctx)};
+    // TODO can we trust static_cast?
+    auto& my_tree_ctx{static_cast<local_atst_tree_context&>(tree_ctx)};
     auto* my_parent{static_cast<local_async_context_base*>(&ctx_)};
     return std::make_shared<local_async_context_base>(
         my_tree_ctx, my_parent, is_req);
@@ -151,7 +152,8 @@ proxy_atst_tree_context::proxy_atst_tree_context(
 
 root_proxy_atst_context::root_proxy_atst_context(
     std::unique_ptr<proxy_atst_tree_context> tree_ctx)
-    : root_proxy_async_context_base{*tree_ctx}, tree_ctx_{std::move(tree_ctx)}
+    : root_proxy_async_context_base{*tree_ctx},
+      owning_tree_ctx_{std::move(tree_ctx)}
 {
 }
 
@@ -251,8 +253,8 @@ root_local_async_context_intf&
 atst_context::prepare_for_local_resolution()
 {
     logger_->info("prepare_for_local_resolution");
-    auto local_tree = std::make_shared<local_atst_tree_context>(resources_);
-    local_root_ = std::make_shared<root_local_atst_context>(local_tree);
+    local_root_ = std::make_shared<root_local_atst_context>(
+        std::make_unique<local_atst_tree_context>(resources_));
     auto* tasklet = create_optional_root_tasklet(
         resources_.the_tasklet_admin(), opt_tasklet_spec_);
     if (tasklet)
