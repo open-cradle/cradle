@@ -149,6 +149,7 @@ loopback_service::submit_async(service_config config, std::string seri_req)
     {
         test_ctx->apply_fail_submit_async();
     }
+    // TODO dom should create root_local_async_context_intf?
     auto actx = cast_ctx_to_shared_ptr<root_local_async_context_intf>(ctx);
     actx->using_result();
     resources_->ensure_async_db();
@@ -231,12 +232,8 @@ serialized_result
 loopback_service::get_async_response(async_id root_aid)
 {
     logger_->info("handle_get_async_response {}", root_aid);
-    auto actx{get_async_db().find(root_aid)};
-    // TODO trust cast_ctx_to_shared_ptr?
-    auto root_actx
-        = cast_ctx_to_shared_ptr<root_local_async_context_intf>(actx);
-    return serialized_result{
-        root_actx->get_result(), root_actx->get_cache_record_id()};
+    auto actx{get_async_db().find_root(root_aid)};
+    return serialized_result{actx->get_result(), actx->get_cache_record_id()};
 }
 
 void

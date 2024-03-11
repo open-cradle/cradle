@@ -360,16 +360,11 @@ try
     auto& db{hctx.get_async_db()};
     auto& logger{hctx.logger()};
     logger.info("handle_get_async_response {}", root_aid);
-    auto actx{db.find(root_aid)};
-    // TODO trust cast_ctx_to_shared_ptr?
-    auto root_actx
-        = cast_ctx_to_shared_ptr<root_local_async_context_intf>(actx);
+    auto actx{db.find_root(root_aid)};
     // TODO response_id
     uint32_t response_id = 0;
     return rpclib_response{
-        response_id,
-        root_actx->get_cache_record_id().value(),
-        root_actx->get_result()};
+        response_id, actx->get_cache_record_id().value(), actx->get_result()};
 }
 catch (std::exception& e)
 {
