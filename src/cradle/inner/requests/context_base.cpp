@@ -279,7 +279,6 @@ local_async_context_base::decide_reschedule_sub()
 void
 local_async_context_base::update_status(async_status status)
 {
-    assert(status != async_status::AWAITING_RESULT);
     auto& logger{tree_ctx_->get_logger()};
     logger.info(
         "local_async_context_base {} update_status {} -> {}",
@@ -289,13 +288,15 @@ local_async_context_base::update_status(async_status status)
     // Invariant: if this context's status is AWAITING_RESULT or FINISHED,
     // then all its subcontexts' statuses are FINISHED.
     // (Subs won't be finished yet if the result came from a cache.)
-    if (status_ != async_status::AWAITING_RESULT
-        && status_ != async_status::FINISHED
-        && status == async_status::FINISHED)
+    auto almost_finished = [](async_status status) -> bool {
+        return status == async_status::AWAITING_RESULT
+               || status == async_status::FINISHED;
+    };
+    if (!almost_finished(status_) && almost_finished(status))
     {
         for (auto sub : subs_)
         {
-            sub->update_status(status);
+            sub->update_status(async_status::FINISHED);
         }
     }
     status_ = status;
@@ -340,9 +341,9 @@ root_local_async_context_base::update_status(async_status status)
     local_async_context_base::update_status(status);
     if (using_result_ && status == async_status::FINISHED)
     {
-        // TODO race condition, must not temporarily set to FINISHED
-        set_status(async_status::AWAITING_RESULT);
+        status = async_status::AWAITING_RESULT;
     }
+    local_async_context_base::update_status(status);
 }
 
 void
@@ -374,7 +375,7 @@ root_local_async_context_base::set_result(blob result)
 {
     check_set_get_result_precondition(false);
     result_ = std::move(result);
-    set_status(async_status::FINISHED);
+    local_async_context_base::update_status(async_status::FINISHED);
 }
 
 blob

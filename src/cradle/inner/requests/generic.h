@@ -468,11 +468,11 @@ class local_async_context_intf : public local_context_intf,
         = 0;
 
     // Updates the status of this task.
-    // If status == FINISHED, also recursively updates subtasks
-    // (needed if this task's result came from a cache).
+    // If status is FINISHED or AWAITING_RESULT, also recursively updates
+    // subtasks (needed if this task's result came from a cache).
     // If status == FINISHED and using_result() was called, the new status
     // will be AWAITING_RESULT.
-    // status must not be AWAITING_RESULT
+    // TODO think of something less tricky
     // TODO need to the the same if status == ERROR?
     // TODO keep history of an async request e.g.
     // TODO vector<tuple<async_status, timestamp>>

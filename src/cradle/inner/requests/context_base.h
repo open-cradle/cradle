@@ -322,13 +322,6 @@ class local_async_context_base : public virtual local_async_context_intf,
         return tree_ctx_;
     }
 
- protected:
-    void
-    set_status(async_status status)
-    {
-        status_ = status;
-    }
-
  private:
     // TODO tree_ctx_ owned by root; parent_ non-root only
     std::shared_ptr<local_tree_context_base> tree_ctx_;
