@@ -413,7 +413,7 @@ cppcoro::task<Val> resolve_request(
  * - It seems likely that for multiple calls for the same Request, Ctx will be
  *   the same in each case (so just one template instantiation).
  * - Passing a non-nullptr lock_ptr is useless for uncached requests.
- * - TODO lock_ptr will be nullptr for subrequest?!
+ * - lock_ptr will be nullptr if Req is a subrequest.
  */
 template<
     Context Ctx,

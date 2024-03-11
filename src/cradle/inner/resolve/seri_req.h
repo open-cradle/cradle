@@ -21,6 +21,9 @@ namespace cradle {
  * ctx indicates where the resolution should happen: locally or remotely.
  * If the request is to be resolved locally, it must exist in the catalog
  * (otherwise, it should exist in the remote's catalog).
+ * If ctx is async, this call prepares it for the upcoming resolution
+ * (unlike resolve_serialized_remote() and resolve_serialized_local(), which
+ * take an already prepared context).
  *
  * Resolving a request yields a value with a request-dependent type, such as
  * int, double, blob or string.
@@ -43,8 +46,9 @@ resolve_serialized_request(
  * Resolves a serialized request to a serialized response, remotely
  *
  * seri_lock.record_id is ignored.
+ *
+ * If ctx is async, it must have been prepared for the upcoming resolution.
  */
-// TODO make resolve_serialized_remote() internal to seri_req.cpp?
 cppcoro::task<serialized_result>
 resolve_serialized_remote(
     remote_context_intf& ctx,
@@ -55,8 +59,9 @@ resolve_serialized_remote(
  * Resolves a serialized request to a serialized response, locally
  *
  * seri_lock.record_id will be put in the returned serialized_result value.
+ *
+ * If ctx is async, it must have been prepared for the upcoming resolution.
  */
-// TODO make resolve_serialized_local() internal to seri_req.cpp?
 cppcoro::task<serialized_result>
 resolve_serialized_local(
     local_context_intf& ctx,

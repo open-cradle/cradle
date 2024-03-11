@@ -153,7 +153,6 @@ loopback_service::submit_async(service_config config, std::string seri_req)
     actx->using_result();
     resources_->ensure_async_db();
     get_async_db().add(actx);
-    // TODO populate actx subs?
     // TODO update status to SUBMITTED
     // This function should return asap, but cppcoro::sync_wait() is blocking,
     // so need to dispatch to another thread.
