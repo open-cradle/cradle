@@ -424,18 +424,6 @@ class local_async_context_intf : public local_context_intf,
         return this;
     }
 
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    async_context_intf*
-    to_async_context_intf() override
-    {
-        return this;
-    }
-
     // Returns the number of subtasks
     // Differs from get_sub() by not being a coroutine.
     virtual std::size_t
@@ -577,18 +565,6 @@ class remote_async_context_intf : public remote_context_intf,
 
     remote_async_context_intf*
     to_remote_async_context_intf() override
-    {
-        return this;
-    }
-
-    // Some redundant redefinitions to prevent MSVC C4250
-    remote_context_intf*
-    to_remote_context_intf() override
-    {
-        return this;
-    }
-    async_context_intf*
-    to_async_context_intf() override
     {
         return this;
     }
