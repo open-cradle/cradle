@@ -28,8 +28,7 @@ TEST_CASE("two DLLs defining same-typed requests", tag)
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_x.*");
-    tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{*resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     auto add_req{rq_test_adder_x0(7, 2)};
@@ -59,8 +58,7 @@ TEST_CASE("unload/reload DLL", tag)
     auto req{rq_test_adder_v1p(7, 2)};
     int expected{7 + 2};
 
-    tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{*resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
@@ -87,8 +85,7 @@ TEST_CASE("unload/reload two DLLs", tag)
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_x.*");
-    tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{*resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0");
@@ -122,8 +119,7 @@ TEST_CASE("unload DLL sharing resolvers", tag)
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_x.*");
-    tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{*resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0x1");
@@ -203,8 +199,7 @@ TEST_CASE("load/unload DLL stress test1", tag)
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_x.*");
-    tasklet_tracker* tasklet{nullptr};
-    testing_request_context ctx{*resources, tasklet, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0");

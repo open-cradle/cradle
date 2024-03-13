@@ -40,7 +40,8 @@ template<
     bool ForceRemote = false,
     bool ForceLocal = false,
     bool ForceSync = false,
-    bool ForceAsync = false>
+    bool ForceAsync = false,
+    bool IsSub = false>
 struct ResolutionConstraints
 {
     static_assert(!(ForceRemote && ForceLocal));
@@ -50,6 +51,7 @@ struct ResolutionConstraints
     static constexpr bool force_local = ForceLocal;
     static constexpr bool force_sync = ForceSync;
     static constexpr bool force_async = ForceAsync;
+    static constexpr bool is_sub = IsSub;
 
     ResolutionConstraints()
     {
@@ -57,17 +59,19 @@ struct ResolutionConstraints
 };
 
 using NoResolutionConstraints
-    = ResolutionConstraints<false, false, false, false>;
+    = ResolutionConstraints<false, false, false, false, false>;
 using ResolutionConstraintsLocal
-    = ResolutionConstraints<false, true, false, false>;
+    = ResolutionConstraints<false, true, false, false, false>;
 using ResolutionConstraintsLocalSync
-    = ResolutionConstraints<false, true, true, false>;
-using ResolutionConstraintsLocalAsync
-    = ResolutionConstraints<false, true, false, true>;
+    = ResolutionConstraints<false, true, true, false, false>;
+using ResolutionConstraintsLocalAsyncRoot
+    = ResolutionConstraints<false, true, false, true, false>;
+using ResolutionConstraintsLocalAsyncSub
+    = ResolutionConstraints<false, true, false, true, true>;
 using ResolutionConstraintsRemoteSync
-    = ResolutionConstraints<true, false, true, false>;
+    = ResolutionConstraints<true, false, true, false, false>;
 using ResolutionConstraintsRemoteAsync
-    = ResolutionConstraints<true, false, false, true>;
+    = ResolutionConstraints<true, false, false, true, false>;
 
 // These defaults should make it superfluous for the caller to specify the
 // constraints, if the actual context class is final and known at the
@@ -77,23 +81,25 @@ using DefaultResolutionConstraints = ResolutionConstraints<
     DefinitelyRemoteContext<Ctx>,
     DefinitelyLocalContext<Ctx>,
     DefinitelySyncContext<Ctx>,
-    DefinitelyAsyncContext<Ctx>>;
+    DefinitelyAsyncContext<Ctx>,
+    false>;
 
-template<bool Async, Context Ctx, Request Req>
+template<Context Ctx, Request Req>
 cppcoro::task<typename Req::value_type>
-resolve_request_uncached(Ctx& ctx, Req const& req)
+resolve_request_sync_uncached(Ctx& ctx, Req const& req)
 {
     // TODO maybe let req.resolve_*sync() return cppcoro::task
-    if constexpr (Async)
-    {
-        auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
-        co_return co_await req.resolve_async(actx);
-    }
-    else
-    {
-        auto& lctx = cast_ctx_to_ref<local_context_intf>(ctx);
-        co_return co_await req.resolve_sync(lctx);
-    }
+    auto& lctx = cast_ctx_to_ref<local_context_intf>(ctx);
+    co_return co_await req.resolve_sync(lctx);
+}
+
+template<Context Ctx, Request Req>
+cppcoro::task<typename Req::value_type>
+resolve_request_async_uncached(Ctx& ctx, Req const& req)
+{
+    // TODO resolve_request_async_uncached() introspection support?
+    auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
+    co_return co_await req.resolve_async(actx);
 }
 
 // Resolves a memory-cached request using some sort of secondary cache.
@@ -241,7 +247,7 @@ resolve_request_sync(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
     // Third decision: cached or not
     if constexpr (UncachedRequest<Req>)
     {
-        return resolve_request_uncached<false>(ctx, req);
+        return resolve_request_sync_uncached(ctx, req);
     }
     else
     {
@@ -249,23 +255,47 @@ resolve_request_sync(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
     }
 }
 
-template<Context Ctx, Request Req>
+template<Context Ctx, Request Req, typename Constraints>
 cppcoro::task<typename Req::value_type>
-resolve_request_async(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
+resolve_request_async(
+    Ctx& ctx,
+    Req const& req,
+    cache_record_lock* lock_ptr,
+    Constraints constraints)
 {
-    // Cf. the similar construct in seri_resolver_impl::resolve()
-    if constexpr (!VisitableRequest<Req>)
+    local_async_context_intf* actx{};
+    // Prepare and populate ctx if it is a root.
+    if constexpr (!constraints.is_sub)
     {
-        throw std::logic_error{"request is not visitable"};
-    }
-    // Third decision: cached or not
-    else if constexpr (UncachedRequest<Req>)
-    {
-        return resolve_request_uncached<true>(ctx, req);
+        root_local_async_context_intf* root_actx{};
+        // The following cast should succeed if client uses atst_context or
+        // similar
+        if (auto* owner = cast_ctx_to_ptr<local_async_ctx_owner_intf>(ctx))
+        {
+            // (Re-)create ctx tree and root ctx; get the new root ctx
+            root_actx = &owner->prepare_for_local_resolution();
+        }
+        else
+        {
+            root_actx = &cast_ctx_to_ref<root_local_async_context_intf>(ctx);
+        }
+        // Populate ctx with sub ctx's
+        static_assert(VisitableRequest<Req>);
+        req.accept(*root_actx->make_ctx_tree_builder());
+        actx = root_actx;
     }
     else
     {
-        return resolve_request_async_cached(ctx, req, lock_ptr);
+        actx = &cast_ctx_to_ref<local_async_context_intf>(ctx);
+    }
+    // Third decision: cached or not
+    if constexpr (UncachedRequest<Req>)
+    {
+        return resolve_request_async_uncached(*actx, req);
+    }
+    else
+    {
+        return resolve_request_async_cached(*actx, req, lock_ptr);
     }
 }
 
@@ -291,10 +321,9 @@ resolve_request_local(
 {
     // TODO static_assert(!req.is_proxy);
     // Second decision (based on constraints if possible): sync or async
-    // This is the last time that constraints are used.
     if constexpr (constraints.force_async)
     {
-        return resolve_request_async(ctx, req, lock_ptr);
+        return resolve_request_async(ctx, req, lock_ptr, constraints);
     }
     else if constexpr (constraints.force_sync)
     {
@@ -304,7 +333,7 @@ resolve_request_local(
     {
         if (ctx.is_async())
         {
-            return resolve_request_async(ctx, req, lock_ptr);
+            return resolve_request_async(ctx, req, lock_ptr, constraints);
         }
         else
         {
@@ -315,10 +344,26 @@ resolve_request_local(
 
 template<Request Req>
 cppcoro::task<typename Req::value_type>
+resolve_request_remote_coro(
+    remote_context_intf& ctx, Req const& req, cache_record_lock* lock_ptr)
+{
+    // This runs in co_await resolve_request().
+    co_return resolve_remote_to_value(ctx, req, lock_ptr);
+}
+
+template<Request Req>
+cppcoro::task<typename Req::value_type>
 resolve_request_remote(
     remote_context_intf& ctx, Req const& req, cache_record_lock* lock_ptr)
 {
-    co_return resolve_remote_to_value(ctx, req, lock_ptr);
+    // This runs in resolve_request(), which is where any preparation must
+    // happen.
+    if (auto* owner = cast_ctx_to_ptr<remote_async_ctx_owner_intf>(ctx))
+    {
+        // (Re-)create ctx tree and root ctx
+        owner->prepare_for_remote_resolution();
+    }
+    return resolve_request_remote_coro(ctx, req, lock_ptr);
 }
 
 /*****************************************************************************
@@ -367,6 +412,7 @@ cppcoro::task<Val> resolve_request(
  * - It seems likely that for multiple calls for the same Request, Ctx will be
  *   the same in each case (so just one template instantiation).
  * - Passing a non-nullptr lock_ptr is useless for uncached requests.
+ * - lock_ptr will be nullptr if Req is a subrequest.
  */
 template<
     Context Ctx,

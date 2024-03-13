@@ -74,6 +74,16 @@ struct dynamic_ctx_caster<local_async_context_intf>
 };
 
 template<>
+struct dynamic_ctx_caster<root_local_async_context_intf>
+{
+    static root_local_async_context_intf*
+    cast_ptr(context_intf* ctx)
+    {
+        return ctx->to_root_local_async_context_intf();
+    }
+};
+
+template<>
 struct dynamic_ctx_caster<remote_async_context_intf>
 {
     static remote_async_context_intf*
@@ -290,6 +300,7 @@ throw_on_ctx_mismatch(SrcCtx& ctx)
 // leading to a throw depending on constexpr values only, and a C4702
 // warning in a VS2019 release build.
 // Retains the original type if no cast is needed.
+// TODO cast_ctx_to_ref<introspective_context_intf>(non-intrsp) does not throw
 template<Context DestCtx, Context SrcCtx>
 DestCtx&
 cast_ctx_to_ref(SrcCtx& ctx)

@@ -28,15 +28,13 @@ test_make_some_blob(bool async, bool shared)
     blob response;
     if (!async)
     {
-        testing_request_context ctx{*resources, nullptr, proxy_name};
+        testing_request_context ctx{*resources, proxy_name};
         ResolutionConstraintsRemoteSync constraints;
         response = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
     }
     else
     {
-        auto tree_ctx{
-            std::make_shared<proxy_atst_tree_context>(*resources, proxy_name)};
-        root_proxy_atst_context ctx{tree_ctx};
+        atst_context ctx{*resources, proxy_name};
         ResolutionConstraintsRemoteAsync constraints;
         response = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
     }

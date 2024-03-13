@@ -207,14 +207,14 @@ catch (std::exception& e)
 static void
 resolve_async(
     rpclib_handler_context& hctx,
-    std::shared_ptr<local_async_context_intf> actx,
+    std::shared_ptr<root_local_async_context_intf> actx,
     std::string seri_req,
     seri_cache_record_lock_t seri_lock)
 {
     auto& logger{hctx.logger()};
-    if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*actx))
+    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
     {
-        atst_ctx->apply_resolve_async_delay();
+        test_ctx->apply_resolve_async_delay();
     }
     logger.info("resolve_async start");
     // TODO update status to STARTED or so
@@ -254,12 +254,11 @@ try
     logger.info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
     auto& dom = hctx.service().find_domain(domain_name);
-    auto ctx{dom.make_local_async_context(config)};
-    if (auto* atst_ctx = cast_ctx_to_ptr<local_atst_context>(*ctx))
+    auto actx{dom.make_local_async_context(config)};
+    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
     {
-        atst_ctx->apply_fail_submit_async();
+        test_ctx->apply_fail_submit_async();
     }
-    auto actx = cast_ctx_to_shared_ptr<local_async_context_intf>(ctx);
     actx->using_result();
     hctx.get_async_db().add(actx);
     // TODO update status to SUBMITTED
@@ -359,7 +358,7 @@ try
     auto& db{hctx.get_async_db()};
     auto& logger{hctx.logger()};
     logger.info("handle_get_async_response {}", root_aid);
-    auto actx{db.find(root_aid)};
+    auto actx{db.find_root(root_aid)};
     // TODO response_id
     uint32_t response_id = 0;
     return rpclib_response{

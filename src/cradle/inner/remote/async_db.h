@@ -29,6 +29,11 @@ class async_db
     std::shared_ptr<local_async_context_intf>
     find(async_id aid);
 
+    // Finds the context object for a root async_id value.
+    // Throws bad_async_id_error if not found, or if not root.
+    std::shared_ptr<root_local_async_context_intf>
+    find_root(async_id aid);
+
     // Removes the context objects for the context tree whose root is formed by
     // root_id.
     // Should be called, on client's initiative, when the corresponding

@@ -124,17 +124,17 @@ local_tree_context_base::local_tree_context_base(inner_resources& resources)
 }
 
 local_async_context_base::local_async_context_base(
-    std::shared_ptr<local_tree_context_base> tree_ctx,
+    local_tree_context_base& tree_ctx,
     local_async_context_base* parent,
     bool is_req)
-    : tree_ctx_{std::move(tree_ctx)},
+    : tree_ctx_{tree_ctx},
       parent_{parent},
       is_req_{is_req},
       id_{allocate_async_id()},
       status_{is_req ? async_status::CREATED : async_status::FINISHED},
       num_subs_not_running_{0}
 {
-    auto& logger{tree_ctx_->get_logger()};
+    auto& logger{tree_ctx_.get_logger()};
     auto parent_id = parent ? parent->get_id() : 0;
     logger.info(
         "local_async_context_base {} (parent {}, {}): created, status {}",
@@ -230,7 +230,7 @@ local_async_context_base::request_cancellation_coro()
 cppcoro::task<void>
 local_async_context_base::reschedule_if_opportune()
 {
-    auto& logger{tree_ctx_->get_logger()};
+    auto& logger{tree_ctx_.get_logger()};
     if (!is_req_)
     {
         // Violating this function's precondition
@@ -279,13 +279,7 @@ local_async_context_base::decide_reschedule_sub()
 void
 local_async_context_base::update_status(async_status status)
 {
-    assert(status != async_status::AWAITING_RESULT);
-    auto& logger{tree_ctx_->get_logger()};
-    auto new_status{status};
-    if (using_result_ && status == async_status::FINISHED)
-    {
-        new_status = async_status::AWAITING_RESULT;
-    }
+    auto& logger{tree_ctx_.get_logger()};
     logger.info(
         "local_async_context_base {} update_status {} -> {}",
         id_,
@@ -294,22 +288,24 @@ local_async_context_base::update_status(async_status status)
     // Invariant: if this context's status is AWAITING_RESULT or FINISHED,
     // then all its subcontexts' statuses are FINISHED.
     // (Subs won't be finished yet if the result came from a cache.)
-    if (status_ != async_status::AWAITING_RESULT
-        && status_ != async_status::FINISHED
-        && status == async_status::FINISHED)
+    auto almost_finished = [](async_status status) -> bool {
+        return status == async_status::AWAITING_RESULT
+               || status == async_status::FINISHED;
+    };
+    if (!almost_finished(status_) && almost_finished(status))
     {
         for (auto sub : subs_)
         {
-            sub->update_status(status);
+            sub->update_status(async_status::FINISHED);
         }
     }
-    status_ = new_status;
+    status_ = status;
 }
 
 void
 local_async_context_base::update_status_error(std::string const& errmsg)
 {
-    auto& logger{tree_ctx_->get_logger()};
+    auto& logger{tree_ctx_.get_logger()};
     logger.info(
         "local_async_context_base {} update_status_error: {} -> ERROR: {}",
         id_,
@@ -319,49 +315,10 @@ local_async_context_base::update_status_error(std::string const& errmsg)
     errmsg_ = errmsg;
 }
 
-void
-local_async_context_base::using_result()
-{
-    assert(!parent_);
-    using_result_ = true;
-}
-
-void
-local_async_context_base::check_set_get_result_precondition(bool is_get_result)
-{
-    async_status required_status{
-        is_get_result ? async_status::FINISHED
-                      : async_status::AWAITING_RESULT};
-    if (!using_result_ || status_ != required_status)
-    {
-        throw std::logic_error(fmt::format(
-            "local_async_context_base {} {}() precondition violated ({}, {})",
-            id_,
-            is_get_result ? "is_get_result" : "is_set_result",
-            using_result_,
-            status_.load(std::memory_order_relaxed)));
-    }
-}
-
-void
-local_async_context_base::set_result(blob result)
-{
-    check_set_get_result_precondition(false);
-    result_ = std::move(result);
-    status_ = async_status::FINISHED;
-}
-
-blob
-local_async_context_base::get_result()
-{
-    check_set_get_result_precondition(true);
-    return result_;
-}
-
 bool
 local_async_context_base::is_cancellation_requested() const noexcept
 {
-    auto token{tree_ctx_->get_cancellation_token()};
+    auto token{tree_ctx_.get_cancellation_token()};
     return token.is_cancellation_requested();
 }
 
@@ -370,6 +327,62 @@ local_async_context_base::throw_async_cancelled() const
 {
     throw async_cancelled{
         fmt::format("local_async_context_base {} cancelled", id_)};
+}
+
+root_local_async_context_base::root_local_async_context_base(
+    local_tree_context_base& tree_ctx)
+    : local_async_context_base{tree_ctx, nullptr, true}
+{
+}
+
+void
+root_local_async_context_base::update_status(async_status status)
+{
+    local_async_context_base::update_status(status);
+    if (using_result_ && status == async_status::FINISHED)
+    {
+        status = async_status::AWAITING_RESULT;
+    }
+    local_async_context_base::update_status(status);
+}
+
+void
+root_local_async_context_base::using_result()
+{
+    using_result_ = true;
+}
+
+void
+root_local_async_context_base::check_set_get_result_precondition(
+    bool is_get_result)
+{
+    async_status required_status{
+        is_get_result ? async_status::FINISHED
+                      : async_status::AWAITING_RESULT};
+    if (!using_result_ || get_status() != required_status)
+    {
+        throw std::logic_error(fmt::format(
+            "local_async_context_base {} {}() precondition violated ({}, {})",
+            get_id(),
+            is_get_result ? "is_get_result" : "is_set_result",
+            using_result_,
+            get_status()));
+    }
+}
+
+void
+root_local_async_context_base::set_result(blob result)
+{
+    check_set_get_result_precondition(false);
+    result_ = std::move(result);
+    local_async_context_base::update_status(async_status::FINISHED);
+}
+
+blob
+root_local_async_context_base::get_result()
+{
+    check_set_get_result_precondition(true);
+    return result_;
 }
 
 local_context_tree_builder_base::local_context_tree_builder_base(
@@ -398,7 +411,7 @@ local_context_tree_builder_base::visit_req_arg(std::size_t ix)
 std::shared_ptr<local_async_context_base>
 local_context_tree_builder_base::make_sub_ctx(std::size_t ix, bool is_req)
 {
-    auto tree_ctx{ctx_.get_tree_context()};
+    auto& tree_ctx{ctx_.get_tree_context()};
     auto sub_ctx{make_sub_ctx(tree_ctx, ix, is_req)};
     ctx_.add_sub(ix, sub_ctx);
     register_local_async_ctx(sub_ctx);
@@ -414,8 +427,8 @@ proxy_async_tree_context_base::proxy_async_tree_context_base(
 }
 
 proxy_async_context_base::proxy_async_context_base(
-    std::shared_ptr<proxy_async_tree_context_base> tree_ctx)
-    : tree_ctx_{std::move(tree_ctx)}, id_{allocate_async_id()}
+    proxy_async_tree_context_base& tree_ctx)
+    : tree_ctx_{tree_ctx}, id_{allocate_async_id()}
 {
 }
 
@@ -468,7 +481,7 @@ proxy_async_context_base::ensure_subs_no_const()
     auto& proxy{get_proxy()};
     // Wait until the get_sub_contexts precondition holds
     wait_until_async_status_matches(
-        proxy, remote_id_, subs_available_matcher(tree_ctx_->get_logger()));
+        proxy, remote_id_, subs_available_matcher(tree_ctx_.get_logger()));
     auto specs = proxy.get_sub_contexts(remote_id_);
     for (auto& spec : specs)
     {
@@ -481,20 +494,21 @@ proxy_async_context_base::ensure_subs_no_const()
 }
 
 root_proxy_async_context_base::root_proxy_async_context_base(
-    std::shared_ptr<proxy_async_tree_context_base> tree_ctx)
+    proxy_async_tree_context_base& tree_ctx)
     : proxy_async_context_base{tree_ctx},
       remote_id_future_{remote_id_promise_.get_future()}
 {
 }
 
-root_proxy_async_context_base::~root_proxy_async_context_base()
+void
+root_proxy_async_context_base::finish_remote() noexcept
 {
     // Clean up the context tree on the server once per proxy context tree.
     // There must have been a set_remote_id() or fail_remote_id() call for this
     // root context.
     if (remote_id_ != NO_ASYNC_ID)
     {
-        // Destructor must not throw
+        // Must not throw
         try
         {
             auto& proxy{get_proxy()};
@@ -502,11 +516,12 @@ root_proxy_async_context_base::~root_proxy_async_context_base()
         }
         catch (std::exception& e)
         {
-            auto& logger{tree_ctx_->get_logger()};
+            auto& logger{tree_ctx_.get_logger()};
             try
             {
                 logger.error(
-                    "~root_proxy_async_context_base() caught {}", e.what());
+                    "root_proxy_async_context_base::finish_remote() caught {}",
+                    e.what());
             }
             catch (...)
             {
@@ -535,7 +550,7 @@ root_proxy_async_context_base::fail_remote_id() noexcept
         try
         {
             // Everything must be noexcept here
-            auto& logger(tree_ctx_->get_logger());
+            auto& logger(tree_ctx_.get_logger());
             logger.warn(
                 "root_proxy_async_context_base::fail_remote_id caught {}",
                 e.what());
@@ -562,35 +577,9 @@ root_proxy_async_context_base::wait_on_remote_id()
     }
 }
 
-tasklet_tracker*
-root_proxy_async_context_base::get_tasklet()
-{
-    if (tasklets_.empty())
-    {
-        return nullptr;
-    }
-    return tasklets_.back();
-}
-
-void
-root_proxy_async_context_base::push_tasklet(tasklet_tracker& tasklet)
-{
-    tasklets_.push_back(&tasklet);
-}
-
-void
-root_proxy_async_context_base::pop_tasklet()
-{
-    tasklets_.pop_back();
-}
-
 non_root_proxy_async_context_base::non_root_proxy_async_context_base(
-    std::shared_ptr<proxy_async_tree_context_base> tree_ctx, bool is_req)
+    proxy_async_tree_context_base& tree_ctx, bool is_req)
     : proxy_async_context_base{tree_ctx}, is_req_{is_req}
-{
-}
-
-non_root_proxy_async_context_base::~non_root_proxy_async_context_base()
 {
 }
 
@@ -616,8 +605,8 @@ non_root_proxy_async_context_base::wait_on_remote_id()
 void
 register_local_async_ctx(std::shared_ptr<local_async_context_base> ctx)
 {
-    auto tree_ctx{ctx->get_tree_context()};
-    if (auto* db = get_async_db(*tree_ctx))
+    auto& tree_ctx{ctx->get_tree_context()};
+    if (auto* db = get_async_db(tree_ctx))
     {
         db->add(ctx);
     }

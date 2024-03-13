@@ -21,10 +21,14 @@ class domain
     name() const
         = 0;
 
+    // Creates a sync context that can be used for any number of local request
+    // resolutions (unlike async contexts, sync ones need no preparation).
     virtual std::shared_ptr<sync_context_intf>
     make_local_sync_context(service_config const& config) const = 0;
 
-    virtual std::shared_ptr<async_context_intf>
+    // Creates an async context that can be used for exactly one local request
+    // resolution (and has been prepared for that one resolution).
+    virtual std::shared_ptr<root_local_async_context_intf>
     make_local_async_context(service_config const& config) const = 0;
 };
 

@@ -61,21 +61,6 @@ class seri_resolver_impl : public seri_resolver_intf
         assert(!ctx.remotely());
         auto req{deserialize_request<Req>(
             ctx.get_resources(), std::move(seri_req))};
-        // The intention of the "if constexpr" is to:
-        // - Prevent build errors should Req not be visitable
-        // - Generate less object code should Req not need async resolving
-        if constexpr (VisitableRequest<Req>)
-        {
-            if (ctx.is_async())
-            {
-                // Populate the context tree under ctx.
-                // The request, and all subrequests, should be visitable;
-                // otherwise, a compile-time error will occur.
-                auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
-                auto builder = actx.make_ctx_tree_builder();
-                req.accept(*builder);
-            }
-        }
         ResolutionConstraintsLocal constraints;
         auto value = co_await resolve_request(
             ctx, req, seri_lock.lock_ptr, constraints);
