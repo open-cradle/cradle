@@ -740,3 +740,53 @@ TEST_CASE("resolve request - disappearing blob file - full", tag)
 {
     test_resolve_to_blob_file<caching_level_type::full>(true);
 }
+
+// Ctx should be non-introspective
+template<caching_level_type req_level, typename Ctx>
+static void
+test_intrsp_req_bad_ctx()
+{
+    auto req{rq_make_some_blob<req_level>(256, false)};
+    auto resources{make_inner_test_resources()};
+    Ctx ctx{*resources};
+
+    // resolve_request() should fail due to mismatch between req and ctx:
+    // req is introspective, ctx is not
+    REQUIRE_THROWS_WITH(
+        cppcoro::sync_wait(resolve_request(ctx, req)),
+        "failing cast_ctx_to_ref");
+}
+
+TEST_CASE("resolve request - cached intrsp req, non-intrsp ctx", tag)
+{
+    test_intrsp_req_bad_ctx<
+        caching_level_type::memory,
+        caching_request_resolution_context>();
+}
+
+#if 0
+// TODO add introspection to resolve_request_sync_uncached()
+TEST_CASE("resolve request - uncached intrsp req, non-intrsp ctx", tag)
+{
+    test_intrsp_req_bad_ctx<
+        caching_level_type::none,
+        non_caching_request_resolution_context>();
+}
+#endif
+
+TEST_CASE("resolve request - cached req, uncached ctx", tag)
+{
+    constexpr auto caching_level = caching_level_type::memory;
+    auto resources{make_inner_test_resources()};
+
+    // req is cached
+    auto req{rq_make_some_blob<caching_level>(256, false)};
+
+    // ctx is uncached
+    non_caching_request_resolution_context ctx{*resources};
+
+    // resolve_request() should fail due to mismatch between req and ctx
+    REQUIRE_THROWS_WITH(
+        cppcoro::sync_wait(resolve_request(ctx, req)),
+        "failing cast_ctx_to_ref");
+}

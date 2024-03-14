@@ -47,15 +47,11 @@ class non_caching_request_resolution_context final : public local_context_intf,
 
     // local_context_intf
     std::shared_ptr<data_owner>
-    make_data_owner(std::size_t size, bool use_shared_memory) override
-    {
-        throw not_implemented_error();
-    }
+    make_data_owner(std::size_t size, bool use_shared_memory) override;
 
     void
     on_value_complete() override
     {
-        throw not_implemented_error();
     }
 
  private:
@@ -92,15 +88,11 @@ class caching_request_resolution_context final : public local_context_intf,
 
     // local_context_intf
     std::shared_ptr<data_owner>
-    make_data_owner(std::size_t size, bool use_shared_memory) override
-    {
-        throw not_implemented_error();
-    }
+    make_data_owner(std::size_t size, bool use_shared_memory) override;
 
     void
     on_value_complete() override
     {
-        throw not_implemented_error();
     }
 
  private:

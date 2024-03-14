@@ -208,7 +208,12 @@ template<Context DestCtx, Context SrcCtx>
     requires(!std::convertible_to<SrcCtx&, DestCtx&>)
 DestCtx& cast_ctx_to_ref_base(SrcCtx& ctx)
 {
-    return *dynamic_ctx_caster<DestCtx>::cast_ptr(&ctx);
+    auto* ptr = dynamic_ctx_caster<DestCtx>::cast_ptr(&ctx);
+    if (!ptr)
+    {
+        throw std::logic_error("failing cast_ctx_to_ref");
+    }
+    return *ptr;
 }
 
 /*
