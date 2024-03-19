@@ -627,6 +627,11 @@ root_proxy_async_context_base::fail_remote_id() noexcept
 // alternative. However, the set() call on an event object could be from an
 // exception handler or destructor, the unblocked call will continue on that
 // thread, and there is no guarantee it won't throw.
+// TODO is this really problematic? Quoting cppreference.com:
+// If an exception is thrown from the execution of the coroutine, the exception
+// is caught and unhandled_exception is called on the coroutine's promise
+// object. If the call to unhandled_exception throws or rethrows an exception,
+// that exception is propagated.
 void
 root_proxy_async_context_base::wait_on_remote_id()
 {
