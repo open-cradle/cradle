@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 
+#include <cppcoro/io_service.hpp>
 #include <cppcoro/static_thread_pool.hpp>
 #include <cppcoro/task.hpp>
 
@@ -194,6 +195,9 @@ class inner_resources
 
     tasklet_admin&
     the_tasklet_admin();
+
+    cppcoro::io_service&
+    the_io_service();
 
  private:
     std::unique_ptr<inner_resources_impl> impl_;
