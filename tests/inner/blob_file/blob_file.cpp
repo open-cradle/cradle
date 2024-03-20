@@ -119,6 +119,7 @@ TEST_CASE("write/read blob file", "[blob_file]")
     REQUIRE(writer_blob.data() == writer.bytes());
     REQUIRE(writer_blob.size() == writer.size());
     REQUIRE(writer_blob.owner() == &writer);
+    REQUIRE(writer_blob.shared_owner() == shared_writer);
     REQUIRE(writer_blob.mapped_file_data_owner() == &writer);
 
     auto shared_reader{std::make_shared<blob_file_reader>(path)};
@@ -133,6 +134,7 @@ TEST_CASE("write/read blob file", "[blob_file]")
     REQUIRE(reader_blob.data() == reader.bytes());
     REQUIRE(reader_blob.size() == reader.size());
     REQUIRE(reader_blob.owner() == &reader);
+    REQUIRE(reader_blob.shared_owner() == shared_reader);
     REQUIRE(reader_blob.mapped_file_data_owner() == &reader);
 
     auto contents = read_file_contents(path);
