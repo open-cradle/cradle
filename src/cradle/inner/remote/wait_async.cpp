@@ -48,7 +48,7 @@ wait_until_async_status_matches(
             throw async_cancelled(
                 fmt::format("remote async {} cancelled", remote_id));
         }
-        else if (status == async_status::ERROR)
+        else if (status == async_status::FAILED)
         {
             std::string errmsg = proxy.get_async_error_message(remote_id);
             throw async_error(errmsg);

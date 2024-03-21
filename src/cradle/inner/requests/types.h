@@ -8,7 +8,7 @@ namespace cradle {
 
 // Status of an asynchronous operation: a (cppcoro) task, associated
 // with a coroutine.
-// CANCELLED, FINISHED and ERROR are final statuses: once a task ends up in
+// CANCELLED, FINISHED and FAILED are final statuses: once a task ends up in
 // one of these, its status won't change anymore.
 enum class async_status
 {
@@ -19,7 +19,7 @@ enum class async_status
     AWAITING_RESULT, // Calculation completed, but the result still has to be
                      // stored in the context (transient internal status)
     FINISHED, // Finished successfully
-    ERROR // Ended due to error
+    FAILED // Ended due to error
 };
 
 std::string

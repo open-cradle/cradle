@@ -28,8 +28,8 @@ to_string(async_status s)
         case async_status::FINISHED:
             res = "FINISHED";
             break;
-        case async_status::ERROR:
-            res = "ERROR";
+        case async_status::FAILED:
+            res = "FAILED";
             break;
         default:
             return fmt::format("bad async_status {}", static_cast<int>(s));

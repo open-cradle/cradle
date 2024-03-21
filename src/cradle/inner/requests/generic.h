@@ -471,7 +471,7 @@ class local_async_context_intf : public local_context_intf,
         = 0;
 
     // Gets the error message for this task.
-    // Should be called only when get_status() returns ERROR.
+    // Should be called only when get_status() returns FAILED.
     virtual std::string
     get_error_message()
         = 0;
@@ -482,16 +482,16 @@ class local_async_context_intf : public local_context_intf,
     // If status == FINISHED and using_result() was called, the new status
     // will be AWAITING_RESULT.
     // status must not be AWAITING_RESULT
-    // TODO need to the the same if status == ERROR?
+    // TODO need to the the same if status == FAILED?
     // TODO keep history of an async request e.g.
     // TODO vector<tuple<async_status, timestamp>>
-    // TODO plus extra info for ERROR status
+    // TODO plus extra info for FAILED status
     // TODO this could replace introspection
     virtual void
     update_status(async_status status)
         = 0;
 
-    // Updates the status of this task to "ERROR", and stores an associated
+    // Updates the status of this task to "FAILED", and stores an associated
     // error message.
     virtual void
     update_status_error(std::string const& errmsg)
@@ -675,13 +675,12 @@ concept LocalContext
 // Context that supports remote resolution only, and does not support local
 template<typename Ctx>
 concept DefinitelyRemoteContext
-    = std::is_final_v<Ctx> && RemoteContext<Ctx> && !
-LocalContext<Ctx>;
+    = std::is_final_v<Ctx> && RemoteContext<Ctx> && !LocalContext<Ctx>;
 
 // Context that supports local resolution only, and does not support remote
 template<typename Ctx>
-concept DefinitelyLocalContext = std::is_final_v<Ctx> && LocalContext<Ctx> && !
-RemoteContext<Ctx>;
+concept DefinitelyLocalContext
+    = std::is_final_v<Ctx> && LocalContext<Ctx> && !RemoteContext<Ctx>;
 
 // Context that supports synchronous resolution
 template<typename Ctx>
@@ -694,21 +693,21 @@ concept AsyncContext = std::convertible_to<Ctx&, async_context_intf&>;
 // Context that supports synchronous resolution only, and does not support
 // asynchronous
 template<typename Ctx>
-concept DefinitelySyncContext = std::is_final_v<Ctx> && SyncContext<Ctx> && !
-AsyncContext<Ctx>;
+concept DefinitelySyncContext
+    = std::is_final_v<Ctx> && SyncContext<Ctx> && !AsyncContext<Ctx>;
 
 // Context that supports asynchronous resolution only, and does not support
 // synchronous
 template<typename Ctx>
-concept DefinitelyAsyncContext = std::is_final_v<Ctx> && AsyncContext<Ctx> && !
-SyncContext<Ctx>;
+concept DefinitelyAsyncContext
+    = std::is_final_v<Ctx> && AsyncContext<Ctx> && !SyncContext<Ctx>;
 
 // Any context implementation class should be valid
 template<typename Ctx>
 concept ValidContext
     = Context<Ctx>
-      && (!std::is_final_v<Ctx> || RemoteContext<Ctx> || LocalContext<Ctx>)
-      && (!std::is_final_v<Ctx> || SyncContext<Ctx> || AsyncContext<Ctx>);
+      && (!std::is_final_v<Ctx> || RemoteContext<Ctx> || LocalContext<Ctx>) &&(
+          !std::is_final_v<Ctx> || SyncContext<Ctx> || AsyncContext<Ctx>);
 
 /*
  * A request is something that can be resolved, resulting in a result
@@ -725,21 +724,18 @@ concept ValidContext
  * TODO define when request's id can be a placeholder
  */
 template<typename T>
-concept Request
-    = requires {
-          requires std::same_as<typename T::element_type, T>;
-          typename T::value_type;
-          requires std::same_as<
-              std::remove_const_t<decltype(T::caching_level)>,
-              caching_level_type>;
-          requires std::same_as<
-              std::remove_const_t<decltype(T::value_based_caching)>,
-              bool>;
-          requires std::
-              same_as<std::remove_const_t<decltype(T::is_proxy)>, bool>;
-          requires std::
-              same_as<std::remove_const_t<decltype(T::introspective)>, bool>;
-      };
+concept Request = requires {
+    requires std::same_as<typename T::element_type, T>;
+    typename T::value_type;
+    requires std::same_as<
+        std::remove_const_t<decltype(T::caching_level)>,
+        caching_level_type>;
+    requires std::
+        same_as<std::remove_const_t<decltype(T::value_based_caching)>, bool>;
+    requires std::same_as<std::remove_const_t<decltype(T::is_proxy)>, bool>;
+    requires std::
+        same_as<std::remove_const_t<decltype(T::introspective)>, bool>;
+};
 // TODO say something about resolve_sync()/_async() as we used to do
 
 template<typename T>
@@ -750,8 +746,7 @@ concept CachedRequest = Request<Req> && is_cached(Req::caching_level)
                         && requires(Req const& req) {
                                {
                                    req.get_captured_id()
-                                   }
-                                   -> std::convertible_to<captured_id const&>;
+                               } -> std::convertible_to<captured_id const&>;
                            };
 
 template<typename Req>
@@ -763,24 +758,22 @@ concept FullyCachedRequest
     = CachedRequest<Req> && is_fully_cached(Req::caching_level);
 
 template<typename Req>
-concept CompositionBasedCachedRequest = CachedRequest<Req> && !
-Req::value_based_caching;
+concept CompositionBasedCachedRequest
+    = CachedRequest<Req> && !Req::value_based_caching;
 
 template<typename Req>
 concept ValueBasedCachedRequest
     = CachedRequest<Req> && Req::value_based_caching;
 
 template<typename Req>
-concept IntrospectiveRequest
-    = Req::introspective && requires(Req const& req) {
-                                {
-                                    req.get_introspection_title()
-                                    } -> std::convertible_to<std::string>;
-                            };
+concept IntrospectiveRequest = Req::introspective && requires(Req const& req) {
+    {
+        req.get_introspection_title()
+    } -> std::convertible_to<std::string>;
+};
 
 template<typename Req>
-concept NonIntrospectiveRequest = !
-Req::introspective;
+concept NonIntrospectiveRequest = !Req::introspective;
 
 template<typename Req>
 concept CachedIntrospectiveRequest
@@ -795,12 +788,11 @@ concept CachedNonIntrospectiveRequest
 // This functionality is being used for constructing a context tree when a
 // request is resolved locally and asynchronously.
 template<typename Req>
-concept VisitableRequest
-    = Request<Req> && requires(Req const& req) {
-                          {
-                              req.accept(*(req_visitor_intf*) nullptr)
-                          };
-                      };
+concept VisitableRequest = Request<Req> && requires(Req const& req) {
+    {
+        req.accept(*(req_visitor_intf*) nullptr)
+    };
+};
 
 // Contains the type of an argument to an rq_function-like call.
 template<typename Value, bool IsReq>

@@ -91,7 +91,7 @@ class remote_proxy
         = 0;
 
     // Returns an error message
-    // Should be called only when status == ERROR
+    // Should be called only when status == FAILED
     virtual std::string
     get_async_error_message(async_id aid)
         = 0;

@@ -275,7 +275,7 @@ test_error_async_coro(Ctx& ctx, Req const& req, auto const& matcher)
 {
     REQUIRE_THROWS_MATCHES(
         co_await resolve_request(ctx, req), async_error, matcher);
-    REQUIRE(co_await ctx.get_status_coro() == async_status::ERROR);
+    REQUIRE(co_await ctx.get_status_coro() == async_status::FAILED);
 }
 
 template<typename Ctx, typename Req>
