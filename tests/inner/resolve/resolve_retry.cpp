@@ -10,7 +10,7 @@
 #include <cradle/inner/io/mock_http.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/request_props.h>
-#include <cradle/inner/resolve/resolve_retry.h>
+#include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/context.h>
 
@@ -101,7 +101,7 @@ test_retry(Ctx& ctx)
         rq_function(props, ask_question),
         rq_function(props, ask_question))};
 
-    auto res = cppcoro::sync_wait(resolve_request_with_retry(ctx, req));
+    auto res = cppcoro::sync_wait(resolve_request(ctx, req));
     REQUIRE(res == "4242");
 }
 

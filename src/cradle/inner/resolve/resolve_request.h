@@ -342,6 +342,96 @@ resolve_request_remote(
     return resolve_request_remote_coro(ctx, req, lock_ptr);
 }
 
+template<
+    Context Ctx,
+    Request Req,
+    typename Constraints = DefaultResolutionConstraints<Ctx>>
+auto
+resolve_request_one_try(
+    Ctx& ctx,
+    Req const& req,
+    cache_record_lock* lock_ptr,
+    Constraints constraints)
+{
+    static_assert(ValidContext<Ctx>);
+    static_assert(!(Req::is_proxy && constraints.force_local));
+    // TODO check_context_satisfies_constraints(ctx, constraints);
+
+    // First decision (based on constraints if possible): remotely or locally.
+    // A proxy request also forces remote resolving.
+    if constexpr (Req::is_proxy || constraints.force_remote)
+    {
+        // Cast here to be like the runtime decision below
+        auto& rem_ctx{cast_ctx_to_ref<remote_context_intf>(ctx)};
+        return resolve_request_remote(rem_ctx, req, lock_ptr);
+    }
+    else if constexpr (constraints.force_local)
+    {
+        // Call one of the two resolve_request_local() versions, depending on
+        // Req being a plain value or a Request
+        return resolve_request_local(ctx, req, lock_ptr, constraints);
+    }
+    else
+    {
+        if (ctx.remotely())
+        {
+            auto& rem_ctx = cast_ctx_to_ref<remote_context_intf>(ctx);
+            return resolve_request_remote(rem_ctx, req, lock_ptr);
+        }
+        else
+        {
+            return resolve_request_local(ctx, req, lock_ptr, constraints);
+        }
+    }
+}
+
+template<typename Orig>
+using ConstraintsForRetry = ResolutionConstraints<
+    Orig::force_remote,
+    Orig::force_local,
+    Orig::force_sync,
+    Orig::force_async,
+    true>;
+
+template<
+    Context Ctx,
+    RetryableRequest Req,
+    typename Constraints = DefaultResolutionConstraints<Ctx>>
+cppcoro::task<typename Req::value_type>
+resolve_request_with_retry(
+    Ctx& ctx,
+    Req const& req,
+    cache_record_lock* lock_ptr,
+    Constraints constraints)
+{
+    static_assert(ValidRetryableRequest<Req>);
+    int attempt = 0;
+    auto resolve_task
+        = resolve_request_one_try(ctx, req, lock_ptr, constraints);
+    for (;;)
+    {
+        std::string what;
+        try
+        {
+            co_return co_await resolve_task;
+        }
+        catch (std::exception const& e)
+        {
+            what = e.what();
+        }
+        // if introspective: update status. Not really possible with
+        // tasklet_tracker.
+        auto interval{req.prepare_retry(attempt, what)};
+        // schedule_after() cannot be cancelled as for current sync
+        auto& io_svc{ctx.get_resources().the_io_service()};
+        co_await io_svc.schedule_after(interval);
+        resolve_task = resolve_request_one_try(
+            ctx, req, lock_ptr, ConstraintsForRetry<Constraints>());
+        ++attempt;
+    }
+    throw std::logic_error("impossible");
+}
+
 /*****************************************************************************
  * Public interface: resolve_request()
  */
@@ -401,35 +491,13 @@ resolve_request(
     Constraints constraints = Constraints(),
     cache_record_lock* lock_ptr = nullptr)
 {
-    static_assert(ValidContext<Ctx>);
-    static_assert(!(Req::is_proxy && constraints.force_local));
-    // TODO check_context_satisfies_constraints(ctx, constraints);
-
-    // First decision (based on constraints if possible): remotely or locally.
-    // A proxy request also forces remote resolving.
-    if constexpr (Req::is_proxy || constraints.force_remote)
+    if constexpr (!constraints.is_sub_or_retry && Req::retryable)
     {
-        // Cast here to be like the runtime decision below
-        auto& rem_ctx{cast_ctx_to_ref<remote_context_intf>(ctx)};
-        return resolve_request_remote(rem_ctx, req, lock_ptr);
-    }
-    else if constexpr (constraints.force_local)
-    {
-        // Call one of the two resolve_request_local() versions, depending on
-        // Req being a plain value or a Request
-        return resolve_request_local(ctx, req, lock_ptr, constraints);
+        return resolve_request_with_retry(ctx, req, lock_ptr, constraints);
     }
     else
     {
-        if (ctx.remotely())
-        {
-            auto& rem_ctx = cast_ctx_to_ref<remote_context_intf>(ctx);
-            return resolve_request_remote(rem_ctx, req, lock_ptr);
-        }
-        else
-        {
-            return resolve_request_local(ctx, req, lock_ptr, constraints);
-        }
+        return resolve_request_one_try(ctx, req, lock_ptr, constraints);
     }
 }
 
