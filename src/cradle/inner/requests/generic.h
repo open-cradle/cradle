@@ -367,6 +367,12 @@ class async_error : public std::runtime_error
 // One context object will be created for each task (coroutine);
 // these objects form a tree with the same topology as the request tree.
 // Thus, a context object tracks progress for a single (sub)request.
+//
+// The implication is that in general a context tree cannot be reused across
+// resolve_request() calls. The exception is when retrying a resolve operation,
+// when reuse is allowed and even desirable, as successful subresults from a
+// former attempt could potentially be reused, avoiding re-resolution of that
+// part of the request tree.
 class async_context_intf : public virtual context_intf
 {
  public:

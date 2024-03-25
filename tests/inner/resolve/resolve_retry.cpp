@@ -66,37 +66,13 @@ concat_one_two(context_intf& ctx, std::string one, std::string two)
     co_return one + two;
 }
 
-} // namespace
-
-TEST_CASE("resolve with retry - sync", tag)
+template<typename Ctx>
+void
+test_retry(Ctx& ctx)
 {
-    auto resources{make_inner_test_resources()};
+    auto& resources{ctx.get_resources()};
 
-    auto& mock_http = resources->enable_http_mocking();
-    mock_http_script script;
-    for (int i = 0; i < 3; ++i)
-    {
-        script.push_back(
-            mock_http_exchange{make_the_request(), make_bad_response()});
-    }
-    script.push_back(
-        mock_http_exchange{make_the_request(), make_good_response()});
-    mock_http.set_script(script);
-
-    request_props<caching_level_type::none, request_function_t::coro> props{
-        make_test_uuid(0)};
-    auto req{rq_function(props, ask_question)};
-
-    testing_request_context ctx{*resources, ""};
-    auto res = cppcoro::sync_wait(resolve_request_with_retry(ctx, req));
-    REQUIRE(res == "42");
-}
-
-TEST_CASE("resolve with retry - atst_context", tag)
-{
-    auto resources{make_inner_test_resources()};
-
-    auto& mock_http = resources->enable_http_mocking();
+    auto& mock_http = resources.enable_http_mocking();
     mock_http_script script;
     // One sub fails, one succeeds
     for (int i = 0; i < 1; ++i)
@@ -104,7 +80,8 @@ TEST_CASE("resolve with retry - atst_context", tag)
         script.push_back(
             mock_http_exchange{make_the_request(), make_bad_response()});
     }
-    // TODO Why need 3 good responses? 2 should be enough.
+    // TODO one good response will be discarded and recalculated;
+    // might be avoidable for async
     for (int i = 0; i < 3; ++i)
     {
         script.push_back(
@@ -120,42 +97,30 @@ TEST_CASE("resolve with retry - atst_context", tag)
         rq_function(props, ask_question),
         rq_function(props, ask_question))};
 
-    atst_context ctx{*resources};
     auto res = cppcoro::sync_wait(resolve_request_with_retry(ctx, req));
     REQUIRE(res == "4242");
+}
+
+} // namespace
+
+TEST_CASE("resolve with retry - sync", tag)
+{
+    auto resources{make_inner_test_resources()};
+    testing_request_context ctx{*resources, ""};
+    test_retry(ctx);
+}
+
+TEST_CASE("resolve with retry - atst_context", tag)
+{
+    auto resources{make_inner_test_resources()};
+    atst_context ctx{*resources};
+    test_retry(ctx);
 }
 
 TEST_CASE("resolve with retry - root_local_atst_context", tag)
 {
     auto resources{make_inner_test_resources()};
-
-    auto& mock_http = resources->enable_http_mocking();
-    mock_http_script script;
-    for (int i = 0; i < 2; ++i)
-    {
-        script.push_back(
-            mock_http_exchange{make_the_request(), make_bad_response()});
-    }
-    for (int i = 0; i < 10; ++i)
-    {
-        script.push_back(
-            mock_http_exchange{make_the_request(), make_good_response()});
-    }
-    script.push_back(
-        mock_http_exchange{make_the_request(), make_good_response()});
-    mock_http.set_script(script);
-
-    request_props<caching_level_type::none, request_function_t::coro> props{
-        make_test_uuid(0)};
-    auto req{rq_function(
-        props,
-        concat_one_two,
-        rq_function(props, ask_question),
-        rq_function(props, ask_question))};
-
     auto tree_ctx{std::make_unique<local_tree_context_base>(*resources)};
     root_local_atst_context root_ctx{std::move(tree_ctx), nullptr};
-
-    auto res = cppcoro::sync_wait(resolve_request_with_retry(root_ctx, req));
-    REQUIRE(res == "4242");
+    test_retry(root_ctx);
 }

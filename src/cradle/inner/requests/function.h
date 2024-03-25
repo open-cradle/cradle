@@ -599,6 +599,8 @@ class function_request_impl
         // the main task will wait until all other subtasks have finished
         // (or thrown).
         // This justifies passing contexts around by reference.
+        // TODO if retrying, status could be FINISHED, but the calculation will
+        // be redone nonetheless.
         try
         {
             auto sub_tasks = make_async_sub_tasks(ctx, args_, ArgIndices{});
