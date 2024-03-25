@@ -772,6 +772,42 @@ class request_title_mixin<true>
     std::string title_;
 };
 
+template<bool Retryable>
+class request_retrier_mixin
+{
+ protected:
+    request_retrier_mixin() = default;
+
+    template<typename Props>
+    request_retrier_mixin(Props const& props)
+    {
+    }
+};
+
+// TODO need to (de-)serialize this
+template<>
+class request_retrier_mixin<true>
+{
+ public:
+    std::chrono::milliseconds
+    prepare_retry(int attempt, std::string const& reason) const
+    {
+        return retrier_->prepare_retry(attempt, reason);
+    }
+
+ protected:
+    // TODO need somehow set retrier with this ctor
+    request_retrier_mixin() = default;
+
+    template<typename Props>
+    request_retrier_mixin(Props const& props) : retrier_{props.get_retrier()}
+    {
+    }
+
+ private:
+    std::shared_ptr<retrier_intf> retrier_;
+};
+
 } // namespace detail
 
 /*
@@ -800,12 +836,15 @@ class request_title_mixin<true>
  */
 template<typename Value, typename Props>
 class function_request
-    : public detail::request_title_mixin<Props::introspective>
+    : public detail::request_title_mixin<Props::introspective>,
+      public detail::request_retrier_mixin<Props::retryable>
 {
  public:
     static_assert(!std::is_reference_v<Value>);
     static_assert(!Props::for_proxy);
-    using mixin_type = detail::request_title_mixin<Props::introspective>;
+    using intrsp_mixin_type
+        = detail::request_title_mixin<Props::introspective>;
+    using retry_mixin_type = detail::request_retrier_mixin<Props::retryable>;
     using element_type = function_request;
     using value_type = Value;
     using intf_type = function_request_intf<Value>;
@@ -819,12 +858,13 @@ class function_request
     static constexpr caching_level_type caching_level{Props::level};
     static constexpr bool value_based_caching{Props::value_based_caching};
     static constexpr bool introspective{Props::introspective};
+    static constexpr bool retryable{Props::retryable};
     static constexpr bool is_proxy{false};
 
     // It is not possible to pass a C-style string as argument.
     template<typename CtorProps, typename Function, typename... Args>
     function_request(CtorProps&& props, Function&& function, Args&&... args)
-        : mixin_type{props}
+        : intrsp_mixin_type{props}, retry_mixin_type{props}
     {
         static_assert(std::is_same_v<std::remove_cvref_t<CtorProps>, Props>);
         using impl_type = function_request_impl<
@@ -842,7 +882,7 @@ class function_request
     // Called from make_flattened_clone() (only)
     template<typename CtorProps>
     function_request(CtorProps&& props, std::shared_ptr<intf_type> impl)
-        : mixin_type{props}, impl_{std::move(impl)}
+        : intrsp_mixin_type{props}, impl_{std::move(impl)}
     {
     }
 
@@ -1051,7 +1091,8 @@ class proxy_request : public detail::request_title_mixin<Props::introspective>
     static_assert(is_uncached(Props::level));
     static_assert(!is_value_based(Props::level));
 
-    using mixin_type = detail::request_title_mixin<Props::introspective>;
+    using intrsp_mixin_type
+        = detail::request_title_mixin<Props::introspective>;
     using element_type = proxy_request;
     using value_type = Value;
     using intf_type = proxy_request_intf<Value>;
@@ -1061,11 +1102,12 @@ class proxy_request : public detail::request_title_mixin<Props::introspective>
         caching_level_type::none};
     static constexpr bool value_based_caching{false};
     static constexpr bool introspective{Props::introspective};
+    static constexpr bool retryable{Props::retryable};
     static constexpr bool is_proxy{true};
 
     template<typename... Args>
     proxy_request(Props const& props, Args&&... args)
-        : mixin_type{props}, uuid_{props.get_uuid()}
+        : intrsp_mixin_type{props}, uuid_{props.get_uuid()}
     {
         using impl_type
             = proxy_request_impl<Value, std::remove_cvref_t<Args>...>;

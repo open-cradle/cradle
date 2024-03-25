@@ -42,7 +42,7 @@ template<
     bool ForceLocal = false,
     bool ForceSync = false,
     bool ForceAsync = false,
-    bool IsSub = false>
+    bool IsSubOrRetry = false>
 struct ResolutionConstraints
 {
     static_assert(!(ForceRemote && ForceLocal));
@@ -52,7 +52,7 @@ struct ResolutionConstraints
     static constexpr bool force_local = ForceLocal;
     static constexpr bool force_sync = ForceSync;
     static constexpr bool force_async = ForceAsync;
-    static constexpr bool is_sub = IsSub;
+    static constexpr bool is_sub_or_retry = IsSubOrRetry;
 
     ResolutionConstraints()
     {
@@ -265,7 +265,7 @@ resolve_request_local(
     // TODO static_assert(!req.is_proxy);
     // Prepare and populate ctx if it is an async root.
     local_context_intf* lctx{&cast_ctx_to_ref<local_context_intf>(ctx)};
-    if constexpr (!constraints.is_sub)
+    if constexpr (!constraints.is_sub_or_retry)
     {
         bool async{};
         if constexpr (constraints.force_async)

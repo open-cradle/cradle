@@ -89,8 +89,13 @@ test_retry(Ctx& ctx)
     }
     mock_http.set_script(script);
 
-    request_props<caching_level_type::none, request_function_t::coro> props{
-        make_test_uuid(0)};
+    request_props<
+        caching_level_type::none,
+        request_function_t::coro,
+        false,
+        true>
+        props{make_test_uuid(0)};
+    props.set_retrier(std::make_shared<default_retrier>());
     auto req{rq_function(
         props,
         concat_one_two,

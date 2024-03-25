@@ -782,6 +782,8 @@ concept Request
               same_as<std::remove_const_t<decltype(T::is_proxy)>, bool>;
           requires std::
               same_as<std::remove_const_t<decltype(T::introspective)>, bool>;
+          requires std::
+              same_as<std::remove_const_t<decltype(T::retryable)>, bool>;
       };
 // TODO say something about resolve_sync()/_async() as we used to do
 
@@ -789,13 +791,13 @@ template<typename T>
 concept UncachedRequest = Request<T> && is_uncached(T::caching_level);
 
 template<typename Req>
-concept CachedRequest = Request<Req> && is_cached(Req::caching_level)
-                        && requires(Req const& req) {
-                               {
-                                   req.get_captured_id()
-                                   }
-                                   -> std::convertible_to<captured_id const&>;
-                           };
+concept CachedRequest
+    = Request<Req> && is_cached(Req::caching_level)
+      && requires(Req const& req) {
+             {
+                 req.get_captured_id()
+                 } -> std::convertible_to<captured_id const&>;
+         };
 
 template<typename Req>
 concept MemoryCachedRequest
@@ -832,6 +834,19 @@ concept CachedIntrospectiveRequest
 template<typename Req>
 concept CachedNonIntrospectiveRequest
     = CachedRequest<Req> && NonIntrospectiveRequest<Req>;
+
+// By having retryable=true, a request advertises itself as being retryable...
+template<typename Req>
+concept RetryableRequest = Request<Req> && Req::retryable;
+// ... but it also needs to implement the corresponding function.
+template<typename Req>
+concept ValidRetryableRequest
+    = RetryableRequest<Req>
+      && requires(Req const& req) {
+             {
+                 req.prepare_retry(0, std::string{})
+                 } -> std::convertible_to<std::chrono::milliseconds>;
+         };
 
 // A request that accepts visitors. A visitor will recursively visit all
 // subrequests, so all of these should be visitable as well.

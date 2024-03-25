@@ -28,6 +28,7 @@ class value_request
     static constexpr bool value_based_caching{false};
     static constexpr bool is_proxy{false};
     static constexpr bool introspective{false};
+    static constexpr bool retryable{false};
 
     value_request(Value const& value) : value_(value)
     {

@@ -1,6 +1,8 @@
 #ifndef CRADLE_INNER_REQUESTS_REQUEST_PROPS_H
 #define CRADLE_INNER_REQUESTS_REQUEST_PROPS_H
 
+#include <chrono>
+#include <memory>
 #include <string>
 
 #include <cradle/inner/requests/generic.h>
@@ -51,6 +53,44 @@ class introspection_mixin<true>
     std::string title_;
 };
 
+class retrier_intf
+{
+ public:
+    virtual ~retrier_intf() = default;
+
+    // Cf. concept ValidRetryableRequest
+    virtual std::chrono::milliseconds
+    prepare_retry(int attempt, std::string const& reason)
+        = 0;
+};
+
+class default_retrier : public retrier_intf
+{
+ public:
+    std::chrono::milliseconds
+    prepare_retry(int attempt, std::string const& reason) override;
+};
+
+template<bool Retryable>
+class retrier_mixin
+{
+};
+
+template<>
+class retrier_mixin<true>
+{
+ public:
+    void
+    set_retrier(std::shared_ptr<retrier_intf> retrier);
+
+    // Returns non-null pointer
+    std::shared_ptr<retrier_intf>
+    get_retrier() const;
+
+ private:
+    std::shared_ptr<retrier_intf> retrier_;
+};
+
 /*
  * Request (resolution) properties that would be identical between similar
  * requests:
@@ -71,8 +111,10 @@ class introspection_mixin<true>
 template<
     caching_level_type Level,
     request_function_t FunctionType = request_function_t::plain,
-    bool Introspective = false>
-class request_props : public introspection_mixin<Introspective>
+    bool Introspective = false,
+    bool Retryable = false>
+class request_props : public introspection_mixin<Introspective>,
+                      public retrier_mixin<Retryable>
 {
  public:
     static constexpr caching_level_type level = Level;
@@ -85,6 +127,7 @@ class request_props : public introspection_mixin<Introspective>
         = FunctionType == request_function_t::proxy_plain
           || FunctionType == request_function_t::proxy_coro;
     static constexpr bool introspective = Introspective;
+    static constexpr bool retryable = Retryable;
     static constexpr bool value_based_caching = is_value_based(Level);
 
     static_assert(!for_proxy || is_uncached(level));
@@ -97,6 +140,7 @@ class request_props : public introspection_mixin<Introspective>
     }
 
     // Constructor for a request that supports introspection
+    // TODO consider replacing with set_title()
     request_props(request_uuid uuid, std::string title)
         requires(Introspective)
         : introspection_mixin<Introspective>{std::move(title)},
