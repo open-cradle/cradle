@@ -772,42 +772,6 @@ class request_title_mixin<true>
     std::string title_;
 };
 
-template<bool Retryable>
-class request_retrier_mixin
-{
- protected:
-    request_retrier_mixin() = default;
-
-    template<typename Props>
-    request_retrier_mixin(Props const& props)
-    {
-    }
-};
-
-// TODO need to (de-)serialize this
-template<>
-class request_retrier_mixin<true>
-{
- public:
-    std::chrono::milliseconds
-    prepare_retry(int attempt, std::string const& reason) const
-    {
-        return retrier_->prepare_retry(attempt, reason);
-    }
-
- protected:
-    // TODO need somehow set retrier with this ctor
-    request_retrier_mixin() = default;
-
-    template<typename Props>
-    request_retrier_mixin(Props const& props) : retrier_{props.get_retrier()}
-    {
-    }
-
- private:
-    std::shared_ptr<retrier_intf> retrier_;
-};
-
 } // namespace detail
 
 /*
@@ -836,15 +800,13 @@ class request_retrier_mixin<true>
  */
 template<typename Value, typename Props>
 class function_request
-    : public detail::request_title_mixin<Props::introspective>,
-      public detail::request_retrier_mixin<Props::retryable>
+    : public detail::request_title_mixin<Props::introspective>
 {
  public:
     static_assert(!std::is_reference_v<Value>);
     static_assert(!Props::for_proxy);
     using intrsp_mixin_type
         = detail::request_title_mixin<Props::introspective>;
-    using retry_mixin_type = detail::request_retrier_mixin<Props::retryable>;
     using element_type = function_request;
     using value_type = Value;
     using intf_type = function_request_intf<Value>;
@@ -854,6 +816,7 @@ class function_request
         Props::function_type,
         Props::introspective>;
     using clone_type = function_request<value_type, clone_props_type>;
+    using retrier_type = typename Props::retrier_type;
 
     static constexpr caching_level_type caching_level{Props::level};
     static constexpr bool value_based_caching{Props::value_based_caching};
@@ -864,7 +827,7 @@ class function_request
     // It is not possible to pass a C-style string as argument.
     template<typename CtorProps, typename Function, typename... Args>
     function_request(CtorProps&& props, Function&& function, Args&&... args)
-        : intrsp_mixin_type{props}, retry_mixin_type{props}
+        : intrsp_mixin_type{props}
     {
         static_assert(std::is_same_v<std::remove_cvref_t<CtorProps>, Props>);
         using impl_type = function_request_impl<
@@ -957,6 +920,13 @@ class function_request
             make_clone_props(), co_await impl_->make_flattened_clone(ctx)};
     }
 
+    std::chrono::milliseconds
+    prepare_retry(int attempt, std::string const& reason) const
+        requires(retryable)
+    {
+        return retrier_.prepare_retry(attempt, reason);
+    }
+
  public:
     // Interface for cereal
 
@@ -1002,6 +972,7 @@ class function_request
     }
 
  private:
+    retrier_type retrier_;
     std::shared_ptr<intf_type> impl_;
 
     auto
@@ -1097,6 +1068,7 @@ class proxy_request : public detail::request_title_mixin<Props::introspective>
     using value_type = Value;
     using intf_type = proxy_request_intf<Value>;
     using props_type = Props;
+    using retrier_type = typename Props::retrier_type;
 
     static constexpr caching_level_type caching_level{
         caching_level_type::none};
@@ -1114,6 +1086,13 @@ class proxy_request : public detail::request_title_mixin<Props::introspective>
         impl_ = std::make_shared<impl_type>(std::forward<Args>(args)...);
     }
 
+    std::chrono::milliseconds
+    prepare_retry(int attempt, std::string const& reason) const
+        requires(retryable)
+    {
+        return retrier_.prepare_retry(attempt, reason);
+    }
+
  public:
     // Interface for cereal
 
@@ -1129,6 +1108,7 @@ class proxy_request : public detail::request_title_mixin<Props::introspective>
 
  private:
     request_uuid uuid_;
+    retrier_type retrier_;
     std::shared_ptr<intf_type> impl_;
 };
 

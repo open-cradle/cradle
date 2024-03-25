@@ -93,9 +93,8 @@ test_retry(Ctx& ctx)
         caching_level_type::none,
         request_function_t::coro,
         false,
-        true>
+        default_retrier>
         props{make_test_uuid(0)};
-    props.set_retrier(std::make_shared<default_retrier>());
     auto req{rq_function(
         props,
         concat_one_two,
