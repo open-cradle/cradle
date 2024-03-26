@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <mutex>
 #include <vector>
 
 #include <spdlog/cfg/helpers.h>
@@ -101,15 +102,25 @@ create_logger(std::string const& name)
     return logger;
 }
 
+static std::mutex ensure_logger_mutex;
+
 std::shared_ptr<spdlog::logger>
 ensure_logger(std::string const& name)
 {
     auto logger = spdlog::get(name);
-    if (!logger)
+    if (logger)
     {
-        logger = create_logger(name);
+        // The usual path, with the lowest overhead.
+        // (Although spdlog::get() also involves a mutex lock.)
+        return logger;
     }
-    return logger;
+    std::scoped_lock lock{ensure_logger_mutex};
+    logger = spdlog::get(name);
+    if (logger)
+    {
+        return logger;
+    }
+    return create_logger(name);
 }
 
 } // namespace cradle
