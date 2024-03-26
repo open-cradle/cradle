@@ -419,12 +419,10 @@ resolve_request_with_retry(
         {
             what = e.what();
         }
-        // if introspective: update status. Not really possible with
+        // TODO if introspective: update status. Not really possible with
         // tasklet_tracker.
-        auto interval{req.prepare_retry(attempt, what)};
-        // schedule_after() cannot be cancelled as for current sync
-        auto& io_svc{ctx.get_resources().the_io_service()};
-        co_await io_svc.schedule_after(interval);
+        auto delay{req.prepare_retry(attempt, what)};
+        co_await ctx.schedule_after(delay);
         resolve_task = resolve_request_one_try(
             ctx, req, lock_ptr, ConstraintsForRetry<Constraints>());
         ++attempt;

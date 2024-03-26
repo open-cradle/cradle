@@ -1,6 +1,7 @@
 #ifndef CRADLE_INNER_REQUESTS_GENERIC_H
 #define CRADLE_INNER_REQUESTS_GENERIC_H
 
+#include <chrono>
 #include <concepts>
 #include <memory>
 #include <string>
@@ -256,6 +257,11 @@ class context_intf
     virtual bool
     is_async() const
         = 0;
+
+    // Delays the calling coroutine for the specified duration.
+    // Cancellable if the context supports that.
+    virtual cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) = 0;
 };
 
 /*

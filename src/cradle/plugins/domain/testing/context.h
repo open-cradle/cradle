@@ -262,6 +262,12 @@ class atst_context final : public root_local_async_context_intf,
         return true;
     }
 
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override
+    {
+        return get_async_root().schedule_after(delay);
+    }
+
     // async_context_intf
     async_id
     get_id() const override

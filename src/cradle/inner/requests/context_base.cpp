@@ -22,6 +22,14 @@ sync_context_base::sync_context_base(
     }
 }
 
+cppcoro::task<>
+sync_context_base::schedule_after(std::chrono::milliseconds delay)
+{
+    auto& io_svc{resources_.the_io_service()};
+    // Note not cancellable
+    co_await io_svc.schedule_after(delay);
+}
+
 std::shared_ptr<data_owner>
 sync_context_base::make_data_owner(std::size_t size, bool use_shared_memory)
 {
@@ -142,6 +150,13 @@ local_async_context_base::local_async_context_base(
         parent_id,
         is_req ? "REQ" : "VAL",
         status_.load(std::memory_order_relaxed));
+}
+
+cppcoro::task<>
+local_async_context_base::schedule_after(std::chrono::milliseconds delay)
+{
+    auto& io_svc{get_resources().the_io_service()};
+    co_await io_svc.schedule_after(delay, tree_ctx_.get_cancellation_token());
 }
 
 std::shared_ptr<data_owner>
@@ -430,6 +445,15 @@ proxy_async_context_base::proxy_async_context_base(
     proxy_async_tree_context_base& tree_ctx)
     : tree_ctx_{tree_ctx}, id_{allocate_async_id()}
 {
+}
+
+cppcoro::task<>
+proxy_async_context_base::schedule_after(std::chrono::milliseconds delay)
+{
+    auto& io_svc{get_resources().the_io_service()};
+    // TODO re-think proxy retry strategy
+    // TODO make proxy_async_context_base::schedule_after() cancellable
+    co_await io_svc.schedule_after(delay);
 }
 
 std::size_t
