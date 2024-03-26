@@ -302,8 +302,8 @@ throw_on_ctx_mismatch(SrcCtx& ctx)
 // Throws if the runtime type doesn't match.
 // Throws if the remotely() and/or is_async() return values don't match.
 // These function are not called when compile-time information suffices,
-// leading to a throw depending on constexpr values only, and a C4702
-// warning in a VS2019 release build.
+// leading to a throw depending on constexpr values only (and a C4702
+// warning in a VS2019 release build, before we disabled that warning).
 // Retains the original type if no cast is needed.
 // TODO cast_ctx_to_ref<introspective_context_intf>(non-intrsp) does not throw
 template<Context DestCtx, Context SrcCtx>

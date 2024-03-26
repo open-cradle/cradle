@@ -15,10 +15,9 @@
 // Uncomment to have one-line messages
 // #define CATCH_CONFIG_DEFAULT_REPORTER "compact"
 
-// The Catch "main" code triggers these in Visual C++.
+// The Catch "main" code triggers this in Visual C++.
 #if defined(_MSC_VER)
 #pragma warning(disable : 4244)
-#pragma warning(disable : 4702)
 #endif
 
 #include <catch2/catch.hpp>
