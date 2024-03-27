@@ -16,16 +16,16 @@ default_retrier::prepare_retry(int attempt, std::string const& reason) const
 {
     int64_t base_millis = 100; // ms
     // Exponential backoff
-    int64_t millis = base_millis * (4L << attempt);
+    int64_t millis = base_millis * (int64_t{1} << (attempt * 2));
     int max_attempts = 9;
     auto logger{ensure_logger("retry")};
-    logger->info("resolve #{} failed: {}", attempt, reason);
+    logger->info("failed on attempt {}: {}", attempt, reason);
     if (attempt + 1 >= max_attempts)
     {
         logger->warn("will not retry");
         // TODO dedicated exception class
         throw std::runtime_error{
-            fmt::format("giving up after {} attempts", attempt + 1)};
+            fmt::format("{} on attempt #{}", reason, attempt)};
     }
     logger->info("will retry after {}ms", millis);
     return std::chrono::milliseconds{millis};

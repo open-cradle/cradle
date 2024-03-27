@@ -30,7 +30,7 @@ auto
 make_the_request()
 {
     return make_get_request(
-        "https://gradle.xyz/api/ask", {{"Accept", "text/plain"}});
+        "https://cradle.xyz/api/ask", {{"Accept", "text/plain"}});
 }
 
 auto
@@ -80,9 +80,8 @@ test_retry(Ctx& ctx)
         script.push_back(
             mock_http_exchange{make_the_request(), make_bad_response()});
     }
-    // TODO one good response will be discarded and recalculated;
-    // might be avoidable for async
-    for (int i = 0; i < 3; ++i)
+    // Need one good response for each sub
+    for (int i = 0; i < 2; ++i)
     {
         script.push_back(
             mock_http_exchange{make_the_request(), make_good_response()});

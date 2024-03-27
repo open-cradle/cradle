@@ -42,17 +42,20 @@ template<
     bool ForceLocal = false,
     bool ForceSync = false,
     bool ForceAsync = false,
-    bool IsSubOrRetry = false>
+    bool IsSub = false>
 struct ResolutionConstraints
 {
     static_assert(!(ForceRemote && ForceLocal));
     static_assert(!(ForceSync && ForceAsync));
+    // IsSub is relevant only for async, so set to false if ForceSync
+    // (preventing unnecessary template instantiations)
+    static_assert(!(ForceSync && IsSub));
 
     static constexpr bool force_remote = ForceRemote;
     static constexpr bool force_local = ForceLocal;
     static constexpr bool force_sync = ForceSync;
     static constexpr bool force_async = ForceAsync;
-    static constexpr bool is_sub_or_retry = IsSubOrRetry;
+    static constexpr bool is_sub = IsSub;
 
     ResolutionConstraints()
     {
@@ -247,6 +250,7 @@ template<Context Ctx, typename Val, typename Constraints>
 cppcoro::task<Val> resolve_request_local(
     Ctx& ctx,
     Val const& val,
+    bool retrying,
     cache_record_lock* lock_ptr,
     Constraints constraints)
 {
@@ -259,28 +263,25 @@ cppcoro::task<typename Req::value_type>
 resolve_request_local(
     Ctx& ctx,
     Req const& req,
+    bool retrying,
     cache_record_lock* lock_ptr,
     Constraints constraints)
 {
     // TODO static_assert(!req.is_proxy);
     // Prepare and populate ctx if it is an async root.
     local_context_intf* lctx{&cast_ctx_to_ref<local_context_intf>(ctx)};
-    if constexpr (!constraints.is_sub_or_retry)
+    if constexpr (!constraints.is_sub && !constraints.force_sync)
     {
         bool async{};
         if constexpr (constraints.force_async)
         {
             async = true;
         }
-        else if constexpr (constraints.force_sync)
-        {
-            async = false;
-        }
         else
         {
             async = ctx.is_async();
         }
-        if (async)
+        if (async && !retrying)
         {
             root_local_async_context_intf* root_actx{};
             // The following cast should succeed if client uses atst_context or
@@ -350,6 +351,7 @@ auto
 resolve_request_one_try(
     Ctx& ctx,
     Req const& req,
+    bool retrying,
     cache_record_lock* lock_ptr,
     Constraints constraints)
 {
@@ -369,7 +371,8 @@ resolve_request_one_try(
     {
         // Call one of the two resolve_request_local() versions, depending on
         // Req being a plain value or a Request
-        return resolve_request_local(ctx, req, lock_ptr, constraints);
+        return resolve_request_local(
+            ctx, req, retrying, lock_ptr, constraints);
     }
     else
     {
@@ -380,18 +383,11 @@ resolve_request_one_try(
         }
         else
         {
-            return resolve_request_local(ctx, req, lock_ptr, constraints);
+            return resolve_request_local(
+                ctx, req, retrying, lock_ptr, constraints);
         }
     }
 }
-
-template<typename Orig>
-using ConstraintsForRetry = ResolutionConstraints<
-    Orig::force_remote,
-    Orig::force_local,
-    Orig::force_sync,
-    Orig::force_async,
-    true>;
 
 template<
     Context Ctx,
@@ -406,14 +402,13 @@ resolve_request_with_retry(
 {
     static_assert(ValidRetryableRequest<Req>);
     int attempt = 0;
-    auto resolve_task
-        = resolve_request_one_try(ctx, req, lock_ptr, constraints);
     for (;;)
     {
         std::string what;
         try
         {
-            co_return co_await resolve_task;
+            co_return co_await resolve_request_one_try(
+                ctx, req, attempt > 0, lock_ptr, constraints);
         }
         catch (std::exception const& e)
         {
@@ -423,8 +418,6 @@ resolve_request_with_retry(
         // tasklet_tracker.
         auto delay{req.prepare_retry(attempt, what)};
         co_await ctx.schedule_after(delay);
-        resolve_task = resolve_request_one_try(
-            ctx, req, lock_ptr, ConstraintsForRetry<Constraints>());
         ++attempt;
     }
     throw std::logic_error("impossible");
@@ -489,13 +482,13 @@ resolve_request(
     Constraints constraints = Constraints(),
     cache_record_lock* lock_ptr = nullptr)
 {
-    if constexpr (!constraints.is_sub_or_retry && Req::retryable)
+    if constexpr (Req::retryable)
     {
         return resolve_request_with_retry(ctx, req, lock_ptr, constraints);
     }
     else
     {
-        return resolve_request_one_try(ctx, req, lock_ptr, constraints);
+        return resolve_request_one_try(ctx, req, false, lock_ptr, constraints);
     }
 }
 
