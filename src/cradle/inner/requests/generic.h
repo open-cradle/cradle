@@ -282,6 +282,15 @@ class local_context_intf : public virtual context_intf
     virtual std::shared_ptr<data_owner>
     make_data_owner(std::size_t size, bool use_shared_memory) = 0;
 
+    // Intended for an (rpclib) server, which must call this function
+    // immediately after creating the context object. The effect is that the
+    // context will track all shared memory regions allocated via
+    // make_data_owner(), such that they can be properly flushed via
+    // on_value_complete().
+    virtual void
+    track_blob_file_writers()
+        = 0;
+
     // Intended for an (rpclib) server, which must call this function before
     // sending a request resolution result back to the client. The function
     // flushes any shared memory regions allocated during the resolution.

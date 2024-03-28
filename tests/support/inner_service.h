@@ -50,6 +50,11 @@ class non_caching_request_resolution_context final : public local_context_intf,
     make_data_owner(std::size_t size, bool use_shared_memory) override;
 
     void
+    track_blob_file_writers() override
+    {
+    }
+
+    void
     on_value_complete() override
     {
     }
@@ -89,6 +94,11 @@ class caching_request_resolution_context final : public local_context_intf,
     // local_context_intf
     std::shared_ptr<data_owner>
     make_data_owner(std::size_t size, bool use_shared_memory) override;
+
+    void
+    track_blob_file_writers() override
+    {
+    }
 
     void
     on_value_complete() override

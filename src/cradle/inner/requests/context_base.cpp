@@ -10,26 +10,22 @@
 
 namespace cradle {
 
-sync_context_base::sync_context_base(
-    inner_resources& resources,
-    tasklet_tracker* tasklet,
-    std::string proxy_name)
-    : resources_{resources}, proxy_name_{std::move(proxy_name)}
+data_owner_factory::data_owner_factory(inner_resources& resources)
+    : resources_{resources}
 {
-    if (tasklet)
-    {
-        tasklets_.push_back(tasklet);
-    }
 }
 
 std::shared_ptr<data_owner>
-sync_context_base::make_data_owner(std::size_t size, bool use_shared_memory)
+data_owner_factory::make_data_owner(std::size_t size, bool use_shared_memory)
 {
     std::shared_ptr<data_owner> owner;
     if (use_shared_memory)
     {
-        auto writer = get_resources().make_blob_file_writer(size);
-        blob_file_writers_.push_back(writer);
+        auto writer = resources_.make_blob_file_writer(size);
+        if (tracking_blob_file_writers_)
+        {
+            blob_file_writers_.push_back(writer);
+        }
         owner = writer;
     }
     else
@@ -40,12 +36,57 @@ sync_context_base::make_data_owner(std::size_t size, bool use_shared_memory)
 }
 
 void
-sync_context_base::on_value_complete()
+data_owner_factory::track_blob_file_writers()
 {
+    tracking_blob_file_writers_ = true;
+}
+
+void
+data_owner_factory::on_value_complete()
+{
+    // TODO need mutex?
+    if (!tracking_blob_file_writers_)
+    {
+        throw std::logic_error(
+            "on_value_complete() without preceding track_blob_file_writers()");
+    }
     for (auto writer : blob_file_writers_)
     {
         writer->on_write_completed();
     }
+    blob_file_writers_.clear();
+}
+
+sync_context_base::sync_context_base(
+    inner_resources& resources,
+    tasklet_tracker* tasklet,
+    std::string proxy_name)
+    : resources_{resources},
+      proxy_name_{std::move(proxy_name)},
+      the_data_owner_factory_{resources}
+{
+    if (tasklet)
+    {
+        tasklets_.push_back(tasklet);
+    }
+}
+
+std::shared_ptr<data_owner>
+sync_context_base::make_data_owner(std::size_t size, bool use_shared_memory)
+{
+    return the_data_owner_factory_.make_data_owner(size, use_shared_memory);
+}
+
+void
+sync_context_base::track_blob_file_writers()
+{
+    the_data_owner_factory_.track_blob_file_writers();
+}
+
+void
+sync_context_base::on_value_complete()
+{
+    the_data_owner_factory_.on_value_complete();
 }
 
 remote_proxy&
@@ -119,8 +160,28 @@ subs_available_matcher::operator()(async_status status) const
 local_tree_context_base::local_tree_context_base(inner_resources& resources)
     : resources_{resources},
       ctoken_{csource_.token()},
-      logger_{spdlog::get("cradle")}
+      logger_{spdlog::get("cradle")},
+      the_data_owner_factory_{resources}
 {
+}
+
+std::shared_ptr<data_owner>
+local_tree_context_base::make_data_owner(
+    std::size_t size, bool use_shared_memory)
+{
+    return the_data_owner_factory_.make_data_owner(size, use_shared_memory);
+}
+
+void
+local_tree_context_base::track_blob_file_writers()
+{
+    the_data_owner_factory_.track_blob_file_writers();
+}
+
+void
+local_tree_context_base::on_value_complete()
+{
+    the_data_owner_factory_.on_value_complete();
 }
 
 local_async_context_base::local_async_context_base(
@@ -148,27 +209,19 @@ std::shared_ptr<data_owner>
 local_async_context_base::make_data_owner(
     std::size_t size, bool use_shared_memory)
 {
-    std::shared_ptr<data_owner> owner;
-    if (use_shared_memory)
-    {
-        auto writer = get_resources().make_blob_file_writer(size);
-        blob_file_writers_.push_back(writer);
-        owner = writer;
-    }
-    else
-    {
-        owner = make_shared_buffer(size);
-    }
-    return owner;
+    return tree_ctx_.make_data_owner(size, use_shared_memory);
+}
+
+void
+local_async_context_base::track_blob_file_writers()
+{
+    tree_ctx_.track_blob_file_writers();
 }
 
 void
 local_async_context_base::on_value_complete()
 {
-    for (auto writer : blob_file_writers_)
-    {
-        writer->on_write_completed();
-    }
+    tree_ctx_.on_value_complete();
 }
 
 // Returns the last tasklet from the vector formed by concatenating the tasklet

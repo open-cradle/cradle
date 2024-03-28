@@ -404,6 +404,12 @@ class atst_context final : public root_local_async_context_intf,
     }
 
     void
+    track_blob_file_writers() override
+    {
+        get_local_root().track_blob_file_writers();
+    }
+
+    void
     on_value_complete() override
     {
         get_local_root().on_value_complete();
