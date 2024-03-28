@@ -23,7 +23,7 @@ class domain
 
     // Creates a sync context that can be used for any number of local request
     // resolutions (unlike async contexts, sync ones need no preparation).
-    virtual std::shared_ptr<sync_context_intf>
+    virtual std::shared_ptr<local_sync_context_intf>
     make_local_sync_context(service_config const& config) const = 0;
 
     // Creates an async context that can be used for exactly one local request

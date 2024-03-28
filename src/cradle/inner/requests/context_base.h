@@ -35,9 +35,8 @@ namespace cradle {
  * It offers all context features other than the asynchronous functionality
  * (i.e., implements all context interfaces other than async_context_intf).
  */
-class sync_context_base : public local_context_intf,
+class sync_context_base : public local_sync_context_intf,
                           public remote_context_intf,
-                          public sync_context_intf,
                           public caching_context_intf,
                           public introspective_context_intf
 {

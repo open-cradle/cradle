@@ -282,9 +282,11 @@ class local_context_intf : public virtual context_intf
     virtual std::shared_ptr<data_owner>
     make_data_owner(std::size_t size, bool use_shared_memory) = 0;
 
-    // The framework must call this once the value has been completely
-    // resolved. It will flush any shared memory regions allocated during the
-    // resolution.
+    // Intended for an (rpclib) server, which must call this function before
+    // sending a request resolution result back to the client. The function
+    // flushes any shared memory regions allocated during the resolution.
+    // Note that the rpclib server creates a dedicated context object for each
+    // request resolution.
     virtual void
     on_value_complete()
         = 0;
@@ -349,6 +351,14 @@ class sync_context_intf : public virtual context_intf
     {
         return this;
     }
+};
+
+// Context that can be used for synchronously resolving requests; at least
+// locally, in addition remotely if the actual context class also implements
+// remote_context_intf.
+class local_sync_context_intf : public local_context_intf,
+                                public sync_context_intf
+{
 };
 
 // Thrown when an asynchronous request resolution is cancelled

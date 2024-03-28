@@ -150,6 +150,7 @@ resolve_sync(
     // TODO try to get rid of .value()
     blob result = seri_result.value();
     logger.info("result {}", result);
+    ctx->on_value_complete();
     // TODO if the result references blob files, then create a response_id
     // uniquely identifying the set of those files
     static uint32_t response_id = 0;
@@ -227,6 +228,7 @@ resolve_async(
         logger.info("resolve_async done: {}", res);
         actx->set_result(std::move(res));
         actx->set_cache_record_id(seri_lock.record_id);
+        actx->on_value_complete();
     }
     catch (async_cancelled const&)
     {
