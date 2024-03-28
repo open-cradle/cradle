@@ -30,14 +30,37 @@
 
 namespace cradle {
 
+class data_owner_factory
+{
+ public:
+    data_owner_factory(inner_resources& resources);
+
+    // Cf. local_context_intf
+    std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory);
+
+    void
+    track_blob_file_writers();
+
+    void
+    on_value_complete();
+
+ private:
+    inner_resources& resources_;
+    bool tracking_blob_file_writers_{false};
+    // The blob_file_writer objects allocated during the resolution of requests
+    // associated with this factory; only if track_blob_file_writers() was
+    // called.
+    std::vector<std::shared_ptr<blob_file_writer>> blob_file_writers_;
+};
+
 /*
  * An abstract base class that can be used to synchronously resolve requests.
  * It offers all context features other than the asynchronous functionality
  * (i.e., implements all context interfaces other than async_context_intf).
  */
-class sync_context_base : public local_context_intf,
+class sync_context_base : public local_sync_context_intf,
                           public remote_context_intf,
-                          public sync_context_intf,
                           public caching_context_intf,
                           public introspective_context_intf
 {
@@ -70,6 +93,9 @@ class sync_context_base : public local_context_intf,
     // local_context_intf
     std::shared_ptr<data_owner>
     make_data_owner(std::size_t size, bool use_shared_memory) override;
+
+    void
+    track_blob_file_writers() override;
 
     void
     on_value_complete() override;
@@ -110,10 +136,7 @@ class sync_context_base : public local_context_intf,
     inner_resources& resources_;
     std::string proxy_name_;
     std::vector<tasklet_tracker*> tasklets_;
-    // The blob_file_writer objects allocated during the resolution of requests
-    // associated with this context. Most useful if the context is used for
-    // resolving a single request only.
-    std::vector<std::shared_ptr<blob_file_writer>> blob_file_writers_;
+    data_owner_factory the_data_owner_factory_;
 };
 
 /*
@@ -165,11 +188,22 @@ class local_tree_context_base
         return *logger_;
     }
 
+    // Cf. local_context_intf
+    std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory);
+
+    void
+    track_blob_file_writers();
+
+    void
+    on_value_complete();
+
  private:
     inner_resources& resources_;
     cppcoro::cancellation_source csource_;
     cppcoro::cancellation_token ctoken_;
     std::shared_ptr<spdlog::logger> logger_;
+    data_owner_factory the_data_owner_factory_;
 };
 
 /*
@@ -221,6 +255,9 @@ class local_async_context_base : public virtual local_async_context_intf,
     // local_context_intf
     std::shared_ptr<data_owner>
     make_data_owner(std::size_t size, bool use_shared_memory) override;
+
+    void
+    track_blob_file_writers() override;
 
     void
     on_value_complete() override;
@@ -335,7 +372,6 @@ class local_async_context_base : public virtual local_async_context_intf,
     // context, and the async_db.
     std::vector<std::shared_ptr<local_async_context_base>> subs_;
     std::atomic<int> num_subs_not_running_;
-    std::vector<std::shared_ptr<blob_file_writer>> blob_file_writers_;
     std::vector<tasklet_tracker*> tasklets_;
 
     bool

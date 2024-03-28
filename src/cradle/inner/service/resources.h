@@ -144,6 +144,8 @@ class inner_resources
     mock_http_session&
     enable_http_mocking(bool http_is_synchronous = false);
 
+    // User code should not call this directly, but through
+    // local_context_intf::make_data_owner().
     std::shared_ptr<blob_file_writer>
     make_blob_file_writer(std::size_t size);
 

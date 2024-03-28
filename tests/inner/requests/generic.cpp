@@ -33,6 +33,12 @@ class local_context_mixin : public local_context_intf
     }
 
     void
+    track_blob_file_writers() override
+    {
+        throw not_implemented_error();
+    }
+
+    void
     on_value_complete() override
     {
         throw not_implemented_error();

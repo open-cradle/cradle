@@ -35,11 +35,22 @@ blob_file_writer::blob_file_writer(file_path path, std::size_t size)
 
 // On Linux, changes to memory are guaranteed to be written to the file system
 // only on msync(2) or munmap(2) calls. The former happens in this function,
-// the latter in the destructor. Note that this function is asynchronous.
+// the latter in the destructor. However, in general we cannot rely on the
+// destructor being called (e.g., the blob could be stored in the memory
+// cache), so an explicit on_write_completed() call is needed.
+// Note that this function is synchronous (blocking).
 void
 blob_file_writer::on_write_completed()
 {
-    region_.flush();
+    std::size_t const mapping_offset{0};
+    std::size_t const numbytes{size_};
+    bool const async{false};
+    if (!region_.flush(mapping_offset, numbytes, async))
+    {
+        // Maybe serious enough to throw?
+        auto logger{spdlog::get("cradle")};
+        logger->error("blob_file_writer::on_write_completed() failed");
+    }
 }
 
 blob_file_reader::blob_file_reader(file_path path) : path_{std::move(path)}

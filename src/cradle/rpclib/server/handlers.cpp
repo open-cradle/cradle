@@ -123,6 +123,7 @@ resolve_sync(
     auto seri_lock{alloc_cache_record_lock_if_needed(hctx, need_record_lock)};
     auto& dom = hctx.service().find_domain(domain_name);
     auto ctx{dom.make_local_sync_context(config)};
+    ctx->track_blob_file_writers();
     cppcoro::task<serialized_result> task;
     auto optional_client_tasklet_id
         = config.get_optional_number(remote_config_keys::TASKLET_ID);
@@ -150,6 +151,7 @@ resolve_sync(
     // TODO try to get rid of .value()
     blob result = seri_result.value();
     logger.info("result {}", result);
+    ctx->on_value_complete();
     // TODO if the result references blob files, then create a response_id
     // uniquely identifying the set of those files
     static uint32_t response_id = 0;
@@ -227,6 +229,7 @@ resolve_async(
         logger.info("resolve_async done: {}", res);
         actx->set_result(std::move(res));
         actx->set_cache_record_id(seri_lock.record_id);
+        actx->on_value_complete();
     }
     catch (async_cancelled const&)
     {
@@ -255,6 +258,7 @@ try
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
     auto& dom = hctx.service().find_domain(domain_name);
     auto actx{dom.make_local_async_context(config)};
+    actx->track_blob_file_writers();
     if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
     {
         test_ctx->apply_fail_submit_async();
