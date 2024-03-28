@@ -10,6 +10,10 @@
 
 namespace cradle {
 
+// The mutex should be part of data_owner_factory, but that would make
+// thinknode_request_context non-copyable.
+static std::mutex data_owner_factory_mutex;
+
 data_owner_factory::data_owner_factory(inner_resources& resources)
     : resources_{resources}
 {
@@ -21,6 +25,7 @@ data_owner_factory::make_data_owner(std::size_t size, bool use_shared_memory)
     std::shared_ptr<data_owner> owner;
     if (use_shared_memory)
     {
+        std::scoped_lock lock(data_owner_factory_mutex);
         auto writer = resources_.make_blob_file_writer(size);
         if (tracking_blob_file_writers_)
         {
@@ -38,13 +43,14 @@ data_owner_factory::make_data_owner(std::size_t size, bool use_shared_memory)
 void
 data_owner_factory::track_blob_file_writers()
 {
+    std::scoped_lock lock(data_owner_factory_mutex);
     tracking_blob_file_writers_ = true;
 }
 
 void
 data_owner_factory::on_value_complete()
 {
-    // TODO need mutex?
+    std::scoped_lock lock(data_owner_factory_mutex);
     if (!tracking_blob_file_writers_)
     {
         throw std::logic_error(
