@@ -18,10 +18,10 @@ class testing_domain : public domain
     std::string
     name() const override;
 
-    std::shared_ptr<sync_context_intf>
+    std::shared_ptr<local_sync_context_intf>
     make_local_sync_context(service_config const& config) const override;
 
-    std::shared_ptr<async_context_intf>
+    std::shared_ptr<root_local_async_context_intf>
     make_local_async_context(service_config const& config) const override;
 
  private:

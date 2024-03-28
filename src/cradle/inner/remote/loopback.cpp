@@ -90,7 +90,7 @@ loopback_service::resolve_sync(service_config config, std::string seri_req)
 static void
 resolve_async(
     loopback_service* loopback,
-    std::shared_ptr<local_async_context_intf> actx,
+    std::shared_ptr<root_local_async_context_intf> actx,
     std::string seri_req,
     seri_cache_record_lock_t seri_lock,
     bool introspective)
@@ -144,23 +144,21 @@ loopback_service::submit_async(service_config config, std::string seri_req)
     logger_->info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
     auto& dom = resources_->find_domain(domain_name);
-    auto ctx{dom.make_local_async_context(config)};
-    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*ctx))
+    auto actx{dom.make_local_async_context(config)};
+    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
     {
         test_ctx->apply_fail_submit_async();
     }
-    auto actx = cast_ctx_to_shared_ptr<local_async_context_intf>(ctx);
     actx->using_result();
     resources_->ensure_async_db();
     get_async_db().add(actx);
-    // TODO populate actx subs?
     // TODO update status to SUBMITTED
     // This function should return asap, but cppcoro::sync_wait() is blocking,
     // so need to dispatch to another thread.
     bool introspective{false};
     auto optional_client_tasklet_id
         = config.get_optional_number(remote_config_keys::TASKLET_ID);
-    auto* intr_ctx = cast_ctx_to_ptr<introspective_context_intf>(*ctx);
+    auto* intr_ctx = cast_ctx_to_ptr<introspective_context_intf>(*actx);
     if (optional_client_tasklet_id && intr_ctx)
     {
         auto* client_tasklet = create_tasklet_tracker(
@@ -232,7 +230,7 @@ serialized_result
 loopback_service::get_async_response(async_id root_aid)
 {
     logger_->info("handle_get_async_response {}", root_aid);
-    auto actx{get_async_db().find(root_aid)};
+    auto actx{get_async_db().find_root(root_aid)};
     return serialized_result{actx->get_result(), actx->get_cache_record_id()};
 }
 

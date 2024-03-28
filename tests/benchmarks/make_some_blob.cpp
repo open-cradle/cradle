@@ -25,7 +25,7 @@ BM_try_resolve_testing_request(
 {
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    testing_request_context ctx{*resources, nullptr, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
 
     // Fill the appropriate cache if any
     auto init = [&]() -> cppcoro::task<void> {

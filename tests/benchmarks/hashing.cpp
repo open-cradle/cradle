@@ -31,7 +31,7 @@ make_my_blob()
     std::string proxy_name{};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    testing_request_context ctx{*resources, nullptr, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
     return cppcoro::sync_wait(make_some_blob(ctx, size, false));
 }
 

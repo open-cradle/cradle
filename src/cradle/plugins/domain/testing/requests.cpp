@@ -25,7 +25,6 @@ make_some_blob(context_intf& ctx, std::size_t size, bool use_shared_memory)
         data[i] = v;
         v = v * 3 + 1;
     }
-    // TODO where is the loc_ctx.on_value_complete() call?
     co_return blob{std::move(owner), as_bytes(data), size};
 }
 

@@ -68,9 +68,8 @@ test_make_some_blob(bool use_shared_memory)
     std::string proxy_name{"rpclib"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
-    auto* tasklet{create_tasklet_tracker(
-        resources->the_tasklet_admin(), "test", "make_some_blob")};
-    testing_request_context ctx{*resources, tasklet, proxy_name};
+    testing_request_context ctx{
+        *resources, proxy_name, root_tasklet_spec{"test", "make_some_blob"}};
 
     auto req{rq_make_some_blob<caching_level>(10000, use_shared_memory)};
     auto response = cppcoro::sync_wait(resolve_request(ctx, req));

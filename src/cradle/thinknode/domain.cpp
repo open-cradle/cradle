@@ -15,13 +15,13 @@ thinknode_domain::name() const
     return "thinknode";
 }
 
-std::shared_ptr<sync_context_intf>
+std::shared_ptr<local_sync_context_intf>
 thinknode_domain::make_local_sync_context(service_config const& config) const
 {
     return std::make_shared<thinknode_request_context>(resources_, config);
 }
 
-std::shared_ptr<async_context_intf>
+std::shared_ptr<root_local_async_context_intf>
 thinknode_domain::make_local_async_context(service_config const& config) const
 {
     throw not_implemented_error(

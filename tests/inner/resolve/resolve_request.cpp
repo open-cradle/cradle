@@ -478,11 +478,12 @@ TEST_CASE("evaluate function request - lock cache record", tag)
     CHECK(info2.cas_num_records == 0);
 }
 
-template<caching_level_type Level, template<typename Req> class CtxMaker>
+template<caching_level_type Level, typename Ctx>
 static void
 test_composition_or_value_based()
 {
     auto resources{make_inner_test_resources()};
+    Ctx ctx{*resources};
     using props_type = request_props<Level>;
     props_type props_inner{make_test_uuid(100)};
     props_type props_main{make_test_uuid(101)};
@@ -494,9 +495,7 @@ test_composition_or_value_based()
 
     auto inner0{rq_function(props_inner, add, 6, 8)};
     auto req0{rq_function(props_main, mul, inner0, 3)};
-    CtxMaker<decltype(req0)> ctx_maker{*resources};
-    auto ctx0 = ctx_maker(req0);
-    auto res0 = cppcoro::sync_wait(resolve_request(*ctx0, req0));
+    auto res0 = cppcoro::sync_wait(resolve_request(ctx, req0));
     REQUIRE(res0 == 42);
     REQUIRE(num_add_calls == 1);
     REQUIRE(num_mul_calls == 1);
@@ -509,8 +508,7 @@ test_composition_or_value_based()
 
     auto inner1{rq_function(props_inner, add, 2, 12)};
     auto req1{rq_function(props_main, mul, inner1, 3)};
-    auto ctx10 = ctx_maker(req1);
-    auto res10 = cppcoro::sync_wait(resolve_request(*ctx10, req1));
+    auto res10 = cppcoro::sync_wait(resolve_request(ctx, req1));
     REQUIRE(res10 == 42);
     REQUIRE(num_add_calls == 2);
     // Value-based caching detects that the 14 * 3 result is already cached.
@@ -522,8 +520,7 @@ test_composition_or_value_based()
         resources->reset_memory_cache();
     }
 
-    auto ctx11 = ctx_maker(req1);
-    auto res11 = cppcoro::sync_wait(resolve_request(*ctx11, req1));
+    auto res11 = cppcoro::sync_wait(resolve_request(ctx, req1));
     REQUIRE(res11 == 42);
     REQUIRE(num_add_calls == 2);
     REQUIRE(num_mul_calls == (is_value_based(Level) ? 1 : 2));
@@ -547,38 +544,13 @@ test_composition_or_value_based()
     }
 }
 
-// Creates a context for sync resolving Req objects
-template<typename Req>
-class SyncCtxMaker
-{
- public:
-    SyncCtxMaker(inner_resources& resources) : resources_{resources}
-    {
-    }
-
-    auto
-    operator()(Req const& req)
-    {
-        // Sync: context does not depend on the request; use the same context
-        // for all requests
-        if (!ctx_)
-        {
-            ctx_ = std::make_shared<caching_request_resolution_context>(
-                resources_);
-        }
-        return ctx_;
-    }
-
- private:
-    inner_resources& resources_;
-    std::shared_ptr<caching_request_resolution_context> ctx_;
-};
-
 template<caching_level_type Level>
 static void
 test_composition_or_value_based_sync()
 {
-    return test_composition_or_value_based<Level, SyncCtxMaker>();
+    return test_composition_or_value_based<
+        Level,
+        caching_request_resolution_context>();
 }
 
 TEST_CASE("evaluate function request - memory cached, CBC, sync", tag)
@@ -601,32 +573,11 @@ TEST_CASE("evaluate function request - disk cached, VBC, sync", tag)
     test_composition_or_value_based_sync<caching_level_type::full_vb>();
 }
 
-// Creates a context for async resolving Req objects
-template<typename Req>
-class AsyncCtxMaker
-{
- public:
-    AsyncCtxMaker(inner_resources& resources) : resources_{resources}
-    {
-    }
-
-    auto
-    operator()(Req const& req)
-    {
-        // Async: use a fresh context for each request
-        auto tree_ctx = std::make_shared<local_atst_tree_context>(resources_);
-        return make_local_async_ctx_tree(tree_ctx, req);
-    }
-
- private:
-    inner_resources& resources_;
-};
-
 template<caching_level_type Level>
 static void
 test_composition_or_value_based_async()
 {
-    return test_composition_or_value_based<Level, AsyncCtxMaker>();
+    return test_composition_or_value_based<Level, atst_context>();
 }
 
 TEST_CASE("evaluate function request - memory cached, CBC, async", tag)
@@ -660,7 +611,7 @@ test_resolve_blob_file_or_not(std::string const& proxy_name)
 {
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option{})};
-    testing_request_context ctx{*resources, nullptr, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
 
     auto req0{rq_make_some_blob<caching_level>(256, false)};
     auto res0 = cppcoro::sync_wait(resolve_request(ctx, req0));
@@ -720,7 +671,7 @@ test_resolve_to_blob_file(bool test_remove_blob_file)
     std::string proxy_name{};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option{})};
-    testing_request_context ctx{*resources, nullptr, proxy_name};
+    testing_request_context ctx{*resources, proxy_name};
 
     auto req{rq_make_some_blob<caching_level>(256, true)};
     auto res0 = cppcoro::sync_wait(resolve_request(ctx, req));
@@ -788,4 +739,54 @@ TEST_CASE("resolve request - disappearing blob file - mem", tag)
 TEST_CASE("resolve request - disappearing blob file - full", tag)
 {
     test_resolve_to_blob_file<caching_level_type::full>(true);
+}
+
+// Ctx should be non-introspective
+template<caching_level_type req_level, typename Ctx>
+static void
+test_intrsp_req_bad_ctx()
+{
+    auto req{rq_make_some_blob<req_level>(256, false)};
+    auto resources{make_inner_test_resources()};
+    Ctx ctx{*resources};
+
+    // resolve_request() should fail due to mismatch between req and ctx:
+    // req is introspective, ctx is not
+    REQUIRE_THROWS_WITH(
+        cppcoro::sync_wait(resolve_request(ctx, req)),
+        "failing cast_ctx_to_ref");
+}
+
+TEST_CASE("resolve request - cached intrsp req, non-intrsp ctx", tag)
+{
+    test_intrsp_req_bad_ctx<
+        caching_level_type::memory,
+        caching_request_resolution_context>();
+}
+
+#if 0
+// TODO add introspection to resolve_request_sync_uncached()
+TEST_CASE("resolve request - uncached intrsp req, non-intrsp ctx", tag)
+{
+    test_intrsp_req_bad_ctx<
+        caching_level_type::none,
+        non_caching_request_resolution_context>();
+}
+#endif
+
+TEST_CASE("resolve request - cached req, uncached ctx", tag)
+{
+    constexpr auto caching_level = caching_level_type::memory;
+    auto resources{make_inner_test_resources()};
+
+    // req is cached
+    auto req{rq_make_some_blob<caching_level>(256, false)};
+
+    // ctx is uncached
+    non_caching_request_resolution_context ctx{*resources};
+
+    // resolve_request() should fail due to mismatch between req and ctx
+    REQUIRE_THROWS_WITH(
+        cppcoro::sync_wait(resolve_request(ctx, req)),
+        "failing cast_ctx_to_ref");
 }

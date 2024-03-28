@@ -262,4 +262,16 @@ create_tasklet_tracker(tasklet_admin& admin, int rpc_client_id)
     return admin.new_tasklet(rpc_client_id);
 }
 
+tasklet_tracker*
+create_optional_root_tasklet(
+    tasklet_admin& admin, std::optional<root_tasklet_spec> opt_spec)
+{
+    if (!opt_spec)
+    {
+        return nullptr;
+    }
+    return create_tasklet_tracker(
+        admin, std::move(opt_spec->pool_name), std::move(opt_spec->title));
+}
+
 } // namespace cradle

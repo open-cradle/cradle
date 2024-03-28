@@ -57,13 +57,23 @@ resolve_serialized_request(
     std::string seri_req,
     seri_cache_record_lock_t seri_lock)
 {
+    // This is not a coroutine, so runs on the caller's stack
+    // (where preparation should happen).
     if (auto* rem_ctx = cast_ctx_to_ptr<remote_context_intf>(ctx))
     {
+        if (auto* owner = cast_ctx_to_ptr<remote_async_ctx_owner_intf>(ctx))
+        {
+            owner->prepare_for_remote_resolution();
+        }
         return resolve_serialized_remote(
             *rem_ctx, std::move(seri_req), std::move(seri_lock));
     }
     else
     {
+        if (auto* owner = cast_ctx_to_ptr<local_async_ctx_owner_intf>(ctx))
+        {
+            owner->prepare_for_local_resolution();
+        }
         auto& loc_ctx = cast_ctx_to_ref<local_context_intf>(ctx);
         return resolve_serialized_local(
             loc_ctx, std::move(seri_req), std::move(seri_lock));
