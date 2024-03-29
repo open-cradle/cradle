@@ -237,6 +237,9 @@ elseif(IS_MSVC)
     add_compile_options(/wd4456)
     # "unreferenced local function has been removed"
     add_compile_options(/wd4505)
+    # Warnings about a derived class inheriting member functions via dominance
+    # (which is correct and intended).
+    add_compile_options(/wd4250)
     # warnings about functions that are potentially insecure
     add_definitions(/D_CRT_SECURE_NO_WARNINGS)
     add_definitions(/D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)

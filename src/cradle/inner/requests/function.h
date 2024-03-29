@@ -155,7 +155,7 @@ template<typename Ctx, typename Args, std::size_t... Ix>
 auto
 make_async_sub_tasks(Ctx& ctx, Args const& args, std::index_sequence<Ix...>)
 {
-    ResolutionConstraintsLocalAsync constraints;
+    ResolutionConstraintsLocalAsyncSub constraints;
     return std::make_tuple(resolve_request(
         ctx.get_local_sub(Ix), std::get<Ix>(args), constraints)...);
 }
