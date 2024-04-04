@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -40,13 +40,13 @@ jobs:
         cmake --build build --target preprocessing -j4
 
     - name: Upload preprocessed headers as build artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: preprocessed
         path: build/generated
 
     - name: Deploy preprocessed headers to preprocessor-output repo
-      uses: JamesIves/github-pages-deploy-action@v4.4.1
+      uses: JamesIves/github-pages-deploy-action@v4.5.0
       with:
         repository-name: open-cradle/preprocessor-output
         branch: output
@@ -65,7 +65,7 @@ jobs:
         config: [Debug, Release]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -74,7 +74,7 @@ jobs:
         committish: 7ba0ba7334c3346e7eee1e049ba85da193a8d821
 
     - name: Download preprocessed headers
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: preprocessed
         path: preprocessed
