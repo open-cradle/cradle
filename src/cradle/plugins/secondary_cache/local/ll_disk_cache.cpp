@@ -12,6 +12,7 @@
 #include <sqlite3.h>
 
 #include <cradle/inner/blob_file/blob_file.h>
+#include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/fs/app_dirs.h>
 #include <cradle/inner/fs/utilities.h>
@@ -85,24 +86,6 @@ open_db(sqlite3** db, file_path const& file)
             << internal_error_message_info(
                    "failed to create disk cache index file (index.db)"));
     }
-}
-
-// Returns a short (one-line) message for an exception.
-// All CRADLE_THROW instances in this file define an
-// internal_error_message_info string containing a one-line error message,
-// which is suitable to be returned here.
-// These exceptions' what() returns a many-line message that is way too long to
-// include in a logger's message.
-// Most CRADLE_THROW's here are of the "cannot happen" internal error kind.
-static std::string
-what(std::exception const& e)
-{
-    if (auto const* msg
-        = boost::get_error_info<internal_error_message_info>(e))
-    {
-        return *msg;
-    }
-    return e.what();
 }
 
 static void
@@ -928,7 +911,7 @@ remove_all_entries(ll_disk_cache_impl& cache)
                 "Error removing entries {}/{}: {}",
                 entry.ac_id,
                 entry.cas_id,
-                what(e));
+                short_what(e));
         }
     }
 }
@@ -983,7 +966,7 @@ enforce_cache_size_limit(ll_disk_cache_impl& cache)
                         "Error removing entries {}/{}: {}",
                         i.ac_id,
                         i.cas_id,
-                        what(e));
+                        short_what(e));
                 }
             }
         }
@@ -991,7 +974,8 @@ enforce_cache_size_limit(ll_disk_cache_impl& cache)
     }
     catch (std::exception const& e)
     {
-        cache.logger->error("enforce_cache_size_limit() caught {}", what(e));
+        cache.logger->error(
+            "enforce_cache_size_limit() caught {}", short_what(e));
     }
 }
 
@@ -1141,7 +1125,8 @@ initialize(ll_disk_cache_impl& cache, ll_disk_cache_config const& config)
     }
     catch (std::exception const& e)
     {
-        cache.logger->error("Error opening database: {}. Retrying.", what(e));
+        cache.logger->error(
+            "Error opening database: {}. Retrying.", short_what(e));
         // If the first attempt fails, we may have an incompatible or corrupt
         // database, so shut everything down, clear out the directory, and try
         // again.

@@ -599,6 +599,8 @@ class function_request_impl
         // the main task will wait until all other subtasks have finished
         // (or thrown).
         // This justifies passing contexts around by reference.
+        // TODO if retrying, status could be FINISHED, but the calculation will
+        // be redone nonetheless.
         try
         {
             auto sub_tasks = make_async_sub_tasks(ctx, args_, ArgIndices{});
@@ -798,12 +800,14 @@ class request_title_mixin<true>
  */
 template<typename Value, typename Props>
 class function_request
-    : public detail::request_title_mixin<Props::introspective>
+    : public detail::request_title_mixin<Props::introspective>,
+      public Props::retrier_type
 {
  public:
     static_assert(!std::is_reference_v<Value>);
     static_assert(!Props::for_proxy);
-    using mixin_type = detail::request_title_mixin<Props::introspective>;
+    using intrsp_mixin_type
+        = detail::request_title_mixin<Props::introspective>;
     using element_type = function_request;
     using value_type = Value;
     using intf_type = function_request_intf<Value>;
@@ -813,16 +817,18 @@ class function_request
         Props::function_type,
         Props::introspective>;
     using clone_type = function_request<value_type, clone_props_type>;
+    using retrier_type = typename Props::retrier_type;
 
     static constexpr caching_level_type caching_level{Props::level};
     static constexpr bool value_based_caching{Props::value_based_caching};
     static constexpr bool introspective{Props::introspective};
+    static constexpr bool retryable{Props::retryable};
     static constexpr bool is_proxy{false};
 
     // It is not possible to pass a C-style string as argument.
     template<typename CtorProps, typename Function, typename... Args>
     function_request(CtorProps&& props, Function&& function, Args&&... args)
-        : mixin_type{props}
+        : intrsp_mixin_type{props}, retrier_type{props}
     {
         static_assert(std::is_same_v<std::remove_cvref_t<CtorProps>, Props>);
         using impl_type = function_request_impl<
@@ -840,7 +846,7 @@ class function_request
     // Called from make_flattened_clone() (only)
     template<typename CtorProps>
     function_request(CtorProps&& props, std::shared_ptr<intf_type> impl)
-        : mixin_type{props}, impl_{std::move(impl)}
+        : intrsp_mixin_type{props}, retrier_type{props}, impl_{std::move(impl)}
     {
     }
 
@@ -1041,7 +1047,8 @@ class proxy_request_impl : public proxy_request_intf<Value>
  * called.
  */
 template<typename Value, typename Props>
-class proxy_request : public detail::request_title_mixin<Props::introspective>
+class proxy_request : public detail::request_title_mixin<Props::introspective>,
+                      public Props::retrier_type
 {
  public:
     static_assert(!std::is_reference_v<Value>);
@@ -1049,21 +1056,26 @@ class proxy_request : public detail::request_title_mixin<Props::introspective>
     static_assert(is_uncached(Props::level));
     static_assert(!is_value_based(Props::level));
 
-    using mixin_type = detail::request_title_mixin<Props::introspective>;
+    using intrsp_mixin_type
+        = detail::request_title_mixin<Props::introspective>;
     using element_type = proxy_request;
     using value_type = Value;
     using intf_type = proxy_request_intf<Value>;
     using props_type = Props;
+    using retrier_type = typename Props::retrier_type;
 
     static constexpr caching_level_type caching_level{
         caching_level_type::none};
     static constexpr bool value_based_caching{false};
     static constexpr bool introspective{Props::introspective};
+    static constexpr bool retryable{Props::retryable};
     static constexpr bool is_proxy{true};
 
     template<typename... Args>
     proxy_request(Props const& props, Args&&... args)
-        : mixin_type{props}, uuid_{props.get_uuid()}
+        : intrsp_mixin_type{props},
+          retrier_type{props},
+          uuid_{props.get_uuid()}
     {
         using impl_type
             = proxy_request_impl<Value, std::remove_cvref_t<Args>...>;

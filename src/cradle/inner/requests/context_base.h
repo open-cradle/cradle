@@ -90,6 +90,9 @@ class sync_context_base : public local_sync_context_intf,
         return false;
     }
 
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override;
+
     // local_context_intf
     std::shared_ptr<data_owner>
     make_data_owner(std::size_t size, bool use_shared_memory) override;
@@ -251,6 +254,9 @@ class local_async_context_base : public virtual local_async_context_intf,
     {
         return true;
     }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override;
 
     // local_context_intf
     std::shared_ptr<data_owner>
@@ -513,6 +519,19 @@ class proxy_async_tree_context_base
         return resources_.get_proxy(proxy_name_);
     }
 
+    // Cancels associated proxy_async_context_base::schedule_after() calls
+    void
+    request_local_cancellation()
+    {
+        csource_.request_cancellation();
+    }
+
+    cppcoro::cancellation_token
+    get_cancellation_token()
+    {
+        return ctoken_;
+    }
+
     spdlog::logger&
     get_logger() const noexcept
     {
@@ -522,6 +541,8 @@ class proxy_async_tree_context_base
  private:
     inner_resources& resources_;
     std::string proxy_name_;
+    cppcoro::cancellation_source csource_;
+    cppcoro::cancellation_token ctoken_;
     std::shared_ptr<spdlog::logger> logger_;
 };
 
@@ -577,6 +598,9 @@ class proxy_async_context_base : public remote_async_context_intf
     {
         return true;
     }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override;
 
     // remote_context_intf
     std::string const&

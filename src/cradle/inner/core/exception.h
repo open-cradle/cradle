@@ -85,6 +85,12 @@ CRADLE_DEFINE_EXCEPTION(invalid_enum_string)
 // Note that this also uses the enum_id info declared above.
 CRADLE_DEFINE_ERROR_INFO(std::string, enum_string)
 
+// Returns a short (one-line) message for an exception.
+// The exceptions defined via the mechanism in this file define a what()
+// returning a many-line message that is way too long to print in a logger.
+std::string
+short_what(std::exception const& e);
+
 } // namespace cradle
 
 #endif

@@ -44,6 +44,29 @@ get_message(rpc::rpc_error& exc)
     return msg;
 }
 
+// Returns an indication whether it would make sense to retry the request that
+// caused the given error.
+//
+// Returns true if the error was raised by the rpclib library, or
+// (intentionally) looks like it was.
+// An error raised by the rpclib library is sent as a string starting with
+// "rpclib: ".
+bool
+is_retryable(rpc::rpc_error& exc)
+{
+    bool retryable{false};
+    try
+    {
+        auto msg = exc.get_error().as<std::string>();
+        retryable = msg.starts_with("rpclib: ");
+    }
+    catch (std::bad_cast&)
+    {
+        // Unrecognized error (not a string): don't retry
+    }
+    return retryable;
+}
+
 } // namespace
 
 rpclib_client::rpclib_client(
@@ -319,7 +342,8 @@ rpclib_client_impl::wait_until_server_running()
         attempts_left -= 1;
         if (attempts_left == 0)
         {
-            throw remote_error("could not start rpclib_server", "timeout");
+            throw remote_error(
+                "could not start rpclib_server", "timeout", true);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -414,7 +438,7 @@ rpclib_client_impl::do_rpc_call(
             func_name,
             e.what(),
             get_message(e));
-        throw remote_error(e.what(), get_message(e));
+        throw remote_error(e.what(), get_message(e), is_retryable(e));
     }
 }
 
@@ -435,7 +459,7 @@ rpclib_client_impl::do_rpc_async_call(
             func_name,
             e.what(),
             get_message(e));
-        throw remote_error(e.what(), get_message(e));
+        throw remote_error(e.what(), get_message(e), is_retryable(e));
     }
 }
 

@@ -125,6 +125,12 @@ class my_local_only_context final : public local_context_mixin,
     {
         throw not_implemented_error();
     }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override
+    {
+        throw not_implemented_error();
+    }
 };
 static_assert(ValidContext<my_local_only_context>);
 
@@ -146,6 +152,12 @@ class my_remote_only_context final : public remote_context_mixin,
 
     bool
     is_async() const override
+    {
+        throw not_implemented_error();
+    }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override
     {
         throw not_implemented_error();
     }
@@ -173,6 +185,12 @@ class my_sync_only_context final : public local_context_mixin,
     {
         throw not_implemented_error("my_sync_only_context::is_async()");
     }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override
+    {
+        throw not_implemented_error();
+    }
 };
 static_assert(ValidContext<my_sync_only_context>);
 
@@ -196,6 +214,12 @@ class my_async_only_context final : public local_context_mixin,
     is_async() const override
     {
         throw not_implemented_error("my_async_only_context::is_async()");
+    }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override
+    {
+        throw not_implemented_error();
     }
 };
 static_assert(ValidContext<my_async_only_context>);
@@ -239,6 +263,12 @@ class my_generic_context : public local_context_mixin,
             throw std::range_error("is_async");
         }
         return static_cast<bool>(is_async_);
+    }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override
+    {
+        throw not_implemented_error();
     }
 
  private:

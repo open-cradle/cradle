@@ -19,6 +19,14 @@ data_owner_factory::data_owner_factory(inner_resources& resources)
 {
 }
 
+cppcoro::task<>
+sync_context_base::schedule_after(std::chrono::milliseconds delay)
+{
+    auto& io_svc{resources_.the_io_service()};
+    // Note not cancellable
+    co_await io_svc.schedule_after(delay);
+}
+
 std::shared_ptr<data_owner>
 data_owner_factory::make_data_owner(std::size_t size, bool use_shared_memory)
 {
@@ -209,6 +217,13 @@ local_async_context_base::local_async_context_base(
         parent_id,
         is_req ? "REQ" : "VAL",
         status_.load(std::memory_order_relaxed));
+}
+
+cppcoro::task<>
+local_async_context_base::schedule_after(std::chrono::milliseconds delay)
+{
+    auto& io_svc{get_resources().the_io_service()};
+    co_await io_svc.schedule_after(delay, tree_ctx_.get_cancellation_token());
 }
 
 std::shared_ptr<data_owner>
@@ -481,6 +496,7 @@ proxy_async_tree_context_base::proxy_async_tree_context_base(
     inner_resources& resources, std::string proxy_name)
     : resources_(resources),
       proxy_name_{std::move(proxy_name)},
+      ctoken_{csource_.token()},
       logger_{spdlog::get("cradle")}
 {
 }
@@ -489,6 +505,13 @@ proxy_async_context_base::proxy_async_context_base(
     proxy_async_tree_context_base& tree_ctx)
     : tree_ctx_{tree_ctx}, id_{allocate_async_id()}
 {
+}
+
+cppcoro::task<>
+proxy_async_context_base::schedule_after(std::chrono::milliseconds delay)
+{
+    auto& io_svc{get_resources().the_io_service()};
+    co_await io_svc.schedule_after(delay, tree_ctx_.get_cancellation_token());
 }
 
 std::size_t
@@ -516,6 +539,7 @@ proxy_async_context_base::get_status_coro()
 cppcoro::task<void>
 proxy_async_context_base::request_cancellation_coro()
 {
+    tree_ctx_.request_local_cancellation();
     wait_on_remote_id();
     auto& proxy{get_proxy()};
     proxy.request_cancellation(remote_id_);

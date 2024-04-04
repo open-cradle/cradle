@@ -3,6 +3,7 @@
 
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
 
 #include <cppcoro/task.hpp>
 
@@ -47,6 +48,9 @@ struct ResolutionConstraints
 {
     static_assert(!(ForceRemote && ForceLocal));
     static_assert(!(ForceSync && ForceAsync));
+    // IsSub is relevant only for async, so set to false if ForceSync
+    // (preventing unnecessary template instantiations)
+    static_assert(!(ForceSync && IsSub));
 
     static constexpr bool force_remote = ForceRemote;
     static constexpr bool force_local = ForceLocal;
@@ -247,6 +251,7 @@ template<Context Ctx, typename Val, typename Constraints>
 cppcoro::task<Val> resolve_request_local(
     Ctx& ctx,
     Val const& val,
+    bool retrying,
     cache_record_lock* lock_ptr,
     Constraints constraints)
 {
@@ -259,28 +264,25 @@ cppcoro::task<typename Req::value_type>
 resolve_request_local(
     Ctx& ctx,
     Req const& req,
+    bool retrying,
     cache_record_lock* lock_ptr,
     Constraints constraints)
 {
     // TODO static_assert(!req.is_proxy);
     // Prepare and populate ctx if it is an async root.
     local_context_intf* lctx{&cast_ctx_to_ref<local_context_intf>(ctx)};
-    if constexpr (!constraints.is_sub)
+    if constexpr (!constraints.is_sub && !constraints.force_sync)
     {
         bool async{};
         if constexpr (constraints.force_async)
         {
             async = true;
         }
-        else if constexpr (constraints.force_sync)
-        {
-            async = false;
-        }
         else
         {
             async = ctx.is_async();
         }
-        if (async)
+        if (async && !retrying)
         {
             root_local_async_context_intf* root_actx{};
             // The following cast should succeed if client uses atst_context or
@@ -342,6 +344,90 @@ resolve_request_remote(
     return resolve_request_remote_coro(ctx, req, lock_ptr);
 }
 
+template<
+    Context Ctx,
+    Request Req,
+    typename Constraints = DefaultResolutionConstraints<Ctx>>
+auto
+resolve_request_one_try(
+    Ctx& ctx,
+    Req const& req,
+    bool retrying,
+    cache_record_lock* lock_ptr,
+    Constraints constraints)
+{
+    static_assert(ValidContext<Ctx>);
+    static_assert(!(Req::is_proxy && constraints.force_local));
+    // TODO check_context_satisfies_constraints(ctx, constraints);
+
+    // First decision (based on constraints if possible): remotely or locally.
+    // A proxy request also forces remote resolving.
+    if constexpr (Req::is_proxy || constraints.force_remote)
+    {
+        // Cast here to be like the runtime decision below
+        auto& rem_ctx{cast_ctx_to_ref<remote_context_intf>(ctx)};
+        return resolve_request_remote(rem_ctx, req, lock_ptr);
+    }
+    else if constexpr (constraints.force_local)
+    {
+        // Call one of the two resolve_request_local() versions, depending on
+        // Req being a plain value or a Request
+        return resolve_request_local(
+            ctx, req, retrying, lock_ptr, constraints);
+    }
+    else
+    {
+        if (ctx.remotely())
+        {
+            auto& rem_ctx = cast_ctx_to_ref<remote_context_intf>(ctx);
+            return resolve_request_remote(rem_ctx, req, lock_ptr);
+        }
+        else
+        {
+            return resolve_request_local(
+                ctx, req, retrying, lock_ptr, constraints);
+        }
+    }
+}
+
+template<
+    Context Ctx,
+    RetryableRequest Req,
+    typename Constraints = DefaultResolutionConstraints<Ctx>>
+cppcoro::task<typename Req::value_type>
+resolve_request_with_retry(
+    Ctx& ctx,
+    Req const& req,
+    cache_record_lock* lock_ptr,
+    Constraints constraints)
+{
+    static_assert(ValidRetryableRequest<Req>);
+    int attempt = 0;
+    for (;;)
+    {
+        std::chrono::milliseconds delay{};
+        try
+        {
+            co_return co_await resolve_request_one_try(
+                ctx, req, attempt > 0, lock_ptr, constraints);
+        }
+        catch (std::exception const& exc)
+        {
+            delay = req.handle_exception(attempt, exc);
+        }
+        // TODO if introspective: update status. Not really possible with
+        // tasklet_tracker.
+        co_await ctx.schedule_after(delay);
+        ++attempt;
+    }
+#ifdef __cpp_lib_unreachable
+    // C++23 feature
+    std::unreachable();
+#else
+    throw std::logic_error("unreachable");
+#endif
+}
+
 /*****************************************************************************
  * Public interface: resolve_request()
  */
@@ -401,35 +487,13 @@ resolve_request(
     Constraints constraints = Constraints(),
     cache_record_lock* lock_ptr = nullptr)
 {
-    static_assert(ValidContext<Ctx>);
-    static_assert(!(Req::is_proxy && constraints.force_local));
-    // TODO check_context_satisfies_constraints(ctx, constraints);
-
-    // First decision (based on constraints if possible): remotely or locally.
-    // A proxy request also forces remote resolving.
-    if constexpr (Req::is_proxy || constraints.force_remote)
+    if constexpr (Req::retryable)
     {
-        // Cast here to be like the runtime decision below
-        auto& rem_ctx{cast_ctx_to_ref<remote_context_intf>(ctx)};
-        return resolve_request_remote(rem_ctx, req, lock_ptr);
-    }
-    else if constexpr (constraints.force_local)
-    {
-        // Call one of the two resolve_request_local() versions, depending on
-        // Req being a plain value or a Request
-        return resolve_request_local(ctx, req, lock_ptr, constraints);
+        return resolve_request_with_retry(ctx, req, lock_ptr, constraints);
     }
     else
     {
-        if (ctx.remotely())
-        {
-            auto& rem_ctx = cast_ctx_to_ref<remote_context_intf>(ctx);
-            return resolve_request_remote(rem_ctx, req, lock_ptr);
-        }
-        else
-        {
-            return resolve_request_local(ctx, req, lock_ptr, constraints);
-        }
+        return resolve_request_one_try(ctx, req, false, lock_ptr, constraints);
     }
 }
 

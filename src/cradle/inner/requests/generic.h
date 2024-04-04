@@ -1,6 +1,7 @@
 #ifndef CRADLE_INNER_REQUESTS_GENERIC_H
 #define CRADLE_INNER_REQUESTS_GENERIC_H
 
+#include <chrono>
 #include <concepts>
 #include <memory>
 #include <string>
@@ -256,6 +257,11 @@ class context_intf
     virtual bool
     is_async() const
         = 0;
+
+    // Delays the calling coroutine for the specified duration.
+    // Cancellable if the context supports that.
+    virtual cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) = 0;
 };
 
 /*
@@ -386,6 +392,12 @@ class async_error : public std::runtime_error
 // One context object will be created for each task (coroutine);
 // these objects form a tree with the same topology as the request tree.
 // Thus, a context object tracks progress for a single (sub)request.
+//
+// The implication is that in general a context tree cannot be reused across
+// resolve_request() calls. The exception is when retrying a resolve operation,
+// where reuse is allowed and even desirable, as successful subresults from a
+// former attempt could potentially be reused, avoiding re-resolution of that
+// part of the request tree.
 class async_context_intf : public virtual context_intf
 {
  public:
@@ -767,6 +779,31 @@ concept ValidContext
       && (!std::is_final_v<Ctx> || SyncContext<Ctx> || AsyncContext<Ctx>);
 
 /*
+ * A resolution retrier offers support for handling a failed resolution, by
+ * retrying the resolution or not.
+ *
+ * If retryable is false, the resolution is never retried; otherwise, the
+ * retrier must implement
+ *   std::chrono::milliseconds
+ *   handle_exception(int attempt, std::exception const& exc) const;
+ * which must be called from an exception handler. The function either returns
+ * the time to wait before the next resolution attempt, or throws if the
+ * maximum number of attempts has been exceeded.
+ */
+template<typename T>
+concept MaybeResolutionRetrier
+    = std::same_as<std::remove_const_t<decltype(T::retryable)>, bool>;
+
+template<typename T>
+concept ResolutionRetrier
+    = MaybeResolutionRetrier<T>
+      && requires(T const& obj) {
+             {
+                 obj.handle_exception(0, std::runtime_error{""})
+                 } -> std::convertible_to<std::chrono::milliseconds>;
+         };
+
+/*
  * A request is something that can be resolved, resulting in a result
  *
  * Attributes:
@@ -795,6 +832,8 @@ concept Request
               same_as<std::remove_const_t<decltype(T::is_proxy)>, bool>;
           requires std::
               same_as<std::remove_const_t<decltype(T::introspective)>, bool>;
+          requires std::
+              same_as<std::remove_const_t<decltype(T::retryable)>, bool>;
       };
 // TODO say something about resolve_sync()/_async() as we used to do
 
@@ -802,13 +841,13 @@ template<typename T>
 concept UncachedRequest = Request<T> && is_uncached(T::caching_level);
 
 template<typename Req>
-concept CachedRequest = Request<Req> && is_cached(Req::caching_level)
-                        && requires(Req const& req) {
-                               {
-                                   req.get_captured_id()
-                                   }
-                                   -> std::convertible_to<captured_id const&>;
-                           };
+concept CachedRequest
+    = Request<Req> && is_cached(Req::caching_level)
+      && requires(Req const& req) {
+             {
+                 req.get_captured_id()
+                 } -> std::convertible_to<captured_id const&>;
+         };
 
 template<typename Req>
 concept MemoryCachedRequest
@@ -845,6 +884,14 @@ concept CachedIntrospectiveRequest
 template<typename Req>
 concept CachedNonIntrospectiveRequest
     = CachedRequest<Req> && NonIntrospectiveRequest<Req>;
+
+// By having retryable=true, a request advertises itself as being retryable...
+template<typename Req>
+concept RetryableRequest = Request<Req> && Req::retryable;
+// ... but it also needs to implement the corresponding function.
+template<typename Req>
+concept ValidRetryableRequest
+    = RetryableRequest<Req> && ResolutionRetrier<Req>;
 
 // A request that accepts visitors. A visitor will recursively visit all
 // subrequests, so all of these should be visitable as well.
