@@ -38,7 +38,10 @@ thread_pool_guard::claim_thread()
     std::scoped_lock lock{mutex_};
     if (num_free_threads_ == 0)
     {
-        throw std::runtime_error{"all threads for this request type are busy"};
+        // Disguise as an error raised by the rpclib library, so that it looks
+        // retryable.
+        throw std::runtime_error{
+            "rpclib: all threads for this request type are busy"};
     }
     num_free_threads_ -= 1;
 }
@@ -266,8 +269,11 @@ try
     actx->using_result();
     hctx.get_async_db().add(actx);
     // TODO update status to SUBMITTED
-    // This function should return asap.
-    // Need to dispatch a thread calling the blocking cppcoro::sync_wait().
+    // This function should return asap, but its work is done by the blocking
+    // resolve_async(), which therefore is being dispatched. BS::thread_pool
+    // puts it on a queue that grows as needed, meaning no additional mechanism
+    // is needed to keep the server responsive (in contrast to the
+    // resolve_sync() situation).
     // TODO actx writes before now should synchronize with the pool thread
     auto need_record_lock{config.get_bool_or_default(
         remote_config_keys::NEED_RECORD_LOCK, false)};

@@ -9,17 +9,20 @@ namespace cradle {
 // Properties for a Thinknode request:
 // - The function is a coroutine
 // - Always introspective
+// - Retryable (local resolution or on the server)
 // Context should be thinknode_request_context.
 // The caching level will typically be "full", but (e.g. for testing purposes)
 // supporting other options may be useful.
 template<caching_level_type Level>
 using thinknode_request_props
-    = request_props<Level, request_function_t::coro, true>;
+    = request_props<Level, request_function_t::coro, true, default_retrier>;
 
+// Proxy attempts retries only when the server doesn't.
 using thinknode_proxy_props = request_props<
     caching_level_type::none,
     request_function_t::proxy_coro,
-    true>;
+    true,
+    proxy_retrier>;
 
 } // namespace cradle
 

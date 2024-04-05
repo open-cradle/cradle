@@ -3,6 +3,7 @@
 
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
 
 #include <cppcoro/task.hpp>
 
@@ -19,6 +20,7 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/service/secondary_cached_blob.h>
 #include <cradle/inner/service/secondary_storage_intf.h>
+#include <cradle/inner/utilities/logging.h>
 
 /*
  * Service resolving a request to a value
@@ -46,6 +48,9 @@ struct ResolutionConstraints
 {
     static_assert(!(ForceRemote && ForceLocal));
     static_assert(!(ForceSync && ForceAsync));
+    // IsSub is relevant only for async, so set to false if ForceSync
+    // (preventing unnecessary template instantiations)
+    static_assert(!(ForceSync && IsSub));
 
     static constexpr bool force_remote = ForceRemote;
     static constexpr bool force_local = ForceLocal;
@@ -84,65 +89,59 @@ using DefaultResolutionConstraints = ResolutionConstraints<
     DefinitelyAsyncContext<Ctx>,
     false>;
 
-template<Context Ctx, Request Req>
+template<Context Ctx, Request Req, typename Constraints>
 cppcoro::task<typename Req::value_type>
-resolve_request_sync_uncached(Ctx& ctx, Req const& req)
+resolve_request_plain(Ctx& ctx, Req const& req, Constraints constraints)
 {
-    // TODO maybe let req.resolve_*sync() return cppcoro::task
-    auto& lctx = cast_ctx_to_ref<local_context_intf>(ctx);
-    co_return co_await req.resolve_sync(lctx);
-}
-
-template<Context Ctx, Request Req>
-cppcoro::task<typename Req::value_type>
-resolve_request_async_uncached(Ctx& ctx, Req const& req)
-{
-    // TODO resolve_request_async_uncached() introspection support?
-    auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
-    co_return co_await req.resolve_async(actx);
+    // Third decision (based on constraints if possible): sync or async
+    // TODO resolve_request_plain() introspection support?
+    if constexpr (constraints.force_async)
+    {
+        auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
+        return req.resolve_async(actx);
+    }
+    else if constexpr (constraints.force_sync)
+    {
+        auto& lctx = cast_ctx_to_ref<local_context_intf>(ctx);
+        return req.resolve_sync(lctx);
+    }
+    else
+    {
+        if (ctx.is_async())
+        {
+            auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
+            return req.resolve_async(actx);
+        }
+        else
+        {
+            auto& lctx = cast_ctx_to_ref<local_context_intf>(ctx);
+            return req.resolve_sync(lctx);
+        }
+    }
 }
 
 // Resolves a memory-cached request using some sort of secondary cache.
 // A memory-cached request needs no secondary cache, so it can be resolved
 // right away (by calling the request's function).
-template<bool Async, Context Ctx, MemoryCachedRequest Req>
+template<Context Ctx, MemoryCachedRequest Req, typename Constraints>
 cppcoro::task<typename Req::value_type>
-resolve_secondary_cached(Ctx& ctx, Req const& req)
+resolve_secondary_cached(Ctx& ctx, Req const& req, Constraints constraints)
 {
-    if constexpr (Async)
-    {
-        auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
-        return req.resolve_async(actx);
-    }
-    else
-    {
-        auto& lctx = cast_ctx_to_ref<local_context_intf>(ctx);
-        return req.resolve_sync(lctx);
-    }
+    return resolve_request_plain(ctx, req, constraints);
 }
 
 // Resolves a fully-cached request using some sort of secondary cache, and some
 // sort of serialization.
-template<bool Async, Context Ctx, FullyCachedRequest Req>
+template<Context Ctx, FullyCachedRequest Req, typename Constraints>
 cppcoro::task<typename Req::value_type>
-resolve_secondary_cached(Ctx& ctx, Req const& req)
+resolve_secondary_cached(Ctx& ctx, Req const& req, Constraints constraints)
 {
     using Value = typename Req::value_type;
     auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
     inner_resources& resources{cac_ctx.get_resources()};
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
-        if constexpr (Async)
-        {
-            auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
-            co_return serialize_secondary_cache_value(
-                co_await req.resolve_async(actx));
-        }
-        else
-        {
-            auto& lctx = cast_ctx_to_ref<local_context_intf>(ctx);
-            co_return serialize_secondary_cache_value(
-                co_await req.resolve_sync(lctx));
-        }
+        co_return serialize_secondary_cache_value(
+            co_await resolve_request_plain(ctx, req, constraints));
     };
     co_return deserialize_secondary_cache_value<Value>(
         co_await secondary_cached_blob(
@@ -153,16 +152,18 @@ resolve_secondary_cached(Ctx& ctx, Req const& req)
 // Resolves the request, stores the result in the CAS, updates the action
 // cache. The cache is accessed via ptr. The caller should ensure that ctx, req
 // and ptr outlive the coroutine.
-template<bool Async, Context Ctx, CachedRequest Req>
+template<Context Ctx, CachedRequest Req, typename Constraints>
 cppcoro::shared_task<void>
 resolve_request_on_memory_cache_miss(
     Ctx& ctx,
     Req const& req,
-    immutable_cache_ptr<typename Req::value_type>& ptr)
+    immutable_cache_ptr<typename Req::value_type>& ptr,
+    Constraints constraints)
 {
     try
     {
-        ptr.record_value(co_await resolve_secondary_cached<Async>(ctx, req));
+        ptr.record_value(
+            co_await resolve_secondary_cached(ctx, req, constraints));
     }
     catch (...)
     {
@@ -171,9 +172,14 @@ resolve_request_on_memory_cache_miss(
     }
 }
 
-template<bool Async, Context Ctx, CompositionBasedCachedRequest Req>
+// TODO Ctx will be local_context_intf; should be caching_context_intf?!
+template<Context Ctx, CompositionBasedCachedRequest Req, typename Constraints>
 cppcoro::task<typename Req::value_type>
-resolve_request_cached(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
+resolve_request_cached(
+    Ctx& ctx,
+    Req const& req,
+    cache_record_lock* lock_ptr,
+    Constraints constraints)
 {
     using value_type = typename Req::value_type;
     using ptr_type = immutable_cache_ptr<value_type>;
@@ -185,9 +191,9 @@ resolve_request_cached(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
     ptr_type ptr{
         cac_ctx.get_resources().memory_cache(),
         req.get_captured_id(),
-        [&ctx, &req](untyped_immutable_cache_ptr& ptr) {
-            return resolve_request_on_memory_cache_miss<Async>(
-                ctx, req, static_cast<ptr_type&>(ptr));
+        [&ctx, &req, constraints](untyped_immutable_cache_ptr& ptr) {
+            return resolve_request_on_memory_cache_miss(
+                ctx, req, static_cast<ptr_type&>(ptr), constraints);
         }};
     if (lock_ptr != nullptr)
     {
@@ -211,92 +217,33 @@ resolve_request_cached(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
         // co_await' ptr's shared_task, ensuring that its value is available.
         co_await ptr.ensure_value_task();
     }
+    // If function ran, status already will be FINISHED
+    // If result came from cache, it will not yet be
+    if (auto* actx = cast_ctx_to_ptr<local_async_context_intf>(ctx))
+    {
+        actx->update_status(async_status::FINISHED);
+    }
     // Finally, return the shared_task's value.
     co_return ptr.get_value();
 }
 
-template<bool Async, Context Ctx, ValueBasedCachedRequest Req>
+template<Context Ctx, ValueBasedCachedRequest Req, typename Constraints>
 cppcoro::task<typename Req::value_type>
-resolve_request_cached(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
-{
-    // Make a CompositionBasedCachedRequest variant of req that has all
-    // subrequests resolved and replaced by resulting values; then resolve
-    // that request as any other request, using composition-based caching.
-    auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
-    co_return co_await resolve_request_cached<Async>(
-        ctx, co_await req.make_flattened_clone(cac_ctx), lock_ptr);
-}
-
-template<Context Ctx, CachedRequest Req>
-cppcoro::task<typename Req::value_type>
-resolve_request_async_cached(
-    Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
-{
-    auto result = co_await resolve_request_cached<true>(ctx, req, lock_ptr);
-    // If function ran, status already will be FINISHED
-    // If result came from cache, it will not yet be
-    auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
-    actx.update_status(async_status::FINISHED);
-    co_return result;
-}
-
-template<Context Ctx, Request Req>
-cppcoro::task<typename Req::value_type>
-resolve_request_sync(Ctx& ctx, Req const& req, cache_record_lock* lock_ptr)
-{
-    // Third decision: cached or not
-    if constexpr (UncachedRequest<Req>)
-    {
-        return resolve_request_sync_uncached(ctx, req);
-    }
-    else
-    {
-        return resolve_request_cached<false>(ctx, req, lock_ptr);
-    }
-}
-
-template<Context Ctx, Request Req, typename Constraints>
-cppcoro::task<typename Req::value_type>
-resolve_request_async(
+resolve_request_cached(
     Ctx& ctx,
     Req const& req,
     cache_record_lock* lock_ptr,
     Constraints constraints)
 {
-    local_async_context_intf* actx{};
-    // Prepare and populate ctx if it is a root.
-    if constexpr (!constraints.is_sub)
-    {
-        root_local_async_context_intf* root_actx{};
-        // The following cast should succeed if client uses atst_context or
-        // similar
-        if (auto* owner = cast_ctx_to_ptr<local_async_ctx_owner_intf>(ctx))
-        {
-            // (Re-)create ctx tree and root ctx; get the new root ctx
-            root_actx = &owner->prepare_for_local_resolution();
-        }
-        else
-        {
-            root_actx = &cast_ctx_to_ref<root_local_async_context_intf>(ctx);
-        }
-        // Populate ctx with sub ctx's
-        static_assert(VisitableRequest<Req>);
-        req.accept(*root_actx->make_ctx_tree_builder());
-        actx = root_actx;
-    }
-    else
-    {
-        actx = &cast_ctx_to_ref<local_async_context_intf>(ctx);
-    }
-    // Third decision: cached or not
-    if constexpr (UncachedRequest<Req>)
-    {
-        return resolve_request_async_uncached(*actx, req);
-    }
-    else
-    {
-        return resolve_request_async_cached(*actx, req, lock_ptr);
-    }
+    // Make a CompositionBasedCachedRequest variant of req that has all
+    // subrequests resolved and replaced by resulting values; then resolve
+    // that request as any other request, using composition-based caching.
+    auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
+    co_return co_await resolve_request_cached(
+        ctx,
+        co_await req.make_flattened_clone(cac_ctx),
+        lock_ptr,
+        constraints);
 }
 
 template<Context Ctx, typename Val, typename Constraints>
@@ -304,6 +251,7 @@ template<Context Ctx, typename Val, typename Constraints>
 cppcoro::task<Val> resolve_request_local(
     Ctx& ctx,
     Val const& val,
+    bool retrying,
     cache_record_lock* lock_ptr,
     Constraints constraints)
 {
@@ -316,29 +264,59 @@ cppcoro::task<typename Req::value_type>
 resolve_request_local(
     Ctx& ctx,
     Req const& req,
+    bool retrying,
     cache_record_lock* lock_ptr,
     Constraints constraints)
 {
     // TODO static_assert(!req.is_proxy);
-    // Second decision (based on constraints if possible): sync or async
-    if constexpr (constraints.force_async)
+    // Prepare and populate ctx if it is an async root.
+    local_context_intf* lctx{&cast_ctx_to_ref<local_context_intf>(ctx)};
+    if constexpr (!constraints.is_sub && !constraints.force_sync)
     {
-        return resolve_request_async(ctx, req, lock_ptr, constraints);
-    }
-    else if constexpr (constraints.force_sync)
-    {
-        return resolve_request_sync(ctx, req, lock_ptr);
-    }
-    else
-    {
-        if (ctx.is_async())
+        bool async{};
+        if constexpr (constraints.force_async)
         {
-            return resolve_request_async(ctx, req, lock_ptr, constraints);
+            async = true;
         }
         else
         {
-            return resolve_request_sync(ctx, req, lock_ptr);
+            async = ctx.is_async();
         }
+        if (async && !retrying)
+        {
+            root_local_async_context_intf* root_actx{};
+            // The following cast should succeed if client uses atst_context or
+            // similar
+            if (auto* owner = cast_ctx_to_ptr<local_async_ctx_owner_intf>(ctx))
+            {
+                // (Re-)create ctx tree and root ctx; get the new root ctx
+                root_actx = &owner->prepare_for_local_resolution();
+                lctx = root_actx;
+            }
+            else
+            {
+                root_actx
+                    = cast_ctx_to_ptr<root_local_async_context_intf>(ctx);
+            }
+            if (root_actx)
+            {
+                // Populate ctx with sub ctx's
+                static_assert(VisitableRequest<Req>);
+                req.accept(*root_actx->make_ctx_tree_builder());
+            }
+        }
+    }
+
+    // Second decision: cached or not
+    // TODO lctx is local_context_intf, no sync/async info anymore (shouldn't
+    // matter anyway)
+    if constexpr (UncachedRequest<Req>)
+    {
+        return resolve_request_plain(*lctx, req, constraints);
+    }
+    else
+    {
+        return resolve_request_cached(*lctx, req, lock_ptr, constraints);
     }
 }
 
@@ -364,6 +342,90 @@ resolve_request_remote(
         owner->prepare_for_remote_resolution();
     }
     return resolve_request_remote_coro(ctx, req, lock_ptr);
+}
+
+template<
+    Context Ctx,
+    Request Req,
+    typename Constraints = DefaultResolutionConstraints<Ctx>>
+auto
+resolve_request_one_try(
+    Ctx& ctx,
+    Req const& req,
+    bool retrying,
+    cache_record_lock* lock_ptr,
+    Constraints constraints)
+{
+    static_assert(ValidContext<Ctx>);
+    static_assert(!(Req::is_proxy && constraints.force_local));
+    // TODO check_context_satisfies_constraints(ctx, constraints);
+
+    // First decision (based on constraints if possible): remotely or locally.
+    // A proxy request also forces remote resolving.
+    if constexpr (Req::is_proxy || constraints.force_remote)
+    {
+        // Cast here to be like the runtime decision below
+        auto& rem_ctx{cast_ctx_to_ref<remote_context_intf>(ctx)};
+        return resolve_request_remote(rem_ctx, req, lock_ptr);
+    }
+    else if constexpr (constraints.force_local)
+    {
+        // Call one of the two resolve_request_local() versions, depending on
+        // Req being a plain value or a Request
+        return resolve_request_local(
+            ctx, req, retrying, lock_ptr, constraints);
+    }
+    else
+    {
+        if (ctx.remotely())
+        {
+            auto& rem_ctx = cast_ctx_to_ref<remote_context_intf>(ctx);
+            return resolve_request_remote(rem_ctx, req, lock_ptr);
+        }
+        else
+        {
+            return resolve_request_local(
+                ctx, req, retrying, lock_ptr, constraints);
+        }
+    }
+}
+
+template<
+    Context Ctx,
+    RetryableRequest Req,
+    typename Constraints = DefaultResolutionConstraints<Ctx>>
+cppcoro::task<typename Req::value_type>
+resolve_request_with_retry(
+    Ctx& ctx,
+    Req const& req,
+    cache_record_lock* lock_ptr,
+    Constraints constraints)
+{
+    static_assert(ValidRetryableRequest<Req>);
+    int attempt = 0;
+    for (;;)
+    {
+        std::chrono::milliseconds delay{};
+        try
+        {
+            co_return co_await resolve_request_one_try(
+                ctx, req, attempt > 0, lock_ptr, constraints);
+        }
+        catch (std::exception const& exc)
+        {
+            delay = req.handle_exception(attempt, exc);
+        }
+        // TODO if introspective: update status. Not really possible with
+        // tasklet_tracker.
+        co_await ctx.schedule_after(delay);
+        ++attempt;
+    }
+#ifdef __cpp_lib_unreachable
+    // C++23 feature
+    std::unreachable();
+#else
+    throw std::logic_error("unreachable");
+#endif
 }
 
 /*****************************************************************************
@@ -425,35 +487,13 @@ resolve_request(
     Constraints constraints = Constraints(),
     cache_record_lock* lock_ptr = nullptr)
 {
-    static_assert(ValidContext<Ctx>);
-    static_assert(!(Req::is_proxy && constraints.force_local));
-    // TODO check_context_satisfies_constraints(ctx, constraints);
-
-    // First decision (based on constraints if possible): remotely or locally.
-    // A proxy request also forces remote resolving.
-    if constexpr (Req::is_proxy || constraints.force_remote)
+    if constexpr (Req::retryable)
     {
-        // Cast here to be like the runtime decision below
-        auto& rem_ctx{cast_ctx_to_ref<remote_context_intf>(ctx)};
-        return resolve_request_remote(rem_ctx, req, lock_ptr);
-    }
-    else if constexpr (constraints.force_local)
-    {
-        // Call one of the two resolve_request_local() versions, depending on
-        // Req being a plain value or a Request
-        return resolve_request_local(ctx, req, lock_ptr, constraints);
+        return resolve_request_with_retry(ctx, req, lock_ptr, constraints);
     }
     else
     {
-        if (ctx.remotely())
-        {
-            auto& rem_ctx = cast_ctx_to_ref<remote_context_intf>(ctx);
-            return resolve_request_remote(rem_ctx, req, lock_ptr);
-        }
-        else
-        {
-            return resolve_request_local(ctx, req, lock_ptr, constraints);
-        }
+        return resolve_request_one_try(ctx, req, false, lock_ptr, constraints);
     }
 }
 

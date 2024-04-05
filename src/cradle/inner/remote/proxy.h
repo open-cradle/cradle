@@ -24,10 +24,25 @@ class remote_error : public std::logic_error
     {
     }
 
-    remote_error(std::string const& what, std::string const& msg)
-        : std::logic_error(fmt::format("{}: {}", what, msg))
+    remote_error(
+        std::string const& what,
+        std::string const& msg,
+        bool retryable = false)
+        : std::logic_error(fmt::format("{}: {}", what, msg)),
+          retryable_{retryable}
     {
     }
+
+    // Returns an indication whether it would make sense to retry the request
+    // that caused this error
+    bool
+    retryable() const
+    {
+        return retryable_;
+    }
+
+ private:
+    bool retryable_{false};
 };
 
 // Minimal descriptor for a child node in an asynchronous context tree on a

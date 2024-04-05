@@ -14,7 +14,7 @@ namespace cradle {
 inline auto
 rq_test_adder_v1p(int a, int b)
 {
-    using props_type = adder_v1_props<true>;
+    using props_type = adder_v1_proxy_props;
     return rq_proxy<int>(
         props_type{request_uuid{adder_v1p_uuid}, adder_v1_title}, a, b);
 }
@@ -26,7 +26,7 @@ template<typename A, typename B>
 auto
 rq_test_adder_v1n(A a, B b)
 {
-    using props_type = adder_v1_props<true>;
+    using props_type = adder_v1_proxy_props;
     return rq_proxy<int>(
         props_type{request_uuid{adder_v1n_uuid}, adder_v1_title},
         normalize_arg<int, props_type>(std::move(a)),

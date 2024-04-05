@@ -4,8 +4,10 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 
+#include <cppcoro/io_service.hpp>
 #include <cppcoro/static_thread_pool.hpp>
 #include <spdlog/spdlog.h>
 
@@ -32,6 +34,20 @@ class inner_resources_impl
  public:
     inner_resources_impl(
         inner_resources& wrapper, service_config const& config);
+
+    ~inner_resources_impl();
+
+    auto&
+    the_logger()
+    {
+        return *logger_;
+    }
+
+    auto&
+    the_io_service()
+    {
+        return io_svc_;
+    }
 
  private:
     friend class inner_resources;
@@ -66,6 +82,8 @@ class inner_resources_impl
         std::unique_ptr<cache_record_lock>>
         cache_record_locks_;
     tasklet_admin the_tasklet_admin_;
+    cppcoro::io_service io_svc_;
+    std::jthread io_svc_thread_;
 
     cppcoro::static_thread_pool http_pool_;
     cppcoro::static_thread_pool async_pool_;

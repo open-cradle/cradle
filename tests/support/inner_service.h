@@ -45,6 +45,9 @@ class non_caching_request_resolution_context final : public local_context_intf,
         return false;
     }
 
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override;
+
     // local_context_intf
     std::shared_ptr<data_owner>
     make_data_owner(std::size_t size, bool use_shared_memory) override;
@@ -90,6 +93,9 @@ class caching_request_resolution_context final : public local_context_intf,
     {
         return false;
     }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override;
 
     // local_context_intf
     std::shared_ptr<data_owner>

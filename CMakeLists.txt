@@ -162,7 +162,7 @@ endif()
 
 FetchContent_Declare(fetched_cppcoro
     GIT_REPOSITORY https://github.com/andreasbuhr/cppcoro
-    GIT_TAG ba05f5c4cfeff9fde1f80c8b354c4506cb446024)
+    GIT_TAG 244f834274a850eeca4cc5c86acbca1a0fbe9d95)
 FetchContent_MakeAvailable(fetched_cppcoro)
 
 # Find core dependencies.
@@ -226,6 +226,11 @@ if(IS_GCC OR IS_CLANG)
     # Disable warnings that are too strict.
     # unused function parameters
     add_compile_options(-Wno-unused-parameter)
+    # Workaround for https://github.com/andreasbuhr/cppcoro/issues/77:
+    # set(CMAKE_CXX_STANDARD 20) causes CMake to append -std=gnu++2a,
+    # causing a built-in -Dlinux=1,
+    # causing build failures when "namespace linux" is encountered.
+    add_compile_options(-Ulinux)
 elseif(IS_MSVC)
     # First strip out the old warning level.
     string(REPLACE "/W3" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
@@ -248,6 +253,9 @@ elseif(IS_MSVC)
     # "operator '|': deprecated between enumerations of different types"
     # in cereal\external\rapidjson\document.h
     add_compile_options(/wd5054)
+    # The "unreachable code" warning is never to the point, and due to lack of
+    # context impossible to fix.
+    add_compile_options(/wd4702)
 endif()
 
 # Use absolute paths for error messages.
