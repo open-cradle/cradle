@@ -87,9 +87,9 @@ get_unique_string(function_request<Value, Props> const& req)
     return hasher.get_string();
 }
 
-template<typename Value, typename Props>
+template<Request Req>
 std::string
-to_json(function_request<Value, Props> const& req)
+to_json(Req const& req)
 {
     std::stringstream os;
     {
@@ -97,6 +97,15 @@ to_json(function_request<Value, Props> const& req)
         req.save(oarchive);
     }
     return os.str();
+}
+
+template<Request Req>
+void
+from_json(Req& req, std::string const& json, inner_resources& resources)
+{
+    std::istringstream is(json);
+    JSONRequestInputArchive iarchive(is, resources);
+    req.load(iarchive);
 }
 
 } // namespace
@@ -395,4 +404,69 @@ TEST_CASE("function_request_impl: load unregistered function", tag)
     std::istringstream is(bad_seri);
     JSONRequestInputArchive iarchive(is, *resources);
     REQUIRE_THROWS_AS(bad_impl->load(iarchive), unregistered_uuid_error);
+}
+
+TEST_CASE("function_request: serialize no_retrier", tag)
+{
+    auto resources{make_inner_test_resources()};
+    request_props<
+        caching_level_type::none,
+        request_function_t::coro,
+        false,
+        no_retrier>
+        props{make_test_uuid("0200")};
+    auto saved_req{rq_function(props, coro_a)};
+    auto registry{resources->get_seri_registry()};
+    seri_catalog cat{registry};
+    cat.register_resolver(saved_req);
+
+    auto json = to_json(saved_req);
+    decltype(saved_req) loaded_req;
+    REQUIRE_NOTHROW(from_json(loaded_req, json, *resources));
+}
+
+TEST_CASE("function_request: serialize default_retrier", tag)
+{
+    int64_t base_millis{123};
+    int max_attempts{7};
+    auto resources{make_inner_test_resources()};
+    request_props<
+        caching_level_type::none,
+        request_function_t::coro,
+        false,
+        default_retrier>
+        props{
+            make_test_uuid("0201"),
+            default_retrier{base_millis, max_attempts}};
+    auto saved_req{rq_function(props, coro_a)};
+    auto registry{resources->get_seri_registry()};
+    seri_catalog cat{registry};
+    cat.register_resolver(saved_req);
+
+    auto json = to_json(saved_req);
+    CHECK(json.find("\"base_millis\": 123,") != json.npos);
+    CHECK(json.find("\"max_attempts\": 7,") != json.npos);
+
+    decltype(saved_req) loaded_req;
+    from_json(loaded_req, json, *resources);
+    CHECK(loaded_req.get_base_millis() == base_millis);
+    CHECK(loaded_req.get_max_attempts() == max_attempts);
+}
+
+TEST_CASE("function_request: serialize proxy_retrier", tag)
+{
+    int64_t base_millis{321};
+    int max_attempts{14};
+    request_props<
+        caching_level_type::none,
+        request_function_t::proxy_coro,
+        false,
+        proxy_retrier>
+        props{
+            make_test_uuid("0202"), proxy_retrier{base_millis, max_attempts}};
+    auto saved_req{rq_proxy<std::string>(props)};
+
+    auto json = to_json(saved_req);
+    CHECK(json.find("\"base_millis\": 321,") != json.npos);
+    CHECK(json.find("\"max_attempts\": 14,") != json.npos);
 }

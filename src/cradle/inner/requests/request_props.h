@@ -6,6 +6,7 @@
 #include <string>
 
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/requests/uuid.h>
 
 namespace cradle {
@@ -60,37 +61,80 @@ class no_retrier
     static constexpr bool retryable = false;
 
     no_retrier() = default;
+
+ protected:
+    void
+    save_retrier_state(JSONRequestOutputArchive& archive) const
+    {
+    }
+
+    void
+    load_retrier_state(JSONRequestInputArchive& archive)
+    {
+    }
 };
 static_assert(MaybeResolutionRetrier<no_retrier>);
 
+// Retrier with an exponential backoff algorithm (base class, not instantiable)
+class backoff_retrier_base
+{
+ public:
+    int64_t
+    get_base_millis() const
+    {
+        return base_millis_;
+    }
+
+    int
+    get_max_attempts() const
+    {
+        return max_attempts_;
+    }
+
+ protected:
+    // base_millis in milliseconds
+    backoff_retrier_base(int64_t base_millis, int max_attempts);
+
+    std::chrono::milliseconds
+    attempt_retry(int attempt, std::exception const& exc) const;
+
+    void
+    save_retrier_state(JSONRequestOutputArchive& archive) const;
+
+    // Not called for proxy_retrier
+    void
+    load_retrier_state(JSONRequestInputArchive& archive);
+
+ private:
+    int64_t base_millis_;
+    int max_attempts_;
+};
+
 // Default retrier, implementing a hard-coded retrying algorithm.
-class default_retrier
+class default_retrier : public backoff_retrier_base
 {
  public:
     static constexpr bool retryable = true;
 
-    // Non-defaults currently for test purposes only
-    // TODO serialize base_millis / max_attempts
     // base_millis in milliseconds
     default_retrier(int64_t base_millis = 100, int max_attempts = 9);
 
     // See ResolutionRetrier
     std::chrono::milliseconds
     handle_exception(int attempt, std::exception const& exc) const;
-
- private:
-    int64_t base_millis_;
-    int max_attempts_;
 };
 static_assert(ResolutionRetrier<default_retrier>);
 
 // Retrier suitable for a proxy, attempting to retry only when the error was
 // due to RPC communication problems, not if it already was retried on the
 // server
-class proxy_retrier
+class proxy_retrier : public backoff_retrier_base
 {
  public:
     static constexpr bool retryable = true;
+
+    // base_millis in milliseconds
+    proxy_retrier(int64_t base_millis = 100, int max_attempts = 9);
 
     // See ResolutionRetrier
     std::chrono::milliseconds
@@ -157,7 +201,6 @@ class request_props : public introspection_mixin<Introspective>, public Retrier
     }
 
     // Constructor for a request that supports introspection
-    // TODO consider replacing with set_title()
     request_props(
         request_uuid uuid, std::string title, Retrier retrier = Retrier())
         requires(Introspective)
