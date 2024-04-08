@@ -50,6 +50,7 @@ loopback_service::resolve_sync(service_config config, std::string seri_req)
         config.get_mandatory_string(remote_config_keys::DOMAIN_NAME)};
     auto& dom = resources_->find_domain(domain_name);
     auto ctx{dom.make_local_sync_context(config)};
+    ctx->track_blob_file_writers();
     auto optional_client_tasklet_id
         = config.get_optional_number(remote_config_keys::TASKLET_ID);
     auto* intr_ctx = cast_ctx_to_ptr<introspective_context_intf>(*ctx);
@@ -83,6 +84,9 @@ loopback_service::resolve_sync(service_config config, std::string seri_req)
             loc_ctx, std::move(seri_req), seri_lock);
     }
     auto result{cppcoro::sync_wait(std::move(task))};
+    // Not really needed for loopback, but mimics rpclib server and improves
+    // code coverage
+    ctx->on_value_complete();
     logger_->debug("response {}", result.value());
     return result;
 }
@@ -123,6 +127,9 @@ resolve_async(
         logger.info("resolve_async done: {}", res);
         actx->set_result(std::move(res));
         actx->set_cache_record_id(seri_lock.record_id);
+        // Not really needed for loopback, but mimics rpclib server and
+        // improves code coverage
+        actx->on_value_complete();
     }
     catch (async_cancelled const&)
     {
@@ -145,6 +152,7 @@ loopback_service::submit_async(service_config config, std::string seri_req)
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
     auto& dom = resources_->find_domain(domain_name);
     auto actx{dom.make_local_async_context(config)};
+    actx->track_blob_file_writers();
     if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
     {
         test_ctx->apply_fail_submit_async();
