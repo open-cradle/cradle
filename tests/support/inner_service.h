@@ -19,8 +19,9 @@ make_inner_test_resources(
     std::string const& proxy_name = {},
     domain_option const& domain = no_domain_option());
 
-class non_caching_request_resolution_context final : public local_context_intf,
-                                                     public sync_context_intf
+class non_caching_request_resolution_context final
+    : public virtual local_context_intf,
+      public virtual sync_context_intf
 {
  public:
     // TODO these resources should not have caches
@@ -68,8 +69,7 @@ class non_caching_request_resolution_context final : public local_context_intf,
 
 static_assert(ValidContext<non_caching_request_resolution_context>);
 
-class caching_request_resolution_context final : public local_context_intf,
-                                                 public sync_context_intf,
+class caching_request_resolution_context final : public sync_context_intf,
                                                  public caching_context_intf
 {
  public:

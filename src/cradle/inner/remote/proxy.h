@@ -96,6 +96,8 @@ class remote_proxy
     // of which aid is the root.
     // Should be called for the root aid (returned from submit_async) only
     // when its status is SUBS_RUNNING, SELF_RUNNING or FINISHED.
+    // TODO maybe simpler and more efficient to call this only for the root
+    // context, and retrieve info for all contexts in the tree.
     virtual remote_context_spec_list
     get_sub_contexts(async_id aid)
         = 0;

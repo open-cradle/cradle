@@ -749,11 +749,13 @@ test_intrsp_req_bad_ctx()
     auto req{rq_make_some_blob<req_level>(256, false)};
     auto resources{make_inner_test_resources()};
     Ctx ctx{*resources};
+    context_intf& ctx_intf{ctx};
 
     // resolve_request() should fail due to mismatch between req and ctx:
-    // req is introspective, ctx is not
+    // req is introspective, ctx is not.
+    // Pass ctx_intf, not ctx itself, to force a runtime mismatch.
     REQUIRE_THROWS_WITH(
-        cppcoro::sync_wait(resolve_request(ctx, req)),
+        cppcoro::sync_wait(resolve_request(ctx_intf, req)),
         "failing cast_ctx_to_ref");
 }
 
@@ -784,9 +786,11 @@ TEST_CASE("resolve request - cached req, uncached ctx", tag)
 
     // ctx is uncached
     non_caching_request_resolution_context ctx{*resources};
+    context_intf& ctx_intf{ctx};
 
     // resolve_request() should fail due to mismatch between req and ctx
+    // Pass ctx_intf, not ctx itself, to force a runtime mismatch.
     REQUIRE_THROWS_WITH(
-        cppcoro::sync_wait(resolve_request(ctx, req)),
+        cppcoro::sync_wait(resolve_request(ctx_intf, req)),
         "failing cast_ctx_to_ref");
 }
