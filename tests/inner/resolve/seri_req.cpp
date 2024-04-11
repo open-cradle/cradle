@@ -61,7 +61,7 @@ TEST_CASE("resolve serialized request, DLL", tag)
 {
     std::string proxy_name{""};
     auto resources{make_inner_test_resources(proxy_name, no_domain_option())};
-    non_caching_request_resolution_context ctx{*resources};
+    testing_request_context ctx{*resources, proxy_name};
 
     auto req{rq_test_adder_v1p(7, 2)};
     int expected{7 + 2};
@@ -191,7 +191,8 @@ test_resolve_with_lock(std::string const& proxy_name, bool introspective)
             infos.end(),
             std::back_inserter(resolve_infos),
             [](tasklet_info const& info) {
-                return info.pool_name() == "resolve_request";
+                return info.pool_name() == "resolve_request"
+                       && !info.title().ends_with("/call");
             });
         // The request was resolved 3 times.
         CHECK(resolve_infos.size() == 3);

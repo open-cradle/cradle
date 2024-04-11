@@ -6,6 +6,7 @@
 #include <utility>
 
 #include <cppcoro/task.hpp>
+#include <fmt/format.h>
 
 #include <cradle/inner/caching/immutable/cache.h>
 #include <cradle/inner/caching/immutable/local_locked_record.h>
@@ -109,11 +110,10 @@ concept MatchingRequestConstraints
 // Resolves a request by directly calling its resolve_...() function.
 template<Request Req, typename Constraints>
 cppcoro::task<typename Req::value_type>
-resolve_request_direct(
+resolve_request_call(
     local_context_intf& ctx, Req const& req, Constraints constraints)
 {
     // Third decision (based on constraints if possible): sync or async
-    // TODO resolve_request_direct() introspection support?
     if constexpr (constraints.force_async)
     {
         auto& actx = cast_ctx_to_ref<local_async_context_intf>(ctx);
@@ -135,6 +135,32 @@ resolve_request_direct(
             return req.resolve_sync(ctx);
         }
     }
+}
+
+// Resolves a request by directly calling its resolve_...() function;
+// with introspection if the request wants that.
+template<Request Req, typename Constraints>
+    requires(!Req::introspective)
+cppcoro::task<typename Req::value_type>
+resolve_request_direct(
+    local_context_intf& ctx, Req const& req, Constraints constraints)
+{
+    return resolve_request_call(ctx, req, constraints);
+}
+
+template<Request Req, typename Constraints>
+    requires(Req::introspective)
+cppcoro::task<typename Req::value_type>
+resolve_request_direct(
+    local_context_intf& ctx, Req const& req, Constraints constraints)
+{
+    auto& intr_ctx = cast_ctx_to_ref<introspective_context_intf>(ctx);
+    co_await dummy_coroutine();
+    coawait_introspection guard{
+        intr_ctx,
+        "resolve_request",
+        fmt::format("{}/call", req.get_introspection_title())};
+    co_return co_await resolve_request_call(ctx, req, constraints);
 }
 
 // Resolves a memory-cached request using some sort of secondary cache.
