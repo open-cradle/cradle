@@ -841,12 +841,6 @@ concept CachedRequest = Request<Req> && is_cached(Req::caching_level)
                                    req.get_captured_id()
                                } -> std::convertible_to<captured_id const&>;
                            };
-concept CachedRequest = Request<Req> && is_cached(Req::caching_level)
-                        && requires(Req const& req) {
-                               {
-                                   req.get_captured_id()
-                               } -> std::convertible_to<captured_id const&>;
-                           };
 
 template<typename Req>
 concept MemoryCachedRequest
