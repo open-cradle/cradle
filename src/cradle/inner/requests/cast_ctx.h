@@ -74,6 +74,16 @@ struct dynamic_ctx_caster<local_async_context_intf>
 };
 
 template<>
+struct dynamic_ctx_caster<root_local_async_context_intf>
+{
+    static root_local_async_context_intf*
+    cast_ptr(context_intf* ctx)
+    {
+        return ctx->to_root_local_async_context_intf();
+    }
+};
+
+template<>
 struct dynamic_ctx_caster<remote_async_context_intf>
 {
     static remote_async_context_intf*
@@ -198,7 +208,12 @@ template<Context DestCtx, Context SrcCtx>
     requires(!std::convertible_to<SrcCtx&, DestCtx&>)
 DestCtx& cast_ctx_to_ref_base(SrcCtx& ctx)
 {
-    return *dynamic_ctx_caster<DestCtx>::cast_ptr(&ctx);
+    auto* ptr = dynamic_ctx_caster<DestCtx>::cast_ptr(&ctx);
+    if (!ptr)
+    {
+        throw std::logic_error("failing cast_ctx_to_ref");
+    }
+    return *ptr;
 }
 
 /*
@@ -287,9 +302,10 @@ throw_on_ctx_mismatch(SrcCtx& ctx)
 // Throws if the runtime type doesn't match.
 // Throws if the remotely() and/or is_async() return values don't match.
 // These function are not called when compile-time information suffices,
-// leading to a throw depending on constexpr values only, and a C4702
-// warning in a VS2019 release build.
+// leading to a throw depending on constexpr values only (and a C4702
+// warning in a VS2019 release build, before we disabled that warning).
 // Retains the original type if no cast is needed.
+// TODO cast_ctx_to_ref<introspective_context_intf>(non-intrsp) does not throw
 template<Context DestCtx, Context SrcCtx>
 DestCtx&
 cast_ctx_to_ref(SrcCtx& ctx)

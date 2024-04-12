@@ -15,7 +15,7 @@ adder_v1_func(int a, int b);
 inline auto
 rq_test_adder_v1p_impl(int a, int b)
 {
-    using props_type = adder_v1_props<false>;
+    using props_type = adder_v1_normal_props;
     return rq_function(
         props_type{request_uuid{adder_v1p_uuid}, adder_v1_title},
         adder_v1_func,
@@ -30,7 +30,7 @@ template<typename A, typename B>
 auto
 rq_test_adder_v1n_impl(A a, B b)
 {
-    using props_type = adder_v1_props<false>;
+    using props_type = adder_v1_normal_props;
     return rq_function(
         props_type{request_uuid{adder_v1n_uuid}, adder_v1_title},
         adder_v1_func,

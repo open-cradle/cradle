@@ -5,6 +5,7 @@
 
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/remote/async_exceptions.h>
+#include <cradle/inner/requests/cast_ctx.h>
 
 namespace cradle {
 
@@ -21,6 +22,18 @@ async_db::find(async_id aid)
 {
     std::scoped_lock lock{mutex_};
     return find_no_lock(aid);
+}
+
+std::shared_ptr<root_local_async_context_intf>
+async_db::find_root(async_id aid)
+{
+    auto ctx
+        = cast_ctx_to_shared_ptr<root_local_async_context_intf>(find(aid));
+    if (!ctx)
+    {
+        throw bad_async_id_error{fmt::format("async_id {} is no root", aid)};
+    }
+    return ctx;
 }
 
 std::shared_ptr<local_async_context_intf>

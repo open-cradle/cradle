@@ -1,6 +1,7 @@
 #include "inner_service.h"
 #include <cradle/deploy_dir.h>
 #include <cradle/inner/blob_file/blob_file_dir.h>
+#include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/introspection/config.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/domain_factory.h>
@@ -54,10 +55,48 @@ non_caching_request_resolution_context::non_caching_request_resolution_context(
 {
 }
 
+cppcoro::task<>
+non_caching_request_resolution_context::schedule_after(
+    std::chrono::milliseconds delay)
+{
+    auto& io_svc{resources_.the_io_service()};
+    co_await io_svc.schedule_after(delay);
+}
+
+std::shared_ptr<data_owner>
+non_caching_request_resolution_context::make_data_owner(
+    std::size_t size, bool use_shared_memory)
+{
+    if (use_shared_memory)
+    {
+        throw not_implemented_error();
+    }
+    return make_shared_buffer(size);
+}
+
 caching_request_resolution_context::caching_request_resolution_context(
     inner_resources& resources)
     : resources_{resources}
 {
+}
+
+cppcoro::task<>
+caching_request_resolution_context::schedule_after(
+    std::chrono::milliseconds delay)
+{
+    auto& io_svc{resources_.the_io_service()};
+    co_await io_svc.schedule_after(delay);
+}
+
+std::shared_ptr<data_owner>
+caching_request_resolution_context::make_data_owner(
+    std::size_t size, bool use_shared_memory)
+{
+    if (use_shared_memory)
+    {
+        throw not_implemented_error();
+    }
+    return make_shared_buffer(size);
 }
 
 } // namespace cradle

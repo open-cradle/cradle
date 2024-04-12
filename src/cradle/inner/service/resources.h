@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 
+#include <cppcoro/io_service.hpp>
 #include <cppcoro/static_thread_pool.hpp>
 #include <cppcoro/task.hpp>
 
@@ -144,6 +145,8 @@ class inner_resources
     mock_http_session&
     enable_http_mocking(bool http_is_synchronous = false);
 
+    // User code should not call this directly, but through
+    // local_context_intf::make_data_owner().
     std::shared_ptr<blob_file_writer>
     make_blob_file_writer(std::size_t size);
 
@@ -192,6 +195,9 @@ class inner_resources
 
     tasklet_admin&
     the_tasklet_admin();
+
+    cppcoro::io_service&
+    the_io_service();
 
  private:
     std::unique_ptr<inner_resources_impl> impl_;

@@ -30,14 +30,37 @@
 
 namespace cradle {
 
+class data_owner_factory
+{
+ public:
+    data_owner_factory(inner_resources& resources);
+
+    // Cf. local_context_intf
+    std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory);
+
+    void
+    track_blob_file_writers();
+
+    void
+    on_value_complete();
+
+ private:
+    inner_resources& resources_;
+    bool tracking_blob_file_writers_{false};
+    // The blob_file_writer objects allocated during the resolution of requests
+    // associated with this factory; only if track_blob_file_writers() was
+    // called.
+    std::vector<std::shared_ptr<blob_file_writer>> blob_file_writers_;
+};
+
 /*
  * An abstract base class that can be used to synchronously resolve requests.
  * It offers all context features other than the asynchronous functionality
  * (i.e., implements all context interfaces other than async_context_intf).
  */
-class sync_context_base : public local_context_intf,
+class sync_context_base : public local_sync_context_intf,
                           public remote_context_intf,
-                          public sync_context_intf,
                           public caching_context_intf,
                           public introspective_context_intf
 {
@@ -46,33 +69,6 @@ class sync_context_base : public local_context_intf,
         inner_resources& resources,
         tasklet_tracker* tasklet,
         std::string proxy_name);
-
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    remote_context_intf*
-    to_remote_context_intf() override
-    {
-        return this;
-    }
-    sync_context_intf*
-    to_sync_context_intf() override
-    {
-        return this;
-    }
-    caching_context_intf*
-    to_caching_context_intf() override
-    {
-        return this;
-    }
-    introspective_context_intf*
-    to_introspective_context_intf() override
-    {
-        return this;
-    }
 
     // context_intf
     inner_resources&
@@ -94,9 +90,15 @@ class sync_context_base : public local_context_intf,
         return false;
     }
 
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override;
+
     // local_context_intf
     std::shared_ptr<data_owner>
     make_data_owner(std::size_t size, bool use_shared_memory) override;
+
+    void
+    track_blob_file_writers() override;
 
     void
     on_value_complete() override;
@@ -137,10 +139,7 @@ class sync_context_base : public local_context_intf,
     inner_resources& resources_;
     std::string proxy_name_;
     std::vector<tasklet_tracker*> tasklets_;
-    // The blob_file_writer objects allocated during the resolution of requests
-    // associated with this context. Most useful if the context is used for
-    // resolving a single request only.
-    std::vector<std::shared_ptr<blob_file_writer>> blob_file_writers_;
+    data_owner_factory the_data_owner_factory_;
 };
 
 /*
@@ -192,11 +191,22 @@ class local_tree_context_base
         return *logger_;
     }
 
+    // Cf. local_context_intf
+    std::shared_ptr<data_owner>
+    make_data_owner(std::size_t size, bool use_shared_memory);
+
+    void
+    track_blob_file_writers();
+
+    void
+    on_value_complete();
+
  private:
     inner_resources& resources_;
     cppcoro::cancellation_source csource_;
     cppcoro::cancellation_token ctoken_;
     std::shared_ptr<spdlog::logger> logger_;
+    data_owner_factory the_data_owner_factory_;
 };
 
 /*
@@ -206,43 +216,15 @@ class local_tree_context_base
  * Relates to a single request, or a non-request argument of such a request,
  * which will be resolved on the local machine.
  */
-class local_async_context_base : public local_async_context_intf,
+class local_async_context_base : public virtual local_async_context_intf,
                                  public caching_context_intf,
-                                 public introspective_context_intf,
-                                 public test_context_intf
+                                 public introspective_context_intf
 {
  public:
     local_async_context_base(
-        std::shared_ptr<local_tree_context_base> tree_ctx,
+        local_tree_context_base& tree_ctx,
         local_async_context_base* parent,
         bool is_req);
-
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    async_context_intf*
-    to_async_context_intf() override
-    {
-        return this;
-    }
-    local_async_context_intf*
-    to_local_async_context_intf() override
-    {
-        return this;
-    }
-    caching_context_intf*
-    to_caching_context_intf() override
-    {
-        return this;
-    }
-    introspective_context_intf*
-    to_introspective_context_intf() override
-    {
-        return this;
-    }
 
     // Once created, these objects should not be moved.
     local_async_context_base(local_async_context_base const&) = delete;
@@ -258,7 +240,7 @@ class local_async_context_base : public local_async_context_intf,
     inner_resources&
     get_resources() override
     {
-        return tree_ctx_->get_resources();
+        return tree_ctx_.get_resources();
     }
 
     bool
@@ -273,9 +255,15 @@ class local_async_context_base : public local_async_context_intf,
         return true;
     }
 
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override;
+
     // local_context_intf
     std::shared_ptr<data_owner>
     make_data_owner(std::size_t size, bool use_shared_memory) override;
+
+    void
+    track_blob_file_writers() override;
 
     void
     on_value_complete() override;
@@ -324,9 +312,6 @@ class local_async_context_base : public local_async_context_intf,
         return *subs_[ix];
     }
 
-    virtual std::unique_ptr<req_visitor_intf>
-    make_ctx_tree_builder() override = 0;
-
     cppcoro::task<void>
     reschedule_if_opportune() override;
 
@@ -349,6 +334,72 @@ class local_async_context_base : public local_async_context_intf,
     update_status_error(std::string const& errmsg) override;
 
     void
+    request_cancellation() override
+    {
+        tree_ctx_.request_cancellation();
+    }
+
+    bool
+    is_cancellation_requested() const noexcept override;
+
+    void
+    throw_async_cancelled() const override;
+
+    // introspective_context_intf
+    tasklet_tracker*
+    get_tasklet() override;
+
+    void
+    push_tasklet(tasklet_tracker& tasklet) override;
+
+    void
+    pop_tasklet() override;
+
+    // Other
+    void
+    add_sub(std::size_t ix, std::shared_ptr<local_async_context_base> sub);
+
+    local_tree_context_base&
+    get_tree_context()
+    {
+        return tree_ctx_;
+    }
+
+ private:
+    local_tree_context_base& tree_ctx_;
+    local_async_context_base* parent_;
+    bool is_req_;
+    async_id const id_;
+    std::atomic<async_status> status_;
+    std::string errmsg_;
+    // Using shared_ptr ensures that local_async_context_base objects are not
+    // relocated during tree build-up / visit.
+    // It cannot be unique_ptr because there can be two owners: the parent
+    // context, and the async_db.
+    std::vector<std::shared_ptr<local_async_context_base>> subs_;
+    std::atomic<int> num_subs_not_running_;
+    std::vector<tasklet_tracker*> tasklets_;
+
+    bool
+    decide_reschedule_sub();
+};
+
+class root_local_async_context_base : public local_async_context_base,
+                                      public root_local_async_context_intf,
+                                      public test_context_intf
+{
+ public:
+    root_local_async_context_base(local_tree_context_base& tree_ctx);
+
+    // local_async_context_intf
+    void
+    update_status(async_status status) override;
+
+    // root_local_async_context_intf
+    virtual std::unique_ptr<req_visitor_intf>
+    make_ctx_tree_builder() override = 0;
+
+    void
     using_result() override;
 
     void
@@ -369,28 +420,6 @@ class local_async_context_base : public local_async_context_intf,
         return cache_record_id_.load();
     }
 
-    void
-    request_cancellation() override
-    {
-        tree_ctx_->request_cancellation();
-    }
-
-    bool
-    is_cancellation_requested() const noexcept override;
-
-    void
-    throw_async_cancelled() const override;
-
-    // introspective_context_intf
-    tasklet_tracker*
-    get_tasklet() override;
-
-    void
-    push_tasklet(tasklet_tracker& tasklet) override;
-
-    void
-    pop_tasklet() override;
-
     // test_context_intf
     virtual void
     apply_fail_submit_async() override
@@ -402,40 +431,19 @@ class local_async_context_base : public local_async_context_intf,
     {
     }
 
-    // Other
-    void
-    add_sub(std::size_t ix, std::shared_ptr<local_async_context_base> sub);
-
-    std::shared_ptr<local_tree_context_base>
-    get_tree_context()
-    {
-        return tree_ctx_;
-    }
-
  private:
-    std::shared_ptr<local_tree_context_base> tree_ctx_;
-    local_async_context_base* parent_;
-    bool is_req_;
-    async_id id_;
-    std::atomic<async_status> status_;
-    std::string errmsg_;
     bool using_result_{false};
     blob result_;
     std::atomic<remote_cache_record_id> cache_record_id_;
-    // Using shared_ptr ensures that local_async_context_base objects are not
-    // relocated during tree build-up / visit.
-    // It cannot be unique_ptr because there can be two owners: the parent
-    // context, and the async_db.
-    std::vector<std::shared_ptr<local_async_context_base>> subs_;
-    std::atomic<int> num_subs_not_running_;
-    std::vector<std::shared_ptr<blob_file_writer>> blob_file_writers_;
-    std::vector<tasklet_tracker*> tasklets_;
 
     void
     check_set_get_result_precondition(bool is_get_result);
+};
 
-    bool
-    decide_reschedule_sub();
+class non_root_local_async_context_base : public local_async_context_base
+{
+ public:
+    using local_async_context_base::local_async_context_base;
 };
 
 /*
@@ -472,9 +480,7 @@ class local_context_tree_builder_base : public req_visitor_intf
 
     virtual std::shared_ptr<local_async_context_base>
     make_sub_ctx(
-        std::shared_ptr<local_tree_context_base> tree_ctx,
-        std::size_t ix,
-        bool is_req)
+        local_tree_context_base& tree_ctx, std::size_t ix, bool is_req)
         = 0;
 };
 
@@ -513,6 +519,19 @@ class proxy_async_tree_context_base
         return resources_.get_proxy(proxy_name_);
     }
 
+    // Cancels associated proxy_async_context_base::schedule_after() calls
+    void
+    request_local_cancellation()
+    {
+        csource_.request_cancellation();
+    }
+
+    cppcoro::cancellation_token
+    get_cancellation_token()
+    {
+        return ctoken_;
+    }
+
     spdlog::logger&
     get_logger() const noexcept
     {
@@ -522,6 +541,8 @@ class proxy_async_tree_context_base
  private:
     inner_resources& resources_;
     std::string proxy_name_;
+    cppcoro::cancellation_source csource_;
+    cppcoro::cancellation_token ctoken_;
     std::shared_ptr<spdlog::logger> logger_;
 };
 
@@ -545,8 +566,9 @@ class proxy_async_tree_context_base
 class proxy_async_context_base : public remote_async_context_intf
 {
  public:
-    proxy_async_context_base(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx);
+    // tree_ctx will be owned by a derived object, so may not exist in
+    // ~proxy_async_context_base().
+    proxy_async_context_base(proxy_async_tree_context_base& tree_ctx);
 
     // Once created, these objects should not be moved.
     proxy_async_context_base(proxy_async_context_base const&) = delete;
@@ -562,7 +584,7 @@ class proxy_async_context_base : public remote_async_context_intf
     inner_resources&
     get_resources() override
     {
-        return tree_ctx_->get_resources();
+        return tree_ctx_.get_resources();
     }
 
     bool
@@ -577,17 +599,20 @@ class proxy_async_context_base : public remote_async_context_intf
         return true;
     }
 
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override;
+
     // remote_context_intf
     std::string const&
     proxy_name() const override
     {
-        return tree_ctx_->get_proxy_name();
+        return tree_ctx_.get_proxy_name();
     }
 
     remote_proxy&
     get_proxy() const override
     {
-        return tree_ctx_->get_proxy();
+        return tree_ctx_.get_proxy();
     }
 
     virtual std::string const&
@@ -625,7 +650,7 @@ class proxy_async_context_base : public remote_async_context_intf
     }
 
  protected:
-    std::shared_ptr<proxy_async_tree_context_base> tree_ctx_;
+    proxy_async_tree_context_base& tree_ctx_;
     async_id id_;
     std::atomic<async_id> remote_id_{NO_ASYNC_ID};
 
@@ -637,9 +662,7 @@ class proxy_async_context_base : public remote_async_context_intf
     std::vector<std::unique_ptr<proxy_async_context_base>> subs_;
 
     virtual std::unique_ptr<proxy_async_context_base>
-    make_sub_ctx(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx, bool is_req)
-        = 0;
+    make_sub_ctx(proxy_async_tree_context_base& tree_ctx, bool is_req) = 0;
 
     void
     ensure_subs() const;
@@ -656,51 +679,10 @@ class proxy_async_context_base : public remote_async_context_intf
  * Context that can be used to asynchronously resolve root requests on a remote
  * machine.
  */
-class root_proxy_async_context_base : public proxy_async_context_base,
-                                      public introspective_context_intf
+class root_proxy_async_context_base : public proxy_async_context_base
 {
  public:
-    root_proxy_async_context_base(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx);
-
-    virtual ~root_proxy_async_context_base();
-
-    // Some redundant redefinitions to prevent MSVC C4250
-    remote_context_intf*
-    to_remote_context_intf() override
-    {
-        return this;
-    }
-    async_context_intf*
-    to_async_context_intf() override
-    {
-        return this;
-    }
-    remote_async_context_intf*
-    to_remote_async_context_intf() override
-    {
-        return this;
-    }
-    introspective_context_intf*
-    to_introspective_context_intf() override
-    {
-        return this;
-    }
-    inner_resources&
-    get_resources() override
-    {
-        return proxy_async_context_base::get_resources();
-    }
-    bool
-    remotely() const override
-    {
-        return proxy_async_context_base::remotely();
-    }
-    bool
-    is_async() const override
-    {
-        return proxy_async_context_base::is_async();
-    }
+    root_proxy_async_context_base(proxy_async_tree_context_base& tree_ctx);
 
     // remote_context_intf
     std::string const&
@@ -721,18 +703,12 @@ class root_proxy_async_context_base : public proxy_async_context_base,
     void
     fail_remote_id() noexcept override;
 
-    // introspective_context_intf
-    tasklet_tracker*
-    get_tasklet() override;
-
-    void
-    push_tasklet(tasklet_tracker& tasklet) override;
-
-    void
-    pop_tasklet() override;
-
  protected:
-    std::vector<tasklet_tracker*> tasklets_;
+    // To be called from a derived object's destructor. The functionality
+    // cannot be in ~root_proxy_async_context_base() as the tree_ctx_ object
+    // may no longer exist at that time.
+    void
+    finish_remote() noexcept;
 
  private:
     std::promise<async_id> remote_id_promise_;
@@ -744,9 +720,7 @@ class root_proxy_async_context_base : public proxy_async_context_base,
 
     // proxy_async_context_base
     std::unique_ptr<proxy_async_context_base>
-    make_sub_ctx(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx,
-        bool is_req) override
+    make_sub_ctx(proxy_async_tree_context_base& tree_ctx, bool is_req) override
         = 0;
 };
 
@@ -758,9 +732,7 @@ class non_root_proxy_async_context_base : public proxy_async_context_base
 {
  public:
     non_root_proxy_async_context_base(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx, bool is_req);
-
-    virtual ~non_root_proxy_async_context_base();
+        proxy_async_tree_context_base& tree_ctx, bool is_req);
 
     // remote_context_intf
     std::string const&
@@ -789,9 +761,7 @@ class non_root_proxy_async_context_base : public proxy_async_context_base
 
     // proxy_async_context_base
     std::unique_ptr<proxy_async_context_base>
-    make_sub_ctx(
-        std::shared_ptr<proxy_async_tree_context_base> tree_ctx,
-        bool is_req) override
+    make_sub_ctx(proxy_async_tree_context_base& tree_ctx, bool is_req) override
         = 0;
 };
 

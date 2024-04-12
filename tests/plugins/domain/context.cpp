@@ -1,6 +1,7 @@
 #include <catch2/catch.hpp>
 
 #include <cradle/inner/introspection/tasklet.h>
+#include <cradle/inner/introspection/tasklet_impl.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/context.h>
 
@@ -8,56 +9,66 @@
 
 using namespace cradle;
 
-TEST_CASE("get_resources()", "[testing][context]")
+static char const tag[] = "[testing][context]";
+
+TEST_CASE("get_resources()", tag)
 {
     auto resources{make_inner_test_resources()};
-    testing_request_context ctx{*resources, nullptr, ""};
+    testing_request_context ctx{*resources, ""};
 
     REQUIRE(&ctx.get_resources() == &*resources);
     REQUIRE(&ctx.get_resources().memory_cache() == &resources->memory_cache());
 }
 
-TEST_CASE("remotely(), default", "[testing][context]")
+TEST_CASE("remotely(), default", tag)
 {
     auto resources{make_inner_test_resources()};
-    testing_request_context ctx{*resources, nullptr, ""};
+    testing_request_context ctx{*resources, ""};
 
     REQUIRE(!ctx.remotely());
 }
 
-TEST_CASE("remotely(), set", "[testing][context]")
+TEST_CASE("remotely(), set", tag)
 {
     auto resources{make_inner_test_resources()};
-    testing_request_context ctx{*resources, nullptr, "some_proxy"};
+    testing_request_context ctx{*resources, "some_proxy"};
 
     REQUIRE(ctx.remotely());
 }
 
-TEST_CASE("no initial tasklet", "[testing][context]")
+TEST_CASE("no initial tasklet", tag)
 {
     auto resources{make_inner_test_resources()};
-    testing_request_context ctx{*resources, nullptr, ""};
+    testing_request_context ctx{*resources, ""};
 
     REQUIRE(ctx.get_tasklet() == nullptr);
 }
 
-TEST_CASE("with initial tasklet", "[testing][context]")
+TEST_CASE("with initial tasklet", tag)
 {
     auto resources{make_inner_test_resources()};
     auto& admin{resources->the_tasklet_admin()};
-    auto t0 = create_tasklet_tracker(admin, "pool", "t0");
-    testing_request_context ctx{*resources, t0, ""};
+    admin.set_capturing_enabled(true);
+    std::string pool_name{"pool"};
+    std::string title{"title"};
+    testing_request_context ctx{
+        *resources, "", root_tasklet_spec{pool_name, title}};
 
-    REQUIRE(ctx.get_tasklet() == t0);
+    auto* tasklet = ctx.get_tasklet();
+    REQUIRE(tasklet != nullptr);
+    auto* impl = dynamic_cast<tasklet_impl*>(tasklet);
+    REQUIRE(impl != nullptr);
+    REQUIRE(impl->pool_name() == pool_name);
+    REQUIRE(impl->title() == title);
 }
 
-TEST_CASE("push/pop tasklet", "[testing][context]")
+TEST_CASE("push/pop tasklet", tag)
 {
     auto resources{make_inner_test_resources()};
     auto& admin{resources->the_tasklet_admin()};
     auto t0 = create_tasklet_tracker(admin, "pool", "t0");
     auto t1 = create_tasklet_tracker(admin, "pool", "t1");
-    testing_request_context ctx{*resources, nullptr, ""};
+    testing_request_context ctx{*resources, ""};
 
     REQUIRE(ctx.get_tasklet() == nullptr);
     ctx.push_tasklet(*t0);
@@ -70,18 +81,18 @@ TEST_CASE("push/pop tasklet", "[testing][context]")
     REQUIRE(ctx.get_tasklet() == nullptr);
 }
 
-TEST_CASE("get proxy name", "[testing][context]")
+TEST_CASE("get proxy name", tag)
 {
     auto resources{make_inner_test_resources()};
-    testing_request_context ctx{*resources, nullptr, "the name"};
+    testing_request_context ctx{*resources, "the name"};
 
     REQUIRE(ctx.proxy_name() == "the name");
 }
 
-TEST_CASE("domain_name()", "[testing][context]")
+TEST_CASE("domain_name()", tag)
 {
     auto resources{make_inner_test_resources()};
-    testing_request_context ctx{*resources, nullptr, ""};
+    testing_request_context ctx{*resources, ""};
 
     REQUIRE(ctx.domain_name() == "testing");
 }

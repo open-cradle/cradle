@@ -2,21 +2,8 @@
 
 #include <catch2/catch.hpp>
 
-// Some "cast context reference to..." test cases lead to a "throw" depending
-// on constexpr values only.
-// The MSVC2019 compiler reports warning C4702 in a release build,
-// complaining about unreachable code in cast_ctx_to_ref().
-// That claim is correct, but we need to disable the warning here if we want
-// to have these test cases.
-#if defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4702)
-#endif
 #include <cradle/inner/requests/cast_ctx.h>
 #include <cradle/inner/requests/generic.h>
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
 
 using namespace cradle;
 
@@ -28,6 +15,12 @@ class local_context_mixin : public local_context_intf
 {
     std::shared_ptr<data_owner>
     make_data_owner(std::size_t size, bool use_shared_memory) override
+    {
+        throw not_implemented_error();
+    }
+
+    void
+    track_blob_file_writers() override
     {
         throw not_implemented_error();
     }
@@ -115,18 +108,6 @@ class my_local_only_context final : public local_context_mixin,
                                     public sync_context_mixin
 {
  public:
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    sync_context_intf*
-    to_sync_context_intf() override
-    {
-        return this;
-    }
-
     inner_resources&
     get_resources() override
     {
@@ -144,6 +125,12 @@ class my_local_only_context final : public local_context_mixin,
     {
         throw not_implemented_error();
     }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override
+    {
+        throw not_implemented_error();
+    }
 };
 static_assert(ValidContext<my_local_only_context>);
 
@@ -151,18 +138,6 @@ class my_remote_only_context final : public remote_context_mixin,
                                      public sync_context_mixin
 {
  public:
-    // Some redundant redefinitions to prevent MSVC C4250
-    remote_context_intf*
-    to_remote_context_intf() override
-    {
-        return this;
-    }
-    sync_context_intf*
-    to_sync_context_intf() override
-    {
-        return this;
-    }
-
     inner_resources&
     get_resources() override
     {
@@ -180,6 +155,12 @@ class my_remote_only_context final : public remote_context_mixin,
     {
         throw not_implemented_error();
     }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override
+    {
+        throw not_implemented_error();
+    }
 };
 static_assert(ValidContext<my_remote_only_context>);
 
@@ -187,18 +168,6 @@ class my_sync_only_context final : public local_context_mixin,
                                    public sync_context_mixin
 {
  public:
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    sync_context_intf*
-    to_sync_context_intf() override
-    {
-        return this;
-    }
-
     inner_resources&
     get_resources() override
     {
@@ -216,6 +185,12 @@ class my_sync_only_context final : public local_context_mixin,
     {
         throw not_implemented_error("my_sync_only_context::is_async()");
     }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override
+    {
+        throw not_implemented_error();
+    }
 };
 static_assert(ValidContext<my_sync_only_context>);
 
@@ -223,18 +198,6 @@ class my_async_only_context final : public local_context_mixin,
                                     public async_context_mixin
 {
  public:
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    async_context_intf*
-    to_async_context_intf() override
-    {
-        return this;
-    }
-
     inner_resources&
     get_resources() override
     {
@@ -252,6 +215,12 @@ class my_async_only_context final : public local_context_mixin,
     {
         throw not_implemented_error("my_async_only_context::is_async()");
     }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override
+    {
+        throw not_implemented_error();
+    }
 };
 static_assert(ValidContext<my_async_only_context>);
 
@@ -266,28 +235,6 @@ class my_generic_context : public local_context_mixin,
     my_generic_context(int remotely, int is_async)
         : remotely_{remotely}, is_async_{is_async}
     {
-    }
-
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    remote_context_intf*
-    to_remote_context_intf() override
-    {
-        return this;
-    }
-    sync_context_intf*
-    to_sync_context_intf() override
-    {
-        return this;
-    }
-    async_context_intf*
-    to_async_context_intf() override
-    {
-        return this;
     }
 
     inner_resources&
@@ -316,6 +263,12 @@ class my_generic_context : public local_context_mixin,
             throw std::range_error("is_async");
         }
         return static_cast<bool>(is_async_);
+    }
+
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override
+    {
+        throw not_implemented_error();
     }
 
  private:

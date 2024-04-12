@@ -1,6 +1,7 @@
 #ifndef CRADLE_INNER_REQUESTS_GENERIC_H
 #define CRADLE_INNER_REQUESTS_GENERIC_H
 
+#include <chrono>
 #include <concepts>
 #include <memory>
 #include <string>
@@ -178,6 +179,7 @@ class remote_context_intf;
 class sync_context_intf;
 class async_context_intf;
 class local_async_context_intf;
+class root_local_async_context_intf;
 class remote_async_context_intf;
 class caching_context_intf;
 class introspective_context_intf;
@@ -211,6 +213,11 @@ class context_intf
     }
     virtual local_async_context_intf*
     to_local_async_context_intf()
+    {
+        return nullptr;
+    }
+    virtual root_local_async_context_intf*
+    to_root_local_async_context_intf()
     {
         return nullptr;
     }
@@ -250,6 +257,11 @@ class context_intf
     virtual bool
     is_async() const
         = 0;
+
+    // Delays the calling coroutine for the specified duration.
+    // Cancellable if the context supports that.
+    virtual cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) = 0;
 };
 
 /*
@@ -276,9 +288,20 @@ class local_context_intf : public virtual context_intf
     virtual std::shared_ptr<data_owner>
     make_data_owner(std::size_t size, bool use_shared_memory) = 0;
 
-    // The framework must call this once the value has been completely
-    // resolved. It will flush any shared memory regions allocated during the
-    // resolution.
+    // Intended for an (rpclib) server, which must call this function
+    // immediately after creating the context object. The effect is that the
+    // context will track all shared memory regions allocated via
+    // make_data_owner(), such that they can be properly flushed via
+    // on_value_complete().
+    virtual void
+    track_blob_file_writers()
+        = 0;
+
+    // Intended for an (rpclib) server, which must call this function before
+    // sending a request resolution result back to the client. The function
+    // flushes any shared memory regions allocated during the resolution.
+    // Note that the rpclib server creates a dedicated context object for each
+    // request resolution.
     virtual void
     on_value_complete()
         = 0;
@@ -345,6 +368,14 @@ class sync_context_intf : public virtual context_intf
     }
 };
 
+// Context that can be used for synchronously resolving requests; at least
+// locally, in addition remotely if the actual context class also implements
+// remote_context_intf.
+class local_sync_context_intf : public local_context_intf,
+                                public sync_context_intf
+{
+};
+
 // Thrown when an asynchronous request resolution is cancelled
 class async_cancelled : public std::runtime_error
 {
@@ -361,6 +392,12 @@ class async_error : public std::runtime_error
 // One context object will be created for each task (coroutine);
 // these objects form a tree with the same topology as the request tree.
 // Thus, a context object tracks progress for a single (sub)request.
+//
+// The implication is that in general a context tree cannot be reused across
+// resolve_request() calls. The exception is when retrying a resolve operation,
+// where reuse is allowed and even desirable, as successful subresults from a
+// former attempt could potentially be reused, avoiding re-resolution of that
+// part of the request tree.
 class async_context_intf : public virtual context_intf
 {
  public:
@@ -413,25 +450,13 @@ class async_context_intf : public virtual context_intf
 
 // Context for an asynchronous task running on the local machine
 class local_async_context_intf : public local_context_intf,
-                                 public async_context_intf
+                                 public virtual async_context_intf
 {
  public:
     virtual ~local_async_context_intf() = default;
 
     local_async_context_intf*
     to_local_async_context_intf() override
-    {
-        return this;
-    }
-
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    async_context_intf*
-    to_async_context_intf() override
     {
         return this;
     }
@@ -448,13 +473,6 @@ class local_async_context_intf : public local_context_intf,
     virtual local_async_context_intf&
     get_local_sub(std::size_t ix)
         = 0;
-
-    // Returns a visitor that will traverse a request tree and build a
-    // corresponding tree of subcontexts, under the current context object.
-    // Should be called only for a root context (a context that forms the
-    // root of its context tree).
-    virtual std::unique_ptr<req_visitor_intf>
-    make_ctx_tree_builder() = 0;
 
     // Reschedule execution for this context on another thread if this is
     // likely to improve performance due to increased parallelism.
@@ -477,11 +495,11 @@ class local_async_context_intf : public local_context_intf,
         = 0;
 
     // Updates the status of this task.
-    // If status == FINISHED, also recursively updates subtasks
-    // (needed if this task's result came from a cache).
+    // If status is FINISHED or AWAITING_RESULT, also recursively updates
+    // subtasks (needed if this task's result came from a cache).
     // If status == FINISHED and using_result() was called, the new status
     // will be AWAITING_RESULT.
-    // status must not be AWAITING_RESULT
+    // TODO think of something less tricky for update_status()
     // TODO need to the the same if status == FAILED?
     // TODO keep history of an async request e.g.
     // TODO vector<tuple<async_status, timestamp>>
@@ -496,6 +514,52 @@ class local_async_context_intf : public local_context_intf,
     virtual void
     update_status_error(std::string const& errmsg)
         = 0;
+
+    // Requests cancellation of all tasks in the same context tree.
+    // This is a non-coroutine version of
+    // async_context_intf::request_cancellation().
+    //
+    // Note that after this call, tasks can still finish successfully or fail.
+    // Thus, a "cancelling" state would not be meaningful.
+    //
+    // Also note that cancellation depends on cooperation by the request
+    // implementation. In particular, an implementation that has no access to
+    // the context object (such as a non-coroutine function_request) is unable
+    // to cooperate. Thus, a cancellation request just may have no effect.
+    virtual void
+    request_cancellation()
+        = 0;
+
+    // Returns true if cancellation has been requested on this context or
+    // another one in the same context tree.
+    // The intention is that an asynchronous task will call this function on
+    // polling basis, and call throw_async_cancelled() when it returns true.
+    virtual bool
+    is_cancellation_requested() const noexcept
+        = 0;
+
+    // Throws async_cancelled. Should be called (only) when
+    // is_cancellation_requested() returns true.
+    virtual void
+    throw_async_cancelled() const
+        = 0;
+};
+
+// Context for an asynchronous task running on the local machine that forms the
+// root of a context tree.
+class root_local_async_context_intf : public virtual local_async_context_intf
+{
+ public:
+    root_local_async_context_intf*
+    to_root_local_async_context_intf() override
+    {
+        return this;
+    }
+
+    // Returns a visitor that will traverse a request tree and build a
+    // corresponding tree of subcontexts, under the current context object.
+    virtual std::unique_ptr<req_visitor_intf>
+    make_ctx_tree_builder() = 0;
 
     // Calling this function indicates that the context will be used as
     // mailbox between a result producer (calling set_result()) and a result
@@ -535,60 +599,19 @@ class local_async_context_intf : public local_context_intf,
     virtual remote_cache_record_id
     get_cache_record_id() const
         = 0;
-
-    // Requests cancellation of all tasks in the same context tree.
-    // This is a non-coroutine version of
-    // async_context_intf::request_cancellation().
-    //
-    // Note that after this call, tasks can still finish successfully or fail.
-    // Thus, a "cancelling" state would not be meaningful.
-    //
-    // Also note that cancellation depends on cooperation by the request
-    // implementation. In particular, an implementation that has no access to
-    // the context object (such as a non-coroutine function_request) is unable
-    // to cooperate. Thus, a cancellation request just may have no effect.
-    virtual void
-    request_cancellation()
-        = 0;
-
-    // Returns true if cancellation has been requested on this context or
-    // another one in the same context tree.
-    // The intention is that an asynchronous task will all this function on
-    // polling basis, and call throw_async_cancelled() when it returns true.
-    virtual bool
-    is_cancellation_requested() const noexcept
-        = 0;
-
-    // Throws async_cancelled. Should be called (only) when
-    // is_cancellation_requested() returns true.
-    virtual void
-    throw_async_cancelled() const
-        = 0;
 };
 
 // Context for an asynchronous task running on a (remote) server.
 // This object will act as a proxy for a local_async_context_intf object on
 // the server.
 class remote_async_context_intf : public remote_context_intf,
-                                  public async_context_intf
+                                  public virtual async_context_intf
 {
  public:
     virtual ~remote_async_context_intf() = default;
 
     remote_async_context_intf*
     to_remote_async_context_intf() override
-    {
-        return this;
-    }
-
-    // Some redundant redefinitions to prevent MSVC C4250
-    remote_context_intf*
-    to_remote_context_intf() override
-    {
-        return this;
-    }
-    async_context_intf*
-    to_async_context_intf() override
     {
         return this;
     }
@@ -627,9 +650,15 @@ class caching_context_intf : public virtual context_intf
     }
 };
 
-// Context interface needed for resolving an introspective request.
-// Implicitly local-only although not derived from local_context_intf,
-// but an implementation class should do that.
+/*
+ * Context interface needed for resolving an introspective request.
+ * A context class implementing this interface should have a stack of
+ * tasklet_tracker objects. It may get an initial push_tasklet() call when the
+ * context is created. A local context will then get nested push_tasklet() /
+ * pop_tasklet() calls during request resolution. These nested calls won't
+ * happen during remote resolution, so a remote-only context class probably
+ * should not implement this interface.
+ */
 class introspective_context_intf : public virtual context_intf
 {
  public:
@@ -646,13 +675,52 @@ class introspective_context_intf : public virtual context_intf
     get_tasklet()
         = 0;
 
+    // Enter a nested introspection state
     virtual void
     push_tasklet(tasklet_tracker& tasklet)
         = 0;
 
-    // Must match a preceding push_tasklet() call
+    // Leave the current nested introspection state;
+    // must match a preceding push_tasklet() call.
     virtual void
     pop_tasklet()
+        = 0;
+};
+
+/*
+ * A context that can be used for asynchronously / locally resolving more than
+ * once; unlike a "normal" root_local_async_context_intf context, that can be
+ * used for just one resolution.
+ *
+ * API for the framework; the client should interact with the context object
+ * that implements this interface.
+ */
+class local_async_ctx_owner_intf : public virtual context_intf
+{
+ public:
+    // Prepares this context for the first or next resolution.
+    // Creates and returns the root async context object; sub-context objects
+    // will e.g. be created by resolve_request().
+    virtual root_local_async_context_intf&
+    prepare_for_local_resolution()
+        = 0;
+};
+
+/*
+ * A context that can be used for asynchronously / remotely resolving more than
+ * once; unlike a "normal" remote_async_context_intf context, that can be used
+ * for just one resolution.
+ *
+ * API for the framework; the client should interact with the context object
+ * that implements this interface.
+ */
+class remote_async_ctx_owner_intf : public virtual context_intf
+{
+ public:
+    // Prepares this context for the first or next resolution.
+    // Creates and returns the root async context object.
+    virtual remote_async_context_intf&
+    prepare_for_remote_resolution()
         = 0;
 };
 
@@ -710,6 +778,30 @@ concept ValidContext
           !std::is_final_v<Ctx> || SyncContext<Ctx> || AsyncContext<Ctx>);
 
 /*
+ * A resolution retrier offers support for handling a failed resolution, by
+ * retrying the resolution or not.
+ *
+ * If retryable is false, the resolution is never retried; otherwise, the
+ * retrier must implement
+ *   std::chrono::milliseconds
+ *   handle_exception(int attempt, std::exception const& exc) const;
+ * which must be called from an exception handler. The function either returns
+ * the time to wait before the next resolution attempt, or throws if the
+ * maximum number of attempts has been exceeded.
+ */
+template<typename T>
+concept MaybeResolutionRetrier
+    = std::same_as<std::remove_const_t<decltype(T::retryable)>, bool>;
+
+template<typename T>
+concept ResolutionRetrier
+    = MaybeResolutionRetrier<T> && requires(T const& obj) {
+          {
+              obj.handle_exception(0, std::runtime_error{""})
+          } -> std::convertible_to<std::chrono::milliseconds>;
+      };
+
+/*
  * A request is something that can be resolved, resulting in a result
  *
  * Attributes:
@@ -735,6 +827,7 @@ concept Request = requires {
     requires std::same_as<std::remove_const_t<decltype(T::is_proxy)>, bool>;
     requires std::
         same_as<std::remove_const_t<decltype(T::introspective)>, bool>;
+    requires std::same_as<std::remove_const_t<decltype(T::retryable)>, bool>;
 };
 // TODO say something about resolve_sync()/_async() as we used to do
 
@@ -742,6 +835,12 @@ template<typename T>
 concept UncachedRequest = Request<T> && is_uncached(T::caching_level);
 
 template<typename Req>
+concept CachedRequest = Request<Req> && is_cached(Req::caching_level)
+                        && requires(Req const& req) {
+                               {
+                                   req.get_captured_id()
+                               } -> std::convertible_to<captured_id const&>;
+                           };
 concept CachedRequest = Request<Req> && is_cached(Req::caching_level)
                         && requires(Req const& req) {
                                {
@@ -782,6 +881,14 @@ concept CachedIntrospectiveRequest
 template<typename Req>
 concept CachedNonIntrospectiveRequest
     = CachedRequest<Req> && NonIntrospectiveRequest<Req>;
+
+// By having retryable=true, a request advertises itself as being retryable...
+template<typename Req>
+concept RetryableRequest = Request<Req> && Req::retryable;
+// ... but it also needs to implement the corresponding function.
+template<typename Req>
+concept ValidRetryableRequest
+    = RetryableRequest<Req> && ResolutionRetrier<Req>;
 
 // A request that accepts visitors. A visitor will recursively visit all
 // subrequests, so all of these should be visitable as well.

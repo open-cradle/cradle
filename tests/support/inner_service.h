@@ -26,18 +26,6 @@ class non_caching_request_resolution_context final : public local_context_intf,
     // TODO these resources should not have caches
     non_caching_request_resolution_context(inner_resources& resources);
 
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    sync_context_intf*
-    to_sync_context_intf() override
-    {
-        return this;
-    }
-
     // context_intf
     inner_resources&
     get_resources() override
@@ -57,17 +45,21 @@ class non_caching_request_resolution_context final : public local_context_intf,
         return false;
     }
 
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override;
+
     // local_context_intf
     std::shared_ptr<data_owner>
-    make_data_owner(std::size_t size, bool use_shared_memory) override
+    make_data_owner(std::size_t size, bool use_shared_memory) override;
+
+    void
+    track_blob_file_writers() override
     {
-        throw not_implemented_error();
     }
 
     void
     on_value_complete() override
     {
-        throw not_implemented_error();
     }
 
  private:
@@ -83,23 +75,6 @@ class caching_request_resolution_context final : public local_context_intf,
  public:
     caching_request_resolution_context(inner_resources& resources);
 
-    // Some redundant redefinitions to prevent MSVC C4250
-    local_context_intf*
-    to_local_context_intf() override
-    {
-        return this;
-    }
-    sync_context_intf*
-    to_sync_context_intf() override
-    {
-        return this;
-    }
-    caching_context_intf*
-    to_caching_context_intf() override
-    {
-        return this;
-    }
-
     // context_intf
     inner_resources&
     get_resources() override
@@ -119,17 +94,21 @@ class caching_request_resolution_context final : public local_context_intf,
         return false;
     }
 
+    cppcoro::task<>
+    schedule_after(std::chrono::milliseconds delay) override;
+
     // local_context_intf
     std::shared_ptr<data_owner>
-    make_data_owner(std::size_t size, bool use_shared_memory) override
+    make_data_owner(std::size_t size, bool use_shared_memory) override;
+
+    void
+    track_blob_file_writers() override
     {
-        throw not_implemented_error();
     }
 
     void
     on_value_complete() override
     {
-        throw not_implemented_error();
     }
 
  private:

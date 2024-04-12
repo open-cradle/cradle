@@ -7,11 +7,14 @@
 
 namespace cradle {
 
-template<bool is_proxy>
-using adder_v1_props = request_props<
+using adder_v1_normal_props
+    = request_props<caching_level_type::none, request_function_t::plain, true>;
+
+using adder_v1_proxy_props = request_props<
     caching_level_type::none,
-    is_proxy ? request_function_t::proxy_plain : request_function_t::plain,
-    true>;
+    request_function_t::proxy_plain,
+    true,
+    proxy_retrier>;
 
 static inline std::string const adder_v1p_uuid{"test-adder-v1p"};
 static inline std::string const adder_v1n_uuid{"test-adder-v1n"};

@@ -280,6 +280,22 @@ inner_resources::the_tasklet_admin()
     return impl_->the_tasklet_admin_;
 }
 
+cppcoro::io_service&
+inner_resources::the_io_service()
+{
+    return impl_->io_svc_;
+}
+
+static void
+io_svc_func(inner_resources_impl& impl)
+{
+    auto& io_svc{impl.the_io_service()};
+    auto& logger{impl.the_logger()};
+    logger.info("io_svc_func start");
+    auto num_events = io_svc.process_events();
+    logger.info("io_svc_func stop; got {} events", num_events);
+}
+
 inner_resources_impl::inner_resources_impl(
     inner_resources& wrapper, service_config const& config)
     : config_{config},
@@ -290,6 +306,7 @@ inner_resources_impl::inner_resources_impl(
       the_dlls_{wrapper},
       the_tasklet_admin_{config.get_bool_or_default(
           introspection_config_keys::FORCE_FINISH, false)},
+      io_svc_thread_{io_svc_func, std::ref(*this)},
       http_pool_{cppcoro::static_thread_pool(
           static_cast<uint32_t>(config.get_number_or_default(
               inner_config_keys::HTTP_CONCURRENCY, 36)))},
@@ -297,6 +314,23 @@ inner_resources_impl::inner_resources_impl(
           static_cast<uint32_t>(config.get_number_or_default(
               inner_config_keys::ASYNC_CONCURRENCY, 20)))}
 {
+}
+
+inner_resources_impl::~inner_resources_impl()
+{
+    auto& logger{*logger_};
+    logger.info("stopping io_svc");
+    io_svc_.stop(); // noexcept
+    logger.info("stopped io_svc");
+    try
+    {
+        io_svc_thread_.join();
+    }
+    catch (std::exception const& e)
+    {
+        logger.info("join threw {}", e.what());
+    }
+    logger.info("joined io_svc_thread_");
 }
 
 http_connection_interface&

@@ -34,7 +34,7 @@ make_test_uuid(int ext)
 template<typename Ctx, typename Req, typename Constraints>
 cppcoro::task<void>
 test_resolve_async_coro(
-    Ctx& ctx,
+    Ctx& main_ctx,
     Req const& req,
     Constraints constraints,
     bool requests_are_normalized,
@@ -42,7 +42,8 @@ test_resolve_async_coro(
     int delay0,
     int delay1)
 {
-    auto res = co_await resolve_request(ctx, req, constraints);
+    auto res = co_await resolve_request(main_ctx, req, constraints);
+    auto& ctx = main_ctx.get_async_root();
 
     REQUIRE(res == (loops + delay0) + (loops + delay1));
     REQUIRE(ctx.is_req());
@@ -137,19 +138,14 @@ test_resolve_async_across_rpc(
         rq_cancellable_coro<level>(loops, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
     ResolutionConstraintsRemoteAsync constraints;
+    atst_context ctx{resources, proxy_name};
 
     // TODO clear the memory cache on the remote and check the duration
-    auto tree_ctx0{
-        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
-    auto ctx0{root_proxy_atst_context{tree_ctx0}};
-    test_resolve_async(ctx0, req, constraints, true, loops, delay0, delay1);
+    test_resolve_async(ctx, req, constraints, true, loops, delay0, delay1);
 
     // TODO check the duration which should be fast because the result now
     // comes from the memory cache on the remote
-    auto tree_ctx1{
-        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
-    auto ctx1{root_proxy_atst_context{tree_ctx1}};
-    test_resolve_async(ctx1, req, constraints, true, loops, delay0, delay1);
+    test_resolve_async(ctx, req, constraints, true, loops, delay0, delay1);
 }
 
 } // namespace
@@ -174,12 +170,10 @@ TEST_CASE("resolve async locally - raw args, coro", tag)
         rq_function(props1, cancellable_coro, loops, delay0),
         rq_function(props2, cancellable_coro, loops, delay1))};
     auto resources{make_inner_test_resources()};
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
-    auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};
+    atst_context ctx{*resources};
 
-    ResolutionConstraintsLocalAsync constraints;
-    test_resolve_async(
-        *root_ctx, req, constraints, false, loops, delay0, delay1);
+    ResolutionConstraintsLocalAsyncRoot constraints;
+    test_resolve_async(ctx, req, constraints, false, loops, delay0, delay1);
 }
 
 TEST_CASE("resolve async locally - raw args, non-coro", tag)
@@ -200,12 +194,10 @@ TEST_CASE("resolve async locally - raw args, non-coro", tag)
         rq_function(props1, non_cancellable_func, loops, delay0),
         rq_function(props2, non_cancellable_func, loops, delay1))};
     auto resources{make_inner_test_resources()};
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
-    auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};
+    atst_context ctx{*resources};
 
-    ResolutionConstraintsLocalAsync constraints;
-    test_resolve_async(
-        *root_ctx, req, constraints, false, loops, delay0, delay1);
+    ResolutionConstraintsLocalAsyncRoot constraints;
+    test_resolve_async(ctx, req, constraints, false, loops, delay0, delay1);
 }
 
 TEST_CASE("resolve async locally - normalized args", tag)
@@ -218,12 +210,10 @@ TEST_CASE("resolve async locally - normalized args", tag)
         rq_cancellable_coro<level>(loops, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
     auto resources{make_inner_test_resources()};
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
-    auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};
+    atst_context ctx{*resources};
 
-    ResolutionConstraintsLocalAsync constraints;
-    test_resolve_async(
-        *root_ctx, req, constraints, true, loops, delay0, delay1);
+    ResolutionConstraintsLocalAsyncRoot constraints;
+    test_resolve_async(ctx, req, constraints, true, loops, delay0, delay1);
 }
 
 TEST_CASE("resolve async on loopback", tag)
@@ -253,17 +243,14 @@ TEST_CASE("resolve async with value_request locally", tag)
     auto req{rq_cancellable_coro<level>(
         rq_cancellable_coro<level>(loops, delay0), rq_value(val1))};
     auto resources{make_inner_test_resources()};
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
-    auto root_ctx{make_local_async_ctx_tree(tree_ctx, req)};
+    atst_context ctx{*resources};
 
-    ResolutionConstraintsLocalAsync constraints;
-    auto res0
-        = cppcoro::sync_wait(resolve_request(*root_ctx, req, constraints));
+    ResolutionConstraintsLocalAsyncRoot constraints;
+    auto res0 = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
     REQUIRE(res0 == 14);
 
     resources->reset_memory_cache();
-    auto res1
-        = cppcoro::sync_wait(resolve_request(*root_ctx, req, constraints));
+    auto res1 = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
     REQUIRE(res1 == 14);
 }
 
@@ -305,9 +292,7 @@ test_error_async_across_rpc(
     auto req{rq_cancellable_coro<level>(
         rq_cancellable_coro<level>(-1, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
-    auto tree_ctx{
-        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
-    auto ctx{root_proxy_atst_context{tree_ctx}};
+    atst_context ctx{resources, proxy_name};
 
     test_error_async(ctx, req);
 }
@@ -321,10 +306,9 @@ TEST_CASE("error async request locally - coro", tag)
         rq_cancellable_coro<level>(-1, 11),
         rq_cancellable_coro<level>(2, 24))};
     auto resources{make_inner_test_resources()};
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
-    auto root_ctx = make_local_async_ctx_tree(tree_ctx, req);
+    atst_context ctx{*resources};
 
-    test_error_async(*root_ctx, req);
+    test_error_async(ctx, req);
 }
 
 TEST_CASE("error async request locally - non-coro", tag)
@@ -334,10 +318,9 @@ TEST_CASE("error async request locally - non-coro", tag)
         rq_non_cancellable_func<level>(-1, 11),
         rq_non_cancellable_func<level>(2, 24))};
     auto resources{make_inner_test_resources()};
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
-    auto root_ctx = make_local_async_ctx_tree(tree_ctx, req);
+    atst_context ctx{*resources};
 
-    test_error_async_plain(*root_ctx, req);
+    test_error_async_plain(ctx, req);
 }
 
 TEST_CASE("error async request on loopback", tag)
@@ -398,24 +381,20 @@ checker_func(async_context_intf& ctx)
     cppcoro::sync_wait(checker_coro(ctx));
 }
 
-template<AsyncContext Ctx, typename Req>
-cppcoro::task<void>
-test_cancel_async_coro(Ctx& ctx, Req const& req)
-{
-    REQUIRE_THROWS_AS(co_await resolve_request(ctx, req), async_cancelled);
-    REQUIRE(co_await ctx.get_status_coro() == async_status::CANCELLED);
-}
-
-template<AsyncContext Ctx, typename Req>
+template<typename Req>
 void
-test_cancel_async(Ctx& ctx, Req const& req)
+test_cancel_async(atst_context& ctx, Req const& req)
 {
     // Run the checker coroutine on a separate thread, independent from the
     // ones under test
     // Note: std::thread::~thread() calls terminate() if the thread wasn't
     // joined; e.g. if the test code threw.
-    std::jthread checker_thread(checker_func, std::ref(ctx));
-    cppcoro::sync_wait(test_cancel_async_coro(ctx, req));
+    auto resolve_task = resolve_request(ctx, req);
+    auto& actx = ctx.get_async_root();
+    std::jthread checker_thread(checker_func, std::ref(actx));
+    REQUIRE_THROWS_AS(cppcoro::sync_wait(resolve_task), async_cancelled);
+    REQUIRE(
+        cppcoro::sync_wait(actx.get_status_coro()) == async_status::CANCELLED);
     checker_thread.join();
 }
 
@@ -430,9 +409,7 @@ test_cancel_async_across_rpc(
     auto req{rq_cancellable_coro<level>(
         rq_cancellable_coro<level>(loops, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
-    auto tree_ctx{
-        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
-    auto ctx{root_proxy_atst_context{tree_ctx}};
+    atst_context ctx{resources, proxy_name};
 
     test_cancel_async(ctx, req);
 }
@@ -446,10 +423,9 @@ TEST_CASE("cancel async request locally", tag)
         rq_cancellable_coro<level>(100, 7),
         rq_cancellable_coro<level>(100, 8))};
     auto resources{make_inner_test_resources()};
-    auto tree_ctx = std::make_shared<local_atst_tree_context>(*resources);
-    auto root_ctx = make_local_async_ctx_tree(tree_ctx, req);
+    atst_context ctx{*resources};
 
-    test_cancel_async(*root_ctx, req);
+    test_cancel_async(ctx, req);
 }
 
 TEST_CASE("cancel async request on loopback", tag)
@@ -480,15 +456,15 @@ namespace {
 // terminate. Moreover, Catch2 is not thread-safe. So instead let the main
 // thread do the check.
 void
-get_subs_control_func(async_context_intf& ctx, bool& threw)
+get_subs_control_func(async_context_intf& ctx, std::string& what)
 {
     try
     {
         ctx.get_num_subs();
     }
-    catch (std::exception const&)
+    catch (std::exception const& e)
     {
-        threw = true;
+        what = e.what();
     }
 }
 
@@ -498,23 +474,24 @@ test_failing_get_num_subs(
 {
     constexpr auto level = caching_level_type::memory;
     auto req{rq_cancellable_coro<level>(2, 3)};
-    auto tree_ctx{
-        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
-    auto ctx{root_proxy_atst_context{tree_ctx}};
+    atst_context ctx{resources, proxy_name};
+    auto resolve_task = resolve_request(ctx, req);
+    auto& root_ctx = ctx.get_remote_root();
+
     // Causes submit_async to fail on the remote
-    ctx.fail_submit_async();
+    root_ctx.fail_submit_async();
 
     // Run get_num_subs on a separate thread, independent from the main one
     // which will call resolve_request().
-    bool thread_threw{false};
+    std::string thread_what;
     std::jthread control_thread(
-        get_subs_control_func, std::ref(ctx), std::ref(thread_threw));
+        get_subs_control_func, std::ref(root_ctx), std::ref(thread_what));
 
-    CHECK_THROWS(cppcoro::sync_wait(resolve_request(ctx, req)));
+    CHECK_THROWS(cppcoro::sync_wait(resolve_task));
 
     control_thread.join();
 
-    CHECK(thread_threw);
+    CHECK(thread_what.find("submit_async forced failure") != thread_what.npos);
 }
 
 } // namespace
@@ -522,7 +499,8 @@ test_failing_get_num_subs(
 TEST_CASE("get_num_subs failure on loopback", tag)
 {
     std::string proxy_name{"loopback"};
-    auto resources{make_inner_test_resources(proxy_name, no_domain_option())};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
     test_failing_get_num_subs(*resources, proxy_name);
 }
@@ -530,7 +508,8 @@ TEST_CASE("get_num_subs failure on loopback", tag)
 TEST_CASE("get_num_subs failure on rpclib", tag)
 {
     std::string proxy_name{"rpclib"};
-    auto resources{make_inner_test_resources(proxy_name, no_domain_option())};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
     test_failing_get_num_subs(*resources, proxy_name);
 }
@@ -562,11 +541,12 @@ test_delayed_get_num_subs(
 {
     constexpr auto level = caching_level_type::memory;
     auto req{rq_cancellable_coro<level>(2, 3)};
-    auto tree_ctx{
-        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
-    auto ctx{root_proxy_atst_context{tree_ctx}};
+    atst_context ctx{resources, proxy_name};
+    auto resolve_task = resolve_request(ctx, req);
+    auto& root_ctx = ctx.get_remote_root();
+
     // Forces resolve_async() on the remote to have a startup delay
-    ctx.set_resolve_async_delay(500);
+    root_ctx.set_resolve_async_delay(500);
 
     // Run get_num_subs on a separate thread, independent from the main one
     // which will call resolve_request().
@@ -574,11 +554,11 @@ test_delayed_get_num_subs(
     std::size_t num_subs{};
     std::jthread control_thread(
         delayed_get_subs_control_func,
-        std::ref(ctx),
+        std::ref(root_ctx),
         std::ref(initial_status),
         std::ref(num_subs));
 
-    CHECK(cppcoro::sync_wait(resolve_request(ctx, req)) == 5);
+    CHECK(cppcoro::sync_wait(resolve_task) == 5);
 
     control_thread.join();
 
@@ -641,11 +621,12 @@ test_delayed_set_result(
 {
     constexpr auto level = caching_level_type::memory;
     auto req{rq_cancellable_coro<level>(0, 0)};
-    auto tree_ctx{
-        std::make_shared<proxy_atst_tree_context>(resources, proxy_name)};
-    auto ctx{root_proxy_atst_context{tree_ctx}};
+    atst_context ctx{resources, proxy_name};
+    auto resolve_task = resolve_request(ctx, req);
+    auto& root_ctx = ctx.get_remote_root();
+
     // Forces set_result() on the remote to have a delay
-    ctx.set_set_result_delay(200);
+    root_ctx.set_set_result_delay(200);
 
     // Create a separate control thread, independent from the main one which
     // will call resolve_request().
@@ -653,11 +634,11 @@ test_delayed_set_result(
     async_status final_status{};
     std::jthread control_thread(
         delayed_set_result_control_func,
-        std::ref(ctx),
+        std::ref(root_ctx),
         std::ref(interim_status),
         std::ref(final_status));
 
-    CHECK(cppcoro::sync_wait(resolve_request(ctx, req)) == 0);
+    CHECK(cppcoro::sync_wait(resolve_task) == 0);
 
     control_thread.join();
 
