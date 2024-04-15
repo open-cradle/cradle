@@ -1,7 +1,7 @@
 #include <cppcoro/fmap.hpp>
 
 #include <cradle/inner/service/secondary_cached_blob.h>
-#include <cradle/plugins/serialization/secondary_cache/legacy/native/native.h>
+#include <cradle/thinknode/secondary_cached.h>
 #include <cradle/typing/encodings/native.h>
 
 namespace cradle {

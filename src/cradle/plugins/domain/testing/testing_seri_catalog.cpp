@@ -3,7 +3,6 @@
 #include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/plugins/domain/testing/testing_seri_catalog.h>
-#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 
 namespace cradle {
 

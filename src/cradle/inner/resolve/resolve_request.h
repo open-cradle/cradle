@@ -12,7 +12,7 @@
 #include <cradle/inner/caching/immutable/local_locked_record.h>
 #include <cradle/inner/caching/immutable/lock.h>
 #include <cradle/inner/caching/immutable/ptr.h>
-#include <cradle/inner/caching/secondary_cache_serialization.h>
+#include <cradle/inner/encodings/cereal_value.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/requests/cast_ctx.h>
 #include <cradle/inner/requests/generic.h>
@@ -184,12 +184,11 @@ resolve_secondary_cached(
     using Value = typename Req::value_type;
     inner_resources& resources{ctx.get_resources()};
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
-        co_return serialize_secondary_cache_value(
+        co_return serialize_value(
             co_await resolve_request_direct(ctx, req, constraints));
     };
-    co_return deserialize_secondary_cache_value<Value>(
-        co_await secondary_cached_blob(
-            resources, req.get_captured_id(), std::move(create_blob_task)));
+    co_return deserialize_value<Value>(co_await secondary_cached_blob(
+        resources, req.get_captured_id(), std::move(create_blob_task)));
 }
 
 // Called if the action cache contains no record for this request.

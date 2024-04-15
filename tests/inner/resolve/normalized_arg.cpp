@@ -9,7 +9,6 @@
 #include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/inner/resolve/seri_registry.h>
 #include <cradle/inner/resolve/seri_req.h>
-#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 
 #include "../../support/inner_service.h"
 

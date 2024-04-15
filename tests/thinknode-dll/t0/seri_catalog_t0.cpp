@@ -1,8 +1,6 @@
 #include "seri_catalog_t0.h"
 #include "make_some_blob_t0_impl.h"
 
-#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
-
 namespace cradle {
 
 seri_catalog_t0::seri_catalog_t0(std::shared_ptr<seri_registry> registry)

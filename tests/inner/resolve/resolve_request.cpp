@@ -12,7 +12,6 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/requests.h>
-#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 
 using namespace cradle;
 

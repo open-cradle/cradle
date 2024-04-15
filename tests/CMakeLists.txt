@@ -43,7 +43,6 @@ add_dependencies(test_lib_unit
     thinknode_dlls_dir_target)
 target_link_libraries(test_lib_unit PUBLIC
     cradle_websocket
-    cradle_plugins_typing
     cradle_plugins_inner)
 
 # Add the unit test runner.
@@ -260,7 +259,6 @@ file(GLOB_RECURSE test_srcs_plugins CONFIGURE_DEPENDS
 add_library(test_lib_plugins OBJECT ${test_srcs_plugins})
 target_link_libraries(test_lib_plugins PUBLIC
     cradle_external
-    cradle_plugins_typing
     cradle_plugins_inner)
 
 # Add the plugins test runner.
@@ -351,7 +349,7 @@ if(IS_CLANG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     # Code executed in the rpclib server is not measured.
     set(coverage_objects
         cradle_inner cradle_plugins_inner cradle_rpclib_client
-        cradle_typing cradle_plugins_typing cradle_thinknode cradle_websocket cradle_external)
+        cradle_typing cradle_thinknode cradle_websocket cradle_external)
     string(REGEX REPLACE "([a-z_]+)" "--object=$<TARGET_FILE:\\1>"
         coverage_object_options "${coverage_objects}")
     add_custom_target(
@@ -388,7 +386,6 @@ add_executable(benchmark_test_runner)
 target_link_libraries(benchmark_test_runner PRIVATE
     thinknode_test_support
     test_lib_benchmark
-    cradle_plugins_typing
     cradle_plugins_inner)
 add_dependencies(benchmark_test_runner
     copy_thinknode_dlls)
@@ -433,7 +430,6 @@ if(IS_MSVC)
             $<TARGET_FILE:cradle_typing>
             $<TARGET_FILE:lib_third_party>
             $<TARGET_FILE:cradle_plugins_inner>
-            $<TARGET_FILE:cradle_plugins_typing>
             $<TARGET_FILE:cradle_thinknode>
             $<TARGET_FILE:cradle_rpclib_client>
             $<TARGET_FILE:cradle_websocket>
@@ -448,7 +444,6 @@ if(IS_MSVC)
         cradle_typing
         lib_third_party
         cradle_plugins_inner
-        cradle_plugins_typing
         cradle_thinknode
         cradle_rpclib_client
         cradle_websocket

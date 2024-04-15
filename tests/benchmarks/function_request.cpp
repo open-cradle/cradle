@@ -5,7 +5,6 @@
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/service/resources.h>
-#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 
 #include "../support/inner_service.h"
 #include "benchmark_support.h"
