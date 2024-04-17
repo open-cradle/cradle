@@ -12,7 +12,7 @@
 #include <cradle/inner/caching/immutable/local_locked_record.h>
 #include <cradle/inner/caching/immutable/lock.h>
 #include <cradle/inner/caching/immutable/ptr.h>
-#include <cradle/inner/encodings/cereal_value.h>
+#include <cradle/inner/encodings/msgpack_value.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/requests/cast_ctx.h>
 #include <cradle/inner/requests/generic.h>

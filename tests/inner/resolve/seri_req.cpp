@@ -6,6 +6,7 @@
 #include "../../inner-dll/v1/adder_v1.h"
 #include "../../support/inner_service.h"
 #include <cradle/inner/dll/dll_collection.h>
+#include <cradle/inner/encodings/msgpack_value.h>
 #include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/introspection/tasklet_util.h>
 #include <cradle/inner/remote/loopback.h>
@@ -16,7 +17,6 @@
 #include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/plugins/domain/testing/testing_seri_catalog.h>
-#include <cradle/plugins/serialization/response/msgpack.h>
 #include <cradle/test_dlls_dir.h>
 
 using namespace cradle;
@@ -35,7 +35,7 @@ test_resolve(std::string const& proxy_name)
     std::string seri_req{serialize_request(req)};
     auto seri_resp
         = cppcoro::sync_wait(resolve_serialized_request(ctx, seri_req));
-    blob response = deserialize_response<blob>(seri_resp.value());
+    blob response = deserialize_value<blob>(seri_resp.value());
     seri_resp.on_deserialized();
 
     REQUIRE(response.size() == 256);
@@ -77,7 +77,7 @@ TEST_CASE("resolve serialized request, DLL", tag)
 
     auto seri_resp
         = cppcoro::sync_wait(resolve_serialized_request(ctx, seri_req));
-    int response = deserialize_response<int>(seri_resp.value());
+    int response = deserialize_value<int>(seri_resp.value());
     seri_resp.on_deserialized();
 
     REQUIRE(response == expected);
@@ -116,7 +116,7 @@ resolve_make_some_blob_file_seri(
         ctx,
         seri_req,
         seri_cache_record_lock_t{lock_ptr, remote_cache_record_id{}}));
-    blob resp = deserialize_response<blob>(seri_resp.value());
+    blob resp = deserialize_value<blob>(seri_resp.value());
     seri_resp.on_deserialized();
     REQUIRE(resp.size() == 256);
     REQUIRE(resp.data()[0xff] == static_cast<std::byte>(0x55));

@@ -33,6 +33,7 @@
 #include <cppcoro/task.hpp>
 #include <cppcoro/when_all.hpp>
 
+#include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/dll/dll_collection.h>
 #include <cradle/inner/encodings/base64.h>
@@ -1774,19 +1775,14 @@ process_message(websocket_server_impl& server, client_request request)
             auto seri_result = co_await resolve_serialized_request(
                 ctx, std::move(rr.json_text));
             blob seri_value = seri_result.value();
-            // TODO msgpack -> dynamic -> msgpack
-            // - First conversion here
-            // - Second in value_to_msgpack_string(), above
-            dynamic response = parse_msgpack_value(
-                reinterpret_cast<uint8_t const*>(seri_value.data()),
-                seri_value.size());
             seri_result.on_deserialized();
-            server.logger->info("dynamic response {}", response);
+            server.logger->info("dynamic response {}", seri_value);
+            // Send back response as a msgpack-encoded blob
             send_response(
                 server,
                 request,
                 make_server_message_content_with_resolve_request_response(
-                    response));
+                    seri_value));
             break;
         }
         default:

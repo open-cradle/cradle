@@ -7,11 +7,11 @@
 #include <string>
 
 #include <cradle/inner/caching/immutable/lock.h>
+#include <cradle/inner/encodings/msgpack_value.h>
 #include <cradle/inner/remote/types.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/resolve/seri_result.h>
-#include <cradle/plugins/serialization/response/msgpack.h>
 
 namespace cradle {
 
@@ -63,7 +63,7 @@ resolve_remote_to_value(
     using Value = typename Req::value_type;
     std::string seri_req{serialize_request(req)};
     auto seri_resp = resolve_remote(ctx, std::move(seri_req), lock_ptr);
-    Value result = deserialize_response<Value>(seri_resp.value());
+    Value result = deserialize_value<Value>(seri_resp.value());
     seri_resp.on_deserialized();
     return result;
 }

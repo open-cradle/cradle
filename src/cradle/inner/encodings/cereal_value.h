@@ -1,59 +1,40 @@
 #ifndef CRADLE_INNER_ENCODINGS_CEREAL_VALUE_H
 #define CRADLE_INNER_ENCODINGS_CEREAL_VALUE_H
 
-// Serialization of any value to/from a blob, using cereal.
-// Current usage:
-// - Secondary cache
-
-#include <sstream>
-#include <type_traits>
-
-#include <cereal/archives/binary.hpp>
+// Serialization of data types using cereal. The data type should already be
+// serializable via msgpack.
 
 #include <cradle/inner/core/type_definitions.h>
-#include <cradle/inner/core/type_interfaces.h>
+#include <cradle/inner/encodings/cereal.h>
+#include <cradle/inner/encodings/msgpack_value.h>
 
 namespace cradle {
 
+// A data type wanting cereal support via the mechanism implemented here should
+// specialize this struct, setting value to true.
 template<typename Value>
-blob
-serialize_value(Value const& value)
+struct serializable_via_cereal
 {
-    if constexpr (std::same_as<Value, blob>)
-    {
-        // The serialization/deserialization process is unnecessary for blobs.
-        return value;
-    }
-    else
-    {
-        std::stringstream ss;
-        cereal::BinaryOutputArchive oarchive(ss);
-        oarchive(value);
-        return make_blob(ss.str());
-    }
+    static constexpr bool value = false;
+};
+
+template<typename Archive, typename Value>
+void
+save(Archive& archive, Value const& val)
+    requires serializable_via_cereal<Value>::value
+{
+    // TODO convert to blob file if Value wants that?
+    save(archive, serialize_value(val));
 }
 
-template<typename Value>
-Value
-deserialize_value(blob const& x)
+template<typename Archive, typename Value>
+void
+load(Archive& archive, Value& val)
+    requires serializable_via_cereal<Value>::value
 {
-    if constexpr (std::same_as<Value, blob>)
-    {
-        // The serialization/deserialization process is unnecessary for blobs.
-        return x;
-    }
-    else
-    {
-        auto data = reinterpret_cast<char const*>(x.data());
-        std::stringstream is;
-        // The string constructor will copy the blob data but this looks
-        // unavoidable.
-        is.str(std::string(data, x.size()));
-        cereal::BinaryInputArchive iarchive(is);
-        Value res;
-        iarchive(res);
-        return res;
-    }
+    blob b;
+    load(archive, b);
+    val = deserialize_value<Value>(b);
 }
 
 } // namespace cradle

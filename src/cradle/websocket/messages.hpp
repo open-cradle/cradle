@@ -383,7 +383,7 @@ union server_message_content
     cradle::local_results_api_response local_results_api_response;
     nil_t introspection_control_response;
     cradle::introspection_status_response introspection_status_response;
-    cradle::dynamic resolve_request_response;
+    blob resolve_request_response;
 };
 
 api(struct)

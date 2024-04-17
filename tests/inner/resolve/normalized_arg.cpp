@@ -5,6 +5,7 @@
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
 
+#include <cradle/inner/encodings/msgpack_value.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/inner/resolve/seri_registry.h>
@@ -68,7 +69,7 @@ TEST_CASE("resolve serialized requests with normalized args", tag)
     std::string seri_req_a{serialize_request(req_a)};
     auto seri_resp_a{
         cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req_a))};
-    int resp_a{deserialize_response<int>(seri_resp_a.value())};
+    int resp_a{deserialize_value<int>(seri_resp_a.value())};
     seri_resp_a.on_deserialized();
     REQUIRE(resp_a == 3);
 
@@ -81,7 +82,7 @@ TEST_CASE("resolve serialized requests with normalized args", tag)
     std::string seri_req_b{serialize_request(req_b)};
     auto seri_resp_b{
         cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req_b))};
-    int resp_b{deserialize_response<int>(seri_resp_b.value())};
+    int resp_b{deserialize_value<int>(seri_resp_b.value())};
     seri_resp_b.on_deserialized();
     REQUIRE(resp_b == 5);
 
@@ -91,7 +92,7 @@ TEST_CASE("resolve serialized requests with normalized args", tag)
     std::string seri_req_c{serialize_request(req_c)};
     auto seri_resp_c{
         cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req_c))};
-    int resp_c{deserialize_response<int>(seri_resp_c.value())};
+    int resp_c{deserialize_value<int>(seri_resp_c.value())};
     seri_resp_c.on_deserialized();
     REQUIRE(resp_c == 3);
 
@@ -104,7 +105,7 @@ TEST_CASE("resolve serialized requests with normalized args", tag)
     std::string seri_req_d{serialize_request(req_d)};
     auto seri_resp_d{
         cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req_d))};
-    int resp_d{deserialize_response<int>(seri_resp_d.value())};
+    int resp_d{deserialize_value<int>(seri_resp_d.value())};
     seri_resp_d.on_deserialized();
     REQUIRE(resp_d == 5);
 }

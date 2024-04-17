@@ -4,6 +4,7 @@
 
 #include "../support/inner_service.h"
 #include <cradle/inner/core/fmt_format.h>
+#include <cradle/inner/encodings/msgpack_value.h>
 #include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/resolve/seri_result.h>
 #include <cradle/inner/service/request_store.h>
@@ -11,7 +12,6 @@
 #include <cradle/plugins/domain/testing/requests.h>
 #include <cradle/plugins/domain/testing/testing_seri_catalog.h>
 #include <cradle/plugins/requests_storage/http/http_requests_storage.h>
-#include <cradle/plugins/serialization/response/msgpack.h>
 
 /*
  * Manual tests to demonstrate storing requests on secondary (local) and
@@ -109,7 +109,7 @@ TEST_CASE("load and resolve stored request", tag_load)
     testing_request_context ctx{resources, ""};
     serialized_result seri_result{
         cppcoro::sync_wait(resolve_serialized_local(ctx, req_serialized))};
-    blob result = deserialize_response<blob>(seri_result.value());
+    blob result = deserialize_value<blob>(seri_result.value());
 
     // expected[i+1] == 3 * expected[i] + 1
     std::byte expected[]
