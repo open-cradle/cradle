@@ -20,15 +20,16 @@ testing_seri_catalog::testing_seri_catalog(
     register_resolver(rq_cancellable_coro<caching_level_type::memory>(0, 0));
     register_resolver(rq_non_cancellable_func<caching_level_type::none>(0, 0));
 
-    register_resolver(rq_make_demo_class<caching_level_type::none>(0, 0));
-    register_resolver(rq_make_demo_class<caching_level_type::memory>(0, 0));
-    register_resolver(rq_make_demo_class<caching_level_type::full>(0, 0));
+    blob y;
+    register_resolver(rq_make_demo_class<caching_level_type::none>(0, y));
+    register_resolver(rq_make_demo_class<caching_level_type::memory>(0, y));
+    register_resolver(rq_make_demo_class<caching_level_type::full>(0, y));
     register_resolver(
-        rq_copy_demo_class<caching_level_type::none>(demo_class{0, 0}));
+        rq_copy_demo_class<caching_level_type::none>(demo_class{0, y}));
     register_resolver(
-        rq_copy_demo_class<caching_level_type::memory>(demo_class{0, 0}));
+        rq_copy_demo_class<caching_level_type::memory>(demo_class{0, y}));
     register_resolver(
-        rq_copy_demo_class<caching_level_type::full>(demo_class{0, 0}));
+        rq_copy_demo_class<caching_level_type::full>(demo_class{0, y}));
 }
 
 } // namespace cradle

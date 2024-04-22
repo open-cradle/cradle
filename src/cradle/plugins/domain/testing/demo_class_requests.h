@@ -19,11 +19,11 @@ namespace cradle {
 
 // Resolves to a demo_class object
 cppcoro::task<demo_class>
-make_demo_class(context_intf& ctx, int x, int y);
+make_demo_class(context_intf& ctx, int x, blob y);
 
 template<caching_level_type Level>
 auto
-rq_make_demo_class(int x, int y)
+rq_make_demo_class(int x, blob y)
 {
     constexpr bool introspective{true};
     using props_type
@@ -32,7 +32,10 @@ rq_make_demo_class(int x, int y)
     uuid.set_level(Level);
     std::string title{"make_demo_class"};
     return rq_function(
-        props_type(std::move(uuid), std::move(title)), make_demo_class, x, y);
+        props_type(std::move(uuid), std::move(title)),
+        make_demo_class,
+        x,
+        std::move(y));
 }
 
 // Takes a demo_class object argument, and resolves to one
@@ -50,7 +53,9 @@ rq_copy_demo_class(demo_class d)
     uuid.set_level(Level);
     std::string title{"copy_demo_class"};
     return rq_function(
-        props_type(std::move(uuid), std::move(title)), copy_demo_class, d);
+        props_type(std::move(uuid), std::move(title)),
+        copy_demo_class,
+        std::move(d));
 }
 
 } // namespace cradle

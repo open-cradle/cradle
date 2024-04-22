@@ -7,6 +7,7 @@
 
 #include <msgpack.hpp>
 
+#include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/encodings/cereal_value.h>
 
 namespace cradle {
@@ -21,10 +22,10 @@ class demo_class
     {
     }
 
-    demo_class(int x, int y)
+    demo_class(int x, blob y)
     {
         x_ = x;
-        y_ = y;
+        y_ = std::move(y);
     }
 
     int
@@ -33,7 +34,7 @@ class demo_class
         return x_;
     }
 
-    int
+    blob const&
     get_y() const
     {
         return y_;
@@ -41,7 +42,7 @@ class demo_class
 
     // private:
     int x_{};
-    int y_{};
+    blob y_{};
 
     // Provide msgpack serialization in the form of a two-element array
     // containing x_ and y_. Some drawbacks:
