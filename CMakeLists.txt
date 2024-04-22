@@ -162,7 +162,7 @@ endif()
 
 FetchContent_Declare(fetched_cppcoro
     GIT_REPOSITORY https://github.com/andreasbuhr/cppcoro
-    GIT_TAG 244f834274a850eeca4cc5c86acbca1a0fbe9d95)
+    GIT_TAG a4ef65281814b18fdd1ac5457d3e219347ec6cb8)
 FetchContent_MakeAvailable(fetched_cppcoro)
 
 # Find core dependencies.
