@@ -728,12 +728,12 @@ class request_title_mixin
     }
 
     void
-    save_title(JSONRequestOutputArchive& archive) const
+    save_intrsp_state(JSONRequestOutputArchive& archive) const
     {
     }
 
     void
-    load_title(JSONRequestInputArchive& archive)
+    load_intrsp_state(JSONRequestInputArchive& archive)
     {
     }
 };
@@ -757,13 +757,13 @@ class request_title_mixin<true>
     }
 
     void
-    save_title(JSONRequestOutputArchive& archive) const
+    save_intrsp_state(JSONRequestOutputArchive& archive) const
     {
         archive(cereal::make_nvp("title", title_));
     }
 
     void
-    load_title(JSONRequestInputArchive& archive)
+    load_intrsp_state(JSONRequestInputArchive& archive)
     {
         archive(cereal::make_nvp("title", title_));
     }
@@ -944,7 +944,8 @@ class function_request
         // At least for JSON, there is no difference between multiple archive()
         // calls, or putting everything in one call.
         impl_->get_uuid().save_with_name(archive, "uuid");
-        this->save_title(archive);
+        this->save_intrsp_state(archive);
+        this->save_retrier_state(archive);
         impl_->save(archive);
     }
 
@@ -957,7 +958,8 @@ class function_request
         auto& resources{archive.get_resources()};
         auto the_seri_registry{resources.get_seri_registry()};
         auto uuid{request_uuid::load_with_name(archive, "uuid")};
-        this->load_title(archive);
+        this->load_intrsp_state(archive);
+        this->load_retrier_state(archive);
         // Create a mostly empty function_request_impl object. uuid defines its
         // exact type (function_request_impl class instantiation).
         impl_ = the_seri_registry->create<intf_type>(std::move(uuid));
@@ -1091,7 +1093,8 @@ class proxy_request : public detail::request_title_mixin<Props::introspective>,
         // At least for JSON, there is no difference between multiple archive()
         // calls, or putting everything in one call.
         uuid_.save_with_name(archive, "uuid");
-        this->save_title(archive);
+        this->save_intrsp_state(archive);
+        this->save_retrier_state(archive);
         impl_->save(archive);
     }
 

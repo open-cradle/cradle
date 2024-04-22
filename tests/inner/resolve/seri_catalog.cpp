@@ -5,6 +5,7 @@
 #include <cppcoro/sync_wait.hpp>
 #include <cppcoro/task.hpp>
 
+#include <cradle/inner/encodings/msgpack_value.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/inner/resolve/seri_req.h>
@@ -57,7 +58,7 @@ TEST_CASE("register seri resolver and call it", tag)
     std::string seri_req{serialize_request(req)};
     auto seri_resp{
         cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req))};
-    std::string response{deserialize_response<std::string>(seri_resp.value())};
+    std::string response{deserialize_value<std::string>(seri_resp.value())};
     seri_resp.on_deserialized();
 
     REQUIRE(response == "a");
@@ -161,9 +162,9 @@ TEST_CASE("resolve two C++ functions with the same signature", tag)
         cppcoro::sync_wait(resolve_serialized_local(ctx, seri_req_f))};
     REQUIRE(seri_resp_e.value() != seri_resp_f.value());
 
-    std::string resp_e{deserialize_response<std::string>(seri_resp_e.value())};
+    std::string resp_e{deserialize_value<std::string>(seri_resp_e.value())};
     seri_resp_e.on_deserialized();
-    std::string resp_f{deserialize_response<std::string>(seri_resp_f.value())};
+    std::string resp_f{deserialize_value<std::string>(seri_resp_f.value())};
     seri_resp_f.on_deserialized();
 
     REQUIRE(resp_e == "e");

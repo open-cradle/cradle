@@ -324,4 +324,5 @@ class ResolveRequestCommand(Command):
             }
 
     def decode_content(self, content: Content) -> Object:
-        return content['resolve_request_response']
+        response = content['resolve_request_response']
+        return msgpack.unpackb(response, use_list=False, raw=False)

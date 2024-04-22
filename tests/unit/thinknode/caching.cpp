@@ -9,6 +9,7 @@
 #include <cradle/inner/introspection/tasklet_info.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/thinknode/caching.h>
+#include <cradle/thinknode/secondary_cached.h>
 
 using namespace cradle;
 

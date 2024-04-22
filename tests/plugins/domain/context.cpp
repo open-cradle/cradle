@@ -96,3 +96,14 @@ TEST_CASE("domain_name()", tag)
 
     REQUIRE(ctx.domain_name() == "testing");
 }
+
+TEST_CASE("missing track_blob_file_writers() call", tag)
+{
+    auto resources{make_inner_test_resources()};
+    testing_request_context ctx{*resources, ""};
+
+    ctx.make_data_owner(10, true);
+    REQUIRE_THROWS_WITH(
+        ctx.on_value_complete(),
+        "on_value_complete() without preceding track_blob_file_writers()");
+}

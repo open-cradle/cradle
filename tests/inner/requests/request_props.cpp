@@ -57,3 +57,58 @@ TEST_CASE("default_retrier retries until max attempts", tag)
             http_request_failure);
     }
 }
+
+TEST_CASE("proxy_retrier rethrows unrecognized exception", tag)
+{
+    proxy_retrier retrier;
+    try
+    {
+        CRADLE_THROW(
+            http_request_failure() << internal_error_message_info("the why"));
+    }
+    catch (std::exception const& exc)
+    {
+        REQUIRE_THROWS_AS(
+            retrier.handle_exception(0, exc), http_request_failure);
+    }
+}
+
+TEST_CASE("proxy_retrier rethrows non-retryable remote_error", tag)
+{
+    proxy_retrier retrier;
+    try
+    {
+        throw remote_error{"the what"};
+    }
+    catch (std::exception const& exc)
+    {
+        REQUIRE_THROWS_AS(retrier.handle_exception(0, exc), remote_error);
+    }
+}
+
+TEST_CASE("proxy_retrier retries retryable remote_error", tag)
+{
+    proxy_retrier retrier;
+    try
+    {
+        throw remote_error{"the what", "the msg", true};
+    }
+    catch (std::exception const& exc)
+    {
+        auto delay = retrier.handle_exception(0, exc);
+        REQUIRE(delay > std::chrono::milliseconds(0));
+    }
+}
+
+TEST_CASE("proxy_retrier gives up after too many attempts", tag)
+{
+    proxy_retrier retrier;
+    try
+    {
+        throw remote_error{"the what", "the msg", true};
+    }
+    catch (std::exception const& exc)
+    {
+        REQUIRE_THROWS_AS(retrier.handle_exception(100, exc), remote_error);
+    }
+}
