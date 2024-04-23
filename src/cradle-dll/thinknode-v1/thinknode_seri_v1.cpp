@@ -3,7 +3,6 @@
 #include <cereal/types/map.hpp>
 
 #include "thinknode_seri_v1.h"
-#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/typing/core/unique_hash.h>
 

@@ -6,7 +6,6 @@
 #include "../x0/adder_x0_impl.h"
 #include "test_seri_catalog_x0.h"
 #include <cradle/inner/dll/dll_capabilities.h>
-#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 
 namespace cradle {
 

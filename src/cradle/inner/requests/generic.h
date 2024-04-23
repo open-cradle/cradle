@@ -371,8 +371,8 @@ class sync_context_intf : public virtual context_intf
 // Context that can be used for synchronously resolving requests; at least
 // locally, in addition remotely if the actual context class also implements
 // remote_context_intf.
-class local_sync_context_intf : public local_context_intf,
-                                public sync_context_intf
+class local_sync_context_intf : public virtual local_context_intf,
+                                public virtual sync_context_intf
 {
 };
 
@@ -449,7 +449,7 @@ class async_context_intf : public virtual context_intf
 };
 
 // Context for an asynchronous task running on the local machine
-class local_async_context_intf : public local_context_intf,
+class local_async_context_intf : public virtual local_context_intf,
                                  public virtual async_context_intf
 {
  public:
@@ -634,11 +634,9 @@ class remote_async_context_intf : public remote_context_intf,
         = 0;
 };
 
-// Context interface needed for resolving a cached request.
-// Implicitly local-only although not derived from local_context_intf,
-// but an implementation class should do that.
+// Context interface needed for locally resolving a cached request.
 // Resources must provide at least a memory cache.
-class caching_context_intf : public virtual context_intf
+class caching_context_intf : public virtual local_context_intf
 {
  public:
     virtual ~caching_context_intf() = default;
@@ -651,13 +649,13 @@ class caching_context_intf : public virtual context_intf
 };
 
 /*
- * Context interface needed for resolving an introspective request.
+ * Context interface needed for locally resolving an introspective request.
  * A context class implementing this interface should have a stack of
  * tasklet_tracker objects. It may get an initial push_tasklet() call when the
  * context is created. A local context will then get nested push_tasklet() /
  * pop_tasklet() calls during request resolution. These nested calls won't
- * happen during remote resolution, so a remote-only context class probably
- * should not implement this interface.
+ * happen during remote resolution, so a remote-only context class need
+ * not implement this interface.
  */
 class introspective_context_intf : public virtual context_intf
 {
@@ -734,11 +732,7 @@ concept RemoteContext = std::convertible_to<Ctx&, remote_context_intf&>;
 
 // Context that supports local resolution
 template<typename Ctx>
-concept LocalContext
-    = std::convertible_to<Ctx&, local_context_intf&>
-      || std::convertible_to<Ctx&, local_async_context_intf&>
-      || std::convertible_to<Ctx&, caching_context_intf&>
-      || std::convertible_to<Ctx&, introspective_context_intf&>;
+concept LocalContext = std::convertible_to<Ctx&, local_context_intf&>;
 
 // Context that supports remote resolution only, and does not support local
 template<typename Ctx>
@@ -749,6 +743,10 @@ concept DefinitelyRemoteContext
 template<typename Ctx>
 concept DefinitelyLocalContext
     = std::is_final_v<Ctx> && LocalContext<Ctx> && !RemoteContext<Ctx>;
+
+// Context that supports caching
+template<typename Ctx>
+concept CachingContext = std::convertible_to<Ctx&, caching_context_intf&>;
 
 // Context that supports synchronous resolution
 template<typename Ctx>
@@ -769,6 +767,11 @@ concept DefinitelySyncContext
 template<typename Ctx>
 concept DefinitelyAsyncContext
     = std::is_final_v<Ctx> && AsyncContext<Ctx> && !SyncContext<Ctx>;
+
+// Context that supports introspection
+template<typename Ctx>
+concept IntrospectiveContext
+    = std::convertible_to<Ctx&, introspective_context_intf&>;
 
 // Any context implementation class should be valid
 template<typename Ctx>
@@ -894,6 +897,17 @@ concept VisitableRequest = Request<Req> && requires(Req const& req) {
         req.accept(*(req_visitor_intf*) nullptr)
     };
 };
+
+// A context/request pair where the context can be used to resolve the request.
+// Due to runtime polymorphism, a mismatch can be detected at compile time only
+// if the context is final.
+template<typename Ctx, typename Req>
+concept MatchingContextRequest
+    = (!(IntrospectiveRequest<Req> && DefinitelyLocalContext<Ctx>
+         && !IntrospectiveContext<Ctx>)
+       && !(
+           CachedRequest<Req> && DefinitelyLocalContext<Ctx>
+           && !CachingContext<Ctx>) );
 
 // Contains the type of an argument to an rq_function-like call.
 template<typename Value, bool IsReq>

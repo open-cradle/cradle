@@ -27,7 +27,6 @@
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/resolve/seri_catalog.h>
-#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 #include <cradle/test_dlls_dir.h>
 #include <cradle/thinknode/iss_req.h>
 #include <cradle/typing/utilities/testing.h>

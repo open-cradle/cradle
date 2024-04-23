@@ -1,4 +1,3 @@
-import msgpack  # type: ignore
 import pytest
 
 import make_request
@@ -18,7 +17,5 @@ def test_req_composite(session, remote):
     # Resolving req2 yields input_value, MessagePack-encoded
     req2_data = make_request.make_retrieve_immutable_object_request(session, req1_data)
 
-    msgpack_encoded = session.resolve_request(req2_data, remote)
-    assert msgpack_encoded == b'\x93\xa3abc\xa3def\xa3ghi'
-    output_value = msgpack.unpackb(msgpack_encoded, use_list=False, raw=False)
+    output_value = session.resolve_request(req2_data, remote)
     assert output_value == input_value

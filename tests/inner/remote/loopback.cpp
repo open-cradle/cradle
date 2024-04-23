@@ -6,7 +6,6 @@
 #include <cradle/plugins/domain/testing/domain.h>
 #include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
-#include <cradle/plugins/serialization/secondary_cache/preferred/cereal/cereal.h>
 
 #include "../../support/inner_service.h"
 

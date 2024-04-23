@@ -162,7 +162,7 @@ endif()
 
 FetchContent_Declare(fetched_cppcoro
     GIT_REPOSITORY https://github.com/andreasbuhr/cppcoro
-    GIT_TAG 244f834274a850eeca4cc5c86acbca1a0fbe9d95)
+    GIT_TAG a4ef65281814b18fdd1ac5457d3e219347ec6cb8)
 FetchContent_MakeAvailable(fetched_cppcoro)
 
 # Find core dependencies.
@@ -547,15 +547,6 @@ target_link_libraries(cradle_typing PUBLIC
     spdlog::spdlog
     yaml-cpp)
 
-# The library for the plugins depending on the typing library
-file(GLOB_RECURSE srcs_plugins_typing CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/plugins/serialization/secondary_cache/legacy/native/*.cpp")
-add_library(cradle_plugins_typing SHARED ${srcs_plugins_typing})
-add_dependencies(cradle_plugins_typing preprocessing)
-target_link_libraries(cradle_plugins_typing PUBLIC
-    cradle_typing
-    cppcoro)
-
 # The thinknode library adds some Thinknode requests
 file(GLOB_RECURSE srcs_thinknode CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/thinknode/*.cpp")
@@ -565,7 +556,6 @@ target_sources(cradle_thinknode PRIVATE
     ${generated_srcs_typing}
     ${generated_srcs_thinknode})
 target_link_libraries(cradle_thinknode PUBLIC
-    cradle_plugins_typing
     cradle_typing
     Boost::headers
     cereal::cereal
@@ -669,7 +659,7 @@ if(CRADLE_INSTALL)
     install(
         TARGETS
             cradle_inner cradle_typing lib_third_party cradle_plugins_inner
-            cradle_plugins_typing cradle_thinknode
+            cradle_thinknode
             cradle_rpclib_client cradle_websocket cradle_external cppcoro
             tomlplusplus_tomlplusplus rpc
         EXPORT CradleTargets

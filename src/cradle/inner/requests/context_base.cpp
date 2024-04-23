@@ -646,16 +646,13 @@ root_proxy_async_context_base::fail_remote_id() noexcept
 
 // This may cause the current thread to block on getting the result from a
 // future.
-//
-// It would seem that cppcoro::async_manual_reset_event forms a viable
-// alternative. However, the set() call on an event object could be from an
-// exception handler or destructor, the unblocked call will continue on that
-// thread, and there is no guarantee it won't throw.
-// TODO is this really problematic? Quoting cppreference.com:
-// If an exception is thrown from the execution of the coroutine, the exception
-// is caught and unhandled_exception is called on the coroutine's promise
-// object. If the call to unhandled_exception throws or rethrows an exception,
-// that exception is propagated.
+// TODO Avoid blocking callers by moving to a cppcoro-based interface, and
+// rescheduling on a thread from a cppcoro pool before calling anything
+// blocking.
+// The remote_id would be retrieved from
+//   cppcoro::shared_task<async_id>
+//   remote_proxy::submit_async(...);
+// which would throw on failure.
 void
 root_proxy_async_context_base::wait_on_remote_id()
 {

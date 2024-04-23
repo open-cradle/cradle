@@ -10,13 +10,13 @@
 
 #include <cppcoro/task.hpp>
 
+#include <cradle/inner/encodings/msgpack_value.h>
 #include <cradle/inner/requests/cast_ctx.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/resolve/seri_lock.h>
 #include <cradle/inner/resolve/seri_result.h>
-#include <cradle/plugins/serialization/response/msgpack.h>
 
 namespace cradle {
 
@@ -45,8 +45,8 @@ class seri_resolver_intf
  * (seri_catalog.cpp).
  *
  * A response value must be serializable via the chosen method.
- * Requests currently are always serialized via cereal-JSON.
- * Responses currently are always serialized via MessagePack.
+ * Requests (currently?) are always serialized via cereal-JSON.
+ * Responses (currently?) are always serialized via msgpack.
  */
 template<Request Req>
 class seri_resolver_impl : public seri_resolver_intf
@@ -65,7 +65,7 @@ class seri_resolver_impl : public seri_resolver_intf
         auto value = co_await resolve_request(
             ctx, req, seri_lock.lock_ptr, constraints);
         co_return serialized_result{
-            serialize_response(value), seri_lock.record_id};
+            serialize_value(value), seri_lock.record_id};
     }
 };
 
