@@ -257,6 +257,11 @@ elseif(IS_MSVC)
     # context impossible to fix.
     add_compile_options(/wd4702)
 endif()
+if(IS_GCC)
+    # Unclear what these warnings exactly mean to say, and whether they are valid.
+    # Clang and MSVC don't complain.
+    add_compile_options(-Wno-subobject-linkage)
+endif()
 
 # Use absolute paths for error messages.
 if (IS_CLANG)

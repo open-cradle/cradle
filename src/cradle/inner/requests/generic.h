@@ -29,8 +29,8 @@ class tasklet_tracker;
 //   - Composition-based: the cache key is based on the argument specifications
 //     (subrequests or values).
 //   - Value-based: the cache key is based on the argument values.
-// Value-based caching probably should be applied to the topmost request in a
-// request tree only, as it tends to basically disable caching at lower levels.
+// Value-based caching probably should be applied to a leaf in a request tree
+// only, as it tends to basically disable caching at lower levels.
 enum class caching_level_type
 {
     // No caching
@@ -458,7 +458,7 @@ class local_async_context_intf : public virtual local_context_intf,
     local_async_context_intf*
     to_local_async_context_intf() override
     {
-        return this;
+        return is_async() ? this : nullptr;
     }
 
     // Returns the number of subtasks
@@ -809,84 +809,40 @@ concept ResolutionRetrier
 /*
  * A request is something that can be resolved, resulting in a result
  *
- * Attributes:
+ * Compile-time attributes:
  * - value_type: result type
- * - caching_level
- * - a boolean indicating whether this is a proxy request
- * - introspective
- * - An id uniquely identifying the request (class). Can be a placeholder
- *   if such identification is not needed.
+ * - is_proxy: indicates whether this is a proxy request
+ * - retryable: indicates whether a failing resolution can be retried
  *
- * TODO make request's value restrictions explicit
- * TODO define when request's id can be a placeholder
+ * Runtime-time attributes:
+ * - caching_level
+ * - introspective: indicates this request's wish to have its resolution be
+ *   introspected
+ * - introspection_title: title to use in introspection output, valid if
+ *   introspective
  */
 template<typename T>
 concept Request
     = requires {
           requires std::same_as<typename T::element_type, T>;
           typename T::value_type;
-          requires std::same_as<
-              std::remove_const_t<decltype(T::caching_level)>,
-              caching_level_type>;
-          requires std::same_as<
-              std::remove_const_t<decltype(T::value_based_caching)>,
-              bool>;
           requires std::
               same_as<std::remove_const_t<decltype(T::is_proxy)>, bool>;
           requires std::
-              same_as<std::remove_const_t<decltype(T::introspective)>, bool>;
-          requires std::
               same_as<std::remove_const_t<decltype(T::retryable)>, bool>;
-      };
-// TODO say something about resolve_sync()/_async() as we used to do
-
-template<typename T>
-concept UncachedRequest = Request<T> && is_uncached(T::caching_level);
-
-template<typename Req>
-concept CachedRequest
-    = Request<Req> && is_cached(Req::caching_level)
-      && requires(Req const& req) {
-             {
-                 req.get_captured_id()
-                 } -> std::convertible_to<captured_id const&>;
-         };
-
-template<typename Req>
-concept MemoryCachedRequest
-    = CachedRequest<Req> && is_memory_cached(Req::caching_level);
-
-template<typename Req>
-concept FullyCachedRequest
-    = CachedRequest<Req> && is_fully_cached(Req::caching_level);
-
-template<typename Req>
-concept CompositionBasedCachedRequest = CachedRequest<Req> && !
-Req::value_based_caching;
-
-template<typename Req>
-concept ValueBasedCachedRequest
-    = CachedRequest<Req> && Req::value_based_caching;
-
-template<typename Req>
-concept IntrospectiveRequest
-    = Req::introspective && requires(Req const& req) {
-                                {
-                                    req.get_introspection_title()
-                                    } -> std::convertible_to<std::string>;
-                            };
-
-template<typename Req>
-concept NonIntrospectiveRequest = !
-Req::introspective;
-
-template<typename Req>
-concept CachedIntrospectiveRequest
-    = CachedRequest<Req> && IntrospectiveRequest<Req>;
-
-template<typename Req>
-concept CachedNonIntrospectiveRequest
-    = CachedRequest<Req> && NonIntrospectiveRequest<Req>;
+      } && requires(T const& req) {
+               {
+                   req.get_caching_level()
+                   } -> std::same_as<caching_level_type>;
+           } && requires(T const& req) {
+                    {
+                        req.is_introspective()
+                        } -> std::same_as<bool>;
+                } && requires(T const& req) {
+                         {
+                             req.get_introspection_title()
+                             } -> std::same_as<std::string>;
+                     };
 
 // By having retryable=true, a request advertises itself as being retryable...
 template<typename Req>
@@ -909,15 +865,8 @@ concept VisitableRequest
                       };
 
 // A context/request pair where the context can be used to resolve the request.
-// Due to runtime polymorphism, a mismatch can be detected at compile time only
-// if the context is final.
 template<typename Ctx, typename Req>
-concept MatchingContextRequest
-    = (!(IntrospectiveRequest<Req> && DefinitelyLocalContext<Ctx>
-         && !IntrospectiveContext<Ctx>)
-       && !(
-           CachedRequest<Req> && DefinitelyLocalContext<Ctx>
-           && !CachingContext<Ctx>) );
+concept MatchingContextRequest = Request<Req> && Context<Ctx>;
 
 // Contains the type of an argument to an rq_function-like call.
 template<typename Value, bool IsReq>

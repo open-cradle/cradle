@@ -109,7 +109,7 @@ struct id_interface_pointer_hash
 
 // captured_id is used to capture an ID for long-term storage (beyond the point
 // where the id_interface reference will be valid).
-// Basically, it wraps a std::shared_ptr<id_interface> value.
+// Basically, it wraps a std::shared_ptr<id_interface const> value.
 class captured_id
 {
  public:
@@ -121,7 +121,7 @@ class captured_id
     }
 
     // The aliasing constructor; ownership information shared with other
-    explicit captured_id(std::shared_ptr<id_interface> other)
+    explicit captured_id(std::shared_ptr<id_interface const> other)
         : id_{std::move(other)}
     {
     }
@@ -163,7 +163,7 @@ class captured_id
     }
 
  private:
-    std::shared_ptr<id_interface> id_;
+    std::shared_ptr<id_interface const> id_;
 };
 bool
 operator==(captured_id const& a, captured_id const& b);
