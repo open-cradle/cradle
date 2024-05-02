@@ -335,6 +335,8 @@ struct immutable_cache_impl
     cache_record_eviction_list eviction_list;
     cas_cache cas;
     std::mutex mutex;
+    int hit_count{0};
+    int miss_count{0};
 };
 
 // Evict unused entries (in LRU order) until the total size of unused entries

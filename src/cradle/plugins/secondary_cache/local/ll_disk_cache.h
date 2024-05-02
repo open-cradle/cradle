@@ -106,7 +106,7 @@ class ll_disk_cache
     find(std::string const& ac_key);
 
     // Returns the ac_id for the specified AC entry if existing, or nullopt
-    // otherwise
+    // otherwise. No impact on hit_count / miss_count.
     std::optional<int64_t>
     look_up_ac_id(std::string const& ac_key);
 

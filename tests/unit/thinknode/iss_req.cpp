@@ -450,7 +450,8 @@ test_retrieve_immutable_object_parallel(
     scope.clear_caches();
     auto& resources{scope.get_resources()};
     mock_http_session* mock_http{nullptr};
-    if (auto proxy = scope.get_proxy())
+    auto proxy = scope.get_proxy();
+    if (proxy)
     {
         // Assumes a single request/response
         auto response{make_http_200_response(responses[0])};
@@ -494,22 +495,32 @@ test_retrieve_immutable_object_parallel(
     }
     // Order unspecified so don't check mock_http.is_in_order()
 
-    // TODO only local?
-    if constexpr (is_cached(level))
+    if (!proxy && is_cached(level))
     {
         // Resolve using memory cache
+        auto& mem_cache{resources.memory_cache()};
+        auto mi_before = get_summary_info(mem_cache);
         auto res1 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+        auto mi_after = get_summary_info(mem_cache);
         REQUIRE(res1 == results);
+        CHECK(mi_after.hit_count > mi_before.hit_count);
+        CHECK(mi_after.miss_count == mi_before.miss_count);
     }
 
-    if constexpr (is_fully_cached(level))
+    if (!proxy && is_fully_cached(level))
     {
+        auto& disk_cache{
+            static_cast<local_disk_cache&>(resources.secondary_cache())};
         sync_wait_write_disk_cache(resources);
         resources.reset_memory_cache();
 
         // Resolve using disk cache
+        auto di_before = disk_cache.get_summary_info();
         auto res2 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+        auto di_after = disk_cache.get_summary_info();
         REQUIRE(res2 == results);
+        CHECK(di_after.hit_count > di_before.hit_count);
+        CHECK(di_after.miss_count == di_before.miss_count);
     }
 }
 

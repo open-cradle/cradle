@@ -68,6 +68,9 @@ struct ll_disk_cache_impl
     std::mutex mutex;
 
     std::shared_ptr<spdlog::logger> logger;
+
+    int hit_count{0};
+    int miss_count{0};
 };
 
 // SQLITE UTILITIES
@@ -1250,6 +1253,8 @@ ll_disk_cache::get_summary_info()
     info.ac_entry_count = get_ac_entry_count(cache);
     info.cas_entry_count = get_cas_entry_count(cache);
     info.total_size = get_total_cas_size(cache);
+    info.hit_count = cache.hit_count;
+    info.miss_count = cache.miss_count;
     return info;
 }
 
@@ -1281,7 +1286,17 @@ ll_disk_cache::find(std::string const& ac_key)
 
     record_activity(cache);
 
-    return look_up(cache, ac_key);
+    auto result = look_up(cache, ac_key);
+    if (result)
+    {
+        cache.hit_count += 1;
+    }
+    else
+    {
+        cache.miss_count += 1;
+    }
+
+    return result;
 }
 
 std::optional<int64_t>
