@@ -134,8 +134,9 @@ TEST_CASE("normalized C-string arg stored as std::string", tag)
 // A proxy subrequest should serialize to the same value as a corresponding
 // function subrequest.
 // A proxy subrequest is possible for a proxy main request, but not for a
-// function main request.
+// function main request (e.g. because it cannot be hashed).
 // A function subrequest is possible for either type of main request.
+// The two normalize_arg() calls pass their arguments unchanged.
 TEST_CASE("compare normalized proxy/function requests", tag)
 {
     using proxy_props_t = request_props<
@@ -149,8 +150,10 @@ TEST_CASE("compare normalized proxy/function requests", tag)
     auto func_subreq{rq_function(func_subreq_props, plus_two_func, 17)};
     auto proxy_subreq{rq_proxy<int>(proxy_subreq_props, 17)};
 
-    auto req_a{rq_proxy<int>(proxy_main_props, func_subreq)};
-    auto req_b{rq_proxy<int>(proxy_main_props, proxy_subreq)};
+    auto req_a{rq_proxy<int>(
+        proxy_main_props, normalize_arg<int, proxy_props_t>(func_subreq))};
+    auto req_b{rq_proxy<int>(
+        proxy_main_props, normalize_arg<int, proxy_props_t>(proxy_subreq))};
 
     std::string seri_req_a{serialize_request(req_a)};
     std::string seri_req_b{serialize_request(req_b)};
@@ -171,8 +174,10 @@ TEST_CASE("compare normalized proxy/coroutine requests", tag)
     auto coro_subreq{rq_function(coro_subreq_props, plus_two_coro, 19)};
     auto proxy_subreq{rq_proxy<int>(proxy_subreq_props, 19)};
 
-    auto req_a{rq_proxy<int>(proxy_main_props, coro_subreq)};
-    auto req_b{rq_proxy<int>(proxy_main_props, proxy_subreq)};
+    auto req_a{rq_proxy<int>(
+        proxy_main_props, normalize_arg<int, proxy_props_t>(coro_subreq))};
+    auto req_b{rq_proxy<int>(
+        proxy_main_props, normalize_arg<int, proxy_props_t>(proxy_subreq))};
 
     std::string seri_req_a{serialize_request(req_a)};
     std::string seri_req_b{serialize_request(req_b)};

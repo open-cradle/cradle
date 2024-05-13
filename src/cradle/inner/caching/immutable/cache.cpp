@@ -41,6 +41,8 @@ get_summary_info(immutable_cache& cache)
     info.cas_num_records = impl.cas.num_records();
     info.cas_total_size = impl.cas.total_size();
     info.cas_total_locked_size = impl.cas.total_locked_size();
+    info.hit_count = impl.hit_count;
+    info.miss_count = impl.miss_count;
     return info;
 }
 

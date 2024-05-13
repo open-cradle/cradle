@@ -68,7 +68,9 @@ jobs:
         python python/generate_config.py $CRADLE_THINKNODE_API_TOKEN
         cmake --build build --config Debug --target unit_test_coverage -j4
 
-    - name: Upload coverage report
-      if: ${{ matrix.config == 'Debug' }}
-      run: |
-        bash <(curl -s https://codecov.io/bash) -X gcov
+    - uses: codecov/codecov-action@v4
+      with:
+        fail_ci_if_error: true
+        token: ${{ secrets.CODECOV_TOKEN }}
+        plugin: gcov
+        verbose: true

@@ -16,8 +16,13 @@ acquire_cache_record(
 {
     std::scoped_lock<std::mutex> lock(cache.mutex);
     cache_record_map::iterator i = cache.records.find(&*key);
-    if (i == cache.records.end())
+    if (i != cache.records.end())
     {
+        cache.hit_count += 1;
+    }
+    else
+    {
+        cache.miss_count += 1;
         auto record = std::make_unique<immutable_cache_record>();
         record->owner_cache = &cache;
         record->eviction_list_iterator = cache.eviction_list.end();

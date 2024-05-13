@@ -22,6 +22,12 @@ struct disk_cache_info
     // the total size (in bytes) of the values in the CAS
     // (counting the stored sizes, not the original ones)
     int64_t total_size;
+
+    // Number of cache hits.
+    int hit_count;
+
+    // Number of cache misses.
+    int miss_count;
 };
 
 } // namespace cradle

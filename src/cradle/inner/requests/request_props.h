@@ -143,19 +143,27 @@ class proxy_retrier : public backoff_retrier_base
 static_assert(ResolutionRetrier<proxy_retrier>);
 
 /*
- * Request (resolution) properties that would be identical between similar
- * requests:
- * - Request attributes (FunctionType)
- * - How it should be resolved (Level, Introspective)
+ * Properties for creating a function_request or proxy_request object;
+ * passed to rq_function(), rq_proxy(), and the respective constructors.
+ * These properties are meant to be identical between similar requests,
+ * and describe how the requests should be resolved.
+ *
+ * Compile-time attributes:
+ * - Caching level (Level)
+ * - Function type (FunctionType)
+ * - Introspection enabled or not (Introspective)
  * - A retry mechanism if any (Retrier)
- * request_props objects currently are used for classes function_request and
- * proxy_request only.
+ *
+ * Runtime attributes:
+ * - Uuid (the main request's uuid, which defines the complete request type)
+ * - Introspection title (only if introspective)
+ *
+ * Introspective is a compile-time attribute due to the overhead, in object
+ * size and execution time, when resolving an introspective request.
  *
  * All requests in a tree (main request, subrequests) must have a uuid, and
- * must have matching request_props types: Level, FunctionType and
- * Introspective must be identical for all requests, but Retrier may differ.
- * The properties specify the main request's uuid, which defines the complete
- * request type.
+ * must have matching request_props types: FunctionType must be identical for
+ * all requests, but Level, Introspective and Retrier may differ.
  *
  * When a request is resolved remotely, any caching happens remotely only;
  * there is no additional local caching. In particular, this means that the
@@ -179,12 +187,15 @@ class request_props : public introspection_mixin<Introspective>, public Retrier
  public:
     static constexpr caching_level_type level = Level;
     static constexpr request_function_t function_type = FunctionType;
-    static constexpr bool for_plain_function
+    static constexpr bool for_local_plain_function
         = FunctionType == request_function_t::plain;
-    static constexpr bool for_coroutine
+    static constexpr bool for_local_coroutine
         = FunctionType == request_function_t::coro;
     static constexpr bool for_proxy
         = FunctionType == request_function_t::proxy_plain
+          || FunctionType == request_function_t::proxy_coro;
+    static constexpr bool for_coroutine
+        = FunctionType == request_function_t::coro
           || FunctionType == request_function_t::proxy_coro;
     static constexpr bool introspective = Introspective;
     static constexpr bool retryable = Retrier::retryable;
@@ -225,6 +236,187 @@ class request_props : public introspection_mixin<Introspective>, public Retrier
  private:
     request_uuid uuid_;
 };
+
+// Tests whether T is a request_props instantiation
+template<typename T>
+struct is_request_props : std::false_type
+{
+};
+
+template<
+    caching_level_type Level,
+    request_function_t FunctionType,
+    bool Introspective,
+    MaybeResolutionRetrier Retrier>
+struct is_request_props<
+    request_props<Level, FunctionType, Introspective, Retrier>>
+    : std::true_type
+{
+};
+
+template<typename T>
+inline constexpr bool is_request_props_v = is_request_props<T>::value;
+
+/*
+ * Properties for a function_request object, derived from the request_props
+ * used for creating the object:
+ * - The caching level and the introspective boolean have been erased: they are
+ *   part of request_impl_props.
+ * - Likewise, the introspection_mixin is already part of
+ *   request_impl_props, so not repeated here.
+ */
+template<request_function_t FunctionType, MaybeResolutionRetrier Retrier>
+class request_object_props
+{
+ public:
+    static constexpr request_function_t function_type = FunctionType;
+    static constexpr bool for_local_plain_function
+        = FunctionType == request_function_t::plain;
+    static constexpr bool for_local_coroutine
+        = FunctionType == request_function_t::coro;
+    static constexpr bool for_proxy
+        = FunctionType == request_function_t::proxy_plain
+          || FunctionType == request_function_t::proxy_coro;
+    static constexpr bool for_coroutine
+        = FunctionType == request_function_t::coro
+          || FunctionType == request_function_t::proxy_coro;
+    static constexpr bool retryable = Retrier::retryable;
+    using retrier_type = Retrier;
+};
+
+// Tests whether T is a request_object_props instantiation
+template<typename T>
+struct is_request_object_props : std::false_type
+{
+};
+
+template<request_function_t FunctionType, MaybeResolutionRetrier Retrier>
+struct is_request_object_props<request_object_props<FunctionType, Retrier>>
+    : std::true_type
+{
+};
+
+template<typename T>
+inline constexpr bool is_request_object_props_v
+    = is_request_object_props<T>::value;
+
+// Derives a request_object_props type from a request_props one
+template<typename Props>
+using make_request_object_props_type_helper
+    = request_object_props<Props::function_type, typename Props::retrier_type>;
+
+template<typename Props>
+using make_request_object_props_type
+    = make_request_object_props_type_helper<std::remove_cvref_t<Props>>;
+
+/*
+ * Properties for a function_request_impl object, derived from the
+ * request_props used for creating the owning function_request object. The
+ * Retrier is relevant to the main function_request object only, so has been
+ * removed.
+ */
+template<
+    caching_level_type Level,
+    request_function_t FunctionType,
+    bool Introspective>
+class request_impl_props : public introspection_mixin<Introspective>
+{
+ public:
+    static constexpr caching_level_type level = Level;
+    static constexpr request_function_t function_type = FunctionType;
+    static constexpr bool for_local_plain_function
+        = FunctionType == request_function_t::plain;
+    static constexpr bool for_local_coroutine
+        = FunctionType == request_function_t::coro;
+    static constexpr bool for_proxy
+        = FunctionType == request_function_t::proxy_plain
+          || FunctionType == request_function_t::proxy_coro;
+    static constexpr bool for_coroutine
+        = FunctionType == request_function_t::coro
+          || FunctionType == request_function_t::proxy_coro;
+    static constexpr bool introspective = Introspective;
+    static constexpr bool value_based_caching = is_value_based(Level);
+
+    static_assert(!for_proxy || is_uncached(level));
+
+    // Constructor for a request that does not support introspection
+    explicit request_impl_props(request_uuid uuid)
+        requires(!Introspective)
+        : uuid_{std::move(uuid)}
+    {
+    }
+
+    // Constructor for a request that supports introspection
+    request_impl_props(request_uuid uuid, std::string title)
+        requires(Introspective)
+        : introspection_mixin<Introspective>{std::move(title)},
+          uuid_{std::move(uuid)}
+    {
+    }
+
+    request_uuid const&
+    get_uuid() const&
+    {
+        return uuid_;
+    }
+
+    request_uuid&&
+    get_uuid() &&
+    {
+        return std::move(uuid_);
+    }
+
+ private:
+    request_uuid uuid_;
+};
+
+// Tests whether T is a request_impl_props instantiation
+template<typename T>
+struct is_request_impl_props : std::false_type
+{
+};
+
+template<
+    caching_level_type Level,
+    request_function_t FunctionType,
+    bool Introspective>
+struct is_request_impl_props<
+    request_impl_props<Level, FunctionType, Introspective>> : std::true_type
+{
+};
+
+template<typename T>
+inline constexpr bool is_request_impl_props_v
+    = is_request_impl_props<T>::value;
+
+// Derives a request_impl_props type from a request_props one
+template<typename Props>
+using make_request_impl_props_type_helper = request_impl_props<
+    Props::level,
+    Props::function_type,
+    Props::introspective>;
+
+template<typename Props>
+using make_request_impl_props_type
+    = make_request_impl_props_type_helper<std::remove_cvref_t<Props>>;
+
+// Derives a request_impl_props object from a request_props one
+template<typename Props>
+auto
+make_request_impl_props(Props&& props)
+{
+    using impl_props_type = make_request_impl_props_type<Props>;
+    if constexpr (impl_props_type::introspective)
+    {
+        std::string title{props.get_title()};
+        return impl_props_type{
+            std::forward<Props>(props).get_uuid(), std::move(title)};
+    }
+    else
+    {
+        return impl_props_type{std::forward<Props>(props).get_uuid()};
+    }
+}
 
 } // namespace cradle
 

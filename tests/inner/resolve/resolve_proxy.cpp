@@ -5,7 +5,9 @@
 #include <fmt/format.h>
 
 #include "../../inner-dll/v1/adder_v1.h"
+#include "../../inner-dll/v1/adder_v1_impl.h"
 #include "../../support/inner_service.h"
+#include <cradle/inner/requests/generic.h>
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/requests.h>
@@ -15,21 +17,17 @@ using namespace cradle;
 
 namespace {
 
-static char const tag[] = "[inner][resolve][proxy]";
+char const tag[] = "[inner][resolve][proxy]";
 
-} // namespace
-
-TEST_CASE("evaluate proxy request, plain args", tag)
+template<Request Req>
+void
+eval_request_over_rpclib(Req const& req, int expected)
 {
     std::string proxy_name{"rpclib"};
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto& proxy{resources->get_proxy(proxy_name)};
     proxy.unload_shared_library("test_inner_dll_v1.*");
-
-    auto req{rq_test_adder_v1p(7, 2)};
-    int expected{7 + 2};
-
     testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
@@ -38,34 +36,60 @@ TEST_CASE("evaluate proxy request, plain args", tag)
         Catch::Contains("no entry found for uuid"));
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
-
     auto res = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
     REQUIRE(res == expected);
+}
+
+} // namespace
+
+namespace cradle {
+
+// Normally in the test_inner_dll_v1 DLL
+int
+adder_v1_func(int a, int b)
+{
+    return a + b;
+}
+
+} // namespace cradle
+
+TEST_CASE("evaluate proxy request, plain args", tag)
+{
+    auto req{rq_test_adder_v1p(7, 2)};
+    int expected{7 + 2};
+    eval_request_over_rpclib(req, expected);
 }
 
 TEST_CASE("evaluate proxy request, normalized args", tag)
 {
-    std::string proxy_name{"rpclib"};
-    auto resources{
-        make_inner_test_resources(proxy_name, testing_domain_option())};
-    auto& proxy{resources->get_proxy(proxy_name)};
-    proxy.unload_shared_library("test_inner_dll_v1.*");
-
     auto req{rq_test_adder_v1n(7, 2)};
     int expected{7 + 2};
-
-    testing_request_context ctx{*resources, proxy_name};
-    ResolutionConstraintsRemoteSync constraints;
-
-    REQUIRE_THROWS_WITH(
-        cppcoro::sync_wait(resolve_request(ctx, req, constraints)),
-        Catch::Contains("no entry found for uuid"));
-
-    proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
-
-    auto res = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
-    REQUIRE(res == expected);
+    eval_request_over_rpclib(req, expected);
 }
+
+TEST_CASE("evaluate proxy request, proxy subrequest", tag)
+{
+    auto req{rq_test_adder_v1n(7, rq_test_adder_v1p(3, 1))};
+    int expected{7 + 3 + 1};
+    eval_request_over_rpclib(req, expected);
+}
+
+TEST_CASE("evaluate proxy request, function subrequest", tag)
+{
+    auto req{rq_test_adder_v1n(7, rq_test_adder_v1n_impl(5, 2))};
+    int expected{7 + 5 + 2};
+    eval_request_over_rpclib(req, expected);
+}
+
+#if 0
+// This would run into a failing static_assert.
+TEST_CASE("evaluate function request, proxy subrequest", tag)
+{
+    auto req{rq_test_adder_v1n_impl(5, rq_test_adder_v1p(7, 3))};
+    int expected{5 + 7 + 3};
+    eval_request_over_rpclib(req, expected);
+}
+#endif
 
 TEST_CASE("attempt to resolve proxy request locally", tag)
 {
