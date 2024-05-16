@@ -232,7 +232,8 @@ TEST_CASE("evaluate function requests in parallel - uncached function", tag)
     static constexpr int num_requests = 7;
     using Value = int;
     using Props = request_props<caching_level_type::none>;
-    using Req = function_request<Value, Props>;
+    using ObjectProps = make_request_object_props_type<Props>;
+    using Req = function_request<Value, ObjectProps>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     non_caching_request_resolution_context ctx{*resources};
@@ -262,7 +263,8 @@ TEST_CASE("evaluate function requests in parallel - uncached coroutine", tag)
         caching_level_type::none,
         request_function_t::coro,
         false>;
-    using Req = function_request<Value, Props>;
+    using ObjectProps = make_request_object_props_type<Props>;
+    using Req = function_request<Value, ObjectProps>;
     int num_add_calls{};
     auto add{create_adder_coro(num_add_calls)};
     non_caching_request_resolution_context ctx{*resources};
@@ -289,7 +291,8 @@ TEST_CASE("evaluate function requests in parallel - memory cached", tag)
     static constexpr int num_requests = 7;
     using Value = int;
     using Props = request_props<caching_level_type::memory>;
-    using Req = function_request<Value, Props>;
+    using ObjectProps = make_request_object_props_type<Props>;
+    using Req = function_request<Value, ObjectProps>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     caching_request_resolution_context ctx{*resources};
@@ -325,7 +328,8 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     static constexpr int num_requests = 7;
     using Value = int;
     using Props = request_props<caching_level_type::full>;
-    using Req = function_request<Value, Props>;
+    using ObjectProps = make_request_object_props_type<Props>;
+    using Req = function_request<Value, ObjectProps>;
     int num_add_calls{};
     auto add{create_adder(num_add_calls)};
     caching_request_resolution_context ctx{*resources};
@@ -792,4 +796,72 @@ TEST_CASE("resolve request - cached req, uncached ctx", tag)
     REQUIRE_THROWS_WITH(
         cppcoro::sync_wait(resolve_request(ctx_intf, req)),
         "failing cast_ctx_to_ref");
+}
+
+template<typename props_type, typename A, typename B>
+    requires TypedArg<A, int> && TypedArg<B, int>
+static auto
+rq_200x(int uuid_ext, A a, B b)
+{
+    return rq_function(
+        props_type{make_test_uuid(uuid_ext)},
+        add2,
+        normalize_arg<int, props_type>(std::move(a)),
+        normalize_arg<int, props_type>(std::move(b)));
+}
+
+// Different request properties in a tree are possible. The only restriction is
+// that the functions all are plain, or all are coroutines. (One reason being
+// that a coroutine takes a context_intf& parameter by convention, and a plain
+// function does not.)
+TEST_CASE("resolve request tree with different props", tag)
+{
+    auto resources{make_inner_test_resources()};
+    auto& mem_cache{resources->memory_cache()};
+    auto& disk_cache{
+        static_cast<local_disk_cache&>(resources->secondary_cache())};
+    caching_request_resolution_context ctx{*resources};
+
+    using none_props = request_props<caching_level_type::none>;
+    using mem_props = request_props<caching_level_type::memory>;
+    using full_props = request_props<caching_level_type::full>;
+    auto req_a{rq_200x<mem_props>(2000, 1, 2)};
+    auto req_b{rq_200x<none_props>(2001, req_a, 4)};
+    auto req_c{rq_200x<full_props>(2002, 8, req_b)};
+
+    // Resolve while the caches do not contain anything relevant
+    auto res0 = cppcoro::sync_wait(resolve_request(ctx, req_c));
+    sync_wait_write_disk_cache(*resources);
+    REQUIRE(res0 == 15);
+    auto mi0 = get_summary_info(mem_cache);
+    CHECK(mi0.hit_count == 0);
+    // Expecting a miss for the two cached requests (req_a, req_c)
+    CHECK(mi0.miss_count == 2);
+    auto di0 = disk_cache.get_summary_info();
+    CHECK(di0.hit_count == 0);
+    // Expecting a miss for the one disk-cached request (req_c)
+    CHECK(di0.miss_count == 1);
+
+    // Resolve via the memory cache
+    auto res1 = cppcoro::sync_wait(resolve_request(ctx, req_c));
+    REQUIRE(res1 == 15);
+    auto mi1 = get_summary_info(mem_cache);
+    CHECK(mi1.hit_count == 1);
+    CHECK(mi1.miss_count == 2);
+    auto di1 = disk_cache.get_summary_info();
+    CHECK(di1.hit_count == 0);
+    CHECK(di1.miss_count == 1);
+
+    // Resolve via the disk cache
+    resources->reset_memory_cache();
+    auto res2 = cppcoro::sync_wait(resolve_request(ctx, req_c));
+    REQUIRE(res2 == 15);
+    auto mi2 = get_summary_info(mem_cache);
+    CHECK(mi2.hit_count == 0);
+    // Expecting a miss for req_c only; as there is a hit on the disk cache,
+    // no attempt is made to resolve any subrequest.
+    CHECK(mi2.miss_count == 1);
+    auto di2 = disk_cache.get_summary_info();
+    CHECK(di2.hit_count == 1);
+    CHECK(di2.miss_count == 1);
 }

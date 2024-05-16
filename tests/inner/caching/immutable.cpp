@@ -304,6 +304,8 @@ TEST_CASE("immutable cache record locking", tag)
     CHECK(info0a.cas_num_records == 2);
     CHECK(info0a.cas_total_size == 2 * sizeof(int));
     CHECK(info0a.cas_total_locked_size == sizeof(int));
+    CHECK(info0a.hit_count == 0);
+    CHECK(info0a.miss_count == 2);
 
     // Revoke interest in both IDs.
     // This should make ID(1) pending-eviction, but not ID(2) due to the lock.
@@ -315,6 +317,8 @@ TEST_CASE("immutable cache record locking", tag)
     CHECK(info0b.cas_num_records == 2);
     CHECK(info0b.cas_total_size == 2 * sizeof(int));
     CHECK(info0b.cas_total_locked_size == sizeof(int));
+    CHECK(info0b.hit_count == 0);
+    CHECK(info0b.miss_count == 2);
 
     // Purging the eviction entries should remove ID(1) but not ID(2).
     clear_unused_entries(cache);
@@ -324,6 +328,8 @@ TEST_CASE("immutable cache record locking", tag)
     CHECK(info0c.cas_num_records == 1);
     CHECK(info0c.cas_total_size == sizeof(int));
     CHECK(info0c.cas_total_locked_size == sizeof(int));
+    CHECK(info0c.hit_count == 0);
+    CHECK(info0c.miss_count == 2);
 
     // If we redeclare interest in ID(1), it should require creation.
     bool p1_needed_creation = false;
@@ -351,6 +357,8 @@ TEST_CASE("immutable cache record locking", tag)
     CHECK(info1a.cas_num_records == 2);
     CHECK(info1a.cas_total_size == 2 * sizeof(int));
     CHECK(info1a.cas_total_locked_size == sizeof(int));
+    CHECK(info1a.hit_count == 1);
+    CHECK(info1a.miss_count == 3);
 
     // Remove the lock and revoke interest in both IDs.
     // No entry remains in use.
@@ -363,6 +371,8 @@ TEST_CASE("immutable cache record locking", tag)
     CHECK(info1b.cas_num_records == 2);
     CHECK(info1b.cas_total_size == 2 * sizeof(int));
     CHECK(info1b.cas_total_locked_size == 0);
+    CHECK(info1b.hit_count == 1);
+    CHECK(info1b.miss_count == 3);
 
     // All entries can be removed from the cache.
     clear_unused_entries(cache);
@@ -372,6 +382,8 @@ TEST_CASE("immutable cache record locking", tag)
     CHECK(info1c.cas_num_records == 0);
     CHECK(info1c.cas_total_size == 0);
     CHECK(info1c.cas_total_locked_size == 0);
+    CHECK(info1c.hit_count == 1);
+    CHECK(info1c.miss_count == 3);
 }
 
 TEST_CASE("immutable cache - record locking with delayed task run", tag)

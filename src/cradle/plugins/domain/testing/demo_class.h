@@ -54,26 +54,31 @@ class demo_class
     MSGPACK_DEFINE(x_, y_)
 };
 
-// Needed if demo_class is cached
+// Needed if demo_class is used in a cached request, or a (direct or indirect)
+// subrequest of a cached request.
 inline constexpr std::size_t
 deep_sizeof(demo_class const& val)
 {
     return sizeof(int);
 }
 
-// Needed if demo_class is cached
+// Needed if demo_class is used in a cached request, or a (direct or indirect)
+// subrequest of a cached request.
 bool
 operator==(demo_class const& a, demo_class const& b);
 
-// Needed if demo_class is cached
+// Needed if demo_class is used in a cached request, or a (direct or indirect)
+// subrequest of a cached request.
 bool
 operator<(demo_class const& a, demo_class const& b);
 
-// Needed if demo_class is cached
+// Needed if demo_class is used in a cached request, or a (direct or indirect)
+// subrequest of a cached request.
 std::size_t
 hash_value(demo_class const& val);
 
-// Needed if demo_class is cached
+// Needed if demo_class is used in a cached request, or a (direct or indirect)
+// subrequest of a cached request.
 void
 update_unique_hash(unique_hasher& hasher, demo_class const& val);
 

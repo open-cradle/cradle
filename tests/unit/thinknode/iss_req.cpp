@@ -67,7 +67,7 @@ auto
 rq_function_thinknode_value(Value&& value)
 {
     using props_type = thinknode_request_props<Level>;
-    return function_request<Value, props_type>(
+    return function_request<Value, make_request_object_props_type<props_type>>(
         props_type{make_uuid(), "rq_function_thinknode_value"},
         identity_coro<Value>,
         std::forward<Value>(value));
@@ -110,8 +110,9 @@ test_serialize_thinknode_request(
     REQUIRE(
         get_unique_string(*req1.get_captured_id())
         == get_unique_string(*req.get_captured_id()));
-    if constexpr (Request::introspective)
+    if (req.is_introspective())
     {
+        REQUIRE(req1.is_introspective());
         REQUIRE(
             req1.get_introspection_title() == req.get_introspection_title());
     }
@@ -181,13 +182,14 @@ test_post_iss_requests_parallel(
     std::vector<std::string> const& results,
     bool introspective)
 {
-    constexpr caching_level_type level = Request::caching_level;
+    caching_level_type level = requests[0].get_caching_level();
     scope.clear_caches();
     auto& resources{scope.get_resources()};
     auto& admin{resources.the_tasklet_admin()};
 
     mock_http_session* mock_http{nullptr};
-    if (auto proxy = scope.get_proxy())
+    auto proxy = scope.get_proxy();
+    if (proxy)
     {
         // Assumes a single request/response
         auto response{
@@ -248,14 +250,14 @@ test_post_iss_requests_parallel(
         REQUIRE(infos[1].title() == "HTTP: post https://mgh.thinknode.io/api/v1.0/iss/string?context=123");
     }
 
-    if constexpr (is_cached(level))
+    if (!proxy && is_cached(level))
     {
         // Resolve using memory cache
         auto res1 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
         REQUIRE(res1 == results);
     }
 
-    if constexpr (is_fully_cached(level))
+    if (!proxy && is_fully_cached(level))
     {
         sync_wait_write_disk_cache(resources);
         resources.reset_memory_cache();
@@ -446,11 +448,12 @@ test_retrieve_immutable_object_parallel(
     std::vector<std::string> const& object_ids,
     std::vector<std::string> const& responses)
 {
-    constexpr caching_level_type level = Request::caching_level;
+    caching_level_type level = requests[0].get_caching_level();
     scope.clear_caches();
     auto& resources{scope.get_resources()};
     mock_http_session* mock_http{nullptr};
-    if (auto proxy = scope.get_proxy())
+    auto proxy = scope.get_proxy();
+    if (proxy)
     {
         // Assumes a single request/response
         auto response{make_http_200_response(responses[0])};
@@ -494,22 +497,32 @@ test_retrieve_immutable_object_parallel(
     }
     // Order unspecified so don't check mock_http.is_in_order()
 
-    // TODO only local?
-    if constexpr (is_cached(level))
+    if (!proxy && is_cached(level))
     {
         // Resolve using memory cache
+        auto& mem_cache{resources.memory_cache()};
+        auto mi_before = get_summary_info(mem_cache);
         auto res1 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+        auto mi_after = get_summary_info(mem_cache);
         REQUIRE(res1 == results);
+        CHECK(mi_after.hit_count > mi_before.hit_count);
+        CHECK(mi_after.miss_count == mi_before.miss_count);
     }
 
-    if constexpr (is_fully_cached(level))
+    if (!proxy && is_fully_cached(level))
     {
+        auto& disk_cache{
+            static_cast<local_disk_cache&>(resources.secondary_cache())};
         sync_wait_write_disk_cache(resources);
         resources.reset_memory_cache();
 
         // Resolve using disk cache
+        auto di_before = disk_cache.get_summary_info();
         auto res2 = cppcoro::sync_wait(resolve_in_parallel(ctx, requests));
+        auto di_after = disk_cache.get_summary_info();
         REQUIRE(res2 == results);
+        CHECK(di_after.hit_count > di_before.hit_count);
+        CHECK(di_after.miss_count == di_before.miss_count);
     }
 }
 

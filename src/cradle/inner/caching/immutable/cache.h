@@ -86,6 +86,10 @@ struct immutable_cache_info
     std::size_t cas_total_size;
     // Total deep size of CAS entries with locked referrers.
     std::size_t cas_total_locked_size;
+    // Number of cache hits.
+    int hit_count;
+    // Number of cache misses.
+    int miss_count;
 };
 
 struct immutable_cache

@@ -147,7 +147,7 @@ TEST_CASE("create function_request: different functors, one uuid", tag)
 TEST_CASE("function_request: identical capturing lambdas, one uuid", tag)
 {
     auto resources{make_inner_test_resources()};
-    request_props<caching_level_type::memory> props{make_test_uuid("0004")};
+    request_props<caching_level_type::none> props{make_test_uuid("0004")};
     auto lambda_a0{make_lambda(func_a)};
     auto lambda_a1{make_lambda(func_a)};
     auto req_a0{rq_function(props, lambda_a0)};
@@ -159,8 +159,8 @@ TEST_CASE("function_request: identical capturing lambdas, one uuid", tag)
     REQUIRE(req_a0.hash() == req_a1.hash());
 
     non_caching_request_resolution_context ctx{*resources};
-    auto result_a0{cppcoro::sync_wait(req_a0.resolve_sync(ctx))};
-    auto result_a1{cppcoro::sync_wait(req_a1.resolve_sync(ctx))};
+    auto result_a0{cppcoro::sync_wait(req_a0.resolve(ctx, nullptr))};
+    auto result_a1{cppcoro::sync_wait(req_a1.resolve(ctx, nullptr))};
 
     REQUIRE(result_a0 == "a");
     REQUIRE(result_a1 == "a");
@@ -173,7 +173,7 @@ TEST_CASE(
     // implementations are identical). The two requests should resolve to the
     // specified values.
     auto resources{make_inner_test_resources()};
-    request_props<caching_level_type::memory> props{make_test_uuid("0005")};
+    request_props<caching_level_type::none> props{make_test_uuid("0005")};
     auto lambda_a{make_lambda(func_a)};
     auto lambda_b{make_lambda(func_b)};
     auto req_a{rq_function(props, lambda_a)};
@@ -185,8 +185,8 @@ TEST_CASE(
     REQUIRE(req_a.hash() == req_b.hash());
 
     non_caching_request_resolution_context ctx{*resources};
-    auto result_a{cppcoro::sync_wait(req_a.resolve_sync(ctx))};
-    auto result_b{cppcoro::sync_wait(req_b.resolve_sync(ctx))};
+    auto result_a{cppcoro::sync_wait(req_a.resolve(ctx, nullptr))};
+    auto result_b{cppcoro::sync_wait(req_b.resolve(ctx, nullptr))};
 
     REQUIRE(result_a == "a");
     REQUIRE(result_b == "b");
@@ -196,7 +196,7 @@ TEST_CASE("function_request: lambdas capturing different args, one uuid", tag)
 {
     // A variant on the previous test case.
     auto resources{make_inner_test_resources()};
-    request_props<caching_level_type::memory> props{make_test_uuid("0006")};
+    request_props<caching_level_type::none> props{make_test_uuid("0006")};
     auto lambda_a{make_lambda(func_x, 2)};
     auto lambda_b{make_lambda(func_x, 3)};
     auto req_a{rq_function(props, lambda_a)};
@@ -208,8 +208,8 @@ TEST_CASE("function_request: lambdas capturing different args, one uuid", tag)
     REQUIRE(req_a.hash() == req_b.hash());
 
     non_caching_request_resolution_context ctx{*resources};
-    auto result_a{cppcoro::sync_wait(req_a.resolve_sync(ctx))};
-    auto result_b{cppcoro::sync_wait(req_b.resolve_sync(ctx))};
+    auto result_a{cppcoro::sync_wait(req_a.resolve(ctx, nullptr))};
+    auto result_b{cppcoro::sync_wait(req_b.resolve(ctx, nullptr))};
 
     REQUIRE(result_a == 2);
     REQUIRE(result_b == 3);
@@ -220,8 +220,8 @@ TEST_CASE(
     tag)
 {
     auto resources{make_inner_test_resources()};
-    request_props<caching_level_type::memory> props_a{make_test_uuid("0010")};
-    request_props<caching_level_type::memory> props_b{make_test_uuid("0011")};
+    request_props<caching_level_type::none> props_a{make_test_uuid("0010")};
+    request_props<caching_level_type::none> props_b{make_test_uuid("0011")};
     auto lambda_a{make_lambda(func_a)};
     auto lambda_b{make_lambda(func_b)};
     auto req_a{rq_function(props_a, lambda_a)};
@@ -234,8 +234,8 @@ TEST_CASE(
     REQUIRE(req_a.hash() != req_b.hash());
 
     non_caching_request_resolution_context ctx{*resources};
-    auto result_a{cppcoro::sync_wait(req_a.resolve_sync(ctx))};
-    auto result_b{cppcoro::sync_wait(req_b.resolve_sync(ctx))};
+    auto result_a{cppcoro::sync_wait(req_a.resolve(ctx, nullptr))};
+    auto result_b{cppcoro::sync_wait(req_b.resolve(ctx, nullptr))};
 
     REQUIRE(result_a == "a");
     REQUIRE(result_b == "b");
@@ -379,13 +379,14 @@ TEST_CASE("function_request_impl: load unregistered function", tag)
     request_props<caching_level> props{good_uuid};
     using value_type = std::string;
     using props_type = decltype(props);
+    using impl_props_type = make_request_impl_props_type<props_type>;
     using impl_type = function_request_impl<
         value_type,
-        caching_level,
-        props_type::function_type == request_function_t::coro,
+        impl_props_type,
         decltype(&func_a)>;
 
-    auto good_impl{std::make_shared<impl_type>(good_uuid, func_a)};
+    auto good_impl{
+        std::make_shared<impl_type>(make_request_impl_props(props), func_a)};
     std::stringstream os;
     {
         JSONRequestOutputArchive oarchive(os);
@@ -469,4 +470,19 @@ TEST_CASE("function_request: serialize proxy_retrier", tag)
     auto json = to_json(saved_req);
     CHECK(json.find("\"base_millis\": 321,") != json.npos);
     CHECK(json.find("\"max_attempts\": 14,") != json.npos);
+}
+
+TEST_CASE("rq_function and rq_proxy give the same serialization", tag)
+{
+    request_props<caching_level_type::memory, request_function_t::coro>
+        props_a{make_test_uuid("0300")};
+    request_props<caching_level_type::none, request_function_t::proxy_coro>
+        props_b{make_test_uuid("0300")};
+    auto req_a = rq_function(props_a, coro_a);
+    auto req_b = rq_proxy<std::string>(props_b);
+
+    auto seri_a = serialize_request(req_a);
+    auto seri_b = serialize_request(req_b);
+
+    REQUIRE(seri_a == seri_b);
 }

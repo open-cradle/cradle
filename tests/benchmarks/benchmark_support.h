@@ -26,7 +26,7 @@ handle_benchmark_exception(benchmark::State& state, std::string const& what);
 int
 check_benchmarks_skipped_with_error();
 
-template<UncachedRequest Req>
+template<Request Req>
 void
 call_resolve_by_ref_loop(Req const& req, inner_resources& resources)
 {
@@ -36,7 +36,7 @@ call_resolve_by_ref_loop(Req const& req, inner_resources& resources)
         int total{};
         for (auto i = 0; i < num_loops; ++i)
         {
-            total += co_await req.resolve_sync(ctx);
+            total += co_await req.resolve(ctx, nullptr);
         }
         co_return total;
     };
@@ -54,9 +54,9 @@ resolve_request_loop(
     benchmark::State& state, Ctx& ctx, Req const& req, int num_loops = 1000)
 {
     auto& resources{ctx.get_resources()};
-    constexpr auto caching_level = Req::element_type::caching_level;
+    auto caching_level = req.get_caching_level();
     auto loop = [&]() -> cppcoro::task<void> {
-        if constexpr (is_fully_cached(caching_level))
+        if (is_fully_cached(caching_level))
         {
             state.PauseTiming();
             resources.reset_memory_cache();
@@ -66,7 +66,7 @@ resolve_request_loop(
         }
         for (int i = 0; i < num_loops; ++i)
         {
-            if constexpr (is_fully_cached(caching_level))
+            if (is_fully_cached(caching_level))
             {
                 state.PauseTiming();
                 resources.reset_memory_cache();
