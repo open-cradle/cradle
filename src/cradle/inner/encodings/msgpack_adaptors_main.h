@@ -27,13 +27,21 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
         msgpack::object const&
         operator()(msgpack::object const& o, cradle::blob& v) const
         {
-            if (o.type == msgpack::type::STR)
+            if (o.type == msgpack::type::ARRAY)
             {
-                // Should be the name of a blob file
-                std::string name{o.via.str.ptr, o.via.str.size};
+                // Should be the name of a blob file and an offset
+                if (o.via.array.size != 2)
+                    throw msgpack::type_error();
+                msgpack::object const& file = o.via.array.ptr[0];
+                if (file.type != msgpack::type::STR)
+                    throw msgpack::type_error();
+                msgpack::object const& offset = o.via.array.ptr[1];
+                if (offset.type != msgpack::type::POSITIVE_INTEGER)
+                    throw msgpack::type_error();
+                std::string name{file.via.str.ptr, file.via.str.size};
                 auto owner = std::make_shared<cradle::blob_file_reader>(
                     cradle::file_path(std::move(name)));
-                v.reset(owner, owner->bytes(), owner->size());
+                v.reset(owner, owner->bytes() + offset.via.u64, owner->size());
                 return o;
             }
             if (o.type != msgpack::type::BIN)
@@ -62,8 +70,14 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
             {
                 std::string name{owner->mapped_file()};
                 uint32_t size{static_cast<uint32_t>(name.size())};
+                o.pack_array(2);
                 o.pack_str(size);
                 o.pack_str_body(name.c_str(), size);
+                uint64_t offset
+                    = v.data()
+                      - reinterpret_cast<std::byte const*>(
+                          const_cast<cradle::data_owner*>(owner)->data());
+                o.pack_uint64(offset);
                 return o;
             }
             if (v.size() >= 0x1'00'00'00'00)
@@ -86,13 +100,18 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
             if (auto owner = v.mapped_file_data_owner())
             {
                 std::string name{owner->mapped_file()};
-                uint32_t size = static_cast<uint32_t>(name.size());
-                o.type = msgpack::type::STR;
-                char* ptr = static_cast<char*>(
-                    o.zone.allocate_align(size, MSGPACK_ZONE_ALIGNOF(char)));
-                o.via.str.ptr = ptr;
-                o.via.str.size = size;
-                std::memcpy(ptr, name.c_str(), size);
+                uint64_t offset
+                    = v.data()
+                      - reinterpret_cast<std::byte const*>(
+                          const_cast<cradle::data_owner*>(owner)->data());
+                o.type = type::ARRAY;
+                o.via.array.size = 2;
+                o.via.array.ptr
+                    = static_cast<msgpack::object*>(o.zone.allocate_align(
+                        sizeof(msgpack::object) * o.via.array.size,
+                        MSGPACK_ZONE_ALIGNOF(msgpack::object)));
+                o.via.array.ptr[0] = msgpack::object(name, o.zone);
+                o.via.array.ptr[1] = msgpack::object(offset, o.zone);
                 return;
             }
             if (v.size() >= 0x1'00'00'00'00)

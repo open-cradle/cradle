@@ -83,21 +83,24 @@ TEST_CASE("msgpack converting file blob (main)", "[encodings][msgpack]")
     if (path.size() <= 31)
     {
         // str format family, <= 31 bytes
-        std::vector<size_t> header{0xa0 + path.size()};
-        expected = make_string(header) + path;
+        std::vector<size_t> header{0x92, 0xa0 + path.size()};
+        std::vector<size_t> footer{0x00};
+        expected = make_string(header) + path + make_string(footer);
     }
     else if (path.size() <= 255)
     {
         // str format family, <= 255 bytes
-        std::vector<size_t> header{0xd9, path.size()};
-        expected = make_string(header) + path;
+        std::vector<size_t> header{0x92, 0xd9, path.size()};
+        std::vector<size_t> footer{0x00};
+        expected = make_string(header) + path + make_string(footer);
     }
     else
     {
         // str format family, <= 65535 bytes
         std::vector<size_t> header{
-            0xda, path.size() / 256, path.size() & 0xff};
-        expected = make_string(header) + path;
+            0x92, 0xda, path.size() / 256, path.size() & 0xff};
+        std::vector<size_t> footer{0x00};
+        expected = make_string(header) + path + make_string(footer);
     }
     test_both(blob{shared_writer, writer.bytes(), writer.size()}, expected);
 }
