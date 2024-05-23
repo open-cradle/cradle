@@ -3,6 +3,7 @@
 #include <fmt/format.h>
 
 #include "../../support/inner_service.h"
+#include "../../support/simple_storage.h"
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/seri_catalog.h>
@@ -19,49 +20,6 @@ request_uuid
 make_test_uuid(int ext)
 {
     return request_uuid{fmt::format("{}-{:04d}", tag, ext)};
-}
-
-class mock_storage : public secondary_storage_intf
-{
- public:
-    void
-    clear() override;
-
-    cppcoro::task<std::optional<blob>>
-    read(std::string key) override;
-
-    cppcoro::task<void>
-    write(std::string key, blob value) override;
-
-    int
-    size() const
-    {
-        return static_cast<int>(storage_.size());
-    }
-
- private:
-    std::map<std::string, blob> storage_;
-};
-
-void
-mock_storage::clear()
-{
-    throw not_implemented_error();
-}
-
-cppcoro::task<std::optional<blob>>
-mock_storage::read(std::string key)
-{
-    auto it = storage_.find(key);
-    co_return it != storage_.end() ? std::make_optional(it->second)
-                                   : std::nullopt;
-}
-
-cppcoro::task<void>
-mock_storage::write(std::string key, blob value)
-{
-    storage_[key] = value;
-    co_return;
 }
 
 static auto add2 = [](int a, int b) { return a + b; };
@@ -85,7 +43,7 @@ TEST_CASE("get_request_key()", tag)
 TEST_CASE("store request in storage", tag)
 {
     inner_resources resources{make_inner_tests_config()};
-    auto owned_storage{std::make_unique<mock_storage>()};
+    auto owned_storage{std::make_unique<simple_blob_storage>()};
     auto& storage{*owned_storage};
     resources.set_requests_storage(std::move(owned_storage));
     seri_catalog cat{resources.get_seri_registry()};
@@ -106,7 +64,7 @@ TEST_CASE("store request in storage", tag)
 TEST_CASE("load request from storage (hit)", tag)
 {
     inner_resources resources{make_inner_tests_config()};
-    resources.set_requests_storage(std::make_unique<mock_storage>());
+    resources.set_requests_storage(std::make_unique<simple_blob_storage>());
     seri_catalog cat{resources.get_seri_registry()};
 
     request_props<caching_level_type::full> props{make_test_uuid(300)};
@@ -123,7 +81,7 @@ TEST_CASE("load request from storage (hit)", tag)
 TEST_CASE("load request from storage (miss)", tag)
 {
     inner_resources resources{make_inner_tests_config()};
-    resources.set_requests_storage(std::make_unique<mock_storage>());
+    resources.set_requests_storage(std::make_unique<simple_blob_storage>());
     seri_catalog cat{resources.get_seri_registry()};
     request_props<caching_level_type::full> props{make_test_uuid(400)};
     auto req_written{rq_function(props, add2, 1, 2)};

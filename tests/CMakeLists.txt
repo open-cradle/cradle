@@ -17,7 +17,9 @@ set_source_files_properties(
 # Define a library containing basic test support.
 add_library(basic_test_support
     support/common.cpp
-    support/inner_service.cpp)
+    support/inner_service.cpp
+    support/make_test_blob.cpp
+    support/simple_storage.cpp)
 add_dependencies(basic_test_support
     deploy_dir_file_target)
 target_link_libraries(basic_test_support PUBLIC

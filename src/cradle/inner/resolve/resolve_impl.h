@@ -20,6 +20,7 @@
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/resolve/util.h>
 #include <cradle/inner/service/secondary_cached_blob.h>
+#include <cradle/inner/service/secondary_storage_intf.h>
 
 namespace cradle {
 
@@ -84,8 +85,11 @@ cppcoro::task<typename Req::value_type> resolve_secondary_cached(
 {
     using Value = typename Req::value_type;
     inner_resources& resources{ctx.get_resources()};
+    auto& cache = resources.secondary_cache();
+    bool allow_blob_files = cache.allow_blob_files();
     auto create_blob_task = [&]() -> cppcoro::task<blob> {
-        co_return serialize_value(co_await resolve_request_direct(ctx, req));
+        co_return serialize_value(
+            co_await resolve_request_direct(ctx, req), allow_blob_files);
     };
     co_return deserialize_value<Value>(co_await secondary_cached_blob(
         resources, req.get_captured_id(), std::move(create_blob_task)));

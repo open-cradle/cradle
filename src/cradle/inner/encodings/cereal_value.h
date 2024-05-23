@@ -24,7 +24,8 @@ save(Archive& archive, Value const& val)
     requires serializable_via_cereal<Value>::value
 {
     // TODO convert to blob file if Value wants that?
-    save(archive, serialize_value(val));
+    bool allow_blob_files{true};
+    save(archive, serialize_value(val, allow_blob_files));
 }
 
 template<typename Archive, typename Value>

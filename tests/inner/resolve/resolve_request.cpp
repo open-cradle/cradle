@@ -7,10 +7,14 @@
 
 #include "../../support/concurrency_testing.h"
 #include "../../support/inner_service.h"
+#include "../../support/make_test_blob.h"
 #include "../../support/request.h"
+#include "../../support/simple_storage.h"
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/context.h>
+#include <cradle/plugins/domain/testing/demo_class.h>
+#include <cradle/plugins/domain/testing/demo_class_requests.h>
 #include <cradle/plugins/domain/testing/requests.h>
 
 using namespace cradle;
@@ -864,4 +868,105 @@ TEST_CASE("resolve request tree with different props", tag)
     auto di2 = disk_cache.get_summary_info();
     CHECK(di2.hit_count == 1);
     CHECK(di2.miss_count == 1);
+}
+
+static void
+test_resolve_inner_blob_file(bool allow_blob_files)
+{
+    constexpr auto caching_level{caching_level_type::full};
+    constexpr bool use_shared_memory{true};
+    std::string proxy_name{""};
+    inner_resources resources{make_inner_tests_config()};
+    std::unique_ptr<secondary_storage_intf> storage;
+    if (allow_blob_files)
+    {
+        storage = std::make_unique<simple_blob_storage>();
+    }
+    else
+    {
+        storage = std::make_unique<simple_string_storage>();
+    }
+    resources.set_secondary_cache(std::move(storage));
+    testing_request_context ctx{resources, proxy_name};
+    ctx.track_blob_file_writers();
+
+    auto req{rq_make_demo_class<caching_level>(
+        3, make_test_blob(ctx, "abc", use_shared_memory))};
+    auto res0 = cppcoro::sync_wait(resolve_request(ctx, req));
+    CHECK(res0.get_x() == 3);
+    CHECK(to_string(res0.get_y()) == "abc");
+    auto y0_owner = res0.get_y().mapped_file_data_owner();
+    // The result has been calculated, serialized for secondary storage, and
+    // deserialized into res0. So if secondary storage disallows blob files,
+    // res0 won't have any.
+    CHECK((y0_owner != nullptr) == allow_blob_files);
+
+    resources.reset_memory_cache();
+
+    auto res1 = cppcoro::sync_wait(resolve_request(ctx, req));
+    CHECK(res1.get_x() == 3);
+    CHECK(to_string(res1.get_y()) == "abc");
+    auto y1_owner = res1.get_y().mapped_file_data_owner();
+    CHECK((y1_owner != nullptr) == allow_blob_files);
+}
+
+TEST_CASE("resolve inner blob file - full - allow", "[A][0]")
+{
+    test_resolve_inner_blob_file(true);
+}
+
+TEST_CASE("resolve inner blob file - full - disallow", "[A][1]")
+{
+    test_resolve_inner_blob_file(false);
+}
+
+static void
+test_resolve_outer_blob_file(bool allow_blob_files)
+{
+    constexpr auto caching_level{caching_level_type::full};
+    constexpr bool use_shared_memory{true};
+    std::string proxy_name{""};
+    inner_resources resources{make_inner_tests_config()};
+    std::unique_ptr<secondary_storage_intf> storage;
+    if (allow_blob_files)
+    {
+        storage = std::make_unique<simple_blob_storage>();
+    }
+    else
+    {
+        storage = std::make_unique<simple_string_storage>();
+    }
+    resources.set_secondary_cache(std::move(storage));
+    testing_request_context ctx{resources, proxy_name};
+    ctx.track_blob_file_writers();
+
+    auto req{rq_make_some_blob<caching_level>(256, use_shared_memory)};
+    auto res0 = cppcoro::sync_wait(resolve_request(ctx, req));
+    CHECK(res0.size() == 256);
+    CHECK(res0.data()[0xff] == static_cast<std::byte>(0x55));
+    auto* res0_owner = res0.mapped_file_data_owner();
+    // Even if the cache disallows blob files, serializing a blob returns that
+    // blob; so the resolve_request() result always is a blob file.
+    CHECK(res0_owner != nullptr);
+
+    resources.reset_memory_cache();
+
+    auto res1 = cppcoro::sync_wait(resolve_request(ctx, req));
+    CHECK(res1.size() == 256);
+    CHECK(res1.data()[0xff] == static_cast<std::byte>(0x55));
+    auto* res1_owner = res1.mapped_file_data_owner();
+    // This time the result comes from the cache, where the blob was stored in
+    // expanded form (a byte sequence containing no reference to the blob
+    // file).
+    CHECK((res1_owner != nullptr) == allow_blob_files);
+}
+
+TEST_CASE("resolve outer blob file - full - allow", "[A][2]")
+{
+    test_resolve_outer_blob_file(true);
+}
+
+TEST_CASE("resolve outer blob file - full - disallow", "[A][3]")
+{
+    test_resolve_outer_blob_file(false);
 }
