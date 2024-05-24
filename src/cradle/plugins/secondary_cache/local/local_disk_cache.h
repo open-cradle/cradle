@@ -87,6 +87,12 @@ class local_disk_cache : public secondary_storage_intf
     cppcoro::task<void>
     write(std::string key, blob value) override;
 
+    bool
+    allow_blob_files() const override
+    {
+        return true;
+    }
+
     // Get summary information about the cache.
     disk_cache_info
     get_summary_info();

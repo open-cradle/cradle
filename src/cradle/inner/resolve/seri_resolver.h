@@ -62,10 +62,13 @@ class seri_resolver_impl : public seri_resolver_intf
         auto req{deserialize_request<Req>(
             ctx.get_resources(), std::move(seri_req))};
         ResolutionConstraintsLocal constraints;
+        // TODO resolve_request also serializes value if fully caching;
+        // allowing blob files or not depending on the cache.
         auto value = co_await resolve_request(
             ctx, req, seri_lock.lock_ptr, constraints);
+        bool allow_blob_files{true};
         co_return serialized_result{
-            serialize_value(value), seri_lock.record_id};
+            serialize_value(value, allow_blob_files), seri_lock.record_id};
     }
 };
 

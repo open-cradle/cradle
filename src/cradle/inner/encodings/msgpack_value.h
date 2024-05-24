@@ -14,13 +14,14 @@
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/encodings/msgpack_adaptors_main.h>
+#include <cradle/inner/encodings/msgpack_packer.h>
 
 namespace cradle {
 
 // Serializes a value to a msgpack-encoded byte sequence, stored in a blob
 template<typename Value>
 blob
-serialize_value(Value const& value)
+serialize_value(Value const& value, bool allow_blob_files)
 {
     if constexpr (std::same_as<Value, blob>)
     {
@@ -29,9 +30,9 @@ serialize_value(Value const& value)
         // information that msgpack::pack() would normally add.
         return value;
     }
-    std::stringstream ss;
-    msgpack::pack(ss, value);
-    return make_blob(std::move(ss).str());
+    msgpack_ostream os;
+    msgpack_packer(os, allow_blob_files).pack(value);
+    return std::move(os).get_blob();
 }
 
 // Deserializes a value from a msgpack-encoded byte sequence
