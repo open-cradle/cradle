@@ -30,7 +30,7 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
             if (o.type == msgpack::type::ARRAY)
             {
                 // Should be the name of a blob file and an offset
-                if (o.via.array.size != 2)
+                if (o.via.array.size != 3)
                     throw msgpack::type_error();
                 msgpack::object const& file = o.via.array.ptr[0];
                 if (file.type != msgpack::type::STR)
@@ -38,10 +38,15 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
                 msgpack::object const& offset = o.via.array.ptr[1];
                 if (offset.type != msgpack::type::POSITIVE_INTEGER)
                     throw msgpack::type_error();
+                // TODO: Maybe store 'unused space at end' instead, since that
+                // would generally be 0 and compress better in msgpack.
+                msgpack::object const& size = o.via.array.ptr[2];
+                if (size.type != msgpack::type::POSITIVE_INTEGER)
+                    throw msgpack::type_error();
                 std::string name{file.via.str.ptr, file.via.str.size};
                 auto owner = std::make_shared<cradle::blob_file_reader>(
                     cradle::file_path(std::move(name)));
-                v.reset(owner, owner->bytes() + offset.via.u64, owner->size());
+                v.reset(owner, owner->bytes() + offset.via.u64, size.via.u64);
                 return o;
             }
             if (o.type != msgpack::type::BIN)
@@ -70,7 +75,7 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
             {
                 std::string name{owner->mapped_file()};
                 uint32_t size{static_cast<uint32_t>(name.size())};
-                o.pack_array(2);
+                o.pack_array(3);
                 o.pack_str(size);
                 o.pack_str_body(name.c_str(), size);
                 uint64_t offset
@@ -78,6 +83,7 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
                       - reinterpret_cast<std::byte const*>(
                           const_cast<cradle::data_owner*>(owner)->data());
                 o.pack_uint64(offset);
+                o.pack_uint64(v.size());
                 return o;
             }
             if (v.size() >= 0x1'00'00'00'00)
@@ -105,13 +111,14 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
                       - reinterpret_cast<std::byte const*>(
                           const_cast<cradle::data_owner*>(owner)->data());
                 o.type = type::ARRAY;
-                o.via.array.size = 2;
+                o.via.array.size = 3;
                 o.via.array.ptr
                     = static_cast<msgpack::object*>(o.zone.allocate_align(
                         sizeof(msgpack::object) * o.via.array.size,
                         MSGPACK_ZONE_ALIGNOF(msgpack::object)));
                 o.via.array.ptr[0] = msgpack::object(name, o.zone);
                 o.via.array.ptr[1] = msgpack::object(offset, o.zone);
+                o.via.array.ptr[2] = msgpack::object(v.size(), o.zone);
                 return;
             }
             if (v.size() >= 0x1'00'00'00'00)
