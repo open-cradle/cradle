@@ -91,7 +91,7 @@ template<typename Props, typename MakerRequest>
 auto
 rq_meta(Props const& meta_props, MakerRequest const& maker_req)
 {
-    using InnerRequest = MakerRequest::value_type;
+    using InnerRequest = typename MakerRequest::value_type;
     return rq_function(meta_props, meta_function<InnerRequest>, maker_req);
 }
 
