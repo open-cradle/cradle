@@ -46,6 +46,11 @@ make_inner_test_resources(
     auto resources{std::make_unique<inner_resources>(config)};
     resources->set_secondary_cache(std::make_unique<local_disk_cache>(config));
     init_and_register_proxy(*resources, proxy_name, domain);
+    if (!proxy_name.empty())
+    {
+        auto& proxy{resources->get_proxy(proxy_name)};
+        proxy.clear_unused_mem_cache_entries();
+    }
     return resources;
 }
 
