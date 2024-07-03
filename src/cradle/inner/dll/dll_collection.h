@@ -43,7 +43,7 @@ class dll_collection
 
     // Unloads a shared library and unregisters its seri resolvers (if any).
     //
-    // dll_name is as for load_shared_library(), or a regex if it contains "*".
+    // dll_name is as for load_shared_library().
     void
     unload(std::string const& dll_name);
 
@@ -74,12 +74,6 @@ class dll_collection
     // dll_controller objects, identified by dll_name
     std::unordered_map<std::string, std::unique_ptr<dll_controller>>
         controllers_;
-
-    void
-    remove_one(std::string const& dll_name);
-
-    void
-    remove_matching(std::string const& dll_name);
 };
 
 } // namespace cradle

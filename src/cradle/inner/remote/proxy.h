@@ -154,12 +154,8 @@ class remote_proxy
     // Unloads a previously loaded shared library, so that its seri resolvers
     // are no longer available.
     //
-    // In the simplest case, dll_name is as for load_shared_library(), and it
-    // is an error if the specified DLL is not loaded.
-    // As an extension, dll_name may contain a "*", in which case it is
-    // interpreted as a regex and all matching DLLs are unloaded; it is not an
-    // error if there are no matching DLLs. This is primarily intended to be
-    // used in unit tests.
+    // dll_name is as for load_shared_library(); it is an error if the
+    // specified DLL is not loaded.
     virtual void
     unload_shared_library(std::string dll_name)
         = 0;

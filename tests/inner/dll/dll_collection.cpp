@@ -92,42 +92,6 @@ TEST_CASE("load/unload/reload two DLLs", tag)
     REQUIRE(the_seri_registry->size() == dll1_size + dll0_size);
 }
 
-TEST_CASE("unload DLLs with regex", tag)
-{
-    auto resources{make_inner_test_resources()};
-    dll_collection the_dlls{*resources};
-    auto the_seri_registry{resources->get_seri_registry()};
-    std::string dll_v1_name{"test_inner_dll_v1"};
-    constexpr auto dll_v1_size{3};
-    std::string dll_x0_name{"test_inner_dll_x0"};
-    constexpr auto dll_x0_size{1};
-    std::string dll_x1_name{"test_inner_dll_x1"};
-    constexpr auto dll_x1_size{1};
-
-    the_dlls.load(get_test_dlls_dir(), dll_v1_name);
-    the_dlls.load(get_test_dlls_dir(), dll_x0_name);
-    the_dlls.load(get_test_dlls_dir(), dll_x1_name);
-    REQUIRE(the_dlls.size() == 3);
-    REQUIRE(the_dlls.trash_size() == 0);
-    REQUIRE(
-        the_seri_registry->size() == dll_v1_size + dll_x0_size + dll_x1_size);
-
-    the_dlls.unload("test_inner_dll_x.*");
-    REQUIRE(the_dlls.size() == 1);
-    REQUIRE(the_dlls.trash_size() == 2);
-    REQUIRE(the_seri_registry->size() == dll_v1_size);
-
-    the_dlls.unload("test_inner_dll_y.*");
-    REQUIRE(the_dlls.size() == 1);
-    REQUIRE(the_dlls.trash_size() == 2);
-    REQUIRE(the_seri_registry->size() == dll_v1_size);
-
-    the_dlls.unload("test_inner_dll_v.*");
-    REQUIRE(the_dlls.size() == 0);
-    REQUIRE(the_dlls.trash_size() == 3);
-    REQUIRE(the_seri_registry->size() == 0);
-}
-
 TEST_CASE("loading a non-existing DLL fails", tag)
 {
     auto resources{make_inner_test_resources()};
