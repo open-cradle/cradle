@@ -177,6 +177,14 @@ class remote_proxy
     virtual void
     release_cache_record_lock(remote_cache_record_id record_id)
         = 0;
+
+    // Retrieves the total number of contained calls initiated by the remote
+    // (so failed contained calls also count).
+    // Intended for unit tests that need to check that a function call that
+    // should run contained, indeed did so.
+    virtual int
+    get_num_contained_calls() const
+        = 0;
 };
 
 } // namespace cradle

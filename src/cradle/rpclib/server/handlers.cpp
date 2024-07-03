@@ -1,3 +1,4 @@
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <stdexcept>
@@ -22,6 +23,7 @@
 #include <cradle/inner/resolve/util.h>
 #include <cradle/inner/service/config_map_from_json.h>
 #include <cradle/plugins/domain/testing/context.h>
+#include <cradle/rpclib/common/config.h>
 #include <cradle/rpclib/server/handlers.h>
 #include <cradle/thinknode/service/core.h>
 
@@ -146,9 +148,7 @@ resolve_sync(
     }
     else
     {
-        auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(*ctx)};
-        task = resolve_serialized_local(
-            loc_ctx, std::move(seri_req), seri_lock);
+        task = resolve_serialized_local(*ctx, std::move(seri_req), seri_lock);
     }
     auto seri_result{cppcoro::sync_wait(std::move(task))};
     // TODO try to get rid of .value()
@@ -157,7 +157,7 @@ resolve_sync(
     ctx->on_value_complete();
     // TODO if the result references blob files, then create a response_id
     // uniquely identifying the set of those files
-    static uint32_t response_id = 0;
+    static std::atomic<uint32_t> response_id = 0;
     response_id += 1;
     return rpclib_response{
         response_id, seri_lock.record_id.value(), std::move(result)};
@@ -217,7 +217,7 @@ resolve_async(
     seri_cache_record_lock_t seri_lock)
 {
     auto& logger{hctx.logger()};
-    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
+    if (auto* test_ctx = dynamic_cast<test_context_intf*>(&*actx))
     {
         test_ctx->apply_resolve_async_delay();
     }
@@ -259,12 +259,14 @@ try
         = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
     logger.info(
         "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
+    // logger.info("  config_json {}", config_json);
     auto& dom = hctx.service().find_domain(domain_name);
     auto actx{dom.make_local_async_context(config)};
     actx->track_blob_file_writers();
-    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
+    if (auto* test_ctx = dynamic_cast<test_context_intf*>(&*actx))
     {
         test_ctx->apply_fail_submit_async();
+        test_ctx->apply_submit_async_delay();
     }
     actx->using_result();
     hctx.get_async_db().add(actx);
@@ -486,6 +488,23 @@ try
 catch (std::exception& e)
 {
     handle_exception(hctx, e);
+}
+
+int
+handle_get_num_contained_calls(rpclib_handler_context& hctx)
+try
+{
+    auto& logger{hctx.logger()};
+    logger.info("handle_get_num_contained_calls");
+    auto& resources{hctx.service()};
+    int num = resources.get_num_contained_calls();
+    logger.info("handle_get_num_contained_calls -> {}", num);
+    return num;
+}
+catch (std::exception& e)
+{
+    handle_exception(hctx, e);
+    return int{};
 }
 
 } // namespace cradle

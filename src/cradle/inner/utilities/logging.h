@@ -11,7 +11,8 @@ namespace cradle {
 void
 initialize_logging(
     std::string const& level_spec_arg = "info",
-    bool ignore_env_setting = false);
+    bool ignore_env_setting = false,
+    std::string prefix = "");
 
 // Throws if a logger with this name already exists
 std::shared_ptr<spdlog::logger>

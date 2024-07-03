@@ -81,14 +81,6 @@ TEST_CASE("push/pop tasklet", tag)
     REQUIRE(ctx.get_tasklet() == nullptr);
 }
 
-TEST_CASE("get proxy name", tag)
-{
-    auto resources{make_inner_test_resources()};
-    testing_request_context ctx{*resources, "the name"};
-
-    REQUIRE(ctx.proxy_name() == "the name");
-}
-
 TEST_CASE("domain_name()", tag)
 {
     auto resources{make_inner_test_resources()};

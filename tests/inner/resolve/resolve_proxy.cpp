@@ -46,17 +46,6 @@ eval_request_over_rpclib(Req const& req, int expected)
 
 } // namespace
 
-namespace cradle {
-
-// Normally in the test_inner_dll_v1 DLL
-int
-adder_v1_func(int a, int b)
-{
-    return a + b;
-}
-
-} // namespace cradle
-
 TEST_CASE("evaluate proxy request, plain args", tag)
 {
     auto req{rq_test_adder_v1p(7, 2)};
@@ -80,7 +69,7 @@ TEST_CASE("evaluate proxy request, proxy subrequest", tag)
 
 TEST_CASE("evaluate proxy request, function subrequest", tag)
 {
-    auto req{rq_test_adder_v1n(7, rq_test_adder_v1n_impl(5, 2))};
+    auto req{rq_test_adder_v1n(7, rq_test_adder_v1n(5, 2))};
     int expected{7 + 5 + 2};
     eval_request_over_rpclib(req, expected);
 }

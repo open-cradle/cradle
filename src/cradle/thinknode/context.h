@@ -26,19 +26,22 @@ struct thinknode_request_context final : public sync_context_base
 
     ~thinknode_request_context();
 
+    // context_intf
     std::string const&
     domain_name() const override;
 
+    // remote_context_intf
     service_config
     make_config(bool need_record_lock) const override;
 
+    // Other
     std::string const&
     api_url() const
     {
         return session.api_url;
     }
 };
-static_assert(ValidContext<thinknode_request_context>);
+static_assert(ValidFinalContext<thinknode_request_context>);
 
 } // namespace cradle
 

@@ -33,7 +33,7 @@ TEST_CASE("load/unload/reload one DLL", tag)
     dll_collection the_dlls{*resources};
     auto the_seri_registry{resources->get_seri_registry()};
     std::string dll_name{"test_inner_dll_v1"};
-    constexpr auto dll_size{3};
+    constexpr auto dll_size{6};
 
     the_dlls.load(get_test_dlls_dir(), dll_name);
     REQUIRE(the_dlls.size() == 1);
@@ -57,7 +57,7 @@ TEST_CASE("load/unload/reload two DLLs", tag)
     dll_collection the_dlls{*resources};
     auto the_seri_registry{resources->get_seri_registry()};
     std::string dll0_name{"test_inner_dll_v1"};
-    constexpr auto dll0_size{3};
+    constexpr auto dll0_size{6};
     std::string dll1_name{"test_inner_dll_x0"};
     constexpr auto dll1_size{1};
 

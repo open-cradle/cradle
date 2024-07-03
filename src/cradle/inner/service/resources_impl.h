@@ -1,6 +1,7 @@
 #ifndef CRADLE_INNER_SERVICE_RESOURCES_IMPL_H
 #define CRADLE_INNER_SERVICE_RESOURCES_IMPL_H
 
+#include <atomic>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -17,6 +18,7 @@
 #include <cradle/inner/remote/types.h>
 #include <cradle/inner/resolve/seri_registry.h>
 #include <cradle/inner/service/config.h>
+#include <cradle/rpclib/client/contained_proxy_pool.h>
 
 namespace cradle {
 
@@ -48,6 +50,9 @@ class inner_resources_impl
     {
         return io_svc_;
     }
+
+    void
+    check_support_caching();
 
  private:
     friend class inner_resources;
@@ -95,6 +100,9 @@ class inner_resources_impl
     // thread. This should happen only for mock HTTP in benchmark tests, where
     // it tends to give more reliable and consistent timings.
     bool http_is_synchronous_{false};
+
+    contained_proxy_pool contained_proxy_pool_;
+    std::atomic<int> num_contained_calls_{};
 };
 
 } // namespace cradle

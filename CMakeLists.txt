@@ -405,16 +405,23 @@ list(FILTER generated_srcs_websocket INCLUDE REGEX "src/cradle/websocket")
 set(intgen_src_dir
     ${CMAKE_CURRENT_BINARY_DIR}/internally_generated/src)
 
+# Helper executable used for creating deploy_dir.h.
+add_executable(hello_world
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/hello_world.cpp")
+
 # Establish the location of deploy_dir.h (which will be created later on).
 set(deploy_dir_file "${intgen_src_dir}/cradle/deploy_dir.h")
 
 # Create deploy_dir.h for providing access to the rpclib server executable.
+# A reference to rpclib_server would create a circular dependency, so instead
+# a reference to the helper hello_world is used, which should end up in the
+# same directory.
 add_custom_command(
     OUTPUT ${deploy_dir_file}
     COMMAND ${CMAKE_COMMAND}
         -D input_dir=${CMAKE_CURRENT_SOURCE_DIR}/cmake
         -D output_dir=${intgen_src_dir}/cradle
-        -D deployed_executable="$<TARGET_FILE:rpclib_server>"
+        -D deploy_dir="$<TARGET_FILE_DIR:hello_world>"
         -D compiler_id=${CMAKE_CXX_COMPILER_ID}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.cmake
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/deploy_dir.h.in)
@@ -447,11 +454,15 @@ record_public_include_directory(lib_third_party
     include/third-party
     "*.[ih]*")
 
-# The library for the inner core
+# The library for the inner core.
+# The rpclib client is included for starting a contained-mode server.
 file(GLOB_RECURSE srcs_inner CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/inner/*.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/inner/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/common/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/client/*.cpp")
 add_library(cradle_inner SHARED ${srcs_inner})
 add_dependencies(cradle_inner version_info)
+add_dependencies(cradle_inner deploy_dir_file_target)
 # simdjson.h "local variable is initialized but not referenced"
 # Only when building from Visual Studio GUI, not from command line?!
 # TODO use recent simdjson
@@ -487,6 +498,7 @@ target_link_libraries(cradle_inner PUBLIC
     msgpackc-cxx
     OpenSSL::SSL
     nlohmann_json::nlohmann_json
+    rpc
     simdjson::simdjson
     spdlog::spdlog
     tomlplusplus::tomlplusplus)
@@ -509,25 +521,6 @@ target_link_libraries(cradle_plugins_inner PUBLIC
     cppcoro
     spdlog::spdlog
     SQLite::SQLite3)
-
-# The library for the rpclib client
-file(GLOB_RECURSE srcs_rpclib_client CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/common/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/client/*.cpp")
-add_library(cradle_rpclib_client SHARED)
-target_sources(cradle_rpclib_client PRIVATE
-    ${srcs_rpclib_client})
-add_dependencies(cradle_rpclib_client deploy_dir_file_target)
-record_public_include_directory(cradle_rpclib_client
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    include
-    "*.h")
-target_link_libraries(cradle_rpclib_client PUBLIC
-    cradle_inner
-    Boost::headers
-    cppcoro
-    rpc
-    spdlog::spdlog)
 
 # The typing library (a.o.) adds a type system (e.g. dynamics)
 file(GLOB_RECURSE srcs_typing CONFIGURE_DEPENDS
@@ -587,7 +580,6 @@ add_dependencies(cradle_websocket
 # Boost::random required by websocketpp even though not advertised
 target_link_libraries(cradle_websocket PUBLIC
     cradle_thinknode
-    cradle_rpclib_client
     cradle_plugins_inner
     Boost::headers
     Boost::random
@@ -665,7 +657,7 @@ if(CRADLE_INSTALL)
         TARGETS
             cradle_inner cradle_typing lib_third_party cradle_plugins_inner
             cradle_thinknode
-            cradle_rpclib_client cradle_websocket cradle_external cppcoro
+            cradle_websocket cradle_external cppcoro
             tomlplusplus_tomlplusplus rpc
         EXPORT CradleTargets
         LIBRARY DESTINATION lib

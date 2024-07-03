@@ -54,8 +54,11 @@ dll_controller::load()
     // TODO Consider rtld_lazy if the library is opened only for getting the
     // uuid's, as this might be significantly faster than rtld_now.
     auto mode{
-        boost::dll::load_mode::rtld_now | boost::dll::load_mode::rtld_local
-        | boost::dll::load_mode::rtld_deepbind};
+        boost::dll::load_mode::rtld_now | boost::dll::load_mode::rtld_local};
+    // Adding
+    //  | boost::dll::load_mode::rtld_deepbind};
+    // has resulted in crashes with gcc-compiled code, when DLL writes to
+    // std::cout.
     lib_ = new boost::dll::shared_library(path_, mode);
 
     using get_caps_func_t = dll_capabilities const*();

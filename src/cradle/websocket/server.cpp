@@ -1913,7 +1913,7 @@ websocket_server_impl::websocket_server_impl(service_config const& in_config)
             on_message(*this, hdl, message);
         });
 
-    core.register_proxy(std::make_unique<rpclib_client>(config));
+    core.register_proxy(std::make_unique<rpclib_client>(config, nullptr));
 
     // TODO maybe delay loading Thinknode DLL until really needed
     // Load Thinknode DLL locally

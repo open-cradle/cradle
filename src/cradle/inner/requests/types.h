@@ -22,6 +22,9 @@ enum class async_status
     ERROR // Ended due to error
 };
 
+bool
+is_final(async_status s);
+
 std::string
 to_string(async_status s);
 
