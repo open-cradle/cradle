@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/dll.hpp>
 #include <boost/program_options.hpp>
 #include <cppcoro/sync_wait.hpp>
 #include <fmt/format.h>
@@ -27,10 +28,21 @@
 #include <cradle/plugins/secondary_cache/http/http_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
 #include <cradle/rpclib/common/common.h>
+#include <cradle/rpclib/common/config.h>
 #include <cradle/rpclib/server/handlers.h>
 #include <cradle/thinknode/domain_factory.h>
 #include <cradle/thinknode/service/core.h>
 #include <cradle/version_info.h>
+
+// The rpclib server interprets RPC messages sent by an rpclib client;
+// the main messages instruct to resolve a request.
+//
+// The server runs in production, testing or contained mode. The main
+// difference between production and testing is the port on which the server
+// listens. In contained mode, a request encodes a single function call, and
+// has no subrequests. In addition, the request is resolved without any form of
+// caching; caching can still happen in the client, which could be another
+// rpclib server (running in non-contained mode).
 
 using namespace cradle;
 
@@ -39,6 +51,7 @@ struct cli_options
     std::string log_level{"info"};
     bool ignore_env_log_level{false};
     bool testing{false};
+    bool contained{false};
     rpclib_port_t port{RPCLIB_PORT_PRODUCTION};
     std::string secondary_cache{local_disk_cache_config_values::PLUGIN_NAME};
 };
@@ -59,6 +72,8 @@ parse_options(int argc, char const* const* argv)
             "logging level (SPDLOG_LEVEL format)")
         ("testing",
             "set testing environment")
+        ("contained",
+            "set contained mode")
         ("port", po::value<rpclib_port_t>(),
             "port number")
         ("secondary-cache", po::value<std::string>(),
@@ -102,6 +117,10 @@ parse_options(int argc, char const* const* argv)
         options.testing = true;
         options.port = RPCLIB_PORT_TESTING;
     }
+    if (vm.count("contained"))
+    {
+        options.contained = true;
+    }
     if (vm.count("port"))
     {
         options.port = vm["port"].as<rpclib_port_t>();
@@ -118,32 +137,49 @@ parse_options(int argc, char const* const* argv)
 static service_config_map
 create_config_map(cli_options const& options)
 {
+    std::string cache_dir{
+        options.testing ? "server_cache_testing" : "server_cache_production"};
     service_config_map config_map;
-
     if (options.testing)
     {
         config_map[generic_config_keys::TESTING] = true;
     }
-    config_map[inner_config_keys::SECONDARY_CACHE_FACTORY]
-        = options.secondary_cache;
-    std::string cache_dir{
-        options.testing ? "server_cache_testing" : "server_cache_production"};
-    config_map[local_disk_cache_config_keys::DIRECTORY] = cache_dir;
+    if (options.contained)
+    {
+        // Won't create any caches in contained mode
+        config_map[rpclib_config_keys::CONTAINED] = true;
+    }
+    else
+    {
+        config_map[inner_config_keys::SECONDARY_CACHE_FACTORY]
+            = options.secondary_cache;
+        config_map[local_disk_cache_config_keys::DIRECTORY] = cache_dir;
+    }
     config_map[blob_cache_config_keys::DIRECTORY] = cache_dir;
     config_map[http_cache_config_keys::PORT] = 9090U;
-
+    config_map[generic_config_keys::DEPLOY_DIR]
+        = boost::dll::program_location().parent_path().string();
     return config_map;
 }
 
 static void
 run_server(cli_options const& options)
 {
-    initialize_logging(options.log_level, options.ignore_env_log_level);
+    std::string prefix{"server "};
+    if (options.contained)
+    {
+        prefix = fmt::format("port {} ", options.port);
+    }
+    initialize_logging(
+        options.log_level, options.ignore_env_log_level, std::move(prefix));
     auto my_logger = create_logger("rpclib_server");
 
     service_config config{create_config_map(options)};
     service_core service{config};
-    service.set_secondary_cache(create_secondary_storage(service));
+    if (!options.contained)
+    {
+        service.set_secondary_cache(create_secondary_storage(service));
+    }
     service.ensure_async_db();
     service.register_domain(create_testing_domain(service));
     service.register_domain(create_thinknode_domain(service));
@@ -218,6 +254,9 @@ run_server(cli_options const& options)
             handle_release_cache_record_lock(
                 hctx, remote_cache_record_id{record_id_value});
         });
+    srv.bind("get_num_contained_calls", [&]() {
+        return handle_get_num_contained_calls(hctx);
+    });
 
     auto num_threads{hctx.handler_pool_size()};
     assert(num_threads >= 2);

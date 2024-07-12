@@ -14,6 +14,11 @@ struct testing_config_keys
         "testopts/fail_submit_async"};
 
     // (Optional number)
+    // Delay, in ms, for a submit_async RPC call; default: 0
+    inline static std::string const SUBMIT_ASYNC_DELAY{
+        "testopts/submit_async_delay"};
+
+    // (Optional number)
     // Startup delay, in ms, for resolve_async; default: 0
     inline static std::string const RESOLVE_ASYNC_DELAY{
         "testopts/resolve_async_delay"};

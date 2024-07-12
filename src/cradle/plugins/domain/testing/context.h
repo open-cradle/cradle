@@ -1,6 +1,10 @@
 #ifndef CRADLE_PLUGINS_DOMAIN_TESTING_CONTEXT_H
 #define CRADLE_PLUGINS_DOMAIN_TESTING_CONTEXT_H
 
+#include <atomic>
+#include <exception>
+#include <future>
+
 #include <spdlog/spdlog.h>
 
 #include <cradle/inner/introspection/tasklet.h>
@@ -29,14 +33,15 @@ class testing_request_context final : public sync_context_base
         std::string proxy_name,
         std::optional<root_tasklet_spec> opt_tasklet_spec = std::nullopt);
 
-    // remote_context_intf
+    // context_intf
     std::string const&
     domain_name() const override;
 
+    // remote_context_intf
     service_config
     make_config(bool need_record_lock) const override;
 };
-static_assert(ValidContext<testing_request_context>);
+static_assert(ValidFinalContext<testing_request_context>);
 
 /*
  * Context that can be used to asynchronously resolve requests on the local
@@ -45,7 +50,8 @@ static_assert(ValidContext<testing_request_context>);
  * Relates to a single root request, which will be resolved on the local
  * machine.
  */
-class root_local_atst_context final : public root_local_async_context_base
+class root_local_atst_context final : public root_local_async_context_base,
+                                      public test_params_context_mixin
 {
  public:
     // Allows special configuration for testing purposes
@@ -56,6 +62,10 @@ class root_local_atst_context final : public root_local_async_context_base
     root_local_atst_context(
         std::unique_ptr<local_tree_context_base> tree_ctx,
         tasklet_tracker* tasklet);
+
+    // context_intf
+    std::string const&
+    domain_name() const override;
 
     // local_async_context_intf
     std::unique_ptr<req_visitor_intf>
@@ -69,15 +79,15 @@ class root_local_atst_context final : public root_local_async_context_base
     apply_fail_submit_async() override;
 
     void
+    apply_submit_async_delay() override;
+
+    void
     apply_resolve_async_delay() override;
 
  private:
     std::unique_ptr<local_tree_context_base> owning_tree_ctx_;
-    bool fail_submit_async_{false};
-    int resolve_async_delay_{0};
-    int set_result_delay_{0};
 };
-static_assert(ValidContext<root_local_atst_context>);
+static_assert(ValidFinalContext<root_local_atst_context>);
 
 /*
  * Context that can be used to asynchronously resolve requests on the local
@@ -91,8 +101,12 @@ class non_root_local_atst_context final
 {
  public:
     using non_root_local_async_context_base::non_root_local_async_context_base;
+
+    // context_intf
+    std::string const&
+    domain_name() const override;
 };
-static_assert(ValidContext<non_root_local_atst_context>);
+static_assert(ValidFinalContext<non_root_local_atst_context>);
 
 /*
  * Recursively creates subtrees of non_root_local_atst_context objects, with
@@ -141,7 +155,8 @@ class proxy_atst_tree_context : public proxy_async_tree_context_base
  * Context that can be used to asynchronously resolve root requests in the
  * "testing" domain, on a remote machine.
  */
-class root_proxy_atst_context final : public root_proxy_async_context_base
+class root_proxy_atst_context final : public root_proxy_async_context_base,
+                                      public test_params_context_mixin
 {
  public:
     root_proxy_atst_context(
@@ -150,55 +165,24 @@ class root_proxy_atst_context final : public root_proxy_async_context_base
 
     ~root_proxy_atst_context();
 
-    // remote_context_intf
+    // context_intf
     std::string const&
     domain_name() const override;
 
+    // remote_context_intf
     service_config
     make_config(bool need_record_lock) const override;
-
-    // Other
-
-    // Causes submit_async to fail on the remote
-    void
-    fail_submit_async()
-    {
-        fail_submit_async_ = true;
-    }
-
-    // Sets the delay (in ms) that a resolve_async operation / thread will wait
-    // after starting.
-    // By extending / aggerating the existing short delay, the corresponding
-    // race condition becomes reproducible and can be checked in a unit test.
-    void
-    set_resolve_async_delay(int delay)
-    {
-        resolve_async_delay_ = delay;
-    }
-
-    // Sets the delay (in ms) that a set_result() call will wait before
-    // actually setting the result.
-    // By extending / aggerating the existing short delay, the corresponding
-    // race condition becomes reproducible and can be checked in a unit test.
-    void
-    set_set_result_delay(int delay)
-    {
-        set_result_delay_ = delay;
-    }
 
  private:
     std::unique_ptr<proxy_atst_tree_context> owning_tree_ctx_;
     tasklet_tracker* tasklet_;
-    bool fail_submit_async_{false};
-    int resolve_async_delay_{0};
-    int set_result_delay_{0};
 
     // proxy_async_context_base
     std::unique_ptr<proxy_async_context_base>
     make_sub_ctx(
         proxy_async_tree_context_base& tree_ctx, bool is_req) override;
 };
-static_assert(ValidContext<root_proxy_atst_context>);
+static_assert(ValidFinalContext<root_proxy_atst_context>);
 
 /*
  * Context that can be used to asynchronously resolve non-root requests in the
@@ -211,10 +195,11 @@ class non_root_proxy_atst_context final
     non_root_proxy_atst_context(
         proxy_atst_tree_context& tree_ctx, bool is_req);
 
-    // remote_context_intf
+    // context_intf
     std::string const&
     domain_name() const override;
 
+    // remote_context_intf
     service_config
     make_config(bool need_record_lock) const override;
 
@@ -224,7 +209,7 @@ class non_root_proxy_atst_context final
     make_sub_ctx(
         proxy_async_tree_context_base& tree_ctx, bool is_req) override;
 };
-static_assert(ValidContext<non_root_proxy_atst_context>);
+static_assert(ValidFinalContext<non_root_proxy_atst_context>);
 
 // Async context that can be used multiple times for resolving a request.
 // Each resolve_request() leads to an active request tree for that resolution;
@@ -232,10 +217,13 @@ static_assert(ValidContext<non_root_proxy_atst_context>);
 // The atst_context functionality is limited: it can be passed to
 // resolve_request(), and a root context object can be retrieved for additional
 // functionality.
+// TODO if async context used for several subsequent resolutions, (query)
+// functions may refer to the wrong resolution.
 class atst_context final : public root_local_async_context_intf,
                            public remote_async_context_intf,
                            public local_async_ctx_owner_intf,
-                           public remote_async_ctx_owner_intf
+                           public remote_async_ctx_owner_intf,
+                           public test_params_context_mixin
 {
  public:
     atst_context(
@@ -261,6 +249,9 @@ class atst_context final : public root_local_async_context_intf,
     {
         return true;
     }
+
+    std::string const&
+    domain_name() const override;
 
     cppcoro::task<>
     schedule_after(std::chrono::milliseconds delay) override
@@ -402,6 +393,18 @@ class atst_context final : public root_local_async_context_intf,
         get_local_root().throw_async_cancelled();
     }
 
+    void
+    set_delegate(std::shared_ptr<async_context_intf> delegate) override
+    {
+        get_local_root().set_delegate(std::move(delegate));
+    }
+
+    std::shared_ptr<async_context_intf>
+    get_delegate() override
+    {
+        return get_local_root().get_delegate();
+    }
+
     // local_context_intf
     std::shared_ptr<data_owner>
     make_data_owner(std::size_t size, bool use_shared_memory) override
@@ -422,22 +425,10 @@ class atst_context final : public root_local_async_context_intf,
     }
 
     // remote_context_intf
-    std::string const&
-    proxy_name() const override
-    {
-        return proxy_name_;
-    }
-
-    virtual remote_proxy&
+    remote_proxy&
     get_proxy() const override
     {
         return get_remote_root().get_proxy();
-    }
-
-    std::string const&
-    domain_name() const override
-    {
-        return get_remote_root().domain_name();
     }
 
     service_config
@@ -474,15 +465,8 @@ class atst_context final : public root_local_async_context_intf,
     prepare_for_remote_resolution() override;
 
     // Returns the root context object for the current resolution, whether
-    // local or remote. The object is available after the client has
-    // called resolve_request():
-    //   atst_context& ctx;
-    //   Request const& req;
-    //   auto task = resolve_request(ctx, req);
-    //   auto& root_ctx = ctx.get_async_root();
-    //      ... interact with root_ctx ...
-    //   auto result = co_await task;
-    // Throws if there is no current resolution.
+    // local or remote. Blocks until the object is available; it becomes so
+    // in resolve_request() or co_await resolve_request() on this context.
     async_context_intf&
     get_async_root();
 
@@ -490,14 +474,8 @@ class atst_context final : public root_local_async_context_intf,
     get_async_root() const;
 
     // Returns the root context object for the current remote resolution.
-    // The object is available after the client has called resolve_request():
-    //   atst_context& ctx;
-    //   Request const& req;
-    //   auto task = resolve_request(ctx, req);
-    //   auto& root_ctx = ctx.get_remote_root();
-    //      ... interact with root_ctx ...
-    //   auto result = co_await task;
-    // Throws if there is no current remote resolution.
+    // Blocks until the object is available; it becomes so in
+    // resolve_request() or co_await resolve_request() on this context.
     root_proxy_atst_context&
     get_remote_root();
 
@@ -509,10 +487,27 @@ class atst_context final : public root_local_async_context_intf,
     std::string proxy_name_;
     std::optional<root_tasklet_spec> opt_tasklet_spec_;
     std::shared_ptr<spdlog::logger> logger_;
+
+    std::atomic<bool> prepared_{false};
+    // Promise/future associated with prepare_for_..._resolution()
+    std::promise<void> preparation_promise_;
+    std::shared_future<void> preparation_future_;
+    // local_root_ used only when proxy_name_ is empty;
     // local_root_ ownership shared between this object and async db
+    // TODO local_root_, remote_root_ accessed from different threads
     std::shared_ptr<root_local_atst_context> local_root_;
+    // remote_root_ used only when proxy_name_ is non-empty;
     // remote_root_ exclusively owned by this object
     std::unique_ptr<root_proxy_atst_context> remote_root_;
+
+    void
+    on_preparation_finished();
+
+    void
+    on_preparation_failed(std::exception const& exception_to_throw);
+
+    void
+    wait_until_prepared();
 
     root_local_async_context_base&
     get_local_root();
@@ -520,6 +515,7 @@ class atst_context final : public root_local_async_context_intf,
     root_local_async_context_base const&
     get_local_root() const;
 };
+static_assert(ValidFinalContext<atst_context>);
 
 } // namespace cradle
 

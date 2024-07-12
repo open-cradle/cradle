@@ -17,6 +17,7 @@ def make_req(session: Session, uuid_base: str, title: str, args: List) -> Any:
 
     return \
         {'uuid': uuid,
+         'plain_uuid': '',
          'title': title,
          'base_millis': 100,
          'max_attempts': 3,

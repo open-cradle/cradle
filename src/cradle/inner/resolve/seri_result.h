@@ -29,7 +29,7 @@ class serialized_result
 {
  public:
     serialized_result(blob value, remote_cache_record_id record_id)
-        : value_{value}, record_id_{record_id}
+        : value_{std::move(value)}, record_id_{std::move(record_id)}
     {
     }
 
@@ -37,7 +37,9 @@ class serialized_result
         blob value,
         std::unique_ptr<deserialization_observer> observer,
         remote_cache_record_id record_id)
-        : value_{value}, observer_{std::move(observer)}, record_id_{record_id}
+        : value_{std::move(value)},
+          observer_{std::move(observer)},
+          record_id_{std::move(record_id)}
     {
     }
 

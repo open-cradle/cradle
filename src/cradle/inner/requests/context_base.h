@@ -7,6 +7,7 @@
 #include <mutex>
 #include <vector>
 
+#include <cppcoro/cancellation_registration.hpp>
 #include <cppcoro/cancellation_source.hpp>
 #include <cppcoro/cancellation_token.hpp>
 #include <spdlog/spdlog.h>
@@ -90,6 +91,10 @@ class sync_context_base : public virtual local_sync_context_intf,
         return false;
     }
 
+    virtual std::string const&
+    domain_name() const override
+        = 0;
+
     cppcoro::task<>
     schedule_after(std::chrono::milliseconds delay) override;
 
@@ -104,18 +109,8 @@ class sync_context_base : public virtual local_sync_context_intf,
     on_value_complete() override;
 
     // remote_context_intf
-    std::string const&
-    proxy_name() const override
-    {
-        return proxy_name_;
-    }
-
     remote_proxy&
     get_proxy() const override;
-
-    virtual std::string const&
-    domain_name() const override
-        = 0;
 
     virtual service_config
     make_config(bool need_record_lock) const override
@@ -130,10 +125,6 @@ class sync_context_base : public virtual local_sync_context_intf,
 
     void
     pop_tasklet() override;
-
-    // Other
-    void
-    proxy_name(std::string const& name);
 
  protected:
     inner_resources& resources_;
@@ -345,6 +336,12 @@ class local_async_context_base : public virtual local_async_context_intf,
     void
     throw_async_cancelled() const override;
 
+    void
+    set_delegate(std::shared_ptr<async_context_intf> delegate) override;
+
+    std::shared_ptr<async_context_intf>
+    get_delegate() override;
+
     // introspective_context_intf
     tasklet_tracker*
     get_tasklet() override;
@@ -380,8 +377,20 @@ class local_async_context_base : public virtual local_async_context_intf,
     std::atomic<int> num_subs_not_running_;
     std::vector<tasklet_tracker*> tasklets_;
 
+    spdlog::logger&
+    get_logger() noexcept
+    {
+        return tree_ctx_.get_logger();
+    }
+
+    std::weak_ptr<async_context_intf> delegate_;
+    std::unique_ptr<cppcoro::cancellation_registration> delegate_cancellation_;
+
     bool
     decide_reschedule_sub();
+
+    void
+    cancel_delegate() noexcept;
 };
 
 class root_local_async_context_base : public local_async_context_base,
@@ -507,12 +516,6 @@ class proxy_async_tree_context_base
         return resources_;
     }
 
-    std::string const&
-    get_proxy_name() const
-    {
-        return proxy_name_;
-    }
-
     remote_proxy&
     get_proxy() const
     {
@@ -599,25 +602,19 @@ class proxy_async_context_base : public remote_async_context_intf
         return true;
     }
 
+    virtual std::string const&
+    domain_name() const override
+        = 0;
+
     cppcoro::task<>
     schedule_after(std::chrono::milliseconds delay) override;
 
     // remote_context_intf
-    std::string const&
-    proxy_name() const override
-    {
-        return tree_ctx_.get_proxy_name();
-    }
-
     remote_proxy&
     get_proxy() const override
     {
         return tree_ctx_.get_proxy();
     }
-
-    virtual std::string const&
-    domain_name() const override
-        = 0;
 
     virtual service_config
     make_config(bool need_record_lock) const override
@@ -684,7 +681,7 @@ class root_proxy_async_context_base : public proxy_async_context_base
  public:
     root_proxy_async_context_base(proxy_async_tree_context_base& tree_ctx);
 
-    // remote_context_intf
+    // context_intf
     std::string const&
     domain_name() const override
         = 0;
@@ -734,7 +731,7 @@ class non_root_proxy_async_context_base : public proxy_async_context_base
     non_root_proxy_async_context_base(
         proxy_async_tree_context_base& tree_ctx, bool is_req);
 
-    // remote_context_intf
+    // context_intf
     std::string const&
     domain_name() const override
         = 0;

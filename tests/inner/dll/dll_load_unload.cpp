@@ -27,7 +27,6 @@ TEST_CASE("two DLLs defining same-typed requests", tag)
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto& proxy{resources->get_proxy(proxy_name)};
-    proxy.unload_shared_library("test_inner_dll_x.*");
     testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
@@ -53,7 +52,6 @@ TEST_CASE("unload/reload DLL", tag)
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto& proxy{resources->get_proxy(proxy_name)};
-    proxy.unload_shared_library("test_inner_dll_v1.*");
 
     auto req{rq_test_adder_v1p(7, 2)};
     int expected{7 + 2};
@@ -66,7 +64,7 @@ TEST_CASE("unload/reload DLL", tag)
     auto res0 = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
     REQUIRE(res0 == expected);
 
-    proxy.unload_shared_library("test_inner_dll_v1.*");
+    proxy.unload_shared_library("test_inner_dll_v1");
 
     REQUIRE_THROWS_WITH(
         cppcoro::sync_wait(resolve_request(ctx, req, constraints)),
@@ -84,13 +82,13 @@ TEST_CASE("unload/reload two DLLs", tag)
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto& proxy{resources->get_proxy(proxy_name)};
-    proxy.unload_shared_library("test_inner_dll_x.*");
     testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x0");
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_x1");
-    proxy.unload_shared_library("test_inner_dll_x.*");
+    proxy.unload_shared_library("test_inner_dll_x1");
+    proxy.unload_shared_library("test_inner_dll_x0");
 
     auto add_req{rq_test_adder_x0(7, 2)};
     int add_expected{7 + 2};
@@ -118,7 +116,6 @@ TEST_CASE("unload DLL sharing resolvers", tag)
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto& proxy{resources->get_proxy(proxy_name)};
-    proxy.unload_shared_library("test_inner_dll_x.*");
     testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
@@ -162,7 +159,6 @@ TEST_CASE("load/unload DLL stress test", "[.dll-stress]")
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto& proxy{resources->get_proxy(proxy_name)};
-    proxy.unload_shared_library("test_inner_dll_x.*");
 
     std::srand(static_cast<unsigned>(std::time(nullptr)));
     std::vector<std::string> dll_names{
@@ -198,7 +194,6 @@ TEST_CASE("load/unload DLL stress test1", tag)
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto& proxy{resources->get_proxy(proxy_name)};
-    proxy.unload_shared_library("test_inner_dll_x.*");
     testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 

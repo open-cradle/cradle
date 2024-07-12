@@ -4,10 +4,12 @@
 #include <memory>
 
 #include <cradle/inner/remote/proxy.h>
+#include <cradle/rpclib/common/port.h>
 
 namespace cradle {
 
 class rpclib_client_impl;
+class ephemeral_port_owner;
 
 // RPC calls should throw remote_error on error.
 // The rpclib library throws rpc::rpc_error so these should be translated to
@@ -19,12 +21,22 @@ class rpclib_client_impl;
 class rpclib_client : public remote_proxy
 {
  public:
+    // If port_owner is set, the client and server run in contained mode, where
+    // the server will execute a single function at a time, without any form
+    // of caching. In that mode, the server listens on an ephemeral port, which
+    // must be allocated from, and returned to, *port_owner.
+    // In non-contained mode, the port number is fixed, depending on whether
+    // the server runs in testing mode.
     rpclib_client(
         service_config const& config,
+        ephemeral_port_owner* port_owner,
         std::shared_ptr<spdlog::logger> logger
         = std::shared_ptr<spdlog::logger>());
 
     ~rpclib_client();
+
+    rpclib_port_t
+    get_port() const;
 
     std::string
     name() const override;
@@ -73,6 +85,9 @@ class rpclib_client : public remote_proxy
 
     void
     release_cache_record_lock(remote_cache_record_id record_id) override;
+
+    int
+    get_num_contained_calls() const override;
 
     // Tests if the rpclib server is running, throws rpc::system_error if not.
     // Returns a compatibility identifier.

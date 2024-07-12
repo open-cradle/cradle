@@ -116,6 +116,12 @@ class test_proxy : public remote_proxy
         throw not_implemented_error("test_proxy::release_cache_record_lock()");
     }
 
+    int
+    get_num_contained_calls() const override
+    {
+        throw not_implemented_error("test_proxy::get_num_contained_calls()");
+    }
+
  private:
     std::string name_;
 };

@@ -101,9 +101,8 @@ thinknode_test_scope::make_context(tasklet_tracker* tasklet)
         = use_real_api_token_
               ? get_environment_variable("CRADLE_THINKNODE_API_TOKEN")
               : "xyz";
-    auto proxy_name{get_proxy_name()};
     return thinknode_request_context{
-        *resources_, session, tasklet, proxy_name};
+        *resources_, session, tasklet, proxy_name_};
 }
 
 mock_http_session&

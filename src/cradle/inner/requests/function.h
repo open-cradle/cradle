@@ -23,12 +23,14 @@
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/encodings/cereal.h>
+#include <cradle/inner/requests/containment_data.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/normalization_uuid.h>
 #include <cradle/inner/requests/request_props.h>
 #include <cradle/inner/requests/types.h>
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/requests/value.h>
+#include <cradle/inner/resolve/creq_controller.h>
 #include <cradle/inner/resolve/resolve_impl.h>
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/resolve/seri_registry.h>
@@ -95,6 +97,10 @@ class function_request_intf : public id_interface
 {
  public:
     virtual ~function_request_intf() = default;
+
+    virtual void
+    set_containment(containment_data const& containment)
+        = 0;
 
     virtual caching_level_type
     get_caching_level() const
@@ -350,6 +356,12 @@ class function_request_impl
                 is_same_v<std::decay_t<CtorFunction>, std::decay_t<Function>>);
     }
 
+    void
+    set_containment(containment_data const& containment) override
+    {
+        containment_ = std::make_unique<containment_data>(containment);
+    }
+
     caching_level_type
     get_caching_level() const override
     {
@@ -493,65 +505,30 @@ class function_request_impl
     }
 
  public:
-    // These functions called from resolve_impl.h
-
+    // resolve_sync() and resolve_async() called from resolve_impl.h
     cppcoro::task<Value>
     resolve_sync(local_context_intf& ctx) const
     {
-        // If there is no coroutine function and no caching in the request
-        // tree, there is nothing to co_await on (but how useful would such
-        // a request be?).
-        // TODO consider optimizing resolve() for "simple" request trees
-        // The std::forward probably doesn't help as all resolve_request()
-        // variants take the arg as const&.
-        if constexpr (!func_is_coro)
+        if (containment_)
         {
-            return resolve_sync_non_coro(ctx);
-        }
-        else if constexpr (sizeof...(Args) == 1)
-        {
-            if constexpr (std::same_as<
-                              typename first_element<Args...>::type,
-                              Value>)
-            {
-                if (is_normalizer())
-                {
-                    return resolve_sync_normalizer(ctx);
-                }
-            }
-            // Object code for the following line will still be generated if
-            // this is a normalizer, but it won't be called in that case.
-            return resolve_sync_coro(ctx);
+            return resolve_sync_contained(ctx);
         }
         else
         {
-            return resolve_sync_coro(ctx);
+            return resolve_sync_local(ctx);
         }
     }
 
     cppcoro::task<Value>
     resolve_async(local_async_context_intf& ctx) const
     {
-        if constexpr (!func_is_coro)
+        if (containment_)
         {
-            return resolve_async_non_coro(ctx);
-        }
-        else if constexpr (sizeof...(Args) == 1)
-        {
-            if constexpr (std::same_as<
-                              typename first_element<Args...>::type,
-                              Value>)
-            {
-                if (is_normalizer())
-                {
-                    return resolve_async_normalizer(ctx);
-                }
-            }
-            return resolve_async_coro(ctx);
+            return resolve_async_contained(ctx);
         }
         else
         {
-            return resolve_async_coro(ctx);
+            return resolve_async_local(ctx);
         }
     }
 
@@ -593,6 +570,121 @@ class function_request_impl
     }
 
  private:
+    // Synchronously resolve the function in contained mode, so in a
+    // subprocess.
+    // Used for both coro and plain functions (no difference when execution
+    // happens in another process).
+    cppcoro::task<Value>
+    resolve_sync_contained(local_context_intf& ctx) const
+    {
+        auto sub_tasks = make_sync_sub_tasks(ctx, args_, ArgIndices{});
+        auto sub_results
+            = co_await when_all_wrapper(std::move(sub_tasks), ArgIndices{});
+        creq_controller ctl{containment_->dll_dir_, containment_->dll_name_};
+        auto seri_resp = co_await ctl.resolve(
+            ctx, serialize_contained_request(sub_results));
+        Value result = deserialize_value<Value>(seri_resp.value());
+        seri_resp.on_deserialized();
+        co_return result;
+    }
+
+    // Asynchronously resolve the function in contained mode, so in a
+    // subprocess.
+    // Used for both coro and plain functions (no difference when execution
+    // happens in another process).
+    cppcoro::task<Value>
+    resolve_async_contained(local_async_context_intf& ctx) const
+    {
+        auto sub_tasks = make_async_sub_tasks(ctx, args_, ArgIndices{});
+        ctx.update_status(async_status::SUBS_RUNNING);
+        auto sub_results
+            = co_await when_all_wrapper(std::move(sub_tasks), ArgIndices{});
+        ctx.update_status(async_status::SELF_RUNNING);
+        creq_controller ctl{containment_->dll_dir_, containment_->dll_name_};
+        auto seri_resp = co_await ctl.resolve(
+            ctx, serialize_contained_request(sub_results));
+        ctx.update_status(async_status::FINISHED);
+        Value result = deserialize_value<Value>(seri_resp.value());
+        seri_resp.on_deserialized();
+        co_return result;
+    }
+
+    std::string
+    serialize_contained_request(auto const& sub_results) const
+    {
+        std::stringstream os;
+        {
+            JSONRequestOutputArchive oarchive(os);
+            containment_->plain_uuid_.save_with_name(oarchive, "uuid");
+            // no_retrier state
+            this->save_intrsp_state(oarchive);
+            // No containment data
+            containment_data::save_nothing(oarchive);
+            oarchive(cereal::make_nvp("args", sub_results));
+        }
+        return os.str();
+    }
+
+    cppcoro::task<Value>
+    resolve_sync_local(local_context_intf& ctx) const
+    {
+        // If there is no coroutine function and no caching in the request
+        // tree, there is nothing to co_await on (but how useful would such
+        // a request be?).
+        // TODO consider optimizing resolve() for "simple" request trees
+        // The std::forward probably doesn't help as all resolve_request()
+        // variants take the arg as const&.
+        if constexpr (!func_is_coro)
+        {
+            return resolve_sync_non_coro(ctx);
+        }
+        else if constexpr (sizeof...(Args) == 1)
+        {
+            if constexpr (std::same_as<
+                              typename first_element<Args...>::type,
+                              Value>)
+            {
+                if (is_normalizer())
+                {
+                    return resolve_sync_normalizer(ctx);
+                }
+            }
+            // Object code for the following line will still be generated if
+            // this is a normalizer, but it won't be called in that case.
+            return resolve_sync_coro(ctx);
+        }
+        else
+        {
+            return resolve_sync_coro(ctx);
+        }
+    }
+
+    cppcoro::task<Value>
+    resolve_async_local(local_async_context_intf& ctx) const
+    {
+        if constexpr (!func_is_coro)
+        {
+            return resolve_async_non_coro(ctx);
+        }
+        else if constexpr (sizeof...(Args) == 1)
+        {
+            if constexpr (std::same_as<
+                              typename first_element<Args...>::type,
+                              Value>)
+            {
+                if (is_normalizer())
+                {
+                    return resolve_async_normalizer(ctx);
+                }
+            }
+            return resolve_async_coro(ctx);
+        }
+        else
+        {
+            return resolve_async_coro(ctx);
+        }
+    }
+
     cppcoro::task<Value>
     resolve_sync_non_coro(local_context_intf& ctx) const
     {
@@ -732,6 +824,14 @@ class function_request_impl
     {
         this->save_intrsp_state(archive);
         archive(cereal::make_nvp("args", args_));
+        if (containment_)
+        {
+            containment_->save(archive);
+        }
+        else
+        {
+            containment_data::save_nothing(archive);
+        }
     }
 
     void
@@ -740,6 +840,7 @@ class function_request_impl
         this->load_intrsp_state(archive);
         archive(cereal::make_nvp("args", args_));
         auto& resources{archive.get_resources()};
+        containment_ = containment_data::load(archive);
         auto the_seri_registry{resources.get_seri_registry()};
         function_
             = the_seri_registry->find_function<stored_function_t>(uuid_.str());
@@ -749,11 +850,15 @@ class function_request_impl
     // Uniquely identifies the function.
     request_uuid uuid_;
 
-    // The function to call when the request is resolved.
+    // The function to call when the request is resolved;
+    // not used if containment_ is set.
     std::shared_ptr<stored_function_t> function_;
 
     // The arguments to pass to the function.
     std::tuple<Args...> args_;
+
+    // Containment data if function should run contained.
+    std::unique_ptr<containment_data> containment_;
 
     // Used when this request's caching level is at least memory; _OR_ if a
     // (direct or indirect) subrequest of a request with such a caching level.
@@ -841,6 +946,12 @@ class function_request : public ObjectProps::retrier_type
             make_request_impl_props(std::forward<Props>(props)),
             std::forward<Function>(function),
             std::forward<Args>(args)...);
+    }
+
+    void
+    set_containment(containment_data const& containment)
+    {
+        impl_->set_containment(containment);
     }
 
     caching_level_type
@@ -989,6 +1100,10 @@ class proxy_request_intf
  public:
     virtual ~proxy_request_intf() = default;
 
+    virtual void
+    set_containment(containment_data const& containment)
+        = 0;
+
     virtual request_uuid const&
     get_uuid() const
         = 0;
@@ -1035,6 +1150,12 @@ class proxy_request_impl
     {
     }
 
+    void
+    set_containment(containment_data const& containment) override
+    {
+        containment_ = std::make_unique<containment_data>(containment);
+    }
+
     bool
     is_introspective() const
     {
@@ -1063,11 +1184,20 @@ class proxy_request_impl
     {
         this->save_intrsp_state(archive);
         archive(cereal::make_nvp("args", args_));
+        if (containment_)
+        {
+            containment_->save(archive);
+        }
+        else
+        {
+            containment_data::save_nothing(archive);
+        }
     }
 
  private:
     request_uuid uuid_;
     std::tuple<Args...> args_;
+    std::unique_ptr<containment_data> containment_;
 };
 
 template<typename Value, typename ObjectProps>
@@ -1132,6 +1262,12 @@ class proxy_request : public ObjectProps::retrier_type
         impl_ = std::make_shared<impl_type>(
             make_request_impl_props(std::forward<Props>(props)),
             std::forward<Args>(args)...);
+    }
+
+    void
+    set_containment(containment_data const& containment)
+    {
+        impl_->set_containment(containment);
     }
 
     caching_level_type

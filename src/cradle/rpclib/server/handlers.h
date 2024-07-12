@@ -188,6 +188,9 @@ void
 handle_release_cache_record_lock(
     rpclib_handler_context& hctx, remote_cache_record_id record_id);
 
+int
+handle_get_num_contained_calls(rpclib_handler_context& hctx);
+
 } // namespace cradle
 
 #endif

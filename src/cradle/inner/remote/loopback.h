@@ -80,6 +80,9 @@ class loopback_service : public remote_proxy
     void
     release_cache_record_lock(remote_cache_record_id record_id) override;
 
+    int
+    get_num_contained_calls() const override;
+
  private:
     std::unique_ptr<inner_resources> resources_;
     bool testing_;

@@ -65,7 +65,7 @@ init_and_register_rpclib(
     inner_resources& resources, domain_option const& domain)
 {
     resources.register_proxy(
-        std::make_unique<rpclib_client>(resources.config()));
+        std::make_unique<rpclib_client>(resources.config(), nullptr));
 }
 
 } // namespace

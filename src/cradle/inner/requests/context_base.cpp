@@ -2,10 +2,13 @@
 #include <cassert>
 #include <stdexcept>
 
+#include <cppcoro/sync_wait.hpp>
+
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/remote/wait_async.h>
 #include <cradle/inner/requests/context_base.h>
+#include <cradle/inner/requests/test_context.h>
 #include <cradle/inner/service/resources.h>
 
 namespace cradle {
@@ -401,6 +404,65 @@ local_async_context_base::throw_async_cancelled() const
 {
     throw async_cancelled{
         fmt::format("local_async_context_base {} cancelled", id_)};
+}
+
+void
+local_async_context_base::set_delegate(
+    std::shared_ptr<async_context_intf> delegate)
+{
+    if (delegate_.lock())
+    {
+        throw std::logic_error{
+            "local_async_context_base: delegate already set"};
+    }
+    delegate_ = delegate;
+    // Copy test parameters to the delegate, if possible
+    if (auto* this_mixin = dynamic_cast<test_params_context_mixin*>(this))
+    {
+        if (auto* delegate_mixin
+            = dynamic_cast<test_params_context_mixin*>(&*delegate))
+        {
+            this_mixin->copy_test_params(*delegate_mixin);
+        }
+    }
+    // Set up a registration that picks up a cancellation request made on any
+    // context object in the current tree, and forwards it to the delegate.
+    // This effectively forwards request_cancellation_coro() and
+    // request_cancellation() calls to the delegate.
+    // Note that the callback must not throw.
+    delegate_cancellation_
+        = std::make_unique<cppcoro::cancellation_registration>(
+            tree_ctx_.get_cancellation_token(),
+            [this] { this->cancel_delegate(); });
+}
+
+std::shared_ptr<async_context_intf>
+local_async_context_base::get_delegate()
+{
+    return delegate_.lock();
+}
+
+// Requests cancellation of the current resolution through the delegate
+// context, if still existing.
+void
+local_async_context_base::cancel_delegate() noexcept
+{
+    if (auto delegate = delegate_.lock())
+    {
+        try
+        {
+            cppcoro::sync_wait(delegate->request_cancellation_coro());
+        }
+        catch (std::exception& e)
+        {
+            auto& logger{get_logger()};
+            logger.error(
+                "local_async_context_base::cancel_delegate() caught {}",
+                e.what());
+        }
+        // Don't rely on reaction from the delegate
+        update_status(async_status::CANCELLED);
+    }
 }
 
 root_local_async_context_base::root_local_async_context_base(

@@ -30,7 +30,7 @@ make_test_uuid(int ext)
 }
 
 auto
-create_adder(int& num_calls)
+create_adder(std::atomic<int>& num_calls)
 {
     return [&](int a, int b) {
         num_calls += 1;
@@ -39,7 +39,7 @@ create_adder(int& num_calls)
 }
 
 auto
-create_adder_coro(int& num_calls)
+create_adder_coro(std::atomic<int>& num_calls)
 {
     return [&](auto& ctx, int a, int b) -> cppcoro::task<int> {
         num_calls += 1;
@@ -48,7 +48,7 @@ create_adder_coro(int& num_calls)
 }
 
 auto
-create_multiplier(int& num_calls)
+create_multiplier(std::atomic<int>& num_calls)
 {
     return [&](int a, int b) {
         num_calls += 1;
@@ -62,8 +62,8 @@ test_resolve_uncached(
     Request const& req,
     inner_resources& resources,
     int expected,
-    int& num_calls1,
-    int* num_calls2 = nullptr)
+    std::atomic<int>& num_calls1,
+    std::atomic<int>* num_calls2 = nullptr)
 {
     non_caching_request_resolution_context ctx{resources};
 
@@ -92,8 +92,8 @@ test_resolve_cached(
     Request const& req,
     inner_resources& resources,
     int expected,
-    int& num_calls1,
-    int* num_calls2 = nullptr)
+    std::atomic<int>& num_calls1,
+    std::atomic<int>* num_calls2 = nullptr)
 {
     caching_request_resolution_context ctx{resources};
 
@@ -122,7 +122,7 @@ TEST_CASE("evaluate function request V+V - uncached", tag)
 {
     auto resources{make_inner_test_resources()};
     request_props<caching_level_type::none> props{make_test_uuid(0)};
-    int num_add_calls{};
+    std::atomic<int> num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req{rq_function(props, add, 6, 1)};
     test_resolve_uncached(req, *resources, 7, num_add_calls);
@@ -132,7 +132,7 @@ TEST_CASE("evaluate function request V+V - memory cached", tag)
 {
     auto resources{make_inner_test_resources()};
     request_props<caching_level_type::memory> props{make_test_uuid(10)};
-    int num_add_calls{};
+    std::atomic<int> num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req{rq_function(props, add, 6, 1)};
     test_resolve_cached(req, *resources, 7, num_add_calls);
@@ -143,7 +143,7 @@ TEST_CASE("evaluate dual function request V+V - memory cached", tag)
     auto resources{make_inner_test_resources()};
     request_props<caching_level_type::memory> props0{make_test_uuid(20)};
     request_props<caching_level_type::memory> props1{make_test_uuid(21)};
-    int num_add_calls{};
+    std::atomic<int> num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req0{rq_function(props0, add, 6, 1)};
     auto req1{rq_function(props1, add, 5, 3)};
@@ -173,9 +173,9 @@ TEST_CASE("evaluate function request (V+V)*V - uncached", tag)
     using Props = request_props<caching_level_type::none>;
     Props props_mul{make_test_uuid(40)};
     Props props_add{make_test_uuid(41)};
-    int num_add_calls = 0;
+    std::atomic<int> num_add_calls = 0;
     auto add = create_adder(num_add_calls);
-    int num_mul_calls = 0;
+    std::atomic<int> num_mul_calls = 0;
     auto mul = create_multiplier(num_mul_calls);
     auto req{
         rq_function(props_mul, mul, rq_function(props_add, add, 1, 2), 3)};
@@ -187,9 +187,9 @@ TEST_CASE("evaluate function request (V+V)*V - memory cached", tag)
     auto resources{make_inner_test_resources()};
     request_props<caching_level_type::memory> props_inner{make_test_uuid(90)};
     request_props<caching_level_type::memory> props_main{make_test_uuid(91)};
-    int num_add_calls = 0;
+    std::atomic<int> num_add_calls = 0;
     auto add = create_adder(num_add_calls);
-    int num_mul_calls = 0;
+    std::atomic<int> num_mul_calls = 0;
     auto mul = create_multiplier(num_mul_calls);
     auto inner{rq_function(props_inner, add, 1, 2)};
     auto req{rq_function(props_main, mul, inner, 3)};
@@ -200,7 +200,7 @@ TEST_CASE("evaluate function request V+V - fully cached", tag)
 {
     auto resources{make_inner_test_resources()};
     request_props<caching_level_type::full> props_full{make_test_uuid(201)};
-    int num_add_calls{};
+    std::atomic<int> num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req_full{rq_function(props_full, add, 6, 1)};
 
@@ -238,7 +238,7 @@ TEST_CASE("evaluate function requests in parallel - uncached function", tag)
     using Props = request_props<caching_level_type::none>;
     using ObjectProps = make_request_object_props_type<Props>;
     using Req = function_request<Value, ObjectProps>;
-    int num_add_calls{};
+    std::atomic<int> num_add_calls{};
     auto add{create_adder(num_add_calls)};
     non_caching_request_resolution_context ctx{*resources};
     std::vector<Req> requests;
@@ -269,7 +269,7 @@ TEST_CASE("evaluate function requests in parallel - uncached coroutine", tag)
         false>;
     using ObjectProps = make_request_object_props_type<Props>;
     using Req = function_request<Value, ObjectProps>;
-    int num_add_calls{};
+    std::atomic<int> num_add_calls{};
     auto add{create_adder_coro(num_add_calls)};
     non_caching_request_resolution_context ctx{*resources};
     std::vector<Req> requests;
@@ -297,7 +297,7 @@ TEST_CASE("evaluate function requests in parallel - memory cached", tag)
     using Props = request_props<caching_level_type::memory>;
     using ObjectProps = make_request_object_props_type<Props>;
     using Req = function_request<Value, ObjectProps>;
-    int num_add_calls{};
+    std::atomic<int> num_add_calls{};
     auto add{create_adder(num_add_calls)};
     caching_request_resolution_context ctx{*resources};
     std::vector<Req> requests;
@@ -334,7 +334,7 @@ TEST_CASE("evaluate function requests in parallel - disk cached", tag)
     using Props = request_props<caching_level_type::full>;
     using ObjectProps = make_request_object_props_type<Props>;
     using Req = function_request<Value, ObjectProps>;
-    int num_add_calls{};
+    std::atomic<int> num_add_calls{};
     auto add{create_adder(num_add_calls)};
     caching_request_resolution_context ctx{*resources};
     auto& disk_cache{
@@ -404,7 +404,7 @@ TEST_CASE("evaluate function request - memory cache behavior", tag)
     auto resources{make_inner_test_resources()};
     auto& mem_cache{resources->memory_cache()};
     request_props<caching_level_type::memory> props{make_test_uuid(600)};
-    int num_add_calls{};
+    std::atomic<int> num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req{rq_function(props, add, 6, 3)};
 
@@ -447,7 +447,7 @@ TEST_CASE("evaluate function request - lock cache record", tag)
     caching_request_resolution_context ctx{*resources};
     auto& mem_cache{resources->memory_cache()};
     request_props<caching_level_type::memory> props{make_test_uuid(10)};
-    int num_add_calls{};
+    std::atomic<int> num_add_calls{};
     auto add{create_adder(num_add_calls)};
     auto req{rq_function(props, add, 6, 3)};
 
@@ -495,9 +495,9 @@ test_composition_or_value_based()
     props_type props_inner{make_test_uuid(100)};
     props_type props_main{make_test_uuid(101)};
 
-    int num_add_calls = 0;
+    std::atomic<int> num_add_calls = 0;
     auto add = create_adder(num_add_calls);
-    int num_mul_calls = 0;
+    std::atomic<int> num_mul_calls = 0;
     auto mul = create_multiplier(num_mul_calls);
 
     auto inner0{rq_function(props_inner, add, 6, 8)};
@@ -910,12 +910,12 @@ test_resolve_inner_blob_file(bool allow_blob_files)
     CHECK((y1_owner != nullptr) == allow_blob_files);
 }
 
-TEST_CASE("resolve inner blob file - full - allow", "[A][0]")
+TEST_CASE("resolve inner blob file - full - allow", tag)
 {
     test_resolve_inner_blob_file(true);
 }
 
-TEST_CASE("resolve inner blob file - full - disallow", "[A][1]")
+TEST_CASE("resolve inner blob file - full - disallow", tag)
 {
     test_resolve_inner_blob_file(false);
 }
@@ -961,12 +961,12 @@ test_resolve_outer_blob_file(bool allow_blob_files)
     CHECK((res1_owner != nullptr) == allow_blob_files);
 }
 
-TEST_CASE("resolve outer blob file - full - allow", "[A][2]")
+TEST_CASE("resolve outer blob file - full - allow", tag)
 {
     test_resolve_outer_blob_file(true);
 }
 
-TEST_CASE("resolve outer blob file - full - disallow", "[A][3]")
+TEST_CASE("resolve outer blob file - full - disallow", tag)
 {
     test_resolve_outer_blob_file(false);
 }

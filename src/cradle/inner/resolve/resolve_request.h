@@ -184,8 +184,6 @@ cppcoro::task<typename Req::value_type>
 resolve_request_remote(
     remote_context_intf& ctx, Req const& req, cache_record_lock* lock_ptr)
 {
-    // This runs in resolve_request(), which is where any preparation must
-    // happen.
     if (auto* owner = cast_ctx_to_ptr<remote_async_ctx_owner_intf>(ctx))
     {
         // (Re-)create ctx tree and root ctx
@@ -210,6 +208,8 @@ resolve_request_one_try(
     // A proxy request also forces remote resolving.
     if constexpr (Req::is_proxy || constraints.force_remote)
     {
+        // TODO if ctx is local and preparing, this throws without failing
+        // ctx's preparation, leading to hangups
         auto& rem_ctx{cast_ctx_to_ref<remote_context_intf>(ctx)};
         return resolve_request_remote(rem_ctx, req, lock_ptr);
     }
@@ -308,6 +308,11 @@ cppcoro::task<Val> resolve_request(
  * memory cache record. While the *lock_ptr object exists, the lock stays
  * active, and the cache record will not be evicted (so the cache keeps the
  * result in memory).
+ *
+ * If ctx is async, one of its prepare_for_..._resolution() functions will be
+ * called:
+ * - In the resolve_request() itself if not Req::retryable
+ * - In the co_await resolve_request() if Req::retryable
  *
  * Notes:
  * - The caller must ensure that the actual ctx type implements all needed

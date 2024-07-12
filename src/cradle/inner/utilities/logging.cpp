@@ -2,6 +2,7 @@
 #include <mutex>
 #include <vector>
 
+#include <fmt/format.h>
 #include <spdlog/cfg/helpers.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
@@ -34,6 +35,7 @@ static spdlog::sink_ptr main_stdout_sink;
 static spdlog::sink_ptr other_stdout_sink;
 static std::string level_spec;
 static bool ignore_env_setting;
+static std::string the_prefix;
 
 static auto
 create_file_sink()
@@ -41,7 +43,8 @@ create_file_sink()
     auto log_path = get_user_logs_dir(none, "cradle") / "log";
     auto sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
         log_path.string(), 262144, 2);
-    sink->set_pattern("[%H:%M:%S:%e] %L [thread %t] [%n] %v");
+    sink->set_pattern(
+        fmt::format("[%H:%M:%S:%e] %L [{}thread %t] [%n] %v", the_prefix));
     return sink;
 }
 
@@ -53,8 +56,8 @@ create_stdout_sink()
 #else
     auto sink = std::make_shared<spdlog::sinks::ansicolor_stdout_sink_mt>();
 #endif
-    std::string pattern{"[%H:%M:%S:%e] %L [thread %t] [%n] %v"};
-    sink->set_pattern(pattern);
+    sink->set_pattern(
+        fmt::format("[%H:%M:%S:%e] %L [{}thread %t] [%n] %v", the_prefix));
     return sink;
 }
 
@@ -79,8 +82,11 @@ load_levels()
 
 void
 initialize_logging(
-    std::string const& level_spec_arg, bool ignore_env_setting_arg)
+    std::string const& level_spec_arg,
+    bool ignore_env_setting_arg,
+    std::string prefix)
 {
+    the_prefix = std::move(prefix);
     shared_file_sink = create_file_sink();
     main_stdout_sink = create_stdout_sink();
     other_stdout_sink = create_stdout_sink();

@@ -27,13 +27,17 @@ eval_request_over_rpclib(Req const& req, int expected)
     auto resources{
         make_inner_test_resources(proxy_name, testing_domain_option())};
     auto& proxy{resources->get_proxy(proxy_name)};
-    proxy.unload_shared_library("test_inner_dll_v1.*");
     testing_request_context ctx{*resources, proxy_name};
     ResolutionConstraintsRemoteSync constraints;
 
+#if 0
+    // This would fail if testing with a long-running rpclib server: loaded
+    // DLLs (on the server, in this case) are never really unloaded, implying
+    // a unit test leak.
     REQUIRE_THROWS_WITH(
         cppcoro::sync_wait(resolve_request(ctx, req, constraints)),
         Catch::Contains("no entry found for uuid"));
+#endif
 
     proxy.load_shared_library(get_test_dlls_dir(), "test_inner_dll_v1");
     auto res = cppcoro::sync_wait(resolve_request(ctx, req, constraints));
@@ -41,17 +45,6 @@ eval_request_over_rpclib(Req const& req, int expected)
 }
 
 } // namespace
-
-namespace cradle {
-
-// Normally in the test_inner_dll_v1 DLL
-int
-adder_v1_func(int a, int b)
-{
-    return a + b;
-}
-
-} // namespace cradle
 
 TEST_CASE("evaluate proxy request, plain args", tag)
 {
@@ -76,7 +69,7 @@ TEST_CASE("evaluate proxy request, proxy subrequest", tag)
 
 TEST_CASE("evaluate proxy request, function subrequest", tag)
 {
-    auto req{rq_test_adder_v1n(7, rq_test_adder_v1n_impl(5, 2))};
+    auto req{rq_test_adder_v1n(7, rq_test_adder_v1n(5, 2))};
     int expected{7 + 5 + 2};
     eval_request_over_rpclib(req, expected);
 }

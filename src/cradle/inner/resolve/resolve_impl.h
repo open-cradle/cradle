@@ -196,6 +196,11 @@ resolve_impl(
     }
     else
     {
+        if (!ctx.get_resources().support_caching())
+        {
+            // No caching in contained mode
+            return resolve_request_direct(ctx, req);
+        }
         auto& cac_ctx = cast_ctx_to_ref<caching_context_intf>(ctx);
         return resolve_request_cached(cac_ctx, req, lock_ptr);
     }

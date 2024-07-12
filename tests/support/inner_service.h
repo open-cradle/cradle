@@ -46,6 +46,9 @@ class non_caching_request_resolution_context final
         return false;
     }
 
+    std::string const&
+    domain_name() const override;
+
     cppcoro::task<>
     schedule_after(std::chrono::milliseconds delay) override;
 
@@ -66,8 +69,7 @@ class non_caching_request_resolution_context final
  private:
     inner_resources& resources_;
 };
-
-static_assert(ValidContext<non_caching_request_resolution_context>);
+static_assert(ValidFinalContext<non_caching_request_resolution_context>);
 
 class caching_request_resolution_context final : public sync_context_intf,
                                                  public caching_context_intf
@@ -94,6 +96,9 @@ class caching_request_resolution_context final : public sync_context_intf,
         return false;
     }
 
+    std::string const&
+    domain_name() const override;
+
     cppcoro::task<>
     schedule_after(std::chrono::milliseconds delay) override;
 
@@ -114,8 +119,7 @@ class caching_request_resolution_context final : public sync_context_intf,
  private:
     inner_resources& resources_;
 };
-
-static_assert(ValidContext<caching_request_resolution_context>);
+static_assert(ValidFinalContext<caching_request_resolution_context>);
 
 } // namespace cradle
 
