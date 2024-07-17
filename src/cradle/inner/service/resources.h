@@ -225,6 +225,21 @@ class inner_resources
     std::unique_ptr<inner_resources_impl> impl_;
 };
 
+// Returns a best-effort reference to a "current resources" object; throws if
+// no such object exists.
+//
+// If more than one inner_resources object is alive, the function may not
+// return the intended one.
+//
+// The function should not be called unless really necessary. This necessity
+// exists for deserializing a msgpack-encoded function_request object: a
+// seri_registry instance is needed for choosing the correct
+// function_request_impl instantiation, but the msgpack library just provides
+// the bare serialization data, and provides no hooks for passing any
+// additional context information.
+inner_resources&
+get_current_inner_resources();
+
 } // namespace cradle
 
 #endif

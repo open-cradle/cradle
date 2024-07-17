@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include <openssl/sha.h>
 
@@ -101,6 +102,18 @@ update_unique_hash(unique_hasher& hasher, blob const& val);
 
 void
 update_unique_hash(unique_hasher& hasher, byte_vector const& val);
+
+// TODO maybe try to split off all support for vector<T>
+template<typename T>
+void
+update_unique_hash(unique_hasher& hasher, std::vector<T> const& val)
+{
+    update_unique_hash(hasher, val.size());
+    for (auto const& x : val)
+    {
+        update_unique_hash(hasher, x);
+    }
+}
 
 } // namespace cradle
 

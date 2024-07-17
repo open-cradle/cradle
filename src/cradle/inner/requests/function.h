@@ -16,6 +16,7 @@
 #include <cppcoro/task.hpp>
 #include <cppcoro/when_all.hpp>
 #include <fmt/format.h>
+#include <msgpack.hpp>
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/hash.h>
@@ -23,6 +24,7 @@
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/encodings/cereal.h>
+#include <cradle/inner/encodings/msgpack_packer.h>
 #include <cradle/inner/requests/containment_data.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/normalization_uuid.h>
@@ -125,12 +127,24 @@ class function_request_intf : public id_interface
         std::shared_ptr<seri_resolver_intf> resolver) const
         = 0;
 
+    virtual std::size_t
+    deep_size() const
+        = 0;
+
     virtual void
     save(JSONRequestOutputArchive& archive) const
         = 0;
 
     virtual void
     load(JSONRequestInputArchive& archive)
+        = 0;
+
+    virtual void
+    save(msgpack_packer& packer)
+        = 0;
+
+    virtual void
+    load(msgpack::object const msgpack_objs[3])
         = 0;
 
     virtual void
@@ -225,6 +239,19 @@ class request_title_mixin
     load_intrsp_state(JSONRequestInputArchive& archive)
     {
     }
+
+    void
+    save_intrsp_state(msgpack_packer& packer) const
+    {
+        // Fill up an element in the parent array
+        packer.pack_nil();
+    }
+
+    void
+    load_intrsp_state(msgpack::object const& msgpack_obj)
+    {
+        // Skip nil placeholder
+    }
 };
 
 template<>
@@ -255,6 +282,18 @@ class request_title_mixin<true>
     load_intrsp_state(JSONRequestInputArchive& archive)
     {
         archive(cereal::make_nvp("title", title_));
+    }
+
+    void
+    save_intrsp_state(msgpack_packer& packer) const
+    {
+        packer.pack(title_);
+    }
+
+    void
+    load_intrsp_state(msgpack::object const& msgpack_obj)
+    {
+        msgpack_obj.convert(title_);
     }
 
  private:
@@ -483,6 +522,13 @@ class function_request_impl
             calc_unique_hash();
         }
         hasher.combine(this->unique_hash_);
+    }
+
+    std::size_t
+    deep_size() const override
+    {
+        // Note that args_ size is shallow
+        return sizeof(*this) + sizeof(containment_data);
     }
 
     void
@@ -803,7 +849,7 @@ class function_request_impl
     }
 
  public:
-    // cereal-related
+    // cereal and msgpack related
 
     // Construct an object to be deserialized.
     // The uuid uniquely identifies the function. It is deserialized in
@@ -839,8 +885,36 @@ class function_request_impl
     {
         this->load_intrsp_state(archive);
         archive(cereal::make_nvp("args", args_));
-        auto& resources{archive.get_resources()};
         containment_ = containment_data::load(archive);
+        auto& resources{archive.get_resources()};
+        auto the_seri_registry{resources.get_seri_registry()};
+        function_
+            = the_seri_registry->find_function<stored_function_t>(uuid_.str());
+    }
+
+    void
+    save(msgpack_packer& packer) override
+    {
+        this->save_intrsp_state(packer);
+        // Args tuple saved as an array
+        packer.pack(args_);
+        if (containment_)
+        {
+            containment_->save(packer);
+        }
+        else
+        {
+            containment_data::save_nothing(packer);
+        }
+    }
+
+    void
+    load(msgpack::object const msgpack_objs[3]) override
+    {
+        this->load_intrsp_state(msgpack_objs[0]);
+        msgpack_objs[1].convert(args_);
+        containment_ = containment_data::load(msgpack_objs[2]);
+        auto& resources{get_current_inner_resources()};
         auto the_seri_registry{resources.get_seri_registry()};
         function_
             = the_seri_registry->find_function<stored_function_t>(uuid_.str());
@@ -981,6 +1055,12 @@ class function_request : public ObjectProps::retrier_type
         impl_->register_uuid(registry, cat_id, std::move(resolver));
     }
 
+    std::size_t
+    deep_size() const
+    {
+        return sizeof(*this) + impl_->deep_size();
+    }
+
     // *this and other are the same type; however, their impl_'s types could
     // differ (especially if these are subrequests).
     bool
@@ -1026,11 +1106,14 @@ class function_request : public ObjectProps::retrier_type
     }
 
  public:
-    // Interface for cereal
+    // Interface for cereal + msgpack
 
     // Used for creating placeholder subrequests in the catalog;
     // also called when deserializing a subrequest.
     function_request() = default;
+
+ public:
+    // Interface for cereal
 
     // Construct object, deserializing from a cereal archive.
     // Convenience constructor for when this is the "outer" object.
@@ -1069,6 +1152,48 @@ class function_request : public ObjectProps::retrier_type
         impl_->load(archive);
     }
 
+ public:
+    // Interface for msgpack. The msgpack_pack() and msgpack_unpack() function
+    // signatures are dictated by the msgpack library.
+
+    // This object is serialized to a msgpack array, with elements
+    // [0] uuid (here)
+    // [1] retrier state (here)
+    // [2] introspection state (impl)
+    // [3] args (impl)
+    // [4] containment (impl)
+    static constexpr int msgpack_array_size{5};
+
+    void
+    msgpack_pack(msgpack_packer_base& base_packer) const
+    {
+        auto& packer{static_cast<msgpack_packer&>(base_packer)};
+        packer.pack_array(msgpack_array_size);
+        impl_->get_uuid().save(packer);
+        this->save_retrier_state(packer);
+        impl_->save(packer);
+    }
+
+    void
+    msgpack_unpack(msgpack::object const& msgpack_obj)
+    {
+        if (msgpack_obj.type != msgpack::type::ARRAY
+            || msgpack_obj.via.array.size != msgpack_array_size)
+        {
+            throw msgpack::type_error{};
+        }
+        msgpack::object* const subobjs = msgpack_obj.via.array.ptr;
+        auto uuid{request_uuid::load(subobjs[0])};
+        this->load_retrier_state(subobjs[1]);
+        // Create a mostly empty function_request_impl object. uuid defines
+        // its exact type (function_request_impl class instantiation).
+        auto& resources{get_current_inner_resources()};
+        auto the_seri_registry{resources.get_seri_registry()};
+        impl_ = the_seri_registry->create<intf_type>(std::move(uuid));
+        // Deserialize the remainder of the function_request_impl object.
+        impl_->load(&subobjs[2]);
+    }
+
  private:
     std::shared_ptr<intf_type> impl_;
 };
@@ -1087,6 +1212,14 @@ struct is_function_request<function_request<Value, ObjectProps>>
 
 template<typename T>
 inline constexpr bool is_function_request_v = is_function_request<T>::value;
+
+// Needed for storing a function_request in the memory cache.
+template<typename Value, typename ObjectProps>
+std::size_t
+deep_sizeof(function_request<Value, ObjectProps> const& req)
+{
+    return req.deep_size();
+}
 
 /*
  * Interface class for class proxy_request_impl

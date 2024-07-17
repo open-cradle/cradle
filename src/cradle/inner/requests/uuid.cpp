@@ -1,7 +1,9 @@
 #include <stdexcept>
 
 #include <fmt/format.h>
+#include <msgpack.hpp>
 
+#include <cradle/inner/encodings/msgpack_packer.h>
 #include <cradle/inner/requests/uuid.h>
 #include <cradle/version_info.h>
 
@@ -37,6 +39,11 @@ request_uuid::request_uuid(std::string base) : str_{std::move(base)}
         throw uuid_error{
             fmt::format("Invalid character(s) in request_uuid base {}", str_)};
     }
+}
+
+request_uuid::request_uuid(std::string complete, complete_tag)
+    : str_{std::move(complete)}, finalized_{true}
+{
 }
 
 request_uuid
@@ -75,6 +82,21 @@ request_uuid::set_flattened()
     }
     flattened_ = true;
     return *this;
+}
+
+void
+request_uuid::save(msgpack_packer& packer) const
+{
+    packer.pack(str());
+}
+
+template<>
+request_uuid
+request_uuid::load(msgpack::object const& msgpack_obj)
+{
+    request_uuid uuid;
+    msgpack_obj.convert(uuid.str_);
+    return uuid;
 }
 
 void

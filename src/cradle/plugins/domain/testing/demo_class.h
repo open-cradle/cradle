@@ -50,7 +50,7 @@ class demo_class
     // - Member variables must be public
     // - Maybe inflexible
     // Still, this is the official solution, and it's really simple if it
-    // suffices.
+    // suffices. Otherwise, see msgpack_readme.md.
     MSGPACK_DEFINE(x_, y_)
 };
 
