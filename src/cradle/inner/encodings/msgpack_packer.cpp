@@ -23,8 +23,10 @@ msgpack_ostream::str() const
     return ss_.str();
 }
 
-msgpack_packer::msgpack_packer(msgpack_ostream& os, bool allow_blob_files)
-    : msgpack::packer<msgpack_ostream>(os), allow_blob_files_{allow_blob_files}
+msgpack_packer::msgpack_packer(msgpack_ostream& ostr, bool allow_blob_files)
+    : msgpack::packer<msgpack_ostream>(ostr),
+      ostr_{ostr},
+      allow_blob_files_{allow_blob_files}
 {
 }
 

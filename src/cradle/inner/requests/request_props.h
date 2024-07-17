@@ -5,11 +5,15 @@
 #include <stdexcept>
 #include <string>
 
+#include <msgpack.hpp>
+
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/requests/uuid.h>
 
 namespace cradle {
+
+class msgpack_packer;
 
 /*
  * The types of function that a request may hold, and that are used to resolve
@@ -72,6 +76,12 @@ class no_retrier
     load_retrier_state(JSONRequestInputArchive& archive)
     {
     }
+
+    void
+    save_retrier_state(msgpack_packer& packer) const;
+
+    void
+    load_retrier_state(msgpack::object const& msgpack_obj);
 };
 static_assert(MaybeResolutionRetrier<no_retrier>);
 
@@ -95,6 +105,8 @@ class backoff_retrier_base
     // base_millis in milliseconds
     backoff_retrier_base(int64_t base_millis, int max_attempts);
 
+    virtual ~backoff_retrier_base() = default;
+
     std::chrono::milliseconds
     attempt_retry(int attempt, std::exception const& exc) const;
 
@@ -104,6 +116,12 @@ class backoff_retrier_base
     // Not called for proxy_retrier
     void
     load_retrier_state(JSONRequestInputArchive& archive);
+
+    void
+    save_retrier_state(msgpack_packer& packer) const;
+
+    void
+    load_retrier_state(msgpack::object const& msgpack_obj);
 
  private:
     int64_t base_millis_;

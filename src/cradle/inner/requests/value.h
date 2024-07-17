@@ -4,10 +4,12 @@
 #include <utility>
 
 #include <cppcoro/task.hpp>
+#include <msgpack.hpp>
 
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/unique_hash.h>
+#include <cradle/inner/encodings/msgpack_packer.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/uuid.h>
 
@@ -89,7 +91,7 @@ class value_request
     }
 
  public:
-    // cereal interface
+    // cereal + msgpack interface
     value_request() = default;
 
     template<typename Archive>
@@ -97,6 +99,18 @@ class value_request
     serialize(Archive& archive)
     {
         archive(value_);
+    }
+
+    void
+    msgpack_pack(msgpack_packer_base& base_packer) const
+    {
+        base_packer.pack(value_);
+    }
+
+    void
+    msgpack_unpack(msgpack::object const& msgpack_obj)
+    {
+        msgpack_obj.convert(value_);
     }
 
  private:

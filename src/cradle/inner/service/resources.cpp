@@ -49,14 +49,41 @@ create_memory_cache(service_config const& config)
         make_immutable_cache_config(config));
 }
 
+static inner_resources* current_inner_resources{nullptr};
+
+inner_resources&
+get_current_inner_resources()
+{
+    if (!current_inner_resources)
+    {
+        throw std::logic_error{"no current_inner_resources"};
+    }
+    return *current_inner_resources;
+}
+
 inner_resources::inner_resources(service_config const& config)
     : impl_{std::make_unique<inner_resources_impl>(*this, config)}
 {
+    // The critical situation is with a loopback, when we legitimately have two
+    // sets of resources in the same process, and the function_request
+    // reconstruction code cannot know which one it should use.
+    // Decision: use the first one, which is not the one for the loopback.
+    // This will work unless the loopback resolves via a contained process.
+    if (current_inner_resources)
+    {
+        auto& logger{impl_->the_logger()};
+        logger.info("inner_resources ctor found existing instance");
+    }
+    else
+    {
+        current_inner_resources = this;
+    }
 }
 
-// The destructor needs the inner_resources_impl definition, which is not
-// available in resources.h.
-inner_resources::~inner_resources() = default;
+inner_resources::~inner_resources()
+{
+    current_inner_resources = nullptr;
+}
 
 service_config const&
 inner_resources::config() const

@@ -88,6 +88,8 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
     template<>
     struct object_with_zone<cradle::blob>
     {
+        // Only called from tests/inner/encodings/msgpack_adaptors_main.cpp
+        // in tests explicitly demanding a zone.
         void
         operator()(msgpack::object::with_zone& o, cradle::blob const& v) const
         {

@@ -13,6 +13,8 @@
 
 namespace cradle {
 
+class msgpack_packer;
+
 /*
  * A request's uuid uniquely identifies its class and current implementation:
  * - It must change when the implementation's observable behaviour changes.
@@ -59,6 +61,16 @@ class request_uuid
  public:
     // The base string should be universally unique.
     explicit request_uuid(std::string base);
+
+    struct complete_tag
+    {
+    };
+
+    // Intended for when a complete uuid string is transmitted over RPC or
+    // other channel, and the receiving side has to create a request_uuid
+    // object from it.
+    // Not intended for user code.
+    request_uuid(std::string complete, complete_tag);
 
     request_uuid
     clone() const;
@@ -118,6 +130,17 @@ class request_uuid
         return uuid;
     }
 
+    void
+    save(msgpack_packer& packer) const;
+
+    // MsgpackObj should be msgpack::object.
+    // The template is a workaround for conflicts between the two msgpack
+    // implementations (the main one, and the one inside rpclib), that lead to
+    // build errors when trying to #include <msgpack.hpp> here.
+    template<typename MsgpackObj>
+    static request_uuid
+    load(MsgpackObj const& msgpack_obj);
+
  private:
     // Used in load_with_name() only
     request_uuid() = default;
@@ -126,7 +149,7 @@ class request_uuid
     mutable std::string str_;
     mutable bool finalized_{false};
 
-    // Modifiers
+    // Modifiers; not used (anymore) when finalized_
     bool include_level_{false};
     caching_level_type level_{};
     bool flattened_{false};

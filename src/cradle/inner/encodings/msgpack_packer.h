@@ -27,13 +27,21 @@ class msgpack_ostream
     std::ostringstream ss_;
 };
 
+using msgpack_packer_base = msgpack::packer<msgpack_ostream>;
+
 // A msgpack packer decorating the original one, and limited to writing to
 // msgpack_ostream only.
 // Note that the base class has no virtual destructor.
-class msgpack_packer : public msgpack::packer<msgpack_ostream>
+class msgpack_packer : public msgpack_packer_base
 {
  public:
-    msgpack_packer(msgpack_ostream& os, bool allow_blob_files);
+    msgpack_packer(msgpack_ostream& ostr, bool allow_blob_files);
+
+    msgpack_ostream&
+    ostr() const
+    {
+        return ostr_;
+    }
 
     bool
     allow_blob_files() const
@@ -42,6 +50,7 @@ class msgpack_packer : public msgpack::packer<msgpack_ostream>
     }
 
  private:
+    msgpack_ostream& ostr_;
     bool allow_blob_files_;
 };
 

@@ -108,6 +108,14 @@ add_library(test_inner_dll_v1 MODULE ${srcs_inner_dll_v1})
 target_link_libraries(test_inner_dll_v1 PUBLIC
     cradle_inner)
 
+# Create another DLL with a meta request factory.
+file(GLOB_RECURSE srcs_inner_dll_m0_meta CONFIGURE_DEPENDS
+    "inner-dll/m0-meta/*.cpp")
+add_library(test_inner_dll_m0_meta MODULE ${srcs_inner_dll_m0_meta})
+target_link_libraries(test_inner_dll_m0_meta PUBLIC
+    cradle_inner
+    basic_test_support)
+
 # Create another DLL.
 # Used in inner/resolve/resolve_proxy.cpp.
 file(GLOB_RECURSE srcs_inner_dll_x0 CONFIGURE_DEPENDS
@@ -184,6 +192,7 @@ target_link_libraries(test_inner_dll_failing_create_catalog PUBLIC
 add_custom_target(all_inner_test_dlls
     DEPENDS
         test_inner_dll_v1
+        test_inner_dll_m0_meta
         test_inner_dll_x0
         test_inner_dll_x1
         test_inner_dll_x0x1
@@ -197,11 +206,13 @@ add_custom_target(all_thinknode_test_dlls
         test_thinknode_dll_t0)
 
 # Define an object library covering the source files in inner/;
-# plus the function defined in the v1 DLL (making it available for local evaluation).
+# plus the function defined in the v1 DLL (making it available for local evaluation);
+# likewise for the m0_meta DLL.
 file(GLOB_RECURSE test_srcs_inner CONFIGURE_DEPENDS
     "inner/*.cpp"
     "rpclib/*.cpp"
-    "inner-dll/v1/adder_v1_impl.cpp")
+    "inner-dll/v1/adder_v1_impl.cpp"
+    "inner-dll/m0-meta/m0_meta_impl.cpp")
 add_library(test_lib_inner OBJECT ${test_srcs_inner})
 target_link_libraries(test_lib_inner PUBLIC
     cradle_plugins_inner

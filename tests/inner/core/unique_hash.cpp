@@ -1,16 +1,18 @@
 #include <cstring>
 #include <filesystem>
+#include <vector>
 
 #include <catch2/catch.hpp>
 
 #include <cradle/inner/blob_file/blob_file.h>
+#include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/fs/types.h>
 #include <cradle/inner/fs/utilities.h>
 
-using namespace cradle;
+namespace cradle {
 
 namespace {
 
@@ -234,3 +236,23 @@ TEST_CASE("update_unique_hash: blob file", tag)
     update_unique_hash(reader_hasher, reader_blob);
     verify_ref_result(reader_hasher, ref_hasher);
 }
+
+TEST_CASE("unique_hash: vector basic", tag)
+{
+    using my_vector_type = std::vector<int>;
+    my_vector_type a{1, 2};
+    my_vector_type b{1, 3};
+    REQUIRE(get_unique_string_tmpl(a) != get_unique_string_tmpl(b));
+}
+
+// Illustrates why the hash of a vector should be based on more than just the
+// hashes of its elements (but also on its size).
+TEST_CASE("unique_hash: vector edge case", tag)
+{
+    using my_vector_type = std::vector<std::vector<int>>;
+    my_vector_type a{{1, 2}, {3}};
+    my_vector_type b{{1}, {2, 3}};
+    REQUIRE(get_unique_string_tmpl(a) != get_unique_string_tmpl(b));
+}
+
+} // namespace cradle
