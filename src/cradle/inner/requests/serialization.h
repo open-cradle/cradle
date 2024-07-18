@@ -6,6 +6,8 @@
 #include <sstream>
 #include <string>
 
+#include <fmt/format.h>
+
 #include <cereal/archives/json.hpp>
 
 namespace cradle {
@@ -44,6 +46,7 @@ serialize_request(Req const& req)
         // but this adds a redundant outer "value0".
         req.save(oarchive);
     }
+    fmt::print("!! serialize_request -> {}\n", os.str());
     return os.str();
 }
 
