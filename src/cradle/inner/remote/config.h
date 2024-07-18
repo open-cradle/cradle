@@ -21,6 +21,9 @@ struct remote_config_keys
     // be locked on behalf of the caller, until the caller releases the lock.
     inline static std::string const NEED_RECORD_LOCK{
         "remote/need_record_lock"};
+
+    // (Optional boolean)
+    inline static std::string const INTROSPECTIVE{"remote/introspective"};
 };
 
 } // namespace cradle

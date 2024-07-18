@@ -651,6 +651,17 @@ class remote_async_context_intf : public remote_context_intf,
     virtual async_id
     get_remote_id()
         = 0;
+
+    // Make resolutions on this context introspective:
+    // - Print out remote_id on submit_async()
+    // - Keep actx tree on remote after resolution finished
+    virtual void
+    make_introspective()
+        = 0;
+
+    virtual bool
+    introspective() const
+        = 0;
 };
 
 // Context interface needed for locally resolving a cached request.

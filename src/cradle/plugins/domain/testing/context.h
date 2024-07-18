@@ -456,6 +456,18 @@ class atst_context final : public root_local_async_context_intf,
         return get_remote_root().get_remote_id();
     }
 
+    void
+    make_introspective() override
+    {
+        get_remote_root().make_introspective();
+    }
+
+    bool
+    introspective() const override
+    {
+        return get_remote_root().introspective();
+    }
+
     // local_async_ctx_owner_intf
     root_local_async_context_intf&
     prepare_for_local_resolution() override;

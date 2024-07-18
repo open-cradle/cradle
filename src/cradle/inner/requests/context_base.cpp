@@ -706,6 +706,12 @@ root_proxy_async_context_base::fail_remote_id() noexcept
     }
 }
 
+void
+root_proxy_async_context_base::make_introspective()
+{
+    introspective_ = true;
+}
+
 // This may cause the current thread to block on getting the result from a
 // future.
 // TODO Avoid blocking callers by moving to a cppcoro-based interface, and
@@ -741,6 +747,20 @@ non_root_proxy_async_context_base::fail_remote_id() noexcept
 {
     // For non-root contexts, remote_id_ is set on object creation
     assert(false);
+}
+
+void
+non_root_proxy_async_context_base::make_introspective()
+{
+    // Should be called for root contexts only
+    assert(false);
+}
+
+bool
+non_root_proxy_async_context_base::introspective() const
+{
+    assert(false);
+    return false;
 }
 
 void
