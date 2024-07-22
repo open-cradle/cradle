@@ -333,10 +333,10 @@ try
 {
     auto& db{hctx.get_async_db()};
     auto& logger{hctx.logger()};
-    logger.info("handle_get_async_status {}", aid);
+    logger.debug("handle_get_async_status {}", aid);
     auto actx{db.find(aid)};
     auto status = actx->get_status();
-    logger.info("handle_get_async_status -> {}", status);
+    logger.debug("handle_get_async_status -> {}", status);
     return static_cast<int>(status);
 }
 catch (std::exception& e)

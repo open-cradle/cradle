@@ -216,10 +216,10 @@ loopback_service::get_sub_contexts(async_id aid)
 async_status
 loopback_service::get_async_status(async_id aid)
 {
-    logger_->info("handle_get_async_status {}", aid);
+    logger_->debug("handle_get_async_status {}", aid);
     auto actx{get_async_db().find(aid)};
     auto status = actx->get_status();
-    logger_->info("handle_get_async_status -> {}", status);
+    logger_->debug("handle_get_async_status -> {}", status);
     return status;
 }
 
