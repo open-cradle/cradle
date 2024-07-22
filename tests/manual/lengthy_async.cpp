@@ -11,7 +11,7 @@ namespace cradle {
 
 namespace {
 
-static char const tag[] = "[manual]";
+#define TAG(n) "[manual][" #n "]"
 
 } // namespace
 
