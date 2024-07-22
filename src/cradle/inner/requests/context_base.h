@@ -291,6 +291,9 @@ class local_async_context_base : public virtual local_async_context_intf,
     request_cancellation_coro() override;
 
     // local_async_context_intf
+    void
+    set_essentials(std::unique_ptr<request_essentials> essentials) override;
+
     std::size_t
     get_local_num_subs() const override
     {
@@ -366,6 +369,7 @@ class local_async_context_base : public virtual local_async_context_intf,
     local_tree_context_base& tree_ctx_;
     local_async_context_base* parent_;
     bool is_req_;
+    std::unique_ptr<request_essentials> essentials_;
     async_id const id_;
     std::atomic<async_status> status_;
     std::string errmsg_;
@@ -452,7 +456,11 @@ class root_local_async_context_base : public local_async_context_base,
 class non_root_local_async_context_base : public local_async_context_base
 {
  public:
-    using local_async_context_base::local_async_context_base;
+    non_root_local_async_context_base(
+        local_tree_context_base& tree_ctx,
+        local_async_context_base* parent,
+        bool is_req,
+        std::unique_ptr<request_essentials> essentials);
 };
 
 /*
@@ -476,7 +484,9 @@ class local_context_tree_builder_base : public req_visitor_intf
     visit_val_arg(std::size_t ix) override;
 
     std::unique_ptr<req_visitor_intf>
-    visit_req_arg(std::size_t ix) override;
+    visit_req_arg(
+        std::size_t ix,
+        std::unique_ptr<request_essentials> essentials) override;
 
  protected:
     local_async_context_base& ctx_;
@@ -485,11 +495,17 @@ class local_context_tree_builder_base : public req_visitor_intf
     make_sub_builder(local_async_context_base& sub_ctx) = 0;
 
     std::shared_ptr<local_async_context_base>
-    make_sub_ctx(std::size_t ix, bool is_req);
+    make_sub_ctx(
+        std::size_t ix,
+        bool is_req,
+        std::unique_ptr<request_essentials> essentials);
 
     virtual std::shared_ptr<local_async_context_base>
     make_sub_ctx(
-        local_tree_context_base& tree_ctx, std::size_t ix, bool is_req)
+        local_tree_context_base& tree_ctx,
+        std::size_t ix,
+        bool is_req,
+        std::unique_ptr<request_essentials> essentials)
         = 0;
 };
 

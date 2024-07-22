@@ -160,6 +160,7 @@ resolve_request_local(
             }
             if (root_actx)
             {
+                root_actx->set_essentials(req.get_essentials());
                 // Populate ctx with sub ctx's
                 static_assert(VisitableRequest<Req>);
                 req.accept(*root_actx->make_ctx_tree_builder());

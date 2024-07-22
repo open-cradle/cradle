@@ -4,6 +4,7 @@
 #include <chrono>
 #include <concepts>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include <cppcoro/task.hpp>
@@ -121,6 +122,23 @@ to_composition_based(caching_level_type level)
     }
 }
 
+// Basic request information
+struct request_essentials
+{
+    request_essentials(std::string uuid_str_arg)
+        : uuid_str{std::move(uuid_str_arg)}
+    {
+    }
+
+    request_essentials(std::string uuid_str_arg, std::string title_arg)
+        : uuid_str{std::move(uuid_str_arg)}, title{std::move(title_arg)}
+    {
+    }
+
+    std::string const uuid_str;
+    std::optional<std::string> const title;
+};
+
 /*
  * Visits a request's arguments (which may be subrequests themselves).
  *
@@ -147,7 +165,9 @@ class req_visitor_intf
     // Visits an argument that is a subrequest.
     // Returns the visitor for the subrequest's arguments.
     virtual std::unique_ptr<req_visitor_intf>
-    visit_req_arg(std::size_t ix) = 0;
+    visit_req_arg(
+        std::size_t ix, std::unique_ptr<request_essentials> essentials)
+        = 0;
 };
 
 /*
@@ -462,6 +482,13 @@ class local_async_context_intf : public virtual local_context_intf,
     {
         return is_async() ? this : nullptr;
     }
+
+    // For a root context, the essentials are set when a request is (first)
+    // resolved using the context. For a non-root context, the essentials will
+    // be passed to its constructor.
+    virtual void
+    set_essentials(std::unique_ptr<request_essentials> essentials)
+        = 0;
 
     // Returns the number of subtasks
     // Differs from get_sub() by not being a coroutine.
@@ -856,6 +883,9 @@ concept ResolutionRetrier
  *   introspected
  * - introspection_title: title to use in introspection output, valid if
  *   introspective
+ * - essentials. May return nullptr (e.g. for value_request).
+ *
+ * TODO is_introspective+get_introspection_title vs get_essentials
  */
 template<typename T>
 concept Request
@@ -878,7 +908,12 @@ concept Request
                          {
                              req.get_introspection_title()
                              } -> std::same_as<std::string>;
-                     };
+                     } && requires(T const& req) {
+                              {
+                                  req.get_essentials()
+                                  } -> std::same_as<
+                                      std::unique_ptr<request_essentials>>;
+                          };
 
 // By having retryable=true, a request advertises itself as being retryable...
 template<typename Req>

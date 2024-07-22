@@ -297,6 +297,13 @@ local_async_context_base::get_status_coro()
     co_return get_status();
 }
 
+void
+local_async_context_base::set_essentials(
+    std::unique_ptr<request_essentials> essentials)
+{
+    essentials_ = std::move(essentials);
+}
+
 cppcoro::task<void>
 local_async_context_base::request_cancellation_coro()
 {
@@ -521,6 +528,16 @@ root_local_async_context_base::get_result()
     return result_;
 }
 
+non_root_local_async_context_base::non_root_local_async_context_base(
+    local_tree_context_base& tree_ctx,
+    local_async_context_base* parent,
+    bool is_req,
+    std::unique_ptr<request_essentials> essentials)
+    : local_async_context_base(tree_ctx, parent, is_req)
+{
+    set_essentials(std::move(essentials));
+}
+
 local_context_tree_builder_base::local_context_tree_builder_base(
     local_async_context_base& ctx)
     : ctx_{ctx}
@@ -534,21 +551,25 @@ local_context_tree_builder_base::~local_context_tree_builder_base()
 void
 local_context_tree_builder_base::visit_val_arg(std::size_t ix)
 {
-    make_sub_ctx(ix, false);
+    make_sub_ctx(ix, false, nullptr);
 }
 
 std::unique_ptr<req_visitor_intf>
-local_context_tree_builder_base::visit_req_arg(std::size_t ix)
+local_context_tree_builder_base::visit_req_arg(
+    std::size_t ix, std::unique_ptr<request_essentials> essentials)
 {
-    auto sub_ctx{make_sub_ctx(ix, true)};
+    auto sub_ctx{make_sub_ctx(ix, true, std::move(essentials))};
     return make_sub_builder(*sub_ctx);
 }
 
 std::shared_ptr<local_async_context_base>
-local_context_tree_builder_base::make_sub_ctx(std::size_t ix, bool is_req)
+local_context_tree_builder_base::make_sub_ctx(
+    std::size_t ix,
+    bool is_req,
+    std::unique_ptr<request_essentials> essentials)
 {
     auto& tree_ctx{ctx_.get_tree_context()};
-    auto sub_ctx{make_sub_ctx(tree_ctx, ix, is_req)};
+    auto sub_ctx{make_sub_ctx(tree_ctx, ix, is_req, std::move(essentials))};
     ctx_.add_sub(ix, sub_ctx);
     register_local_async_ctx(sub_ctx);
     return sub_ctx;
