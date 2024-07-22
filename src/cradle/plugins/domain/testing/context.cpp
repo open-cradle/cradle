@@ -291,6 +291,10 @@ atst_context::prepare_for_remote_resolution()
         std::make_unique<proxy_atst_tree_context>(resources_, proxy_name_),
         create_optional_root_tasklet(
             resources_.the_tasklet_admin(), opt_tasklet_spec_));
+    if (introspective_)
+    {
+        remote_root_->make_introspective();
+    }
     copy_test_params(*remote_root_);
     on_preparation_finished();
     return *remote_root_;
