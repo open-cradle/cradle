@@ -1,6 +1,7 @@
 #include <stdexcept>
 #include <string>
 
+#include <fmt/format.h>
 #include <msgpack.hpp>
 
 #include <boost/program_options.hpp>
@@ -15,6 +16,7 @@
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/common/common.h>
+#include <cradle/rpclib/common/config.h>
 #include <cradle/version_info.h>
 
 // Command-line application interacting with an rpclib server.
@@ -33,6 +35,8 @@ static cli_options
 parse_options(int argc, char const* const* argv)
 {
     namespace po = boost::program_options;
+    auto port_help{
+        fmt::format("port number (default {})", RPCLIB_PORT_PRODUCTION)};
 
     // clang-format off
     po::options_description desc("Options");
@@ -44,7 +48,7 @@ parse_options(int argc, char const* const* argv)
         ("log-level", po::value<std::string>(),
             "logging level (SPDLOG_LEVEL format)")
         ("port", po::value<rpclib_port_t>(),
-            "port number")
+            port_help.c_str())
         ("id", po::value<int>(),
             "remote id");
     // clang-format on
@@ -86,9 +90,8 @@ static service_config_map
 create_config_map(cli_options const& options)
 {
     service_config_map config_map;
-    // TODO pass port
     // TODO don't start rpclib_server if not yet running
-    config_map[generic_config_keys::TESTING] = true;
+    config_map[rpclib_config_keys::PORT_NUMBER] = options.port;
     return config_map;
 }
 

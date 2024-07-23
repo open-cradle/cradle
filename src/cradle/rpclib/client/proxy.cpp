@@ -70,14 +70,26 @@ is_retryable(rpc::rpc_error& exc)
     return retryable;
 }
 
+bool
+get_testing(service_config const& config)
+{
+    return config.get_bool_or_default(generic_config_keys::TESTING, false);
+}
+
 rpclib_port_t
-alloc_port(ephemeral_port_owner* port_owner, bool testing)
+alloc_port(ephemeral_port_owner* port_owner, service_config const& config)
 {
     if (port_owner)
     {
         return port_owner->alloc_port();
     }
-    return testing ? RPCLIB_PORT_TESTING : RPCLIB_PORT_PRODUCTION;
+    auto opt_port
+        = config.get_optional_number(rpclib_config_keys::PORT_NUMBER);
+    if (opt_port)
+    {
+        return static_cast<rpclib_port_t>(*opt_port);
+    }
+    return get_testing(config) ? RPCLIB_PORT_TESTING : RPCLIB_PORT_PRODUCTION;
 }
 
 } // namespace
@@ -99,11 +111,10 @@ rpclib_client_impl::rpclib_client_impl(
     std::shared_ptr<spdlog::logger> logger)
     : port_owner_{port_owner},
       logger_{logger ? std::move(logger) : ensure_logger("rpclib_client")},
-      testing_{
-          config.get_bool_or_default(generic_config_keys::TESTING, false)},
+      testing_{get_testing(config)},
       contained_{port_owner != nullptr},
       deploy_dir_{config.get_optional_string(generic_config_keys::DEPLOY_DIR)},
-      port_{alloc_port(port_owner, testing_)},
+      port_{alloc_port(port_owner, config)},
       secondary_cache_factory_{config.get_optional_string(
           inner_config_keys::SECONDARY_CACHE_FACTORY)}
 {
