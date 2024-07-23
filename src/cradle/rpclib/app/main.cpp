@@ -90,7 +90,7 @@ static service_config_map
 create_config_map(cli_options const& options)
 {
     service_config_map config_map;
-    // TODO don't start rpclib_server if not yet running
+    config_map[rpclib_config_keys::EXPECT_SERVER] = true;
     config_map[rpclib_config_keys::PORT_NUMBER] = options.port;
     return config_map;
 }

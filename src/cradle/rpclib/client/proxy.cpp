@@ -113,12 +113,14 @@ rpclib_client_impl::rpclib_client_impl(
       logger_{logger ? std::move(logger) : ensure_logger("rpclib_client")},
       testing_{get_testing(config)},
       contained_{port_owner != nullptr},
+      expect_server_{config.get_bool_or_default(
+          rpclib_config_keys::EXPECT_SERVER, false)},
       deploy_dir_{config.get_optional_string(generic_config_keys::DEPLOY_DIR)},
       port_{alloc_port(port_owner, config)},
       secondary_cache_factory_{config.get_optional_string(
           inner_config_keys::SECONDARY_CACHE_FACTORY)}
 {
-    start_server();
+    ensure_server();
 }
 
 rpclib_client_impl::~rpclib_client_impl()
@@ -480,6 +482,20 @@ rpclib_client_impl::wait_until_server_running()
         std::this_thread::sleep_for(std::chrono::milliseconds(delay));
         attempt += 1;
     }
+}
+
+void
+rpclib_client_impl::ensure_server()
+{
+    if (server_is_running())
+    {
+        return;
+    }
+    if (expect_server_)
+    {
+        throw std::runtime_error{fmt::format("No server on port {}", port_)};
+    }
+    start_server();
 }
 
 void
