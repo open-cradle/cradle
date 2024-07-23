@@ -199,10 +199,6 @@ root_proxy_atst_context::make_config(bool need_record_lock) const
             remote_config_keys::TASKLET_ID,
             static_cast<std::size_t>(tasklet_->own_id())});
     }
-    if (introspective())
-    {
-        config_map.insert(std::pair{remote_config_keys::INTROSPECTIVE, true});
-    }
     return service_config{config_map};
 }
 

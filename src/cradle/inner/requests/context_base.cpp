@@ -681,9 +681,10 @@ void
 root_proxy_async_context_base::finish_remote() noexcept
 {
     // Clean up the context tree on the server once per proxy context tree.
-    // There must have been a set_remote_id() or fail_remote_id() call for this
-    // root context.
-    if (remote_id_ != NO_ASYNC_ID)
+    // Keep the context tree if the client context is introspective, so that
+    // the server contexts remain available for querying. There must have been
+    // a set_remote_id() or fail_remote_id() call for this root context.
+    if (remote_id_ != NO_ASYNC_ID && !introspective())
     {
         // Must not throw
         try
