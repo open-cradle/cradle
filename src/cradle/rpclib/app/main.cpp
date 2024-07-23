@@ -25,10 +25,10 @@ using namespace cradle;
 
 struct cli_options
 {
-    std::string log_level{"info"};
+    std::string log_level{"critical"};
     bool ignore_env_log_level{false};
     rpclib_port_t port{RPCLIB_PORT_PRODUCTION};
-    int remote_id;
+    int remote_id{};
 };
 
 static cli_options
