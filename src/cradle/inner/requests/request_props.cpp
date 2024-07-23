@@ -1,11 +1,25 @@
 #include <spdlog/spdlog.h>
 
 #include <cradle/inner/core/exception.h>
+#include <cradle/inner/encodings/msgpack_packer.h>
 #include <cradle/inner/io/http_requests.h>
 #include <cradle/inner/requests/request_props.h>
 #include <cradle/inner/utilities/logging.h>
 
 namespace cradle {
+
+void
+no_retrier::save_retrier_state(msgpack_packer& packer) const
+{
+    // Placeholder element occupying a place in the parent array
+    packer.pack_nil();
+}
+
+void
+no_retrier::load_retrier_state(msgpack::object const& msgpack_obj)
+{
+    // Skip placeholder element
+}
 
 backoff_retrier_base::backoff_retrier_base(
     int64_t base_millis, int max_attempts)
@@ -26,6 +40,27 @@ backoff_retrier_base::load_retrier_state(JSONRequestInputArchive& archive)
 {
     archive(cereal::make_nvp("base_millis", base_millis_));
     archive(cereal::make_nvp("max_attempts", max_attempts_));
+}
+
+void
+backoff_retrier_base::save_retrier_state(msgpack_packer& packer) const
+{
+    packer.pack_array(2);
+    packer.pack_int64(base_millis_);
+    packer.pack_int(max_attempts_);
+}
+
+void
+backoff_retrier_base::load_retrier_state(msgpack::object const& msgpack_obj)
+{
+    if (msgpack_obj.type != msgpack::type::ARRAY
+        || msgpack_obj.via.array.size != 2)
+    {
+        throw msgpack::type_error();
+    }
+    msgpack::object* const subobjs = msgpack_obj.via.array.ptr;
+    subobjs[0].convert(base_millis_);
+    subobjs[1].convert(max_attempts_);
 }
 
 std::chrono::milliseconds

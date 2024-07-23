@@ -34,12 +34,6 @@ class thinknode_test_scope
         return *resources_;
     }
 
-    std::string
-    get_proxy_name() const
-    {
-        return proxy_name_;
-    }
-
     // Returns nullptr for local operation
     remote_proxy*
     get_proxy() const

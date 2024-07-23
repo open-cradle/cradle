@@ -7,6 +7,7 @@
 #include <cppcoro/io_service.hpp>
 #include <cppcoro/static_thread_pool.hpp>
 #include <cppcoro/task.hpp>
+#include <spdlog/spdlog.h>
 
 #include <cradle/inner/io/http_requests.h>
 #include <cradle/inner/remote/types.h>
@@ -23,6 +24,7 @@ struct immutable_cache;
 class inner_resources_impl;
 struct mock_http_session;
 class remote_proxy;
+class rpclib_client;
 class secondary_storage_intf;
 class seri_registry;
 class tasklet_admin;
@@ -37,10 +39,12 @@ struct inner_config_keys
     inline static std::string const MEMORY_CACHE_UNUSED_SIZE_LIMIT{
         "memory_cache/unused_size_limit"};
 
-    // (Mandatory string)
+    // (Optional string)
     // Specifies the factory to use to create a secondary cache implementation.
     // The string should equal a key passed to
     // register_secondary_storage_factory().
+    // The string will be absent in the configuration of a contained process,
+    // and normally be present otherwise.
     inline static std::string const SECONDARY_CACHE_FACTORY{
         "secondary_cache/factory"};
 
@@ -63,8 +67,8 @@ struct inner_config_keys
  * lifetimes, to hold a reference to an inner_resources object.
  *
  * The resources are:
- * - A memory (immutable) cache
- * - A secondary cache
+ * - An optional memory (immutable) cache (present unless in contained mode)
+ * - An optional secondary cache
  * - An optional requests storage
  * - A blob_file_writer writing blobs in shared memory
  * - An optional async_db instance
@@ -76,6 +80,7 @@ struct inner_config_keys
  * - A registry of templates of requests that can be (de-)serialized
  * - A collection of cache record locks that can be released
  * - A collection of introspection tasklets
+ * - A pool of rpclib clients for communicating to contained rpclib servers
  *
  * TODO make resources optional? E.g. cacheless resolving doesn't need much.
  * service_config could indicate what to provide.
@@ -105,6 +110,9 @@ class inner_resources
 
     service_config const&
     config() const;
+
+    bool
+    support_caching() const;
 
     immutable_cache&
     memory_cache();
@@ -199,9 +207,38 @@ class inner_resources
     cppcoro::io_service&
     the_io_service();
 
+    std::unique_ptr<rpclib_client>
+    alloc_contained_proxy(std::shared_ptr<spdlog::logger> logger);
+
+    void
+    free_contained_proxy(std::unique_ptr<rpclib_client> proxy, bool succeeded);
+
+    // Retrieve the total number of contained calls initiated through these
+    // resources (so failed contained calls also count).
+    int
+    get_num_contained_calls() const;
+
+    void
+    increase_num_contained_calls();
+
  private:
     std::unique_ptr<inner_resources_impl> impl_;
 };
+
+// Returns a best-effort reference to a "current resources" object; throws if
+// no such object exists.
+//
+// If more than one inner_resources object is alive, the function may not
+// return the intended one.
+//
+// The function should not be called unless really necessary. This necessity
+// exists for deserializing a msgpack-encoded function_request object: a
+// seri_registry instance is needed for choosing the correct
+// function_request_impl instantiation, but the msgpack library just provides
+// the bare serialization data, and provides no hooks for passing any
+// additional context information.
+inner_resources&
+get_current_inner_resources();
 
 } // namespace cradle
 

@@ -16,8 +16,11 @@ set_source_files_properties(
 
 # Define a library containing basic test support.
 add_library(basic_test_support
+    support/cancel_async.cpp
     support/common.cpp
-    support/inner_service.cpp)
+    support/inner_service.cpp
+    support/make_test_blob.cpp
+    support/simple_storage.cpp)
 add_dependencies(basic_test_support
     deploy_dir_file_target)
 target_link_libraries(basic_test_support PUBLIC
@@ -79,13 +82,39 @@ add_test(
         --build ${CMAKE_BINARY_DIR}
         --target unit_tests)
 
+# Create a dummy DLL used for generating test_dlls_dir.h
+add_library(dummy_dll MODULE inner-dll/dummy/dummy.cpp)
+
+# Create a C++ header file defining the location of the dynamically-loaded test DLLs.
+# A reference to any test DLL would introduce a circular reference, so instead
+# dummy_dll is used, which is in the same directory.
+set(test_dlls_dir_file "${intgen_src_dir}/cradle/test_dlls_dir.h")
+add_custom_command(
+    OUTPUT ${test_dlls_dir_file}
+    COMMAND ${CMAKE_COMMAND}
+        -D input_file=${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.h.in
+        -D output_file=${test_dlls_dir_file}
+        -D test_dlls_dir=$<TARGET_FILE_DIR:dummy_dll>
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.cmake
+    DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.cmake
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.h.in)
+add_custom_target(test_dlls_dir_target DEPENDS ${test_dlls_dir_file})
+
 # Create a shared library that can be loaded dynamically at runtime.
-# Used in inner/resolve/resolve_proxy.cpp.
 file(GLOB_RECURSE srcs_inner_dll_v1 CONFIGURE_DEPENDS
     "inner-dll/v1/*.cpp")
 add_library(test_inner_dll_v1 MODULE ${srcs_inner_dll_v1})
 target_link_libraries(test_inner_dll_v1 PUBLIC
     cradle_inner)
+
+# Create another DLL with a meta request factory.
+file(GLOB_RECURSE srcs_inner_dll_m0_meta CONFIGURE_DEPENDS
+    "inner-dll/m0-meta/*.cpp")
+add_library(test_inner_dll_m0_meta MODULE ${srcs_inner_dll_m0_meta})
+target_link_libraries(test_inner_dll_m0_meta PUBLIC
+    cradle_inner
+    basic_test_support)
 
 # Create another DLL.
 # Used in inner/resolve/resolve_proxy.cpp.
@@ -163,6 +192,7 @@ target_link_libraries(test_inner_dll_failing_create_catalog PUBLIC
 add_custom_target(all_inner_test_dlls
     DEPENDS
         test_inner_dll_v1
+        test_inner_dll_m0_meta
         test_inner_dll_x0
         test_inner_dll_x1
         test_inner_dll_x0x1
@@ -175,28 +205,17 @@ add_custom_target(all_thinknode_test_dlls
     DEPENDS
         test_thinknode_dll_t0)
 
-# Create a C++ header file defining the location of the dynamically-loaded test DLLs.
-set(test_dlls_dir_file "${intgen_src_dir}/cradle/test_dlls_dir.h")
-add_custom_command(
-    OUTPUT ${test_dlls_dir_file}
-    COMMAND ${CMAKE_COMMAND}
-        -D input_file=${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.h.in
-        -D output_file=${test_dlls_dir_file}
-        -D test_dlls_dir=$<TARGET_FILE_DIR:test_inner_dll_v1>
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.cmake
-    DEPENDS
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.cmake
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.h.in)
-add_custom_target(test_dlls_dir_target DEPENDS ${test_dlls_dir_file})
-
-# Define an object library covering the source files in inner/.
+# Define an object library covering the source files in inner/;
+# plus the function defined in the v1 DLL (making it available for local evaluation);
+# likewise for the m0_meta DLL.
 file(GLOB_RECURSE test_srcs_inner CONFIGURE_DEPENDS
     "inner/*.cpp"
-    "rpclib/*.cpp")
+    "rpclib/*.cpp"
+    "inner-dll/v1/adder_v1_impl.cpp"
+    "inner-dll/m0-meta/m0_meta_impl.cpp")
 add_library(test_lib_inner OBJECT ${test_srcs_inner})
 target_link_libraries(test_lib_inner PUBLIC
     cradle_plugins_inner
-    cradle_rpclib_client
     cradle_inner
     Catch2::Catch2)
 add_dependencies(test_lib_inner 
@@ -315,7 +334,6 @@ add_dependencies(manual_test_runner
 target_link_libraries(manual_test_runner PRIVATE
     catch2_runner
     basic_test_support
-    cradle_rpclib_client
     test_lib_manual)
 
 # Add a target running all unit tests (including external and inner).
@@ -348,7 +366,7 @@ if(IS_CLANG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     # those explicitly loaded by the unit tests, into the local test runner process.
     # Code executed in the rpclib server is not measured.
     set(coverage_objects
-        cradle_inner cradle_plugins_inner cradle_rpclib_client
+        cradle_inner cradle_plugins_inner
         cradle_typing cradle_thinknode cradle_websocket cradle_external)
     string(REGEX REPLACE "([a-z_]+)" "--object=$<TARGET_FILE:\\1>"
         coverage_object_options "${coverage_objects}")
@@ -375,7 +393,8 @@ endif()
 
 # Create an object library covering the source files in benchmarks/.
 file(GLOB_RECURSE test_srcs_benchmark CONFIGURE_DEPENDS
-    "benchmarks/*.cpp")
+    "benchmarks/*.cpp"
+    "inner-dll/v1/adder_v1_impl.cpp")
 add_library(test_lib_benchmark OBJECT ${test_srcs_benchmark})
 target_link_libraries(test_lib_benchmark PUBLIC
     cradle_external
@@ -431,7 +450,6 @@ if(IS_MSVC)
             $<TARGET_FILE:lib_third_party>
             $<TARGET_FILE:cradle_plugins_inner>
             $<TARGET_FILE:cradle_thinknode>
-            $<TARGET_FILE:cradle_rpclib_client>
             $<TARGET_FILE:cradle_websocket>
             $<TARGET_FILE:cradle_external>
         $<TARGET_FILE_DIR:inner_test_runner>
@@ -445,7 +463,6 @@ if(IS_MSVC)
         lib_third_party
         cradle_plugins_inner
         cradle_thinknode
-        cradle_rpclib_client
         cradle_websocket
         cradle_external
         test_thinknode_t0)

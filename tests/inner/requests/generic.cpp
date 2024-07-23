@@ -35,12 +35,6 @@ class local_context_mixin : public local_context_intf
 class remote_context_mixin : public remote_context_intf
 {
  public:
-    std::string const&
-    proxy_name() const override
-    {
-        throw not_implemented_error();
-    }
-
     remote_proxy&
     get_proxy() const override
     {
@@ -123,13 +117,19 @@ class my_local_only_context final : public local_context_mixin,
     bool
     is_async() const override
     {
-        throw not_implemented_error();
+        throw not_implemented_error("my_local_only_context::is_async()");
+    }
+
+    std::string const&
+    domain_name() const override
+    {
+        throw not_implemented_error("my_local_only_context::domain_name()");
     }
 
     cppcoro::task<>
     schedule_after(std::chrono::milliseconds delay) override
     {
-        throw not_implemented_error();
+        throw not_implemented_error("my_local_only_context::schedule_after()");
     }
 };
 static_assert(ValidContext<my_local_only_context>);
@@ -153,13 +153,20 @@ class my_remote_only_context final : public remote_context_mixin,
     bool
     is_async() const override
     {
-        throw not_implemented_error();
+        throw not_implemented_error("my_remote_only_context::is_async()");
+    }
+
+    std::string const&
+    domain_name() const override
+    {
+        throw not_implemented_error("my_remote_only_context::domain_name()");
     }
 
     cppcoro::task<>
     schedule_after(std::chrono::milliseconds delay) override
     {
-        throw not_implemented_error();
+        throw not_implemented_error(
+            "my_remote_only_context::schedule_after()");
     }
 };
 static_assert(ValidContext<my_remote_only_context>);
@@ -177,7 +184,7 @@ class my_sync_only_context final : public local_context_mixin,
     bool
     remotely() const override
     {
-        throw not_implemented_error();
+        throw not_implemented_error("my_sync_only_context::remotely()");
     }
 
     bool
@@ -186,10 +193,16 @@ class my_sync_only_context final : public local_context_mixin,
         throw not_implemented_error("my_sync_only_context::is_async()");
     }
 
+    std::string const&
+    domain_name() const override
+    {
+        throw not_implemented_error("my_sync_only_context::domain_name()");
+    }
+
     cppcoro::task<>
     schedule_after(std::chrono::milliseconds delay) override
     {
-        throw not_implemented_error();
+        throw not_implemented_error("my_sync_only_context::schedule_after()");
     }
 };
 static_assert(ValidContext<my_sync_only_context>);
@@ -216,10 +229,16 @@ class my_async_only_context final : public local_context_mixin,
         throw not_implemented_error("my_async_only_context::is_async()");
     }
 
+    std::string const&
+    domain_name() const override
+    {
+        throw not_implemented_error("my_async_only_context::domain_name()");
+    }
+
     cppcoro::task<>
     schedule_after(std::chrono::milliseconds delay) override
     {
-        throw not_implemented_error();
+        throw not_implemented_error("my_async_only_context::schedule_after()");
     }
 };
 static_assert(ValidContext<my_async_only_context>);
@@ -265,10 +284,16 @@ class my_generic_context : public local_context_mixin,
         return static_cast<bool>(is_async_);
     }
 
+    std::string const&
+    domain_name() const override
+    {
+        throw not_implemented_error("my_generic_context::domain_name()");
+    }
+
     cppcoro::task<>
     schedule_after(std::chrono::milliseconds delay) override
     {
-        throw not_implemented_error();
+        throw not_implemented_error("my_generic_context::schedule_after()");
     }
 
  private:

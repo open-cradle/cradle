@@ -1,5 +1,3 @@
-#include <regex>
-
 #include <fmt/format.h>
 
 #include <cradle/inner/dll/dll_collection.h>
@@ -47,19 +45,6 @@ void
 dll_collection::unload(std::string const& dll_name)
 {
     std::scoped_lock lock{mutex_};
-    if (dll_name.find('*') == std::string::npos)
-    {
-        remove_one(dll_name);
-    }
-    else
-    {
-        remove_matching(dll_name);
-    }
-}
-
-void
-dll_collection::remove_one(std::string const& dll_name)
-{
     auto it{controllers_.find(dll_name)};
     if (it == controllers_.end())
     {
@@ -67,23 +52,6 @@ dll_collection::remove_one(std::string const& dll_name)
             fmt::format("no DLL loaded named {}", dll_name)};
     }
     controllers_.erase(it);
-}
-
-void
-dll_collection::remove_matching(std::string const& dll_name_regex)
-{
-    std::regex re{dll_name_regex};
-    for (auto it = controllers_.cbegin(); it != controllers_.cend();)
-    {
-        if (std::regex_match(it->first, re))
-        {
-            it = controllers_.erase(it);
-        }
-        else
-        {
-            ++it;
-        }
-    }
 }
 
 } // namespace cradle

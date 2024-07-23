@@ -258,6 +258,12 @@ class context_intf
     is_async() const
         = 0;
 
+    // The domain name identifies a context implementation class.
+    // It is mainly used when a request is resolved remotely.
+    virtual std::string const&
+    domain_name() const
+        = 0;
+
     // Delays the calling coroutine for the specified duration.
     // Cancellable if the context supports that.
     virtual cppcoro::task<>
@@ -331,20 +337,10 @@ class remote_context_intf : public virtual context_intf
         return this;
     }
 
-    // The proxy name identifies the proxy that will forward requests to a
-    // remote executioner.
-    virtual std::string const&
-    proxy_name() const
-        = 0;
-
-    // The proxy itself. Will throw when it was not registered.
+    // The proxy that forwards requests to a remote executioner.
+    // Throws when the proxy (name) was not registered.
     virtual remote_proxy&
     get_proxy() const
-        = 0;
-
-    // The domain name identifies a context implementation class.
-    virtual std::string const&
-    domain_name() const
         = 0;
 
     // Creates the configuration to be passed to the remote.
@@ -398,6 +394,12 @@ class async_error : public std::runtime_error
 // where reuse is allowed and even desirable, as successful subresults from a
 // former attempt could potentially be reused, avoiding re-resolution of that
 // part of the request tree.
+//
+// Some get_...() functions are coroutines, others are not. The distinction is
+// based on assumptions about the information always being available, or only
+// after some time. These assumptions may no longer hold (e.g. if retriers are
+// used).
+// TODO consider revising context_intf::get_...() being coro or not
 class async_context_intf : public virtual context_intf
 {
  public:
@@ -517,7 +519,7 @@ class local_async_context_intf : public virtual local_context_intf,
 
     // Requests cancellation of all tasks in the same context tree.
     // This is a non-coroutine version of
-    // async_context_intf::request_cancellation().
+    // async_context_intf::request_cancellation_coro().
     //
     // Note that after this call, tasks can still finish successfully or fail.
     // Thus, a "cancelling" state would not be meaningful.
@@ -543,6 +545,23 @@ class local_async_context_intf : public virtual local_context_intf,
     virtual void
     throw_async_cancelled() const
         = 0;
+
+    // Sets a delegate that takes over the resolution of the request associated
+    // with this context. The delegate will probably be a creq_context object:
+    // a remote context, unlike the current local one.
+    // Once a delegate has been set, it will stay, until it is deleted
+    // (the current object need not own the delegate). It is not allowed to set
+    // another delegate.
+    // Relevant calls on the current context's interfaces should be forwarded
+    // to the delegate; the most important ones probably are
+    // request_cancellation_coro() and request_cancellation().
+    virtual void
+    set_delegate(std::shared_ptr<async_context_intf> delegate)
+        = 0;
+
+    // Returns the delegate, or null if it was not yet set, or deleted
+    virtual std::shared_ptr<async_context_intf>
+    get_delegate() = 0;
 };
 
 // Context for an asynchronous task running on the local machine that forms the
@@ -779,6 +798,12 @@ concept ValidContext
     = Context<Ctx>
       && (!std::is_final_v<Ctx> || RemoteContext<Ctx> || LocalContext<Ctx>)
       && (!std::is_final_v<Ctx> || SyncContext<Ctx> || AsyncContext<Ctx>);
+
+// A valid final context implementation class
+template<typename Ctx>
+concept ValidFinalContext = Context<Ctx> && std::is_final_v<Ctx>
+                            && (RemoteContext<Ctx> || LocalContext<Ctx>)
+                            && (SyncContext<Ctx> || AsyncContext<Ctx>);
 
 /*
  * A resolution retrier offers support for handling a failed resolution, by

@@ -47,6 +47,12 @@ class http_cache : public secondary_storage_intf
     cppcoro::task<void>
     write(std::string key, blob value) override;
 
+    bool
+    allow_blob_files() const override
+    {
+        return false;
+    }
+
  private:
     std::unique_ptr<http_cache_impl> impl_;
 };

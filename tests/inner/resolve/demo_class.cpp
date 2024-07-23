@@ -6,6 +6,7 @@
 
 #include "../../support/common.h"
 #include "../../support/inner_service.h"
+#include "../../support/make_test_blob.h"
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/context.h>
@@ -17,20 +18,6 @@ using namespace cradle;
 namespace {
 
 static char const tag[] = "[demo_class]";
-
-blob
-make_test_blob(
-    local_context_intf& ctx,
-    std::string const& contents,
-    bool use_shared_memory)
-{
-    auto size = contents.size();
-    auto owner = ctx.make_data_owner(size, use_shared_memory);
-    auto* data = reinterpret_cast<char*>(owner->data());
-    std::copy_n(contents.data(), size, data);
-    ctx.on_value_complete();
-    return blob{std::move(owner), as_bytes(data), size};
-}
 
 // Tests resolving the two requests related to demo_class
 template<caching_level_type caching_level>

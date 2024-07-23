@@ -33,7 +33,7 @@ TEST_CASE("alternate logger for client", "[rpclib]")
     resources->set_secondary_cache(std::make_unique<local_disk_cache>(config));
     auto logger{ensure_logger("alternate")};
     resources->register_proxy(
-        std::make_unique<rpclib_client>(resources->config(), logger));
+        std::make_unique<rpclib_client>(resources->config(), nullptr, logger));
     auto& client{resources->get_proxy(proxy_name)};
 
     REQUIRE(&client.get_logger() == logger.get());

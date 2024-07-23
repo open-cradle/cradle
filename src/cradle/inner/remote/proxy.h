@@ -154,12 +154,8 @@ class remote_proxy
     // Unloads a previously loaded shared library, so that its seri resolvers
     // are no longer available.
     //
-    // In the simplest case, dll_name is as for load_shared_library(), and it
-    // is an error if the specified DLL is not loaded.
-    // As an extension, dll_name may contain a "*", in which case it is
-    // interpreted as a regex and all matching DLLs are unloaded; it is not an
-    // error if there are no matching DLLs. This is primarily intended to be
-    // used in unit tests.
+    // dll_name is as for load_shared_library(); it is an error if the
+    // specified DLL is not loaded.
     virtual void
     unload_shared_library(std::string dll_name)
         = 0;
@@ -180,6 +176,14 @@ class remote_proxy
     // Releases a lock on the given memory cache record on the server.
     virtual void
     release_cache_record_lock(remote_cache_record_id record_id)
+        = 0;
+
+    // Retrieves the total number of contained calls initiated by the remote
+    // (so failed contained calls also count).
+    // Intended for unit tests that need to check that a function call that
+    // should run contained, indeed did so.
+    virtual int
+    get_num_contained_calls() const
         = 0;
 };
 

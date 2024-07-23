@@ -5,7 +5,9 @@
 // For official msgpack versions
 
 #include <cstring>
+#include <sstream>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 #include <msgpack.hpp>
@@ -13,6 +15,7 @@
 #include <cradle/inner/blob_file/blob_file.h>
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/core/type_interfaces.h>
+#include <cradle/inner/encodings/msgpack_packer.h>
 #include <cradle/inner/fs/types.h>
 
 namespace msgpack {
@@ -71,7 +74,12 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
         msgpack::packer<Stream>&
         operator()(msgpack::packer<Stream>& o, cradle::blob const& v) const
         {
-            if (auto owner = v.mapped_file_data_owner())
+            static_assert(std::same_as<Stream, cradle::msgpack_ostream>);
+            // Assuming that msgpack_packer is used everywhere, no
+            // msgpack::pack() calls
+            auto& packer = static_cast<cradle::msgpack_packer&>(o);
+            if (auto owner = v.mapped_file_data_owner();
+                owner && packer.allow_blob_files())
             {
                 std::string name{owner->mapped_file()};
                 uint32_t size{static_cast<uint32_t>(name.size())};
@@ -100,6 +108,8 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
     template<>
     struct object_with_zone<cradle::blob>
     {
+        // Only called from tests/inner/encodings/msgpack_adaptors_main.cpp
+        // in tests explicitly demanding a zone.
         void
         operator()(msgpack::object::with_zone& o, cradle::blob const& v) const
         {

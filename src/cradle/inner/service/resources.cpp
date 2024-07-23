@@ -24,6 +24,8 @@
 #include <cradle/inner/service/resources_impl.h>
 #include <cradle/inner/service/secondary_storage_intf.h>
 #include <cradle/inner/utilities/logging.h>
+#include <cradle/rpclib/client/proxy.h>
+#include <cradle/rpclib/common/config.h>
 
 namespace cradle {
 
@@ -38,18 +40,50 @@ make_immutable_cache_config(service_config const& config)
 static std::unique_ptr<cradle::immutable_cache>
 create_memory_cache(service_config const& config)
 {
+    if (config.get_bool_or_default(rpclib_config_keys::CONTAINED, false))
+    {
+        // No memory cache in contained mode
+        return {};
+    }
     return std::make_unique<immutable_cache>(
         make_immutable_cache_config(config));
+}
+
+static inner_resources* current_inner_resources{nullptr};
+
+inner_resources&
+get_current_inner_resources()
+{
+    if (!current_inner_resources)
+    {
+        throw std::logic_error{"no current_inner_resources"};
+    }
+    return *current_inner_resources;
 }
 
 inner_resources::inner_resources(service_config const& config)
     : impl_{std::make_unique<inner_resources_impl>(*this, config)}
 {
+    // The critical situation is with a loopback, when we legitimately have two
+    // sets of resources in the same process, and the function_request
+    // reconstruction code cannot know which one it should use.
+    // Decision: use the first one, which is not the one for the loopback.
+    // This will work unless the loopback resolves via a contained process.
+    if (current_inner_resources)
+    {
+        auto& logger{impl_->the_logger()};
+        logger.info("inner_resources ctor found existing instance");
+    }
+    else
+    {
+        current_inner_resources = this;
+    }
 }
 
-// The destructor needs the inner_resources_impl definition, which is not
-// available in resources.h.
-inner_resources::~inner_resources() = default;
+inner_resources::~inner_resources()
+{
+    current_inner_resources = nullptr;
+}
 
 service_config const&
 inner_resources::config() const
@@ -57,16 +91,26 @@ inner_resources::config() const
     return impl_->config_;
 }
 
+bool
+inner_resources::support_caching() const
+{
+    auto& impl{*impl_};
+    return impl.memory_cache_.operator bool();
+}
+
 cradle::immutable_cache&
 inner_resources::memory_cache()
 {
-    return *impl_->memory_cache_;
+    auto& impl{*impl_};
+    impl.check_support_caching();
+    return *impl.memory_cache_;
 }
 
 void
 inner_resources::reset_memory_cache()
 {
     auto& impl{*impl_};
+    impl.check_support_caching();
     impl.logger_->info("reset memory cache");
     impl.memory_cache_->reset(make_immutable_cache_config(impl.config_));
 }
@@ -76,6 +120,7 @@ inner_resources::set_secondary_cache(
     std::unique_ptr<secondary_storage_intf> secondary_cache)
 {
     auto& impl{*impl_};
+    impl.check_support_caching();
     if (impl.secondary_cache_)
     {
         throw std::logic_error(
@@ -286,6 +331,31 @@ inner_resources::the_io_service()
     return impl_->io_svc_;
 }
 
+std::unique_ptr<rpclib_client>
+inner_resources::alloc_contained_proxy(std::shared_ptr<spdlog::logger> logger)
+{
+    return impl_->contained_proxy_pool_.alloc_proxy(impl_->config_, logger);
+}
+
+void
+inner_resources::free_contained_proxy(
+    std::unique_ptr<rpclib_client> proxy, bool succeeded)
+{
+    impl_->contained_proxy_pool_.free_proxy(std::move(proxy), succeeded);
+}
+
+int
+inner_resources::get_num_contained_calls() const
+{
+    return impl_->num_contained_calls_;
+}
+
+void
+inner_resources::increase_num_contained_calls()
+{
+    impl_->num_contained_calls_ += 1;
+}
+
 static void
 io_svc_func(inner_resources_impl& impl)
 {
@@ -331,6 +401,15 @@ inner_resources_impl::~inner_resources_impl()
         logger.info("join threw {}", e.what());
     }
     logger.info("joined io_svc_thread_");
+}
+
+void
+inner_resources_impl::check_support_caching()
+{
+    if (!memory_cache_)
+    {
+        throw std::logic_error("caching not supported in contained mode");
+    }
 }
 
 http_connection_interface&

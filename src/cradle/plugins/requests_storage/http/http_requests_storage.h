@@ -38,6 +38,12 @@ class http_requests_storage : public secondary_storage_intf
     cppcoro::task<void>
     write(std::string key, blob value) override;
 
+    bool
+    allow_blob_files() const override
+    {
+        return false;
+    }
+
  private:
     inner_resources& resources_;
     int port_;

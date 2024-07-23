@@ -30,6 +30,8 @@ service_config_map const inner_config_map{
     {introspection_config_keys::FORCE_FINISH, true},
 };
 
+static std::string const the_domain_name{"unit tests"};
+
 } // namespace
 
 service_config
@@ -46,6 +48,13 @@ make_inner_test_resources(
     auto resources{std::make_unique<inner_resources>(config)};
     resources->set_secondary_cache(std::make_unique<local_disk_cache>(config));
     init_and_register_proxy(*resources, proxy_name, domain);
+    if (!proxy_name.empty())
+    {
+        // Improve test isolation if testing with a long-running rpclib server
+        // instance.
+        auto& proxy{resources->get_proxy(proxy_name)};
+        proxy.clear_unused_mem_cache_entries();
+    }
     return resources;
 }
 
@@ -53,6 +62,12 @@ non_caching_request_resolution_context::non_caching_request_resolution_context(
     inner_resources& resources)
     : resources_{resources}
 {
+}
+
+std::string const&
+non_caching_request_resolution_context::domain_name() const
+{
+    return the_domain_name;
 }
 
 cppcoro::task<>
@@ -78,6 +93,12 @@ caching_request_resolution_context::caching_request_resolution_context(
     inner_resources& resources)
     : resources_{resources}
 {
+}
+
+std::string const&
+caching_request_resolution_context::domain_name() const
+{
+    return the_domain_name;
 }
 
 cppcoro::task<>

@@ -15,6 +15,8 @@ test_seri_catalog_v1::test_seri_catalog_v1(
 {
     register_resolver(rq_test_adder_v1p_impl(2, 3));
     register_resolver(rq_test_adder_v1n_impl(2, 3));
+    register_resolver(rq_test_coro_v1p_impl(2, 3));
+    register_resolver(rq_test_coro_v1n_impl(2, 3));
 }
 
 static std::unique_ptr<selfreg_seri_catalog>

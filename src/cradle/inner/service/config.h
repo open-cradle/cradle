@@ -120,8 +120,16 @@ struct generic_config_keys
     inline static std::string const TESTING{"testing"};
 
     // (Optional string)
-    // Deployment directory containing server executables
-    // Used in testing context
+    // Deployment directory containing server executables.
+    // - Used for starting an rpclib server (main or contained) from a test:
+    //   the executable is where the build put it. The test sets the config
+    //   item.
+    // - Used for starting a contained rpclib server from a main one: the two
+    //   executables, and thus their paths, are identical. The server's
+    //   initialization sets the config item.
+    // - Not used for starting an rpclib server from a production app: the
+    //   server should be installed, and its location should be in the PATH.
+    //   The config item is not set.
     inline static std::string const DEPLOY_DIR{"deploy_dir"};
 };
 

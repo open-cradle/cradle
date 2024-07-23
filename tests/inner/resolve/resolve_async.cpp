@@ -7,6 +7,7 @@
 #include <cppcoro/when_all.hpp>
 #include <fmt/format.h>
 
+#include "../../support/cancel_async.h"
 #include "../../support/inner_service.h"
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/loopback.h>
@@ -18,7 +19,7 @@
 #include <cradle/plugins/domain/testing/domain_factory.h>
 #include <cradle/plugins/domain/testing/requests.h>
 
-using namespace cradle;
+namespace cradle {
 
 namespace {
 
@@ -340,66 +341,22 @@ TEST_CASE("error async request on rpclib", tag)
     test_error_async_across_rpc(*resources, proxy_name);
 }
 
+TEST_CASE("cancel async request locally", tag)
+{
+    std::string proxy_name{""};
+    constexpr auto level{caching_level_type::none};
+    auto req{rq_cancellable_coro<level>(
+        rq_cancellable_coro<level>(100, 7),
+        rq_cancellable_coro<level>(100, 8))};
+    auto resources{make_inner_test_resources()};
+
+    test_cancel_async(*resources, proxy_name, req);
+}
+
 namespace {
 
-// Requests cancellation of all coroutines sharing the context resources
-// for ctx
-cppcoro::task<void>
-checker_coro(async_context_intf& ctx)
-{
-    auto logger = ensure_logger("checker");
-    logger->info("checker_coro(ctx {})", ctx.get_id());
-    for (int i = 0; i < 20; ++i)
-    {
-        // TODO this hangs when resolve_request() doesn't make it to the RPC
-        // server
-        auto status = co_await ctx.get_status_coro();
-        logger->info("checker_coro {}: {}", i, status);
-        if (status == async_status::FINISHED)
-        {
-            logger->error("finished too early");
-            break;
-        }
-        if (status == async_status::CANCELLED)
-        {
-            break;
-        }
-        if (i == 8)
-        {
-            logger->info("!! checker_coro {}: cancelling", i);
-            co_await ctx.request_cancellation_coro();
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    }
-    co_return;
-}
-
 void
-checker_func(async_context_intf& ctx)
-{
-    cppcoro::sync_wait(checker_coro(ctx));
-}
-
-template<typename Req>
-void
-test_cancel_async(atst_context& ctx, Req const& req)
-{
-    // Run the checker coroutine on a separate thread, independent from the
-    // ones under test
-    // Note: std::thread::~thread() calls terminate() if the thread wasn't
-    // joined; e.g. if the test code threw.
-    auto resolve_task = resolve_request(ctx, req);
-    auto& actx = ctx.get_async_root();
-    std::jthread checker_thread(checker_func, std::ref(actx));
-    REQUIRE_THROWS_AS(cppcoro::sync_wait(resolve_task), async_cancelled);
-    REQUIRE(
-        cppcoro::sync_wait(actx.get_status_coro()) == async_status::CANCELLED);
-    checker_thread.join();
-}
-
-void
-test_cancel_async_across_rpc(
-    inner_resources& resources, std::string const& proxy_name)
+test_cancel_async_across_rpc(std::string const& proxy_name)
 {
     constexpr int loops = 10;
     constexpr auto level = caching_level_type::memory;
@@ -408,41 +365,22 @@ test_cancel_async_across_rpc(
     auto req{rq_cancellable_coro<level>(
         rq_cancellable_coro<level>(loops, delay0),
         rq_cancellable_coro<level>(loops, delay1))};
-    atst_context ctx{resources, proxy_name};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
 
-    test_cancel_async(ctx, req);
+    test_cancel_async(*resources, proxy_name, req);
 }
 
 } // namespace
 
-TEST_CASE("cancel async request locally", tag)
-{
-    constexpr auto level{caching_level_type::none};
-    auto req{rq_cancellable_coro<level>(
-        rq_cancellable_coro<level>(100, 7),
-        rq_cancellable_coro<level>(100, 8))};
-    auto resources{make_inner_test_resources()};
-    atst_context ctx{*resources};
-
-    test_cancel_async(ctx, req);
-}
-
 TEST_CASE("cancel async request on loopback", tag)
 {
-    std::string proxy_name{"loopback"};
-    auto resources{
-        make_inner_test_resources(proxy_name, testing_domain_option())};
-
-    test_cancel_async_across_rpc(*resources, proxy_name);
+    test_cancel_async_across_rpc("loopback");
 }
 
 TEST_CASE("cancel async request on rpclib", tag)
 {
-    std::string proxy_name{"rpclib"};
-    auto resources{
-        make_inner_test_resources(proxy_name, testing_domain_option())};
-
-    test_cancel_async_across_rpc(*resources, proxy_name);
+    test_cancel_async_across_rpc("rpclib");
 }
 
 namespace {
@@ -474,19 +412,17 @@ test_failing_get_num_subs(
     constexpr auto level = caching_level_type::memory;
     auto req{rq_cancellable_coro<level>(2, 3)};
     atst_context ctx{resources, proxy_name};
-    auto resolve_task = resolve_request(ctx, req);
-    auto& root_ctx = ctx.get_remote_root();
 
     // Causes submit_async to fail on the remote
-    root_ctx.fail_submit_async();
+    ctx.fail_submit_async();
 
     // Run get_num_subs on a separate thread, independent from the main one
     // which will call resolve_request().
     std::string thread_what;
     std::jthread control_thread(
-        get_subs_control_func, std::ref(root_ctx), std::ref(thread_what));
+        get_subs_control_func, std::ref(ctx), std::ref(thread_what));
 
-    CHECK_THROWS(cppcoro::sync_wait(resolve_task));
+    CHECK_THROWS(cppcoro::sync_wait(resolve_request(ctx, req)));
 
     control_thread.join();
 
@@ -541,11 +477,9 @@ test_delayed_get_num_subs(
     constexpr auto level = caching_level_type::memory;
     auto req{rq_cancellable_coro<level>(2, 3)};
     atst_context ctx{resources, proxy_name};
-    auto resolve_task = resolve_request(ctx, req);
-    auto& root_ctx = ctx.get_remote_root();
 
     // Forces resolve_async() on the remote to have a startup delay
-    root_ctx.set_resolve_async_delay(500);
+    ctx.set_resolve_async_delay(500);
 
     // Run get_num_subs on a separate thread, independent from the main one
     // which will call resolve_request().
@@ -553,11 +487,11 @@ test_delayed_get_num_subs(
     std::size_t num_subs{};
     std::jthread control_thread(
         delayed_get_subs_control_func,
-        std::ref(root_ctx),
+        std::ref(ctx),
         std::ref(initial_status),
         std::ref(num_subs));
 
-    CHECK(cppcoro::sync_wait(resolve_task) == 5);
+    CHECK(cppcoro::sync_wait(resolve_request(ctx, req)) == 5);
 
     control_thread.join();
 
@@ -621,11 +555,9 @@ test_delayed_set_result(
     constexpr auto level = caching_level_type::memory;
     auto req{rq_cancellable_coro<level>(0, 0)};
     atst_context ctx{resources, proxy_name};
-    auto resolve_task = resolve_request(ctx, req);
-    auto& root_ctx = ctx.get_remote_root();
 
     // Forces set_result() on the remote to have a delay
-    root_ctx.set_set_result_delay(200);
+    ctx.set_set_result_delay(200);
 
     // Create a separate control thread, independent from the main one which
     // will call resolve_request().
@@ -633,11 +565,11 @@ test_delayed_set_result(
     async_status final_status{};
     std::jthread control_thread(
         delayed_set_result_control_func,
-        std::ref(root_ctx),
+        std::ref(ctx),
         std::ref(interim_status),
         std::ref(final_status));
 
-    CHECK(cppcoro::sync_wait(resolve_task) == 0);
+    CHECK(cppcoro::sync_wait(resolve_request(ctx, req)) == 0);
 
     control_thread.join();
 
@@ -687,3 +619,5 @@ TEST_CASE("create rq_cancellable_coro with different loop/delay types", tag)
     REQUIRE_NOTHROW(
         rq_cancellable_coro<caching_level_type::full, int, unsigned>(0, 0));
 }
+
+} // namespace cradle

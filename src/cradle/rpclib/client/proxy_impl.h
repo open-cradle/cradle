@@ -2,7 +2,9 @@
 #define CRADLE_RPCLIB_CLIENT_PROXY_IMPL_H
 
 #include <memory>
+#include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <tuple>
 
@@ -22,16 +24,44 @@ class rpclib_client_impl
 {
  public:
     rpclib_client_impl(
-        service_config const& config, std::shared_ptr<spdlog::logger> logger);
+        service_config const& config,
+        ephemeral_port_owner* port_owner,
+        std::shared_ptr<spdlog::logger> logger);
 
     ~rpclib_client_impl();
+
+    rpclib_port_t
+    get_port() const
+    {
+        return port_;
+    }
 
  private:
     friend class rpclib_client;
     friend class rpclib_deserialization_observer;
 
+    // All timeouts given in milliseconds
+
+    // Timeout for establishing a connection, and timeout for detecting a
+    // running server.
+    // Establishing a connection on Windows tends to be slow.
+#if defined(_MSC_VER)
+    static inline constexpr int connection_timeout{10000};
+    static inline constexpr int detect_server_timeout{30000};
+#else
+    static inline constexpr int connection_timeout{1000};
+    static inline constexpr int detect_server_timeout{5000};
+#endif
+
+    // Timeout for RPC calls that should be fast
+    static inline constexpr int default_timeout{2000};
+    // Timeout for receiving an async response, which could be GB's of data
+    static inline constexpr int get_async_response_timeout{20000};
+    // Timeout for loading a shared library
+    static inline constexpr int load_dll_timeout{10000};
+
     std::string
-    ping();
+    ping(int timeout);
 
     void
     verify_rpclib_protocol(std::string const& server_rpclib_protocol);
@@ -50,7 +80,7 @@ class rpclib_client_impl
 
     template<typename... Params>
     RPCLIB_MSGPACK::object_handle
-    do_rpc_call(std::string const& func_name, Params&&... params);
+    do_rpc_call(std::string const& func_name, int timeout, Params&&... params);
 
     template<typename... Params>
     void
@@ -59,20 +89,28 @@ class rpclib_client_impl
     serialized_result
     make_serialized_result(rpclib_response const& response);
 
+    ephemeral_port_owner* const port_owner_;
     std::shared_ptr<spdlog::logger> logger_;
-    bool testing_{};
-    std::optional<std::string> deploy_dir_;
-    uint16_t port_{};
-    std::string secondary_cache_factory_;
+    bool const testing_{};
+    bool const contained_{};
+    std::optional<std::string> const deploy_dir_;
+    rpclib_port_t const port_{};
+    std::optional<std::string> secondary_cache_factory_;
 
     // On Windows, localhost and 127.0.0.1 are not the same:
     // https://stackoverflow.com/questions/68957411/winsock-connect-is-slow
     static inline std::string const localhost_{"127.0.0.1"};
     std::unique_ptr<rpc::client> rpc_client_;
 
-    // Server subprocess
+    // Server subprocess. A real (not contained) server process is put in a new
+    // process group (group_) so that any (contained) subprocesses terminate
+    // when the server is terminated. For the same reason, contained processes
+    // are _not_ put in a new group; group_ is unused for them.
     boost::process::group group_;
     boost::process::child child_;
+
+    std::mutex loaded_dlls_mutex_;
+    std::set<std::string> loaded_dlls_;
 };
 
 class rpclib_deserialization_observer : public deserialization_observer

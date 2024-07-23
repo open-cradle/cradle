@@ -1,3 +1,4 @@
+#include <chrono>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
@@ -14,9 +15,11 @@
 #include <cradle/inner/service/config_map_to_json.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/utilities/logging.h>
+#include <cradle/rpclib/client/ephemeral_port_owner.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/client/proxy_impl.h>
 #include <cradle/rpclib/common/common.h>
+#include <cradle/rpclib/common/config.h>
 
 namespace cradle {
 
@@ -67,38 +70,66 @@ is_retryable(rpc::rpc_error& exc)
     return retryable;
 }
 
+rpclib_port_t
+alloc_port(ephemeral_port_owner* port_owner, bool testing)
+{
+    if (port_owner)
+    {
+        return port_owner->alloc_port();
+    }
+    return testing ? RPCLIB_PORT_TESTING : RPCLIB_PORT_PRODUCTION;
+}
+
 } // namespace
 
 rpclib_client::rpclib_client(
-    service_config const& config, std::shared_ptr<spdlog::logger> logger)
-    : pimpl_{std::make_unique<rpclib_client_impl>(config, logger)}
+    service_config const& config,
+    ephemeral_port_owner* port_owner,
+    std::shared_ptr<spdlog::logger> logger)
+    : pimpl_{std::make_unique<rpclib_client_impl>(
+        config, port_owner, std::move(logger))}
 {
 }
 
+rpclib_client::~rpclib_client() = default;
+
 rpclib_client_impl::rpclib_client_impl(
-    service_config const& config, std::shared_ptr<spdlog::logger> logger)
-    : logger_{logger ? std::move(logger) : ensure_logger("rpclib_client")},
+    service_config const& config,
+    ephemeral_port_owner* port_owner,
+    std::shared_ptr<spdlog::logger> logger)
+    : port_owner_{port_owner},
+      logger_{logger ? std::move(logger) : ensure_logger("rpclib_client")},
       testing_{
           config.get_bool_or_default(generic_config_keys::TESTING, false)},
+      contained_{port_owner != nullptr},
       deploy_dir_{config.get_optional_string(generic_config_keys::DEPLOY_DIR)},
-      port_{testing_ ? RPCLIB_PORT_TESTING : RPCLIB_PORT_PRODUCTION},
-      secondary_cache_factory_{config.get_mandatory_string(
+      port_{alloc_port(port_owner, testing_)},
+      secondary_cache_factory_{config.get_optional_string(
           inner_config_keys::SECONDARY_CACHE_FACTORY)}
 {
     start_server();
 }
-
-rpclib_client::~rpclib_client() = default;
 
 rpclib_client_impl::~rpclib_client_impl()
 {
     try
     {
         stop_server();
+        if (port_owner_)
+        {
+            port_owner_->free_port(port_);
+        }
     }
-    catch (...)
+    catch (std::exception const& e)
     {
+        logger_->error("caught {}", e.what());
     }
+}
+
+rpclib_port_t
+rpclib_client::get_port() const
+{
+    return pimpl_->get_port();
 }
 
 std::string
@@ -121,6 +152,7 @@ rpclib_client::resolve_sync(service_config config, std::string seri_req)
     auto response = pimpl_
                         ->do_rpc_call(
                             "resolve_sync",
+                            -1,
                             write_config_map_to_json(config.get_config_map()),
                             seri_req)
                         .as<rpclib_response>();
@@ -135,6 +167,7 @@ rpclib_client::submit_async(service_config config, std::string seri_req)
     auto aid = pimpl_
                    ->do_rpc_call(
                        "submit_async",
+                       pimpl_->default_timeout,
                        write_config_map_to_json(config.get_config_map()),
                        seri_req)
                    .as<async_id>();
@@ -147,8 +180,9 @@ rpclib_client::get_sub_contexts(async_id aid)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("get_sub_contexts {}", aid);
-    auto result = pimpl_->do_rpc_call("get_sub_contexts", aid)
-                      .as<remote_context_spec_list>();
+    auto result
+        = pimpl_->do_rpc_call("get_sub_contexts", pimpl_->default_timeout, aid)
+              .as<remote_context_spec_list>();
     logger.debug("get_sub_contexts {} -> {} sub(s)", aid, result.size());
     return result;
 }
@@ -158,7 +192,9 @@ rpclib_client::get_async_status(async_id aid)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("get_async_status {}", aid);
-    auto status_value = pimpl_->do_rpc_call("get_async_status", aid).as<int>();
+    auto status_value
+        = pimpl_->do_rpc_call("get_async_status", pimpl_->default_timeout, aid)
+              .as<int>();
     async_status status{status_value};
     logger.debug("async_status for {}: {}", aid, status);
     return status;
@@ -169,8 +205,11 @@ rpclib_client::get_async_error_message(async_id aid)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("get_async_error_message {}", aid);
-    auto errmsg = pimpl_->do_rpc_call("get_async_error_message", aid)
-                      .as<std::string>();
+    auto errmsg
+        = pimpl_
+              ->do_rpc_call(
+                  "get_async_error_message", pimpl_->default_timeout, aid)
+              .as<std::string>();
     logger.debug("async_error_message for {}: {}", aid, errmsg);
     return errmsg;
 }
@@ -180,7 +219,11 @@ rpclib_client::get_async_response(async_id root_aid)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("get_async_response {}", root_aid);
-    auto response = pimpl_->do_rpc_call("get_async_response", root_aid)
+    auto response = pimpl_
+                        ->do_rpc_call(
+                            "get_async_response",
+                            pimpl_->get_async_response_timeout,
+                            root_aid)
                         .as<rpclib_response>();
     return pimpl_->make_serialized_result(response);
 }
@@ -190,7 +233,7 @@ rpclib_client::request_cancellation(async_id aid)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("request_cancellation {}", aid);
-    pimpl_->do_rpc_call("request_cancellation", aid);
+    pimpl_->do_rpc_call("request_cancellation", pimpl_->default_timeout, aid);
     logger.debug("request_cancellation done");
 }
 
@@ -199,7 +242,7 @@ rpclib_client::finish_async(async_id root_aid)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("finish_async {}", root_aid);
-    pimpl_->do_rpc_call("finish_async", root_aid);
+    pimpl_->do_rpc_call("finish_async", pimpl_->default_timeout, root_aid);
     logger.debug("finish_async done");
 }
 
@@ -208,7 +251,11 @@ rpclib_client::get_tasklet_infos(bool include_finished)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("get_tasklet_infos {}", include_finished);
-    auto tuples = pimpl_->do_rpc_call("get_tasklet_infos", include_finished)
+    auto tuples = pimpl_
+                      ->do_rpc_call(
+                          "get_tasklet_infos",
+                          pimpl_->default_timeout,
+                          include_finished)
                       .as<tasklet_info_tuple_list>();
     logger.debug("get_tasklet_infos done");
     return make_tasklet_infos(tuples);
@@ -219,7 +266,15 @@ rpclib_client::load_shared_library(std::string dir_path, std::string dll_name)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("load_shared_library {} {}", dir_path, dll_name);
-    pimpl_->do_rpc_call("load_shared_library", dir_path, dll_name);
+    std::scoped_lock lock{pimpl_->loaded_dlls_mutex_};
+    if (pimpl_->loaded_dlls_.contains(dll_name))
+    {
+        logger.debug("skip loading DLL {} as it's already there", dll_name);
+        return;
+    }
+    pimpl_->do_rpc_call(
+        "load_shared_library", pimpl_->load_dll_timeout, dir_path, dll_name);
+    pimpl_->loaded_dlls_.insert(dll_name);
     logger.debug("load_shared_library done");
 }
 
@@ -228,7 +283,10 @@ rpclib_client::unload_shared_library(std::string dll_name)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("unload_shared_library {}", dll_name);
-    pimpl_->do_rpc_call("unload_shared_library", dll_name);
+    std::scoped_lock lock{pimpl_->loaded_dlls_mutex_};
+    pimpl_->loaded_dlls_.erase(dll_name);
+    pimpl_->do_rpc_call(
+        "unload_shared_library", pimpl_->default_timeout, dll_name);
     logger.debug("unload_shared_library done");
 }
 
@@ -237,7 +295,7 @@ rpclib_client::mock_http(std::string const& response_body)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("mock_http start");
-    pimpl_->do_rpc_call("mock_http", response_body);
+    pimpl_->do_rpc_call("mock_http", pimpl_->default_timeout, response_body);
     logger.debug("mock_http finished");
 }
 
@@ -246,7 +304,8 @@ rpclib_client::clear_unused_mem_cache_entries()
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("clear_unused_mem_cache_entries start");
-    pimpl_->do_rpc_call("clear_unused_mem_cache_entries");
+    pimpl_->do_rpc_call(
+        "clear_unused_mem_cache_entries", pimpl_->default_timeout);
     logger.debug("clear_unused_mem_cache_entries finished");
 }
 
@@ -255,22 +314,38 @@ rpclib_client::release_cache_record_lock(remote_cache_record_id record_id)
 {
     auto& logger{*pimpl_->logger_};
     logger.debug("release_cache_record_lock start");
-    pimpl_->do_rpc_call("release_cache_record_lock", record_id.value());
+    pimpl_->do_rpc_call(
+        "release_cache_record_lock",
+        pimpl_->default_timeout,
+        record_id.value());
     logger.debug("release_cache_record_lock finished");
+}
+
+int
+rpclib_client::get_num_contained_calls() const
+{
+    auto& logger{*pimpl_->logger_};
+    logger.debug("get_num_contained_calls start");
+    auto num
+        = pimpl_
+              ->do_rpc_call("get_num_contained_calls", pimpl_->default_timeout)
+              .as<int>();
+    logger.debug("get_num_contained_calls -> {}", num);
+    return num;
 }
 
 // Note is blocking
 std::string
 rpclib_client::ping()
 {
-    return pimpl_->ping();
+    return pimpl_->ping(pimpl_->default_timeout);
 }
 
 std::string
-rpclib_client_impl::ping()
+rpclib_client_impl::ping(int timeout)
 {
     logger_->debug("ping");
-    std::string result = do_rpc_call("ping").as<std::string>();
+    std::string result = do_rpc_call("ping", timeout).as<std::string>();
     logger_->debug("pong {}", result);
     return result;
 }
@@ -311,41 +386,66 @@ rpclib_client_impl::ack_response(uint32_t pool_id)
 bool
 rpclib_client_impl::server_is_running()
 {
-    logger_->info("test whether rpclib server is running");
+    logger_->info("test whether rpclib server {} is running", port_);
     std::string server_rpclib_protocol;
     try
     {
         rpc_client_ = std::make_unique<rpc::client>(localhost_, port_);
-        server_rpclib_protocol = ping();
+        // Set a timeout that rpc_client_ applies to:
+        // - Establishing a connection
+        // - Doing a sync RPC call
+        // As we do async RPC calls only (see do_rpc_call()), this timeout is
+        // just used for establishing a connection.
+        rpc_client_->set_timeout(connection_timeout);
+        server_rpclib_protocol = ping(default_timeout);
     }
-    catch (rpc::system_error& e)
+    catch (rpc::system_error const& e)
     {
+        // Linux: error code 111, immediately
+        // Windows: error code 10061, but only after 2 or more seconds
+        // (as per design; cf. TcpMaxConnectRetransmissions)
         // rpclib sets the error code, not what
         logger_->info(
             "rpclib server is not running (code {})", e.code().value());
+        return false;
+    }
+    catch (rpc::rpc_error const&)
+    {
+        // rpc_error doesn't contain anything useful in this case
+        logger_->info("rpclib server is not running (rpc_error)");
+        return false;
+    }
+    catch (remote_error const&)
+    {
+        // Already reported
         return false;
     }
     logger_->info(
         "received pong {}: rpclib server is running", server_rpclib_protocol);
     // Detect an incompatible rpclib server instance.
     verify_rpclib_protocol(server_rpclib_protocol);
-    // rpc_client_->set_timeout(30);
     return true;
 }
 
 void
 rpclib_client_impl::wait_until_server_running()
 {
-    int attempts_left = 20;
+    int attempt = 0;
+    auto t0 = std::chrono::steady_clock::now();
     while (!server_is_running())
     {
-        attempts_left -= 1;
-        if (attempts_left == 0)
+        auto t1 = std::chrono::steady_clock::now();
+        auto elapsed
+            = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0)
+                  .count();
+        if (elapsed >= detect_server_timeout)
         {
             throw remote_error(
                 "could not start rpclib_server", "timeout", true);
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        int delay = attempt < 7 ? (1 << attempt) : 100;
+        std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+        attempt += 1;
     }
 }
 
@@ -364,8 +464,17 @@ rpclib_client_impl::start_server()
     {
         child_args.push_back("--testing");
     }
-    child_args.push_back("--secondary-cache");
-    child_args.push_back(secondary_cache_factory_);
+    if (contained_)
+    {
+        child_args.push_back("--contained");
+    }
+    child_args.push_back("--port");
+    child_args.push_back(std::to_string(port_));
+    if (secondary_cache_factory_)
+    {
+        child_args.push_back("--secondary-cache");
+        child_args.push_back(*secondary_cache_factory_);
+    }
     std::string cmd;
     bf::path path;
     if (deploy_dir_)
@@ -383,7 +492,15 @@ rpclib_client_impl::start_server()
         cmd += fmt::format(" {}", arg);
     }
     logger_->info("starting {}", cmd);
-    auto child = bp::child(bp::exe = path, bp::args = child_args, group_);
+    boost::process::child child;
+    if (contained_)
+    {
+        child = bp::child(bp::exe = path, bp::args = child_args);
+    }
+    else
+    {
+        child = bp::child(bp::exe = path, bp::args = child_args, group_);
+    }
     logger_->info("started child process");
     wait_until_server_running();
     child_ = std::move(child);
@@ -396,7 +513,11 @@ rpclib_client_impl::stop_server()
     {
         return;
     }
-    if (!testing_)
+    // In testing mode, a new rpclib server instance is used for each unit
+    // test, to have good test isolation.
+    // In contained mode, the lifetime of the rpclib server instance is
+    // controlled by the lifetime of the corresponding rpclib_client object.
+    if (!(testing_ || contained_))
     {
         logger_->info("keep rpclib process running");
         // ~child() will call terminate (without warning) when the child
@@ -407,34 +528,77 @@ rpclib_client_impl::stop_server()
         group_.detach();
         return;
     }
-    logger_->info("killing rpclib process");
-    logger_->debug("calling group.terminate()");
-    group_.terminate();
+    logger_->info("killing rpclib process {}", port_);
+    logger_->debug("calling child.terminate()");
+    if (contained_)
+    {
+        child_.terminate();
+    }
+    else
+    {
+        group_.terminate();
+    }
 
     // To avoid a zombie process
     logger_->debug("calling child.wait()");
     child_.wait();
 
+    // Although the server process has been killed, connecting to the port it
+    // was listening on may still be possible (without getting a ECONNREFUSED),
+    // but an RPC call won't get a response.
+
     logger_->info("rpclib server process killed");
     child_ = boost::process::child();
 }
 
-// Performs a synchronous RPC call.
-// rpc::client::call is blocking. Internally it calls async_call() which
-// returns a future.
+// Performs a synchronous RPC call (returning a response)
+//
+// Timeout given in milliseconds; a negative value means no timeout, to be used
+// for resolve_sync() only, which returns after the resolution has finished.
+//
+// The implementation is based on rpc::client::call(), invoking
+// rpc::client::async_call(). The difference is that we have a timeout that
+// can differ between calls, and the rpclib library applies the same timeout
+// to all calls (and also to a connection request).
 template<typename... Params>
 RPCLIB_MSGPACK::object_handle
 rpclib_client_impl::do_rpc_call(
-    std::string const& func_name, Params&&... params)
+    std::string const& func_name, int timeout, Params&&... params)
 {
+    std::future<RPCLIB_MSGPACK::object_handle> fut;
     try
     {
-        return rpc_client_->call(func_name, std::forward<Params>(params)...);
+        fut = rpc_client_->async_call(
+            func_name, std::forward<Params>(params)...);
     }
     catch (rpc::rpc_error& e)
     {
         logger_->error(
-            "do_rpc_call({}) caught {}: {}",
+            "do_rpc_call({}) caught {} in async_call: {}",
+            func_name,
+            e.what(),
+            get_message(e));
+        throw remote_error(e.what(), get_message(e), is_retryable(e));
+    }
+    if (timeout > 0)
+    {
+        auto status = fut.wait_for(std::chrono::milliseconds{timeout});
+        if (status == std::future_status::timeout)
+        {
+            std::string msg{fmt::format(
+                "do_rpc_call: timeout ({}ms) for {}", timeout, func_name)};
+            logger_->error(msg);
+            throw remote_error{msg};
+        }
+    }
+    try
+    {
+        return fut.get();
+    }
+    catch (rpc::rpc_error& e)
+    {
+        logger_->error(
+            "do_rpc_call({}) caught {} in fut.get(): {}",
             func_name,
             e.what(),
             get_message(e));
@@ -442,7 +606,7 @@ rpclib_client_impl::do_rpc_call(
     }
 }
 
-// Performs an asynchronous RPC call.
+// Performs an asynchronous RPC call (not expecting a response)
 template<typename... Params>
 void
 rpclib_client_impl::do_rpc_async_call(

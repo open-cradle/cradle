@@ -79,9 +79,7 @@ loopback_service::resolve_sync(service_config config, std::string seri_req)
     }
     else
     {
-        auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(*ctx)};
-        task = resolve_serialized_local(
-            loc_ctx, std::move(seri_req), seri_lock);
+        task = resolve_serialized_local(*ctx, std::move(seri_req), seri_lock);
     }
     auto result{cppcoro::sync_wait(std::move(task))};
     // Not really needed for loopback, but mimics rpclib server and improves
@@ -100,7 +98,7 @@ resolve_async(
     bool introspective)
 {
     auto& logger{loopback->get_logger()};
-    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
+    if (auto* test_ctx = dynamic_cast<test_context_intf*>(&*actx))
     {
         test_ctx->apply_resolve_async_delay();
     }
@@ -153,9 +151,10 @@ loopback_service::submit_async(service_config config, std::string seri_req)
     auto& dom = resources_->find_domain(domain_name);
     auto actx{dom.make_local_async_context(config)};
     actx->track_blob_file_writers();
-    if (auto* test_ctx = cast_ctx_to_ptr<test_context_intf>(*actx))
+    if (auto* test_ctx = dynamic_cast<test_context_intf*>(&*actx))
     {
         test_ctx->apply_fail_submit_async();
+        test_ctx->apply_submit_async_delay();
     }
     actx->using_result();
     resources_->ensure_async_db();
@@ -298,6 +297,12 @@ void
 loopback_service::release_cache_record_lock(remote_cache_record_id record_id)
 {
     resources_->release_cache_record_lock(record_id);
+}
+
+int
+loopback_service::get_num_contained_calls() const
+{
+    return resources_->get_num_contained_calls();
 }
 
 async_db&

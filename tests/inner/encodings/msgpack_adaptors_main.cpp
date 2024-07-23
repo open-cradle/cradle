@@ -1,5 +1,4 @@
 #include <memory>
-#include <sstream>
 #include <string>
 
 #include <catch2/catch.hpp>
@@ -9,6 +8,7 @@
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/core/type_interfaces.h>
 #include <cradle/inner/encodings/msgpack_adaptors_main.h>
+#include <cradle/inner/encodings/msgpack_packer.h>
 #include <cradle/inner/service/resources.h>
 
 using namespace cradle;
@@ -27,16 +27,17 @@ make_string(std::vector<size_t> const& v)
 static void
 test_one(blob const& x, std::string const& expected, bool with_zone)
 {
-    std::stringstream ss;
+    bool const allow_blob_files{true};
+    msgpack_ostream ss;
     if (with_zone)
     {
         auto z = std::make_unique<msgpack::zone>();
         msgpack::object x_obj{x, *z};
-        msgpack::pack(ss, x_obj);
+        msgpack_packer(ss, allow_blob_files).pack(x_obj);
     }
     else
     {
-        msgpack::pack(ss, x);
+        msgpack_packer(ss, allow_blob_files).pack(x);
     }
     auto serialized = ss.str();
     REQUIRE(serialized == expected);
@@ -108,7 +109,7 @@ TEST_CASE("msgpack converting file blob (main)", "[encodings][msgpack]")
 TEST_CASE("msgpack decoding throws on bad data (main)", "[encodings][msgpack]")
 {
     int x{};
-    std::stringstream ss;
+    msgpack_ostream ss;
     msgpack::pack(ss, x);
     auto serialized = ss.str();
 
@@ -122,7 +123,7 @@ TEST_CASE("msgpack decoding throws on bad data (main)", "[encodings][msgpack]")
 static void
 test_one_throws(blob const& x, bool with_zone)
 {
-    std::stringstream ss;
+    msgpack_ostream ss;
     if (with_zone)
     {
         auto z = std::make_unique<msgpack::zone>();
