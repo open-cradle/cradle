@@ -1,3 +1,4 @@
+#include <map>
 #include <stdexcept>
 #include <string>
 
@@ -25,66 +26,12 @@ using namespace cradle;
 
 struct cli_options
 {
+    std::string command;
     std::string log_level{"critical"};
     bool ignore_env_log_level{false};
     rpclib_port_t port{RPCLIB_PORT_PRODUCTION};
-    int remote_id{};
+    int remote_id{-1};
 };
-
-static cli_options
-parse_options(int argc, char const* const* argv)
-{
-    namespace po = boost::program_options;
-    auto port_help{
-        fmt::format("port number (default {})", RPCLIB_PORT_PRODUCTION)};
-
-    // clang-format off
-    po::options_description desc("Options");
-    desc.add_options()
-        ("help",
-            "show help message")
-        ("version",
-            "show version information")
-        ("log-level", po::value<std::string>(),
-            "logging level (SPDLOG_LEVEL format)")
-        ("port", po::value<rpclib_port_t>(),
-            port_help.c_str())
-        ("id", po::value<int>(),
-            "remote id");
-    // clang-format on
-
-    po::variables_map vm;
-    po::store(po::command_line_parser(argc, argv).options(desc).run(), vm);
-    po::notify(vm);
-
-    if (vm.count("help"))
-    {
-        std::cout << fmt::format("Usage: {} [OPTION]...\n", argv[0]);
-        std::cout << "Interact with a CRADLE server.\n\n";
-        std::cout << desc;
-        std::exit(0);
-    }
-
-    if (vm.count("version"))
-    {
-        show_version_info(version_info);
-        std::exit(0);
-    }
-
-    cli_options options;
-    if (vm.count("log-level"))
-    {
-        options.log_level = vm["log-level"].as<std::string>();
-        options.ignore_env_log_level = true;
-    }
-    if (vm.count("port"))
-    {
-        options.port = vm["port"].as<rpclib_port_t>();
-    }
-    options.remote_id = vm["id"].as<int>();
-
-    return options;
-}
 
 static service_config_map
 create_config_map(cli_options const& options)
@@ -96,8 +43,14 @@ create_config_map(cli_options const& options)
 }
 
 static void
-run_cli(cli_options const& options)
+cmd_show(cli_options const& options)
 {
+    auto const remote_id = options.remote_id;
+    if (remote_id < 0)
+    {
+        // TODO cli_error
+        throw std::runtime_error{"missing --id"};
+    }
     std::string prefix{"cli "};
     initialize_logging(
         options.log_level, options.ignore_env_log_level, std::move(prefix));
@@ -107,7 +60,6 @@ run_cli(cli_options const& options)
 
     rpclib_client client{config, nullptr, my_logger};
 
-    auto remote_id = options.remote_id;
     auto status = client.get_async_status(remote_id);
     fmt::print("id {}: status {}\n", remote_id, to_string(status));
 
@@ -135,7 +87,7 @@ run_cli(cli_options const& options)
     }
     catch (remote_error const& e)
     {
-        fmt::print("get_essentials: caught {}\n", e.what());
+        my_logger->warn("No essentials for id {}: {}", remote_id, e.what());
     }
     if (status == async_status::FINISHED)
     {
@@ -149,25 +101,207 @@ run_cli(cli_options const& options)
             fmt::print("result: ");
             dump_msgpack_object(obj);
         }
-        catch (remote_error const&)
+        catch (remote_error const& e)
         {
             // No root ctx probably
-            // TODO logger shouldn't report error. Default FATAL only?
+            my_logger->warn("No result for id {}: {}", remote_id, e.what());
         }
     }
+}
+
+class my_parser
+{
+ public:
+    my_parser(int argc, char const* const* argv);
+
+    void
+    parse();
+
+    void
+    run_cmd();
+
+ private:
+    int const argc_;
+    char const* const* argv_;
+
+    // These set in the constructor, via define_visible() / define_hidden()
+    std::string port_help_;
+    boost::program_options::options_description visible_{"Options"};
+    boost::program_options::options_description hidden_;
+
+    // Set in make_vm()
+    boost::program_options::variables_map vm_;
+    // Set in make_options()
+    cli_options options_;
+
+    void
+    define_visible();
+    void
+    define_hidden();
+
+    void
+    show_help();
+    void
+    bad_command_line(std::string const& reason);
+
+    void
+    make_vm();
+    void
+    make_options();
+};
+
+my_parser::my_parser(int argc, char const* const* argv)
+    : argc_{argc}, argv_{argv}
+{
+    define_visible();
+    define_hidden();
+}
+
+void
+my_parser::define_visible()
+{
+    namespace po = boost::program_options;
+    port_help_
+        = fmt::format("port number (default {})", RPCLIB_PORT_PRODUCTION);
+    // clang-format off
+    visible_.add_options()
+        ("help",
+            "show help message")
+        ("version",
+            "show version information")
+        ("log-level", po::value<std::string>(),
+            "logging level (SPDLOG_LEVEL format)")
+        ("port", po::value<rpclib_port_t>(),
+            port_help_.c_str())
+        ("id", po::value<int>(),
+            "remote id");
+    // clang-format on
+}
+
+void
+my_parser::define_hidden()
+{
+    namespace po = boost::program_options;
+    // clang-format off
+    hidden_.add_options()
+        ("hidden-cmd", po::value<std::string>(),
+            "command");
+    // clang-format on
+}
+
+void
+my_parser::show_help()
+{
+    fmt::print("Usage: {} [CMD] [OPTION]...\n", argv_[0]);
+    std::cout << "Interact with a CRADLE server.\n\n";
+    std::cout << "Commands:\n";
+    std::cout << "  show                  show status of remote context "
+                 "identified by --id\n";
+    std::cout << "\n";
+    std::cout << visible_;
+    std::cout << "\n";
+    std::cout << "Examples:\n";
+    fmt::print("  {} show --port 8096 --id 1\n", argv_[0]);
+}
+
+void
+my_parser::bad_command_line(std::string const& reason)
+{
+    std::cerr << reason << "\n\n";
+    show_help();
+    std::exit(1);
+}
+
+void
+my_parser::parse()
+{
+    make_vm();
+    make_options();
+}
+
+void
+my_parser::make_vm()
+{
+    namespace po = boost::program_options;
+
+    po::options_description all_options;
+    all_options.add(visible_).add(hidden_);
+
+    po::positional_options_description positional;
+    positional.add("hidden-cmd", -1);
+
+    po::store(
+        po::command_line_parser(argc_, argv_)
+            .options(all_options)
+            .positional(positional)
+            .run(),
+        vm_);
+    notify(vm_);
+
+    if (vm_.count("help"))
+    {
+        show_help();
+        std::exit(0);
+    }
+
+    if (vm_.count("version"))
+    {
+        show_version_info(version_info);
+        std::exit(0);
+    }
+}
+
+void
+my_parser::make_options()
+{
+    if (vm_.count("hidden-cmd"))
+    {
+        options_.command = vm_["hidden-cmd"].as<std::string>();
+    }
+    else
+    {
+        bad_command_line("Missing command");
+    }
+    if (vm_.count("log-level"))
+    {
+        options_.log_level = vm_["log-level"].as<std::string>();
+        options_.ignore_env_log_level = true;
+    }
+    if (vm_.count("port"))
+    {
+        options_.port = vm_["port"].as<rpclib_port_t>();
+    }
+    if (vm_.count("id"))
+    {
+        options_.remote_id = vm_["id"].as<int>();
+    }
+}
+
+void
+my_parser::run_cmd()
+{
+    using cmd_func_ptr = void (*)(cli_options const& options);
+    std::map<std::string, cmd_func_ptr> const func_map = {{"show", cmd_show}};
+    auto it = func_map.find(options_.command);
+    if (it == func_map.end())
+    {
+        bad_command_line(fmt::format("Unknown command {}", options_.command));
+    }
+    it->second(options_);
 }
 
 int
 main(int argc, char const* const* argv)
 try
 {
-    auto options = parse_options(argc, argv);
-    run_cli(options);
+    my_parser parser{argc, argv};
+    parser.parse();
+    parser.run_cmd();
     return 0;
 }
 catch (std::exception& e)
 {
-    std::cerr << e.what() << "\n";
+    std::cerr << "main() caught " << e.what() << "\n";
     return 1;
 }
 catch (...)
