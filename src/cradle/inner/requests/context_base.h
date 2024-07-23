@@ -294,6 +294,9 @@ class local_async_context_base : public virtual local_async_context_intf,
     void
     set_essentials(std::unique_ptr<request_essentials> essentials) override;
 
+    request_essentials
+    get_essentials() const override;
+
     std::size_t
     get_local_num_subs() const override
     {

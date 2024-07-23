@@ -257,6 +257,9 @@ run_server(cli_options const& options)
     srv.bind("get_num_contained_calls", [&]() {
         return handle_get_num_contained_calls(hctx);
     });
+    srv.bind("get_essentials", [&](async_id aid) {
+        return handle_get_essentials(hctx, aid);
+    });
 
     auto num_threads{hctx.handler_pool_size()};
     assert(num_threads >= 2);

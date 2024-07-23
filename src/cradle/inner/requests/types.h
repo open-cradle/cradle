@@ -2,6 +2,7 @@
 #define CRADLE_INNER_REQUESTS_TYPES_H
 
 #include <cstddef>
+#include <optional>
 #include <string>
 
 namespace cradle {
@@ -33,6 +34,23 @@ to_string(async_status s);
 using async_id = uint64_t;
 
 static constexpr async_id NO_ASYNC_ID{~async_id{}};
+
+// Basic request information
+struct request_essentials
+{
+    request_essentials(std::string uuid_str_arg)
+        : uuid_str{std::move(uuid_str_arg)}
+    {
+    }
+
+    request_essentials(std::string uuid_str_arg, std::string title_arg)
+        : uuid_str{std::move(uuid_str_arg)}, title{std::move(title_arg)}
+    {
+    }
+
+    std::string const uuid_str;
+    std::optional<std::string> const title;
+};
 
 /*
  * Id for a catalog instance.

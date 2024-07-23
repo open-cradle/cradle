@@ -67,6 +67,12 @@ class test_proxy : public remote_proxy
         throw not_implemented_error{"test_proxy::get_async_response()"};
     }
 
+    request_essentials
+    get_essentials(async_id aid) override
+    {
+        throw not_implemented_error{"test_proxy::get_essentials()"};
+    }
+
     void
     request_cancellation(async_id aid) override
     {

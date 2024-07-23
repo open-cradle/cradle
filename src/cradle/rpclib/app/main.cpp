@@ -121,6 +121,19 @@ run_cli(cli_options const& options)
     {
         fmt::print("error: {}\n", client.get_async_error_message(remote_id));
     }
+    try
+    {
+        auto essentials = client.get_essentials(remote_id);
+        fmt::print("uuid {}\n", essentials.uuid_str);
+        if (essentials.title)
+        {
+            fmt::print("title {}\n", *essentials.title);
+        }
+    }
+    catch (remote_error const& e)
+    {
+        fmt::print("get_essentials: caught {}\n", e.what());
+    }
     if (status == async_status::FINISHED)
     {
         try

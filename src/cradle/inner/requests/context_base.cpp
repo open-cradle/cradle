@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include <cppcoro/sync_wait.hpp>
+#include <fmt/format.h>
 
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/async_db.h>
@@ -302,6 +303,16 @@ local_async_context_base::set_essentials(
     std::unique_ptr<request_essentials> essentials)
 {
     essentials_ = std::move(essentials);
+}
+
+request_essentials
+local_async_context_base::get_essentials() const
+{
+    if (!essentials_)
+    {
+        throw std::logic_error(fmt::format("no essentials for id {}", id_));
+    }
+    return *essentials_;
 }
 
 cppcoro::task<void>

@@ -191,6 +191,9 @@ handle_release_cache_record_lock(
 int
 handle_get_num_contained_calls(rpclib_handler_context& hctx);
 
+rpclib_essentials
+handle_get_essentials(rpclib_handler_context& hctx, async_id aid);
+
 } // namespace cradle
 
 #endif

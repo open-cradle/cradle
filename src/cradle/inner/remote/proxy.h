@@ -120,6 +120,13 @@ class remote_proxy
     get_async_response(async_id root_aid)
         = 0;
 
+    // Returns essentials for the corresponding request, or throws if they are
+    // not available.
+    // aid should specify a context in the tree.
+    virtual request_essentials
+    get_essentials(async_id root_aid)
+        = 0;
+
     // Requests for an asynchronous resolution to be cancelled. aid should
     // specify a context in the tree.
     virtual void

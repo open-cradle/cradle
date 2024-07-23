@@ -241,6 +241,14 @@ loopback_service::get_async_response(async_id root_aid)
     return serialized_result{actx->get_result(), actx->get_cache_record_id()};
 }
 
+request_essentials
+loopback_service::get_essentials(async_id aid)
+{
+    logger_->debug("get_essentials {}", aid);
+    auto actx{get_async_db().find_root(aid)};
+    return actx->get_essentials();
+}
+
 void
 loopback_service::request_cancellation(async_id aid)
 {

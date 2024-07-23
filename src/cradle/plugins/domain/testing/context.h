@@ -304,6 +304,12 @@ class atst_context final : public root_local_async_context_intf,
         get_local_root().set_essentials(std::move(essentials));
     }
 
+    request_essentials
+    get_essentials() const override
+    {
+        return get_local_root().get_essentials();
+    }
+
     std::size_t
     get_local_num_subs() const override
     {

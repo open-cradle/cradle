@@ -4,7 +4,6 @@
 #include <chrono>
 #include <concepts>
 #include <memory>
-#include <optional>
 #include <string>
 
 #include <cppcoro/task.hpp>
@@ -121,23 +120,6 @@ to_composition_based(caching_level_type level)
         return level;
     }
 }
-
-// Basic request information
-struct request_essentials
-{
-    request_essentials(std::string uuid_str_arg)
-        : uuid_str{std::move(uuid_str_arg)}
-    {
-    }
-
-    request_essentials(std::string uuid_str_arg, std::string title_arg)
-        : uuid_str{std::move(uuid_str_arg)}, title{std::move(title_arg)}
-    {
-    }
-
-    std::string const uuid_str;
-    std::optional<std::string> const title;
-};
 
 /*
  * Visits a request's arguments (which may be subrequests themselves).
@@ -483,11 +465,26 @@ class local_async_context_intf : public virtual local_context_intf,
         return is_async() ? this : nullptr;
     }
 
+    // Sets the corresponding request's essentials on this context.
+    // essentials could be nullptr (e.g. it will be for a value_request).
     // For a root context, the essentials are set when a request is (first)
-    // resolved using the context. For a non-root context, the essentials will
-    // be passed to its constructor.
+    // resolved using the context. For a non-root context object, the
+    // essentials will be passed to its constructor.
     virtual void
     set_essentials(std::unique_ptr<request_essentials> essentials)
+        = 0;
+
+    // Returns the essentials for the corresponding request, if set.
+    // Throws if no essentials have been set on this context object, which
+    // implies one of:
+    // - The context does not correspond to a request.
+    // - The context corresponds to a request that does not have essentials,
+    //   like a value_request.
+    // - Something temporary, i.e., the essentials have not been set _yet_
+    //   on the context, but soon will be. (The essentials are copied from
+    //   request to context early in the resolution process.)
+    virtual request_essentials
+    get_essentials() const
         = 0;
 
     // Returns the number of subtasks
