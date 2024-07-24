@@ -1,39 +1,24 @@
-#include <stdexcept>
-#include <string>
-
-#include <cppcoro/sync_wait.hpp>
 #include <fmt/format.h>
 #include <msgpack.hpp>
-#include <spdlog/spdlog.h>
 
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/encodings/msgpack_dump.h>
 #include <cradle/inner/requests/types.h>
-#include <cradle/inner/utilities/logging.h>
+#include <cradle/rpclib/cli/cmd_common.h>
+#include <cradle/rpclib/cli/cmd_show.h>
 #include <cradle/rpclib/cli/types.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/common/common.h>
-#include <cradle/rpclib/common/config.h>
 
 namespace cradle {
-
-static service_config_map
-create_config_map(cli_options const& options)
-{
-    service_config_map config_map;
-    config_map[rpclib_config_keys::EXPECT_SERVER] = true;
-    config_map[rpclib_config_keys::PORT_NUMBER] = options.port;
-    return config_map;
-}
 
 void
 cmd_show(cli_options const& options)
 {
     auto const remote_id = get_remote_id(options);
-    initialize_logging(options.log_level, options.log_level_set, "cli ");
-    auto my_logger = create_logger("cli");
+    auto logger{create_logger(options)};
     service_config config{create_config_map(options)};
-    rpclib_client client{config, nullptr, my_logger};
+    rpclib_client client{config, nullptr, logger};
 
     auto status = client.get_async_status(remote_id);
     fmt::print("id {}: status {}\n", remote_id, to_string(status));
@@ -64,7 +49,7 @@ cmd_show(cli_options const& options)
     }
     catch (remote_error const& e)
     {
-        my_logger->warn("No essentials for id {}: {}", remote_id, e.what());
+        logger->warn("No essentials for id {}: {}", remote_id, e.what());
     }
 
     if (status == async_status::FINISHED)
@@ -82,7 +67,7 @@ cmd_show(cli_options const& options)
         catch (remote_error const& e)
         {
             // No root ctx probably
-            my_logger->warn("No result for id {}: {}", remote_id, e.what());
+            logger->warn("No result for id {}: {}", remote_id, e.what());
         }
     }
 }
