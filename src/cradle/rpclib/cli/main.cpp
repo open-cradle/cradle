@@ -3,6 +3,7 @@
 
 #include <fmt/format.h>
 
+#include <cradle/rpclib/cli/cmd_cancel.h>
 #include <cradle/rpclib/cli/cmd_show.h>
 #include <cradle/rpclib/cli/parser.h>
 #include <cradle/rpclib/cli/types.h>
@@ -15,7 +16,8 @@ void
 run_cmd(cli_options const& options)
 {
     using cmd_func_ptr = void (*)(cli_options const& options);
-    std::map<std::string, cmd_func_ptr> const func_map = {{"show", cmd_show}};
+    std::map<std::string, cmd_func_ptr> const func_map{
+        {"cancel", cmd_cancel}, {"show", cmd_show}};
     auto it = func_map.find(options.command);
     if (it == func_map.end())
     {

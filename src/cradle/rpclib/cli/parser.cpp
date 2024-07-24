@@ -33,7 +33,7 @@ cli_parser::define_visible()
         ("port", po::value<rpclib_port_t>(),
             port_help_.c_str())
         ("id", po::value<int>(),
-            "remote id");
+            "id of remote async context");
     // clang-format on
 }
 
@@ -54,12 +54,14 @@ cli_parser::show_help()
     fmt::print("Usage: {} [CMD] [OPTION]...\n", argv_[0]);
     std::cout << "Interact with a CRADLE server.\n\n";
     std::cout << "Commands:\n";
-    std::cout << "  show                  show status of remote context "
-                 "identified by --id\n";
+    std::cout << "  cancel                requests cancellation of remote "
+                 "resolution (no feedback)\n";
+    std::cout << "  show                  shows status of remote context\n";
     std::cout << "\n";
     std::cout << visible_;
     std::cout << "\n";
     std::cout << "Examples:\n";
+    fmt::print("  {} cancel --port 8096 --id 1\n", argv_[0]);
     fmt::print("  {} show --port 8096 --id 1\n", argv_[0]);
 }
 
