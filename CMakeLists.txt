@@ -620,7 +620,7 @@ target_link_libraries(rpclib_server PRIVATE
 # The rpclib client app
 file(GLOB_RECURSE srcs_cradle_cli CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/common/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/app/*.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/cradle/rpclib/cli/*.cpp")
 add_executable(cradle_cli ${srcs_cradle_cli})
 target_link_libraries(cradle_cli PRIVATE
     cradle_plugins_inner
