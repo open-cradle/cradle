@@ -56,6 +56,9 @@ class loopback_service : public remote_proxy
     serialized_result
     get_async_response(async_id root_aid) override;
 
+    request_essentials
+    get_essentials(async_id root_aid) override;
+
     void
     request_cancellation(async_id aid) override;
 

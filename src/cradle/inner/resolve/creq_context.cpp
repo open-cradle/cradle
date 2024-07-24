@@ -165,6 +165,18 @@ creq_context::fail_remote_id() noexcept
 }
 
 void
+creq_context::make_introspective()
+{
+    throw not_implemented_error("creq_context::make_introspective()");
+}
+
+bool
+creq_context::introspective() const
+{
+    return false;
+}
+
+void
 creq_context::throw_if_cancelled()
 {
     logger_->debug("creq_context::throw_if_cancelled()");

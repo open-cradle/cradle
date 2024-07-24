@@ -1,5 +1,7 @@
 #include <deque>
 
+#include <fmt/format.h>
+
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/remote/wait_async.h>
@@ -80,6 +82,10 @@ resolve_async(
         remote_id = proxy->submit_async(
             ctx.make_config(need_record_lock), std::move(seri_req));
         ctx.set_remote_id(remote_id);
+        if (ctx.introspective())
+        {
+            fmt::print("submit_async: remote_id {}\n", remote_id);
+        }
     }
     catch (...)
     {

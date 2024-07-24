@@ -70,14 +70,26 @@ is_retryable(rpc::rpc_error& exc)
     return retryable;
 }
 
+bool
+get_testing(service_config const& config)
+{
+    return config.get_bool_or_default(generic_config_keys::TESTING, false);
+}
+
 rpclib_port_t
-alloc_port(ephemeral_port_owner* port_owner, bool testing)
+alloc_port(ephemeral_port_owner* port_owner, service_config const& config)
 {
     if (port_owner)
     {
         return port_owner->alloc_port();
     }
-    return testing ? RPCLIB_PORT_TESTING : RPCLIB_PORT_PRODUCTION;
+    auto opt_port
+        = config.get_optional_number(rpclib_config_keys::PORT_NUMBER);
+    if (opt_port)
+    {
+        return static_cast<rpclib_port_t>(*opt_port);
+    }
+    return get_testing(config) ? RPCLIB_PORT_TESTING : RPCLIB_PORT_PRODUCTION;
 }
 
 } // namespace
@@ -99,15 +111,16 @@ rpclib_client_impl::rpclib_client_impl(
     std::shared_ptr<spdlog::logger> logger)
     : port_owner_{port_owner},
       logger_{logger ? std::move(logger) : ensure_logger("rpclib_client")},
-      testing_{
-          config.get_bool_or_default(generic_config_keys::TESTING, false)},
+      testing_{get_testing(config)},
       contained_{port_owner != nullptr},
+      expect_server_{config.get_bool_or_default(
+          rpclib_config_keys::EXPECT_SERVER, false)},
       deploy_dir_{config.get_optional_string(generic_config_keys::DEPLOY_DIR)},
-      port_{alloc_port(port_owner, testing_)},
+      port_{alloc_port(port_owner, config)},
       secondary_cache_factory_{config.get_optional_string(
           inner_config_keys::SECONDARY_CACHE_FACTORY)}
 {
-    start_server();
+    ensure_server();
 }
 
 rpclib_client_impl::~rpclib_client_impl()
@@ -226,6 +239,28 @@ rpclib_client::get_async_response(async_id root_aid)
                             root_aid)
                         .as<rpclib_response>();
     return pimpl_->make_serialized_result(response);
+}
+
+request_essentials
+rpclib_client::get_essentials(async_id aid)
+{
+    auto& logger{*pimpl_->logger_};
+    logger.debug("get_essentials {}", aid);
+    auto essentials_tuple
+        = pimpl_->do_rpc_call("get_essentials", pimpl_->default_timeout, aid)
+              .as<rpclib_essentials>();
+    auto uuid_str = std::get<0>(essentials_tuple);
+    auto opt_title = std::get<1>(essentials_tuple);
+    logger.debug(
+        "essentials for {}: uuid {}, title {}", aid, uuid_str, opt_title);
+    if (opt_title.empty())
+    {
+        return request_essentials{std::move(uuid_str)};
+    }
+    else
+    {
+        return request_essentials{std::move(uuid_str), std::move(opt_title)};
+    }
 }
 
 void
@@ -447,6 +482,20 @@ rpclib_client_impl::wait_until_server_running()
         std::this_thread::sleep_for(std::chrono::milliseconds(delay));
         attempt += 1;
     }
+}
+
+void
+rpclib_client_impl::ensure_server()
+{
+    if (server_is_running())
+    {
+        return;
+    }
+    if (expect_server_)
+    {
+        throw std::runtime_error{fmt::format("No server on port {}", port_)};
+    }
+    start_server();
 }
 
 void

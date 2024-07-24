@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include <cppcoro/sync_wait.hpp>
+#include <fmt/format.h>
 
 #include <cradle/inner/core/fmt_format.h>
 #include <cradle/inner/remote/async_db.h>
@@ -297,6 +298,23 @@ local_async_context_base::get_status_coro()
     co_return get_status();
 }
 
+void
+local_async_context_base::set_essentials(
+    std::unique_ptr<request_essentials> essentials)
+{
+    essentials_ = std::move(essentials);
+}
+
+request_essentials
+local_async_context_base::get_essentials() const
+{
+    if (!essentials_)
+    {
+        throw std::logic_error(fmt::format("no essentials for id {}", id_));
+    }
+    return *essentials_;
+}
+
 cppcoro::task<void>
 local_async_context_base::request_cancellation_coro()
 {
@@ -521,6 +539,16 @@ root_local_async_context_base::get_result()
     return result_;
 }
 
+non_root_local_async_context_base::non_root_local_async_context_base(
+    local_tree_context_base& tree_ctx,
+    local_async_context_base* parent,
+    bool is_req,
+    std::unique_ptr<request_essentials> essentials)
+    : local_async_context_base(tree_ctx, parent, is_req)
+{
+    set_essentials(std::move(essentials));
+}
+
 local_context_tree_builder_base::local_context_tree_builder_base(
     local_async_context_base& ctx)
     : ctx_{ctx}
@@ -534,21 +562,25 @@ local_context_tree_builder_base::~local_context_tree_builder_base()
 void
 local_context_tree_builder_base::visit_val_arg(std::size_t ix)
 {
-    make_sub_ctx(ix, false);
+    make_sub_ctx(ix, false, nullptr);
 }
 
 std::unique_ptr<req_visitor_intf>
-local_context_tree_builder_base::visit_req_arg(std::size_t ix)
+local_context_tree_builder_base::visit_req_arg(
+    std::size_t ix, std::unique_ptr<request_essentials> essentials)
 {
-    auto sub_ctx{make_sub_ctx(ix, true)};
+    auto sub_ctx{make_sub_ctx(ix, true, std::move(essentials))};
     return make_sub_builder(*sub_ctx);
 }
 
 std::shared_ptr<local_async_context_base>
-local_context_tree_builder_base::make_sub_ctx(std::size_t ix, bool is_req)
+local_context_tree_builder_base::make_sub_ctx(
+    std::size_t ix,
+    bool is_req,
+    std::unique_ptr<request_essentials> essentials)
 {
     auto& tree_ctx{ctx_.get_tree_context()};
-    auto sub_ctx{make_sub_ctx(tree_ctx, ix, is_req)};
+    auto sub_ctx{make_sub_ctx(tree_ctx, ix, is_req, std::move(essentials))};
     ctx_.add_sub(ix, sub_ctx);
     register_local_async_ctx(sub_ctx);
     return sub_ctx;
@@ -649,9 +681,10 @@ void
 root_proxy_async_context_base::finish_remote() noexcept
 {
     // Clean up the context tree on the server once per proxy context tree.
-    // There must have been a set_remote_id() or fail_remote_id() call for this
-    // root context.
-    if (remote_id_ != NO_ASYNC_ID)
+    // Keep the context tree if the client context is introspective, so that
+    // the server contexts remain available for querying. There must have been
+    // a set_remote_id() or fail_remote_id() call for this root context.
+    if (remote_id_ != NO_ASYNC_ID && !introspective())
     {
         // Must not throw
         try
@@ -706,6 +739,12 @@ root_proxy_async_context_base::fail_remote_id() noexcept
     }
 }
 
+void
+root_proxy_async_context_base::make_introspective()
+{
+    introspective_ = true;
+}
+
 // This may cause the current thread to block on getting the result from a
 // future.
 // TODO Avoid blocking callers by moving to a cppcoro-based interface, and
@@ -741,6 +780,20 @@ non_root_proxy_async_context_base::fail_remote_id() noexcept
 {
     // For non-root contexts, remote_id_ is set on object creation
     assert(false);
+}
+
+void
+non_root_proxy_async_context_base::make_introspective()
+{
+    // Should be called for root contexts only
+    assert(false);
+}
+
+bool
+non_root_proxy_async_context_base::introspective() const
+{
+    assert(false);
+    return false;
 }
 
 void
