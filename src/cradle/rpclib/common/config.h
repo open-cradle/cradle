@@ -23,6 +23,13 @@ struct rpclib_config_keys
     // asynchronous requests.
     inline static std::string const REQUEST_CONCURRENCY{
         "rpclib/request_concurrency"};
+
+    // (Optional boolean)
+    // If true, expects a running server; client shouldn't start it, and it is
+    // an error if no server is listening on the specified port.
+    // If false, client tries to start a server on the specified port if it
+    // doesn't detect an existing one.
+    inline static std::string const EXPECT_SERVER{"rpclib/expect_server"};
 };
 
 } // namespace cradle

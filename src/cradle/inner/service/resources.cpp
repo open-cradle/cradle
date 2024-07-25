@@ -274,7 +274,19 @@ inner_resources::find_domain(std::string const& name)
     auto it = impl.domains_.find(name);
     if (it == impl.domains_.end())
     {
-        throw std::domain_error(fmt::format("unknown domain {}", name));
+        std::ostringstream ostr;
+        bool need_sep{false};
+        for (auto const& it : impl.domains_)
+        {
+            if (need_sep)
+            {
+                ostr << ", ";
+            }
+            ostr << it.first;
+            need_sep = true;
+        }
+        throw std::domain_error{fmt::format(
+            "unknown domain {}; should be one of: {}", name, ostr.str())};
     }
     return *it->second;
 }
