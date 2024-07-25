@@ -333,10 +333,10 @@ try
 {
     auto& db{hctx.get_async_db()};
     auto& logger{hctx.logger()};
-    logger.info("handle_get_async_status {}", aid);
+    logger.debug("handle_get_async_status {}", aid);
     auto actx{db.find(aid)};
     auto status = actx->get_status();
-    logger.info("handle_get_async_status -> {}", status);
+    logger.debug("handle_get_async_status -> {}", status);
     return static_cast<int>(status);
 }
 catch (std::exception& e)
@@ -505,6 +505,29 @@ catch (std::exception& e)
 {
     handle_exception(hctx, e);
     return int{};
+}
+
+rpclib_essentials
+handle_get_essentials(rpclib_handler_context& hctx, async_id aid)
+try
+{
+    auto& logger{hctx.logger()};
+    logger.info("handle_get_essentials {}", aid);
+    auto& db{hctx.get_async_db()};
+    auto actx{db.find(aid)};
+    auto essentials{actx->get_essentials()};
+    std::string title_str;
+    if (essentials.title)
+    {
+        title_str = *essentials.title;
+    }
+    rpclib_essentials result{essentials.uuid_str, title_str};
+    return result;
+}
+catch (std::exception& e)
+{
+    handle_exception(hctx, e);
+    return rpclib_essentials{};
 }
 
 } // namespace cradle

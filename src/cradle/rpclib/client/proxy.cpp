@@ -228,6 +228,28 @@ rpclib_client::get_async_response(async_id root_aid)
     return pimpl_->make_serialized_result(response);
 }
 
+request_essentials
+rpclib_client::get_essentials(async_id aid)
+{
+    auto& logger{*pimpl_->logger_};
+    logger.debug("get_essentials {}", aid);
+    auto essentials_tuple
+        = pimpl_->do_rpc_call("get_essentials", pimpl_->default_timeout, aid)
+              .as<rpclib_essentials>();
+    auto uuid_str = std::get<0>(essentials_tuple);
+    auto opt_title = std::get<1>(essentials_tuple);
+    logger.debug(
+        "essentials for {}: uuid {}, title {}", aid, uuid_str, opt_title);
+    if (opt_title.empty())
+    {
+        return request_essentials{std::move(uuid_str)};
+    }
+    else
+    {
+        return request_essentials{std::move(uuid_str), std::move(opt_title)};
+    }
+}
+
 void
 rpclib_client::request_cancellation(async_id aid)
 {

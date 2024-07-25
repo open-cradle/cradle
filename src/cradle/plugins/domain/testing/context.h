@@ -132,7 +132,8 @@ class local_atst_context_tree_builder : public local_context_tree_builder_base
     make_sub_ctx(
         local_tree_context_base& tree_ctx,
         std::size_t ix,
-        bool is_req) override;
+        bool is_req,
+        std::unique_ptr<request_essentials> essentials) override;
 };
 
 /*
@@ -297,6 +298,18 @@ class atst_context final : public root_local_async_context_intf,
     }
 
     // local_async_context_intf
+    void
+    set_essentials(std::unique_ptr<request_essentials> essentials) override
+    {
+        get_local_root().set_essentials(std::move(essentials));
+    }
+
+    request_essentials
+    get_essentials() const override
+    {
+        return get_local_root().get_essentials();
+    }
+
     std::size_t
     get_local_num_subs() const override
     {
@@ -307,12 +320,6 @@ class atst_context final : public root_local_async_context_intf,
     get_local_sub(std::size_t ix) override
     {
         return get_local_root().get_local_sub(ix);
-    }
-
-    std::unique_ptr<req_visitor_intf>
-    make_ctx_tree_builder() override
-    {
-        return get_local_root().make_ctx_tree_builder();
     }
 
     cppcoro::task<void>
@@ -343,6 +350,13 @@ class atst_context final : public root_local_async_context_intf,
     update_status_error(std::string const& errmsg) override
     {
         get_local_root().update_status_error(errmsg);
+    }
+
+    // root_local_async_context_intf
+    std::unique_ptr<req_visitor_intf>
+    make_ctx_tree_builder() override
+    {
+        return get_local_root().make_ctx_tree_builder();
     }
 
     void

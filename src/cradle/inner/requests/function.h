@@ -77,7 +77,7 @@ void
 visit_arg(req_visitor_intf& visitor, std::size_t ix, SubReq const& sub_req)
 {
     static_assert(VisitableRequest<SubReq>);
-    auto sub_visitor = visitor.visit_req_arg(ix);
+    auto sub_visitor = visitor.visit_req_arg(ix, sub_req.get_essentials());
     sub_req.accept(*sub_visitor);
 }
 
@@ -1046,6 +1046,21 @@ class function_request : public ObjectProps::retrier_type
         return impl_->get_introspection_title();
     }
 
+    std::unique_ptr<request_essentials>
+    get_essentials() const
+    {
+        if (impl_->is_introspective())
+        {
+            return std::make_unique<request_essentials>(
+                impl_->get_uuid().str(), impl_->get_introspection_title());
+        }
+        else
+        {
+            return std::make_unique<request_essentials>(
+                impl_->get_uuid().str());
+        }
+    }
+
     void
     register_uuid(
         seri_registry& registry,
@@ -1419,6 +1434,13 @@ class proxy_request : public ObjectProps::retrier_type
     get_introspection_title() const
     {
         return impl_->get_introspection_title();
+    }
+
+    // There should be no reason to call this
+    std::unique_ptr<request_essentials>
+    get_essentials() const
+    {
+        throw not_implemented_error{"proxy_request::get_essentials()"};
     }
 
  public:
