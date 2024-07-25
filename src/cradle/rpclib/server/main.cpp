@@ -196,11 +196,6 @@ run_server(cli_options const& options)
 
     // TODO we need a session concept and a "start session" / "register"
     // (notification) message
-    srv.bind(
-        "resolve_sync", [&](std::string config_json, std::string seri_req) {
-            return handle_resolve_sync(
-                hctx, std::move(config_json), std::move(seri_req));
-        });
     if (options.testing)
     {
         // No mocking in production server
@@ -214,9 +209,34 @@ run_server(cli_options const& options)
     srv.bind("ping", []() { return RPCLIB_PROTOCOL; });
 
     srv.bind(
+        "store_request",
+        [&](std::string storage_name, std::string key, std::string seri_req) {
+            return handle_store_request(
+                hctx,
+                std::move(storage_name),
+                std::move(key),
+                std::move(seri_req));
+        });
+    srv.bind(
+        "resolve_sync", [&](std::string config_json, std::string seri_req) {
+            return handle_resolve_sync(
+                hctx, std::move(config_json), std::move(seri_req));
+        });
+    srv.bind(
         "submit_async", [&](std::string config_json, std::string seri_req) {
             return handle_submit_async(
                 hctx, std::move(config_json), std::move(seri_req));
+        });
+    srv.bind(
+        "submit_stored",
+        [&](std::string config_json,
+            std::string storage_name,
+            std::string key) {
+            return handle_submit_stored(
+                hctx,
+                std::move(config_json),
+                std::move(storage_name),
+                std::move(key));
         });
     srv.bind("get_sub_contexts", [&](async_id aid) {
         return handle_get_sub_contexts(hctx, aid);

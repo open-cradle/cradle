@@ -144,6 +144,16 @@ rpclib_client::get_logger()
     return *pimpl_->logger_;
 }
 
+void
+rpclib_client::store_request(
+    std::string storage_name, std::string key, std::string seri_req)
+{
+    auto& logger{*pimpl_->logger_};
+    logger.debug("store_request");
+    pimpl_->do_rpc_call(
+        "store_request", pimpl_->default_timeout, storage_name, key, seri_req);
+}
+
 serialized_result
 rpclib_client::resolve_sync(service_config config, std::string seri_req)
 {
@@ -172,6 +182,24 @@ rpclib_client::submit_async(service_config config, std::string seri_req)
                        seri_req)
                    .as<async_id>();
     logger.debug("submit_async -> {}", aid);
+    return aid;
+}
+
+async_id
+rpclib_client::submit_stored(
+    service_config config, std::string storage_name, std::string key)
+{
+    auto& logger{*pimpl_->logger_};
+    logger.debug("submit_stored");
+    auto aid = pimpl_
+                   ->do_rpc_call(
+                       "submit_stored",
+                       pimpl_->default_timeout,
+                       write_config_map_to_json(config.get_config_map()),
+                       storage_name,
+                       key)
+                   .as<async_id>();
+    logger.debug("submit_stored -> {}", aid);
     return aid;
 }
 

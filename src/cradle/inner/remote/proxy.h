@@ -78,6 +78,13 @@ class remote_proxy
     get_logger()
         = 0;
 
+    // Stores a request in the named storage, under key (which should be the
+    // request's unique hash).
+    virtual void
+    store_request(
+        std::string storage_name, std::string key, std::string seri_req)
+        = 0;
+
     // Resolves a request, synchronously.
     virtual serialized_result
     resolve_sync(service_config config, std::string seri_req)
@@ -90,6 +97,12 @@ class remote_proxy
     // take some time.
     virtual async_id
     submit_async(service_config config, std::string seri_req)
+        = 0;
+
+    // Like submit_async(), but retrieves the request from the named storage.
+    virtual async_id
+    submit_stored(
+        service_config config, std::string storage_name, std::string key)
         = 0;
 
     // Returns the specification of the child contexts of the context subtree

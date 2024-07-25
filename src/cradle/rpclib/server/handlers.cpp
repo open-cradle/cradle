@@ -22,6 +22,7 @@
 #include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/resolve/util.h>
 #include <cradle/inner/service/config_map_from_json.h>
+#include <cradle/inner/service/secondary_storage_intf.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/rpclib/common/config.h>
 #include <cradle/rpclib/server/handlers.h>
@@ -207,6 +208,28 @@ catch (std::exception& e)
     handle_exception(hctx, e);
 }
 
+int
+handle_store_request(
+    rpclib_handler_context& hctx,
+    std::string storage_name,
+    std::string key,
+    std::string seri_req)
+try
+{
+    auto& logger{hctx.logger()};
+    logger.info("handle_store_request ({}, {})", storage_name, key);
+    auto& resources{hctx.service()};
+    auto& storage{resources.requests_storage(storage_name)};
+    cppcoro::sync_wait(
+        storage.write(std::move(key), make_blob(std::move(seri_req))));
+    return int{};
+}
+catch (std::exception& e)
+{
+    handle_exception(hctx, e);
+    return int{};
+}
+
 // Resolves an async request, running on a dedicated thread from the
 // async_request_pool_.
 static void
@@ -246,12 +269,11 @@ resolve_async(
     }
 }
 
-async_id
-handle_submit_async(
+static async_id
+try_handle_submit_async(
     rpclib_handler_context& hctx,
     std::string config_json,
     std::string seri_req)
-try
 {
     auto& logger{hctx.logger()};
     service_config config{read_config_map_from_json(config_json)};
@@ -289,6 +311,45 @@ try
     async_id aid = actx->get_id();
     logger.info("async_id {}", aid);
     return aid;
+}
+
+async_id
+handle_submit_async(
+    rpclib_handler_context& hctx,
+    std::string config_json,
+    std::string seri_req)
+try
+{
+    return try_handle_submit_async(
+        hctx, std::move(config_json), std::move(seri_req));
+}
+catch (std::exception& e)
+{
+    handle_exception(hctx, e);
+    return async_id{};
+}
+
+async_id
+handle_submit_stored(
+    rpclib_handler_context& hctx,
+    std::string config_json,
+    std::string storage_name,
+    std::string key)
+try
+{
+    auto& logger{hctx.logger()};
+    logger.info("handle_submit_stored ({}, {})", storage_name, key);
+    auto& resources{hctx.service()};
+    auto& storage{resources.requests_storage(storage_name)};
+    auto opt_seri_req_as_blob
+        = cppcoro::sync_wait(storage.read(std::move(key)));
+    if (!opt_seri_req_as_blob)
+    {
+        throw std::logic_error{"Request not in storage"};
+    }
+    auto seri_req{to_string(*opt_seri_req_as_blob)};
+    return try_handle_submit_async(
+        hctx, std::move(config_json), std::move(seri_req));
 }
 catch (std::exception& e)
 {
