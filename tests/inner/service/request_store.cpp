@@ -3,12 +3,12 @@
 #include <fmt/format.h>
 
 #include "../../support/inner_service.h"
-#include "../../support/simple_storage.h"
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/requests/function.h>
 #include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/inner/resolve/seri_registry.h>
 #include <cradle/inner/service/request_store.h>
+#include <cradle/plugins/secondary_cache/simple/simple_storage.h>
 
 using namespace cradle;
 

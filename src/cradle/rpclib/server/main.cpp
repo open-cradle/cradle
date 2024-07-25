@@ -27,6 +27,7 @@
 #include <cradle/plugins/secondary_cache/all_plugins.h>
 #include <cradle/plugins/secondary_cache/http/http_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
+#include <cradle/plugins/secondary_cache/simple/simple_storage.h>
 #include <cradle/rpclib/common/common.h>
 #include <cradle/rpclib/common/config.h>
 #include <cradle/rpclib/server/handlers.h>
@@ -180,6 +181,8 @@ run_server(cli_options const& options)
     {
         service.set_secondary_cache(create_secondary_storage(service));
     }
+    service.set_requests_storage(
+        std::make_unique<simple_blob_storage>("simple"));
     service.ensure_async_db();
     service.register_domain(create_testing_domain(service));
     service.register_domain(create_thinknode_domain(service));

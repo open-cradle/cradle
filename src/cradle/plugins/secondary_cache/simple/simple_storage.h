@@ -1,5 +1,5 @@
-#ifndef CRADLE_TESTS_SUPPORT_SIMPLE_STORAGE_H
-#define CRADLE_TESTS_SUPPORT_SIMPLE_STORAGE_H
+#ifndef CRADLE_PLUGINS_SECONDARY_CACHE_SIMPLE_SIMPLE_STORAGE_H
+#define CRADLE_PLUGINS_SECONDARY_CACHE_SIMPLE_SIMPLE_STORAGE_H
 
 #include <map>
 #include <optional>
@@ -17,6 +17,12 @@ namespace cradle {
 class simple_blob_storage : public secondary_storage_intf
 {
  public:
+    simple_blob_storage() = default;
+
+    simple_blob_storage(std::string name) : name_{std::move(name)}
+    {
+    }
+
     std::string const&
     name() const override
     {
