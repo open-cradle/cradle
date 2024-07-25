@@ -700,6 +700,15 @@ class root_proxy_async_context_base : public proxy_async_context_base
     void
     fail_remote_id() noexcept override;
 
+    void
+    make_introspective() override;
+
+    bool
+    introspective() const override
+    {
+        return introspective_;
+    }
+
  protected:
     // To be called from a derived object's destructor. The functionality
     // cannot be in ~root_proxy_async_context_base() as the tree_ctx_ object
@@ -711,6 +720,7 @@ class root_proxy_async_context_base : public proxy_async_context_base
     std::promise<async_id> remote_id_promise_;
     // Using shared_future to allow get() from multiple threads
     std::shared_future<async_id> remote_id_future_;
+    bool introspective_{false};
 
     void
     wait_on_remote_id() override;
@@ -749,6 +759,12 @@ class non_root_proxy_async_context_base : public proxy_async_context_base
 
     void
     fail_remote_id() noexcept override;
+
+    void
+    make_introspective() override;
+
+    bool
+    introspective() const override;
 
  private:
     bool is_req_;

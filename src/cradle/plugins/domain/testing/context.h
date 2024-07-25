@@ -456,6 +456,18 @@ class atst_context final : public root_local_async_context_intf,
         return get_remote_root().get_remote_id();
     }
 
+    void
+    make_introspective() override
+    {
+        introspective_ = true;
+    }
+
+    bool
+    introspective() const override
+    {
+        return introspective_;
+    }
+
     // local_async_ctx_owner_intf
     root_local_async_context_intf&
     prepare_for_local_resolution() override;
@@ -487,6 +499,7 @@ class atst_context final : public root_local_async_context_intf,
     std::string proxy_name_;
     std::optional<root_tasklet_spec> opt_tasklet_spec_;
     std::shared_ptr<spdlog::logger> logger_;
+    bool introspective_{false};
 
     std::atomic<bool> prepared_{false};
     // Promise/future associated with prepare_for_..._resolution()
