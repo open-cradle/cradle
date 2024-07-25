@@ -17,6 +17,12 @@ namespace cradle {
 class simple_blob_storage : public secondary_storage_intf
 {
  public:
+    std::string const&
+    name() const override
+    {
+        return name_;
+    }
+
     void
     clear() override;
 
@@ -39,6 +45,7 @@ class simple_blob_storage : public secondary_storage_intf
     }
 
  private:
+    std::string const name_{"simple_blob"};
     std::map<std::string, blob> storage_;
 };
 
@@ -47,6 +54,12 @@ class simple_blob_storage : public secondary_storage_intf
 class simple_string_storage : public secondary_storage_intf
 {
  public:
+    std::string const&
+    name() const override
+    {
+        return name_;
+    }
+
     void
     clear() override;
 
@@ -69,6 +82,7 @@ class simple_string_storage : public secondary_storage_intf
     }
 
  private:
+    std::string const name_{"simple_string"};
     std::map<std::string, std::string> storage_;
 };
 

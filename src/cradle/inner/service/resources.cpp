@@ -148,26 +148,48 @@ inner_resources::clear_secondary_cache()
 
 void
 inner_resources::set_requests_storage(
-    std::unique_ptr<secondary_storage_intf> requests_storage)
+    std::unique_ptr<secondary_storage_intf> storage, bool is_default)
 {
     auto& impl{*impl_};
-    if (impl.requests_storage_)
+    std::string name{storage->name()};
+    if (impl.requests_storages_.contains(name))
+    {
+        throw std::logic_error(fmt::format(
+            "inner_resources already has requests storage named {}", name));
+    }
+    if (is_default && impl.default_requests_storage_)
     {
         throw std::logic_error(
-            "attempt to change requests storage in inner_resources");
+            "inner_resources already has a default requests storage");
     }
-    impl.requests_storage_ = std::move(requests_storage);
+    impl.default_requests_storage_ = &*storage;
+    impl.requests_storages_.emplace(
+        std::make_pair(std::move(name), std::move(storage)));
 }
 
 secondary_storage_intf&
 inner_resources::requests_storage()
 {
     auto& impl{*impl_};
-    if (!impl.requests_storage_)
+    if (!impl.default_requests_storage_)
     {
-        throw std::logic_error("inner_resources has no requests storage");
+        throw std::logic_error(
+            "inner_resources has no default requests storage");
     }
-    return *impl.requests_storage_;
+    return *impl.default_requests_storage_;
+}
+
+secondary_storage_intf&
+inner_resources::requests_storage(std::string const& name)
+{
+    auto& impl{*impl_};
+    auto it = impl.requests_storages_.find(name);
+    if (it == impl.requests_storages_.end())
+    {
+        throw std::logic_error(fmt::format(
+            "inner_resources has no requests storage named {}", name));
+    }
+    return *it->second;
 }
 
 http_connection_interface&

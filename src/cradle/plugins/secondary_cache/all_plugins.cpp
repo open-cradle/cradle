@@ -6,6 +6,7 @@
 
 namespace cradle {
 
+// TODO consider adding the "simple" plugins
 std::vector<std::string>
 get_secondary_storage_plugin_names()
 {
