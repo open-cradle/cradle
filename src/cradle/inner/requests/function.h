@@ -103,7 +103,6 @@ class base_request_intf : public id_interface
     get_uuid() const
         = 0;
 
-    // needed here?
     virtual bool
     is_introspective() const
         = 0;
@@ -130,8 +129,6 @@ template<typename Value>
 class function_request_intf : public base_request_intf
 {
  public:
-    virtual ~function_request_intf() = default;
-
     virtual caching_level_type
     get_caching_level() const
         = 0;
@@ -1254,7 +1251,13 @@ deep_sizeof(function_request<Value, ObjectProps> const& req)
  * Compared to class proxy_request_impl, the argument types have been erased;
  * not even the Value template parameter remains.
  */
-using proxy_request_intf = base_request_intf;
+class proxy_request_intf : public base_request_intf
+{
+ public:
+    virtual void
+    register_uuid(seri_registry& registry, catalog_id cat_id) const
+        = 0;
+};
 
 /*
  * Proxy request implementation.
@@ -1404,9 +1407,7 @@ class proxy_request_impl final
     // deserialization will translate an input containing that same uuid to an
     // object of the same type.
     void
-    register_uuid(
-        seri_registry& registry,
-        catalog_id cat_id) const // override
+    register_uuid(seri_registry& registry, catalog_id cat_id) const override
     {
         registry.add(cat_id, uuid_.str(), create);
     }
@@ -1508,6 +1509,7 @@ class proxy_request : public ObjectProps::retrier_type
         return caching_level_type::none;
     }
 
+    // TODO not called for proxy_request, it seems
     bool
     is_introspective() const
     {
@@ -1527,8 +1529,6 @@ class proxy_request : public ObjectProps::retrier_type
         throw not_implemented_error{"proxy_request::get_essentials()"};
     }
 
-#if 0
-    // TODO
     void
     register_uuid(
         seri_registry& registry,
@@ -1536,7 +1536,13 @@ class proxy_request : public ObjectProps::retrier_type
     {
         impl_->register_uuid(registry, cat_id);
     }
-#endif
+
+ public:
+    // Interface for cereal + msgpack
+
+    // Used for creating placeholder subrequests in the catalog;
+    // also called when deserializing a subrequest.
+    proxy_request() = default;
 
  public:
     // Interface for cereal
