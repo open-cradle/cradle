@@ -947,8 +947,10 @@ class function_request_impl final
     // (direct or indirect) subrequest of a request with such a caching level.
     mutable std::optional<size_t> hash_;
 
-    // Used when this request's caching level is at full; _OR_ if a
-    // (direct or indirect) subrequest of a request with such a caching level.
+    // Used when resolving this request, and its caching level is at full;
+    // _OR_ if a (direct or indirect) subrequest of a request with such a
+    // caching level;
+    // _OR_ when storing the request.
     mutable unique_hasher::result_t unique_hash_;
     mutable bool have_unique_hash_{false};
 
@@ -1245,6 +1247,55 @@ deep_sizeof(function_request<Value, ObjectProps> const& req)
     return req.deep_size();
 }
 
+// register_uuid_for_normalized_arg() specialization for function_request types
+// arg should result from normalize_arg()
+template<typename Value, typename Props>
+void
+register_uuid_for_normalized_arg(
+    seri_registry& registry,
+    catalog_id cat_id,
+    function_request<Value, Props> const& arg)
+{
+    using arg_t = function_request<Value, Props>;
+    arg.register_uuid(
+        registry, cat_id, std::make_shared<seri_resolver_impl<arg_t>>());
+}
+
+// Used for comparing subrequests, where the main requests have the same type;
+// so the subrequests have the same type too.
+template<typename Value, typename Props>
+bool
+operator==(
+    function_request<Value, Props> const& lhs,
+    function_request<Value, Props> const& rhs)
+{
+    return lhs.equals(rhs);
+}
+
+template<typename Value, typename Props>
+bool
+operator<(
+    function_request<Value, Props> const& lhs,
+    function_request<Value, Props> const& rhs)
+{
+    return lhs.less_than(rhs);
+}
+
+template<typename Value, typename Props>
+std::size_t
+hash_value(function_request<Value, Props> const& req)
+{
+    return req.hash();
+}
+
+template<typename Value, typename Props>
+void
+update_unique_hash(
+    unique_hasher& hasher, function_request<Value, Props> const& req)
+{
+    req.update_hash(hasher);
+}
+
 /*
  * Interface class for class proxy_request_impl
  *
@@ -1336,17 +1387,15 @@ class proxy_request_impl final
         throw not_implemented_error{"proxy_request_impl::hash()"};
     }
 
+    // Needed for storing a request
     void
     update_hash(unique_hasher& hasher) const override
     {
-        throw not_implemented_error{"proxy_request_impl::update_hash()"};
-#if 0
         if (!this->have_unique_hash_)
         {
             calc_unique_hash();
         }
         hasher.combine(this->unique_hash_);
-#endif
     }
 
  public: // base_request_intf
@@ -1417,7 +1466,10 @@ class proxy_request_impl final
     std::tuple<Args...> args_;
     std::unique_ptr<containment_data> containment_;
 
-#if 0
+    // Used when storing the request.
+    mutable unique_hasher::result_t unique_hash_;
+    mutable bool have_unique_hash_{false};
+
     void
     calc_unique_hash() const
     {
@@ -1431,7 +1483,6 @@ class proxy_request_impl final
         this->unique_hash_ = hasher.get_result();
         this->have_unique_hash_ = true;
     }
-#endif
 };
 
 template<typename Value, typename ObjectProps>
@@ -1541,6 +1592,12 @@ class proxy_request : public ObjectProps::retrier_type
         return captured_id{impl_};
     }
 
+    void
+    update_hash(unique_hasher& hasher) const
+    {
+        impl_->update_hash(hasher);
+    }
+
  public:
     // Interface for cereal + msgpack
 
@@ -1592,27 +1649,14 @@ class proxy_request : public ObjectProps::retrier_type
     std::shared_ptr<intf_type> impl_;
 };
 
-// register_uuid_for_normalized_arg() specialization for function_request types
-// arg should result from normalize_arg()
-template<typename Value, typename Props>
-void
-register_uuid_for_normalized_arg(
-    seri_registry& registry,
-    catalog_id cat_id,
-    function_request<Value, Props> const& arg)
-{
-    using arg_t = function_request<Value, Props>;
-    arg.register_uuid(
-        registry, cat_id, std::make_shared<seri_resolver_impl<arg_t>>());
-}
-
+#if 0
 // Used for comparing subrequests, where the main requests have the same type;
 // so the subrequests have the same type too.
 template<typename Value, typename Props>
 bool
 operator==(
-    function_request<Value, Props> const& lhs,
-    function_request<Value, Props> const& rhs)
+    proxy_request<Value, Props> const& lhs,
+    proxy_request<Value, Props> const& rhs)
 {
     return lhs.equals(rhs);
 }
@@ -1620,23 +1664,24 @@ operator==(
 template<typename Value, typename Props>
 bool
 operator<(
-    function_request<Value, Props> const& lhs,
-    function_request<Value, Props> const& rhs)
+    proxy_request<Value, Props> const& lhs,
+    proxy_request<Value, Props> const& rhs)
 {
     return lhs.less_than(rhs);
 }
 
 template<typename Value, typename Props>
 std::size_t
-hash_value(function_request<Value, Props> const& req)
+hash_value(proxy_request<Value, Props> const& req)
 {
     return req.hash();
 }
+#endif
 
 template<typename Value, typename Props>
 void
 update_unique_hash(
-    unique_hasher& hasher, function_request<Value, Props> const& req)
+    unique_hasher& hasher, proxy_request<Value, Props> const& req)
 {
     req.update_hash(hasher);
 }
