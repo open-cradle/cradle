@@ -26,6 +26,12 @@ class http_requests_storage : public secondary_storage_intf
  public:
     http_requests_storage(inner_resources& resources);
 
+    std::string const&
+    name() const override
+    {
+        return name_;
+    }
+
     // Not (yet?) implemented
     void
     clear() override;
@@ -45,6 +51,7 @@ class http_requests_storage : public secondary_storage_intf
     }
 
  private:
+    std::string const name_{"http_requests"};
     inner_resources& resources_;
     int port_;
 };

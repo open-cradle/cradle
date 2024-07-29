@@ -74,6 +74,8 @@ class rpclib_client_impl
     void
     wait_until_server_running();
     void
+    ensure_server();
+    void
     start_server();
     void
     stop_server();
@@ -93,6 +95,7 @@ class rpclib_client_impl
     std::shared_ptr<spdlog::logger> logger_;
     bool const testing_{};
     bool const contained_{};
+    bool const expect_server_{};
     std::optional<std::string> const deploy_dir_;
     rpclib_port_t const port_{};
     std::optional<std::string> secondary_cache_factory_;

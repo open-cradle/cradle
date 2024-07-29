@@ -35,6 +35,12 @@ class http_cache : public secondary_storage_intf
 
     ~http_cache();
 
+    std::string const&
+    name() const override
+    {
+        return name_;
+    }
+
     // Not (yet?) implemented
     void
     clear() override;
@@ -54,6 +60,7 @@ class http_cache : public secondary_storage_intf
     }
 
  private:
+    std::string const name_{"http_cache"};
     std::unique_ptr<http_cache_impl> impl_;
 };
 

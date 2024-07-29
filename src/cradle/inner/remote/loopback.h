@@ -38,11 +38,23 @@ class loopback_service : public remote_proxy
     spdlog::logger&
     get_logger() override;
 
+    void
+    store_request(
+        std::string storage_name,
+        std::string key,
+        std::string seri_req) override;
+
     serialized_result
     resolve_sync(service_config config, std::string seri_req) override;
 
     async_id
     submit_async(service_config config, std::string seri_req) override;
+
+    async_id
+    submit_stored(
+        service_config config,
+        std::string storage_name,
+        std::string key) override;
 
     remote_context_spec_list
     get_sub_contexts(async_id aid) override;
@@ -55,6 +67,9 @@ class loopback_service : public remote_proxy
 
     serialized_result
     get_async_response(async_id root_aid) override;
+
+    request_essentials
+    get_essentials(async_id root_aid) override;
 
     void
     request_cancellation(async_id aid) override;

@@ -9,13 +9,13 @@
 #include "../../support/inner_service.h"
 #include "../../support/make_test_blob.h"
 #include "../../support/request.h"
-#include "../../support/simple_storage.h"
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/plugins/domain/testing/context.h>
 #include <cradle/plugins/domain/testing/demo_class.h>
 #include <cradle/plugins/domain/testing/demo_class_requests.h>
 #include <cradle/plugins/domain/testing/requests.h>
+#include <cradle/plugins/secondary_cache/simple/simple_storage.h>
 
 using namespace cradle;
 

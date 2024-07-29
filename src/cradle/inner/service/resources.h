@@ -69,7 +69,7 @@ struct inner_config_keys
  * The resources are:
  * - An optional memory (immutable) cache (present unless in contained mode)
  * - An optional secondary cache
- * - An optional requests storage
+ * - Zero or more requests storages
  * - A blob_file_writer writing blobs in shared memory
  * - An optional async_db instance
  * - A collection of domains
@@ -135,10 +135,18 @@ class inner_resources
     // should really be separate.
     void
     set_requests_storage(
-        std::unique_ptr<secondary_storage_intf> requests_storage);
+        std::unique_ptr<secondary_storage_intf> storage,
+        bool is_default = false);
 
+    // Returns the default requests storage.
+    // Throws if not set.
     secondary_storage_intf&
     requests_storage();
+
+    // Returns the requests storage identified by name.
+    // Throws if not set.
+    secondary_storage_intf&
+    requests_storage(std::string const& name);
 
     http_connection_interface&
     http_connection_for_thread();

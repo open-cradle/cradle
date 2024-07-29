@@ -19,8 +19,7 @@ add_library(basic_test_support
     support/cancel_async.cpp
     support/common.cpp
     support/inner_service.cpp
-    support/make_test_blob.cpp
-    support/simple_storage.cpp)
+    support/make_test_blob.cpp)
 add_dependencies(basic_test_support
     deploy_dir_file_target)
 target_link_libraries(basic_test_support PUBLIC

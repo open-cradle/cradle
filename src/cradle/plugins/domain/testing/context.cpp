@@ -150,10 +150,13 @@ local_atst_context_tree_builder::make_sub_builder(
 
 std::shared_ptr<local_async_context_base>
 local_atst_context_tree_builder::make_sub_ctx(
-    local_tree_context_base& tree_ctx, std::size_t ix, bool is_req)
+    local_tree_context_base& tree_ctx,
+    std::size_t ix,
+    bool is_req,
+    std::unique_ptr<request_essentials> essentials)
 {
     return std::make_shared<non_root_local_atst_context>(
-        tree_ctx, &ctx_, is_req);
+        tree_ctx, &ctx_, is_req, std::move(essentials));
 }
 
 proxy_atst_tree_context::proxy_atst_tree_context(
@@ -287,6 +290,10 @@ atst_context::prepare_for_remote_resolution()
         std::make_unique<proxy_atst_tree_context>(resources_, proxy_name_),
         create_optional_root_tasklet(
             resources_.the_tasklet_admin(), opt_tasklet_spec_));
+    if (introspective_)
+    {
+        remote_root_->make_introspective();
+    }
     copy_test_params(*remote_root_);
     on_preparation_finished();
     return *remote_root_;

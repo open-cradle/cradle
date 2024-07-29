@@ -18,6 +18,10 @@ class secondary_storage_intf
  public:
     virtual ~secondary_storage_intf() = default;
 
+    virtual std::string const&
+    name() const
+        = 0;
+
     // Clear the cache, removing all entries.
     virtual void
     clear()

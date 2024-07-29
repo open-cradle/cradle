@@ -2,6 +2,7 @@
 #define CRADLE_INNER_SERVICE_RESOURCES_IMPL_H
 
 #include <atomic>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -68,7 +69,9 @@ class inner_resources_impl
     std::shared_ptr<spdlog::logger> logger_;
     std::unique_ptr<immutable_cache> memory_cache_;
     std::unique_ptr<secondary_storage_intf> secondary_cache_;
-    std::unique_ptr<secondary_storage_intf> requests_storage_;
+    std::map<std::string, std::unique_ptr<secondary_storage_intf>>
+        requests_storages_;
+    secondary_storage_intf* default_requests_storage_{nullptr};
     std::unique_ptr<blob_file_directory> blob_dir_;
     std::unique_ptr<async_db> the_async_db_;
     std::unordered_map<std::string, std::unique_ptr<domain>> domains_;

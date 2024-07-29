@@ -1,6 +1,6 @@
-#include "simple_storage.h"
 #include <cradle/inner/core/exception.h>
 #include <cradle/inner/core/type_interfaces.h>
+#include <cradle/plugins/secondary_cache/simple/simple_storage.h>
 
 namespace cradle {
 

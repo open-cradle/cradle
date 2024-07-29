@@ -117,6 +117,12 @@ class creq_context : public remote_async_context_intf,
         return remote_id_;
     }
 
+    void
+    make_introspective() override;
+
+    bool
+    introspective() const override;
+
     // special
     void
     throw_if_cancelled();

@@ -58,6 +58,13 @@ class value_request
             "value_request::get_introspection_title()"};
     }
 
+    std::unique_ptr<request_essentials>
+    get_essentials() const
+    {
+        // no uuid, no title
+        return nullptr;
+    }
+
     // A value request is "trivial": it presents itself as having no
     // subrequests, and no arguments.
     // Thus, accept() becomes a no-op.

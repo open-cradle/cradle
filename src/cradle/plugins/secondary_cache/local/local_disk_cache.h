@@ -78,6 +78,12 @@ class local_disk_cache : public secondary_storage_intf
  public:
     local_disk_cache(service_config const& config);
 
+    std::string const&
+    name() const override
+    {
+        return name_;
+    }
+
     void
     clear() override;
 
@@ -115,6 +121,7 @@ class local_disk_cache : public secondary_storage_intf
     busy_writing_to_file() const;
 
  private:
+    std::string const name_{"disk_cache"};
     bool check_file_data_;
     ll_disk_cache ll_cache_;
     disk_cache_poller poller_;

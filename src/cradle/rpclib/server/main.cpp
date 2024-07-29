@@ -27,6 +27,7 @@
 #include <cradle/plugins/secondary_cache/all_plugins.h>
 #include <cradle/plugins/secondary_cache/http/http_cache.h>
 #include <cradle/plugins/secondary_cache/local/local_disk_cache.h>
+#include <cradle/plugins/secondary_cache/simple/simple_storage.h>
 #include <cradle/rpclib/common/common.h>
 #include <cradle/rpclib/common/config.h>
 #include <cradle/rpclib/server/handlers.h>
@@ -180,6 +181,8 @@ run_server(cli_options const& options)
     {
         service.set_secondary_cache(create_secondary_storage(service));
     }
+    service.set_requests_storage(
+        std::make_unique<simple_blob_storage>("simple"));
     service.ensure_async_db();
     service.register_domain(create_testing_domain(service));
     service.register_domain(create_thinknode_domain(service));
@@ -193,11 +196,6 @@ run_server(cli_options const& options)
 
     // TODO we need a session concept and a "start session" / "register"
     // (notification) message
-    srv.bind(
-        "resolve_sync", [&](std::string config_json, std::string seri_req) {
-            return handle_resolve_sync(
-                hctx, std::move(config_json), std::move(seri_req));
-        });
     if (options.testing)
     {
         // No mocking in production server
@@ -211,9 +209,34 @@ run_server(cli_options const& options)
     srv.bind("ping", []() { return RPCLIB_PROTOCOL; });
 
     srv.bind(
+        "store_request",
+        [&](std::string storage_name, std::string key, std::string seri_req) {
+            return handle_store_request(
+                hctx,
+                std::move(storage_name),
+                std::move(key),
+                std::move(seri_req));
+        });
+    srv.bind(
+        "resolve_sync", [&](std::string config_json, std::string seri_req) {
+            return handle_resolve_sync(
+                hctx, std::move(config_json), std::move(seri_req));
+        });
+    srv.bind(
         "submit_async", [&](std::string config_json, std::string seri_req) {
             return handle_submit_async(
                 hctx, std::move(config_json), std::move(seri_req));
+        });
+    srv.bind(
+        "submit_stored",
+        [&](std::string config_json,
+            std::string storage_name,
+            std::string key) {
+            return handle_submit_stored(
+                hctx,
+                std::move(config_json),
+                std::move(storage_name),
+                std::move(key));
         });
     srv.bind("get_sub_contexts", [&](async_id aid) {
         return handle_get_sub_contexts(hctx, aid);
@@ -256,6 +279,9 @@ run_server(cli_options const& options)
         });
     srv.bind("get_num_contained_calls", [&]() {
         return handle_get_num_contained_calls(hctx);
+    });
+    srv.bind("get_essentials", [&](async_id aid) {
+        return handle_get_essentials(hctx, aid);
     });
 
     auto num_threads{hctx.handler_pool_size()};
