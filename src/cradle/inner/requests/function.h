@@ -120,13 +120,160 @@ class base_request_intf : public id_interface
         = 0;
 };
 
+// base_request_intf implementation, mixin for function_request_impl and
+// proxy_request_impl
+template<typename... Args>
+class base_request_impl : public virtual base_request_intf
+{
+ protected:
+    template<typename... CtorArgs>
+    base_request_impl(request_uuid const& uuid, CtorArgs&&... args)
+        : uuid_{uuid}, args_{std::forward<CtorArgs>(args)...}
+    {
+    }
+
+    // Construct an object to be deserialized.
+    base_request_impl(request_uuid&& uuid) : uuid_{std::move(uuid)}
+    {
+    }
+
+ public: // id_interface
+    bool
+    equals_base(base_request_impl const& other) const
+    {
+        if (this == &other)
+        {
+            return true;
+        }
+        if (uuid_ != other.uuid_)
+        {
+            return false;
+        }
+        return args_ == other.args_;
+    }
+
+    // other will be a base_request_impl, but possibly instantiated from
+    // different template arguments.
+    bool
+    less_than_base(base_request_impl const& other) const
+    {
+        if (this == &other)
+        {
+            return false;
+        }
+        if (uuid_ != other.uuid_)
+        {
+            return uuid_ < other.uuid_;
+        }
+        return args_ < other.args_;
+    }
+
+    // Maybe caching the hashes could be optional (policy?).
+    size_t
+    hash() const override
+    {
+        if (!this->hash_)
+        {
+            auto uuid_hash = invoke_hash(uuid_);
+            auto args_hash = std::apply(
+                [](auto&&... args) {
+                    return combine_hashes(invoke_hash(args)...);
+                },
+                args_);
+            this->hash_ = combine_hashes(uuid_hash, args_hash);
+        }
+        return *this->hash_;
+    }
+
+    void
+    update_hash(unique_hasher& hasher) const override
+    {
+        if (!this->have_unique_hash_)
+        {
+            calc_unique_hash();
+        }
+        hasher.combine(this->unique_hash_);
+    }
+
+ public: // base_request_intf
+    void
+    set_containment(containment_data const& containment) override
+    {
+        containment_ = std::make_unique<containment_data>(containment);
+    }
+
+    request_uuid const&
+    get_uuid() const override
+    {
+        return uuid_;
+    }
+
+    // base part of save()
+    void
+    save_base(JSONRequestOutputArchive& archive) const
+    {
+        archive(cereal::make_nvp("args", args_));
+        if (containment_)
+        {
+            containment_->save(archive);
+        }
+        else
+        {
+            containment_data::save_nothing(archive);
+        }
+    }
+
+    // base part of load()
+    void
+    load_base(JSONRequestInputArchive& archive)
+    {
+        archive(cereal::make_nvp("args", args_));
+        containment_ = containment_data::load(archive);
+    }
+
+ protected:
+    // Uniquely identifies the function.
+    request_uuid uuid_;
+
+    // The arguments to pass to the function.
+    std::tuple<Args...> args_;
+
+    // Containment data if function should run contained.
+    std::unique_ptr<containment_data> containment_;
+
+    // Used when this request's caching level is at least memory; _OR_ if a
+    // (direct or indirect) subrequest of a request with such a caching level.
+    mutable std::optional<size_t> hash_;
+
+    // Used when resolving this request, and its caching level is at full;
+    // _OR_ if a (direct or indirect) subrequest of a request with such a
+    // caching level;
+    // _OR_ when storing the request.
+    mutable unique_hasher::result_t unique_hash_;
+    mutable bool have_unique_hash_{false};
+
+    void
+    calc_unique_hash() const
+    {
+        unique_hasher hasher;
+        update_unique_hash(hasher, uuid_);
+        std::apply(
+            [&hasher](auto&&... args) {
+                (update_unique_hash(hasher, args), ...);
+            },
+            args_);
+        this->unique_hash_ = hasher.get_result();
+        this->have_unique_hash_ = true;
+    }
+};
+
 /*
  * The function_request_impl functionality required by function_request outside
  * its constructor.
  */
 // note Value used in resolve() only
 template<typename Value>
-class function_request_intf : public base_request_intf
+class function_request_intf : public virtual base_request_intf
 {
  public:
     virtual caching_level_type
@@ -347,7 +494,8 @@ template<
     typename Function,
     typename... Args>
 class function_request_impl final
-    : public function_request_intf<Value>,
+    : public virtual base_request_impl<Args...>,
+      public virtual function_request_intf<Value>,
       public detail::request_title_mixin<ImplProps::introspective>,
       public std::enable_shared_from_this<
           function_request_impl<Value, ImplProps, Function, Args...>>
@@ -359,6 +507,7 @@ class function_request_impl final
     using value_type = Value;
     using intf_type = function_request_intf<Value>;
     using this_type = function_request_impl;
+    using base_impl_type = base_request_impl<Args...>;
     using intrsp_mixin_type
         = detail::request_title_mixin<ImplProps::introspective>;
     using clone_props_type = request_impl_props<
@@ -390,11 +539,10 @@ class function_request_impl final
     template<typename CtorProps, typename CtorFunction, typename... CtorArgs>
     function_request_impl(
         CtorProps&& props, CtorFunction&& function, CtorArgs&&... args)
-        : intrsp_mixin_type{props},
-          uuid_{std::forward<CtorProps>(props).get_uuid()},
+        : base_impl_type{(props).get_uuid(), std::forward<CtorArgs>(args)...},
+          intrsp_mixin_type{props},
           function_{std::make_shared<stored_function_t>(
-              std::forward<CtorFunction>(function))},
-          args_{std::forward<CtorArgs>(args)...}
+              std::forward<CtorFunction>(function))}
     {
         static_assert(
             std::
@@ -406,7 +554,8 @@ class function_request_impl final
     // The uuid uniquely identifies the function. It is deserialized in
     // function_request, and stored here so that is available during
     // deserialization, which populates the remainder of this object.
-    function_request_impl(request_uuid&& uuid) : uuid_{std::move(uuid)}
+    function_request_impl(request_uuid&& uuid)
+        : base_impl_type{std::move(uuid)}
     {
     }
 
@@ -430,17 +579,10 @@ class function_request_impl final
             // themselves might still differ, in which case the uuid's
             // should be different. Likewise, argument types will be
             // identical, but their values might differ.
-            auto const* other_impl
-                = static_cast<function_request_impl const*>(&other);
-            if (this == other_impl)
-            {
-                return true;
-            }
-            if (uuid_ != other_impl->uuid_)
-            {
-                return false;
-            }
-            return args_ == other_impl->args_;
+            // TODO try to replace dynamic_cast with static_cast
+            auto const& other_impl
+                = dynamic_cast<base_impl_type const&>(other);
+            return this->equals_base(other_impl);
         }
         return false;
     }
@@ -452,61 +594,15 @@ class function_request_impl final
     {
         if (typeid(*this) == typeid(other))
         {
-            auto const* other_impl
-                = static_cast<function_request_impl const*>(&other);
-            if (this == other_impl)
-            {
-                return false;
-            }
-            if (uuid_ != other_impl->uuid_)
-            {
-                return uuid_ < other_impl->uuid_;
-            }
-            return args_ < other_impl->args_;
+            // TODO try to replace dynamic_cast with static_cast
+            auto const& other_impl
+                = dynamic_cast<base_impl_type const&>(other);
+            return this->less_than_base(other_impl);
         }
         return typeid(*this).before(typeid(other));
     }
 
-    // Maybe caching the hashes could be optional (policy?).
-    size_t
-    hash() const override
-    {
-        if (!this->hash_)
-        {
-            auto uuid_hash = invoke_hash(uuid_);
-            auto args_hash = std::apply(
-                [](auto&&... args) {
-                    return combine_hashes(invoke_hash(args)...);
-                },
-                args_);
-            this->hash_ = combine_hashes(uuid_hash, args_hash);
-        }
-        return *this->hash_;
-    }
-
-    void
-    update_hash(unique_hasher& hasher) const override
-    {
-        if (!this->have_unique_hash_)
-        {
-            calc_unique_hash();
-        }
-        hasher.combine(this->unique_hash_);
-    }
-
  public: // base_request_intf
-    void
-    set_containment(containment_data const& containment) override
-    {
-        containment_ = std::make_unique<containment_data>(containment);
-    }
-
-    request_uuid const&
-    get_uuid() const override
-    {
-        return uuid_;
-    }
-
     bool
     is_introspective() const override
     {
@@ -528,27 +624,18 @@ class function_request_impl final
     save(JSONRequestOutputArchive& archive) const override
     {
         this->save_intrsp_state(archive);
-        archive(cereal::make_nvp("args", args_));
-        if (containment_)
-        {
-            containment_->save(archive);
-        }
-        else
-        {
-            containment_data::save_nothing(archive);
-        }
+        this->save_base(archive);
     }
 
     void
     load(JSONRequestInputArchive& archive) override
     {
         this->load_intrsp_state(archive);
-        archive(cereal::make_nvp("args", args_));
-        containment_ = containment_data::load(archive);
+        this->load_base(archive);
         auto& resources{archive.get_resources()};
         auto the_seri_registry{resources.get_seri_registry()};
-        function_
-            = the_seri_registry->find_function<stored_function_t>(uuid_.str());
+        function_ = the_seri_registry->find_function<stored_function_t>(
+            this->uuid_.str());
     }
 
  public: // function_request_intf
@@ -575,17 +662,17 @@ class function_request_impl final
         std::shared_ptr<seri_resolver_intf> resolver) const override
     {
         registry.add(
-            cat_id, uuid_.str(), std::move(resolver), create, function_);
+            cat_id, this->uuid_.str(), std::move(resolver), create, function_);
 
         // Register uuids for any args resulting from normalize_arg()
         register_uuid_for_normalized_args(
-            registry, cat_id, args_, ArgIndices{});
+            registry, cat_id, this->args_, ArgIndices{});
     }
 
     void
     accept(req_visitor_intf& visitor) const override
     {
-        visit_args(visitor, args_, ArgIndices{});
+        visit_args(visitor, this->args_, ArgIndices{});
     }
 
     void
@@ -593,10 +680,10 @@ class function_request_impl final
     {
         this->save_intrsp_state(packer);
         // Args tuple saved as an array
-        packer.pack(args_);
-        if (containment_)
+        packer.pack(this->args_);
+        if (this->containment_)
         {
-            containment_->save(packer);
+            this->containment_->save(packer);
         }
         else
         {
@@ -609,13 +696,13 @@ class function_request_impl final
     {
         // begin base_request_mixin::load()
         this->load_intrsp_state(msgpack_objs[0]);
-        msgpack_objs[1].convert(args_);
-        containment_ = containment_data::load(msgpack_objs[2]);
+        msgpack_objs[1].convert(this->args_);
+        this->containment_ = containment_data::load(msgpack_objs[2]);
         // end
         auto& resources{get_current_inner_resources()};
         auto the_seri_registry{resources.get_seri_registry()};
-        function_
-            = the_seri_registry->find_function<stored_function_t>(uuid_.str());
+        function_ = the_seri_registry->find_function<stored_function_t>(
+            this->uuid_.str());
     }
 
     cppcoro::task<Value>
@@ -636,7 +723,7 @@ class function_request_impl final
     cppcoro::task<Value>
     resolve_sync(local_context_intf& ctx) const
     {
-        if (containment_)
+        if (this->containment_)
         {
             return resolve_sync_contained(ctx);
         }
@@ -649,7 +736,7 @@ class function_request_impl final
     cppcoro::task<Value>
     resolve_async(local_async_context_intf& ctx) const
     {
-        if (containment_)
+        if (this->containment_)
         {
             return resolve_async_contained(ctx);
         }
@@ -666,7 +753,7 @@ class function_request_impl final
     cppcoro::task<std::shared_ptr<clone_type>>
     make_flattened_clone(caching_context_intf& ctx) const
     {
-        auto sub_tasks = make_sync_sub_tasks(ctx, args_, ArgIndices{});
+        auto sub_tasks = make_sync_sub_tasks(ctx, this->args_, ArgIndices{});
         auto sub_results
             = co_await when_all_wrapper(std::move(sub_tasks), ArgIndices{});
         co_return std::make_shared<clone_type>(
@@ -694,7 +781,7 @@ class function_request_impl final
     request_uuid
     make_clone_uuid() const
     {
-        return uuid_.clone().set_flattened();
+        return this->uuid_.clone().set_flattened();
     }
 
     // Synchronously resolve the function in contained mode, so in a
@@ -704,10 +791,11 @@ class function_request_impl final
     cppcoro::task<Value>
     resolve_sync_contained(local_context_intf& ctx) const
     {
-        auto sub_tasks = make_sync_sub_tasks(ctx, args_, ArgIndices{});
+        auto sub_tasks = make_sync_sub_tasks(ctx, this->args_, ArgIndices{});
         auto sub_results
             = co_await when_all_wrapper(std::move(sub_tasks), ArgIndices{});
-        creq_controller ctl{containment_->dll_dir_, containment_->dll_name_};
+        creq_controller ctl{
+            this->containment_->dll_dir_, this->containment_->dll_name_};
         auto seri_resp = co_await ctl.resolve(
             ctx, serialize_contained_request(sub_results));
         Value result = deserialize_value<Value>(seri_resp.value());
@@ -722,12 +810,13 @@ class function_request_impl final
     cppcoro::task<Value>
     resolve_async_contained(local_async_context_intf& ctx) const
     {
-        auto sub_tasks = make_async_sub_tasks(ctx, args_, ArgIndices{});
+        auto sub_tasks = make_async_sub_tasks(ctx, this->args_, ArgIndices{});
         ctx.update_status(async_status::SUBS_RUNNING);
         auto sub_results
             = co_await when_all_wrapper(std::move(sub_tasks), ArgIndices{});
         ctx.update_status(async_status::SELF_RUNNING);
-        creq_controller ctl{containment_->dll_dir_, containment_->dll_name_};
+        creq_controller ctl{
+            this->containment_->dll_dir_, this->containment_->dll_name_};
         auto seri_resp = co_await ctl.resolve(
             ctx, serialize_contained_request(sub_results));
         ctx.update_status(async_status::FINISHED);
@@ -742,7 +831,7 @@ class function_request_impl final
         std::stringstream os;
         {
             JSONRequestOutputArchive oarchive(os);
-            containment_->plain_uuid_.save_with_name(oarchive, "uuid");
+            this->containment_->plain_uuid_.save_with_name(oarchive, "uuid");
             // no_retrier state
             this->save_intrsp_state(oarchive);
             // No containment data
@@ -823,13 +912,13 @@ class function_request_impl final
                 co_return (*function_)((co_await resolve_request(
                     ctx, std::forward<decltype(args)>(args), constraints))...);
             },
-            args_);
+            this->args_);
     }
 
     cppcoro::task<Value>
     resolve_sync_coro(local_context_intf& ctx) const
     {
-        auto sub_tasks = make_sync_sub_tasks(ctx, args_, ArgIndices{});
+        auto sub_tasks = make_sync_sub_tasks(ctx, this->args_, ArgIndices{});
         co_return co_await std::apply(
             *function_,
             std::tuple_cat(
@@ -851,7 +940,8 @@ class function_request_impl final
         // This justifies passing contexts around by reference.
         try
         {
-            auto sub_tasks = make_async_sub_tasks(ctx, args_, ArgIndices{});
+            auto sub_tasks
+                = make_async_sub_tasks(ctx, this->args_, ArgIndices{});
             ctx.update_status(async_status::SUBS_RUNNING);
             auto sub_results = co_await when_all_wrapper(
                 std::move(sub_tasks), ArgIndices{});
@@ -888,7 +978,8 @@ class function_request_impl final
         // be redone nonetheless.
         try
         {
-            auto sub_tasks = make_async_sub_tasks(ctx, args_, ArgIndices{});
+            auto sub_tasks
+                = make_async_sub_tasks(ctx, this->args_, ArgIndices{});
             ctx.update_status(async_status::SUBS_RUNNING);
             auto sub_results = co_await when_all_wrapper(
                 std::move(sub_tasks), ArgIndices{});
@@ -919,59 +1010,25 @@ class function_request_impl final
     cppcoro::task<Value>
     resolve_sync_normalizer(local_context_intf& ctx) const
     {
-        co_return std::get<0>(args_);
+        co_return std::get<0>(this->args_);
     }
 
     cppcoro::task<Value>
     resolve_async_normalizer(local_async_context_intf& ctx) const
     {
         ctx.update_status(async_status::FINISHED);
-        co_return std::get<0>(args_);
+        co_return std::get<0>(this->args_);
     }
 
  private:
-    // Uniquely identifies the function.
-    request_uuid uuid_;
-
     // The function to call when the request is resolved;
     // not used if containment_ is set.
     std::shared_ptr<stored_function_t> function_;
 
-    // The arguments to pass to the function.
-    std::tuple<Args...> args_;
-
-    // Containment data if function should run contained.
-    std::unique_ptr<containment_data> containment_;
-
-    // Used when this request's caching level is at least memory; _OR_ if a
-    // (direct or indirect) subrequest of a request with such a caching level.
-    mutable std::optional<size_t> hash_;
-
-    // Used when resolving this request, and its caching level is at full;
-    // _OR_ if a (direct or indirect) subrequest of a request with such a
-    // caching level;
-    // _OR_ when storing the request.
-    mutable unique_hasher::result_t unique_hash_;
-    mutable bool have_unique_hash_{false};
-
     bool
     is_normalizer() const
     {
-        return uuid_.str().starts_with("normalization<");
-    }
-
-    void
-    calc_unique_hash() const
-    {
-        unique_hasher hasher;
-        update_unique_hash(hasher, uuid_);
-        std::apply(
-            [&hasher](auto&&... args) {
-                (update_unique_hash(hasher, args), ...);
-            },
-            args_);
-        this->unique_hash_ = hasher.get_result();
-        this->have_unique_hash_ = true;
+        return this->uuid_.str().starts_with("normalization<");
     }
 };
 
@@ -1302,7 +1359,7 @@ update_unique_hash(
  * Compared to class proxy_request_impl, the argument types have been erased;
  * not even the Value template parameter remains.
  */
-class proxy_request_intf : public base_request_intf
+class proxy_request_intf : public virtual base_request_intf
 {
  public:
     virtual void
@@ -1329,7 +1386,8 @@ class proxy_request_intf : public base_request_intf
  */
 template<typename ImplProps, typename... Args>
 class proxy_request_impl final
-    : public proxy_request_intf,
+    : public virtual base_request_impl<Args...>,
+      public virtual proxy_request_intf,
       public detail::request_title_mixin<ImplProps::introspective>
 {
  public:
@@ -1338,13 +1396,13 @@ class proxy_request_impl final
     static constexpr bool introspective = ImplProps::introspective;
 
     using this_type = proxy_request_impl;
+    using base_impl_type = base_request_impl<Args...>;
     using intrsp_mixin_type = detail::request_title_mixin<introspective>;
 
     template<typename CtorProps, typename... CtorArgs>
     proxy_request_impl(CtorProps&& props, CtorArgs&&... args)
-        : intrsp_mixin_type{props},
-          uuid_{std::forward<CtorProps>(props).get_uuid()},
-          args_{std::forward<CtorArgs>(args)...}
+        : base_impl_type{(props).get_uuid(), std::forward<CtorArgs>(args)...},
+          intrsp_mixin_type{props}
     {
     }
 
@@ -1353,7 +1411,7 @@ class proxy_request_impl final
     // The uuid is deserialized in proxy_request, and stored here so that is
     // available during deserialization, which populates the remainder of this
     // object.
-    proxy_request_impl(request_uuid&& uuid) : uuid_{std::move(uuid)}
+    proxy_request_impl(request_uuid&& uuid) : base_impl_type{std::move(uuid)}
     {
     }
 
@@ -1370,67 +1428,30 @@ class proxy_request_impl final
     bool
     equals(id_interface const& other) const override
     {
-        // Comparing std::type_info's is much faster than a dynamic_cast.
         if (typeid(*this) == typeid(other))
         {
-            // *this and other are the same type;
-            // - Uuid's could differ.
-            // - Argument types will be identical, but their values might
-            //   differ.
-            auto const* other_impl
-                = static_cast<proxy_request_impl const*>(&other);
-            if (this == other_impl)
-            {
-                return true;
-            }
-            if (uuid_ != other_impl->uuid_)
-            {
-                return false;
-            }
-            return args_ == other_impl->args_;
+            // TODO try to replace dynamic_cast with static_cast
+            auto const& other_impl
+                = dynamic_cast<base_impl_type const&>(other);
+            return this->equals_base(other_impl);
         }
         return false;
     }
 
-    // other will be a proxy_request_impl, but possibly instantiated from
-    // different template arguments.
     bool
     less_than(id_interface const& other) const override
     {
-        throw not_implemented_error{"proxy_request_impl::less_than()"};
-    }
-
-    // Maybe caching the hashes could be optional (policy?).
-    size_t
-    hash() const override
-    {
-        throw not_implemented_error{"proxy_request_impl::hash()"};
-    }
-
-    // Needed for storing a request
-    void
-    update_hash(unique_hasher& hasher) const override
-    {
-        if (!this->have_unique_hash_)
+        if (typeid(*this) == typeid(other))
         {
-            calc_unique_hash();
+            // TODO try to replace dynamic_cast with static_cast
+            auto const& other_impl
+                = dynamic_cast<base_impl_type const&>(other);
+            return this->less_than_base(other_impl);
         }
-        hasher.combine(this->unique_hash_);
+        return typeid(*this).before(typeid(other));
     }
 
  public: // base_request_intf
-    void
-    set_containment(containment_data const& containment) override
-    {
-        containment_ = std::make_unique<containment_data>(containment);
-    }
-
-    request_uuid const&
-    get_uuid() const override
-    {
-        return uuid_;
-    }
-
     bool
     is_introspective() const override
     {
@@ -1452,23 +1473,14 @@ class proxy_request_impl final
     save(JSONRequestOutputArchive& archive) const override
     {
         this->save_intrsp_state(archive);
-        archive(cereal::make_nvp("args", args_));
-        if (containment_)
-        {
-            containment_->save(archive);
-        }
-        else
-        {
-            containment_data::save_nothing(archive);
-        }
+        this->save_base(archive);
     }
 
     void
     load(JSONRequestInputArchive& archive) override
     {
         this->load_intrsp_state(archive);
-        archive(cereal::make_nvp("args", args_));
-        containment_ = containment_data::load(archive);
+        this->load_base(archive);
     }
 
  public: // proxy_request_intf
@@ -1478,30 +1490,7 @@ class proxy_request_impl final
     void
     register_uuid(seri_registry& registry, catalog_id cat_id) const override
     {
-        registry.add(cat_id, uuid_.str(), create);
-    }
-
- private:
-    request_uuid uuid_;
-    std::tuple<Args...> args_;
-    std::unique_ptr<containment_data> containment_;
-
-    // Used when storing the request.
-    mutable unique_hasher::result_t unique_hash_;
-    mutable bool have_unique_hash_{false};
-
-    void
-    calc_unique_hash() const
-    {
-        unique_hasher hasher;
-        update_unique_hash(hasher, uuid_);
-        std::apply(
-            [&hasher](auto&&... args) {
-                (update_unique_hash(hasher, args), ...);
-            },
-            args_);
-        this->unique_hash_ = hasher.get_result();
-        this->have_unique_hash_ = true;
+        registry.add(cat_id, this->uuid_.str(), create);
     }
 };
 
@@ -1614,6 +1603,18 @@ class proxy_request : public ObjectProps::retrier_type
         return impl_->equals(*other.impl_);
     }
 
+    bool
+    less_than(proxy_request const& other) const
+    {
+        return impl_->less_than(*other.impl_);
+    }
+
+    std::size_t
+    hash() const
+    {
+        return impl_->hash();
+    }
+
     void
     update_hash(unique_hasher& hasher) const
     {
@@ -1688,7 +1689,6 @@ operator==(
     return lhs.equals(rhs);
 }
 
-#if 0
 template<typename Value, typename Props>
 bool
 operator<(
@@ -1704,7 +1704,6 @@ hash_value(proxy_request<Value, Props> const& req)
 {
     return req.hash();
 }
-#endif
 
 template<typename Value, typename Props>
 void
