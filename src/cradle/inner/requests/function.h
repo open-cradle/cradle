@@ -1364,12 +1364,32 @@ class proxy_request_impl final
     }
 
  public: // id_interface
-    // equals(), less_than() and hash() needed only for memory caching,
-    // which does not apply to proxy requests.
+    // Production code needs equals(), less_than() and hash() only for memory
+    // caching, which does not apply to proxy requests.
+    // Unit tests rely on equals().
     bool
     equals(id_interface const& other) const override
     {
-        throw not_implemented_error{"proxy_request_impl::equals()"};
+        // Comparing std::type_info's is much faster than a dynamic_cast.
+        if (typeid(*this) == typeid(other))
+        {
+            // *this and other are the same type;
+            // - Uuid's could differ.
+            // - Argument types will be identical, but their values might
+            //   differ.
+            auto const* other_impl
+                = static_cast<proxy_request_impl const*>(&other);
+            if (this == other_impl)
+            {
+                return true;
+            }
+            if (uuid_ != other_impl->uuid_)
+            {
+                return false;
+            }
+            return args_ == other_impl->args_;
+        }
+        return false;
     }
 
     // other will be a proxy_request_impl, but possibly instantiated from
@@ -1586,16 +1606,24 @@ class proxy_request : public ObjectProps::retrier_type
         impl_->register_uuid(registry, cat_id);
     }
 
-    captured_id
-    get_captured_id() const
+    // *this and other are the same type; however, their impl_'s types could
+    // differ (especially if these are subrequests).
+    bool
+    equals(proxy_request const& other) const
     {
-        return captured_id{impl_};
+        return impl_->equals(*other.impl_);
     }
 
     void
     update_hash(unique_hasher& hasher) const
     {
         impl_->update_hash(hasher);
+    }
+
+    captured_id
+    get_captured_id() const
+    {
+        return captured_id{impl_};
     }
 
  public:
@@ -1649,7 +1677,6 @@ class proxy_request : public ObjectProps::retrier_type
     std::shared_ptr<intf_type> impl_;
 };
 
-#if 0
 // Used for comparing subrequests, where the main requests have the same type;
 // so the subrequests have the same type too.
 template<typename Value, typename Props>
@@ -1661,6 +1688,7 @@ operator==(
     return lhs.equals(rhs);
 }
 
+#if 0
 template<typename Value, typename Props>
 bool
 operator<(

@@ -160,6 +160,5 @@ TEST_CASE("load proxy_request from storage (hit)", TAG(21))
     using Req = decltype(req_written);
     std::string key{get_request_key(req_written)};
     auto req_read = cppcoro::sync_wait(load_request<Req>(key, resources));
-    // production code needs no proxy_request::operator==(); implement anyway?
-    // REQUIRE(req_read == req_written);
+    REQUIRE(req_read == req_written);
 }
