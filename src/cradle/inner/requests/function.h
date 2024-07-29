@@ -1530,11 +1530,15 @@ class proxy_request : public ObjectProps::retrier_type
     }
 
     void
-    register_uuid(
-        seri_registry& registry,
-        catalog_id cat_id)
+    register_uuid(seri_registry& registry, catalog_id cat_id) const
     {
         impl_->register_uuid(registry, cat_id);
+    }
+
+    captured_id
+    get_captured_id() const
+    {
+        return captured_id{impl_};
     }
 
  public:
@@ -1546,6 +1550,16 @@ class proxy_request : public ObjectProps::retrier_type
 
  public:
     // Interface for cereal
+
+    // Construct object, deserializing from a cereal archive.
+    // Convenience constructor for when this is the "outer" object.
+    // Equivalent alternative:
+    //   proxy_request<...> req;
+    //   req.load(archive)
+    explicit proxy_request(JSONRequestInputArchive& archive)
+    {
+        load(archive);
+    }
 
     void
     save(JSONRequestOutputArchive& archive) const

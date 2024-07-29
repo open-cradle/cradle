@@ -117,8 +117,6 @@ TEST_CASE("store function_request with subreq", TAG(100))
     REQUIRE(storage.size() == 1);
 }
 
-#if 0
-// Not building
 TEST_CASE("store proxy_request in storage", TAG(20))
 {
     using props_type = request_props<
@@ -156,12 +154,12 @@ TEST_CASE("load proxy_request from storage (hit)", TAG(21))
     seri_catalog cat{resources.get_seri_registry()};
 
     auto req_written{rq_proxy<int>(props_type{make_test_uuid(21)}, 1, 2)};
-    cat.register_resolver(req_written);
+    cat.register_proxy(req_written);
     cppcoro::sync_wait(store_request(req_written, resources));
 
     using Req = decltype(req_written);
     std::string key{get_request_key(req_written)};
     auto req_read = cppcoro::sync_wait(load_request<Req>(key, resources));
+    // production code needs no proxy_request::operator==(); implement anyway?
     // REQUIRE(req_read == req_written);
 }
-#endif
