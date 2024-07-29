@@ -90,28 +90,20 @@ visit_args(
     (visit_arg(visitor, Ix, std::get<Ix>(args)), ...);
 }
 
-/*
- * The function_request_impl functionality required by function_request outside
- * its constructor.
- */
-template<typename Value>
-class function_request_intf : public id_interface
+class base_request_intf : public id_interface
 {
  public:
-    virtual ~function_request_intf() = default;
+    virtual ~base_request_intf() = default;
 
     virtual void
     set_containment(containment_data const& containment)
-        = 0;
-
-    virtual caching_level_type
-    get_caching_level() const
         = 0;
 
     virtual request_uuid const&
     get_uuid() const
         = 0;
 
+    // needed here?
     virtual bool
     is_introspective() const
         = 0;
@@ -121,10 +113,27 @@ class function_request_intf : public id_interface
         = 0;
 
     virtual void
-    register_uuid(
-        seri_registry& registry,
-        catalog_id cat_id,
-        std::shared_ptr<seri_resolver_intf> resolver) const
+    save(JSONRequestOutputArchive& archive) const
+        = 0;
+
+    virtual void
+    load(JSONRequestInputArchive& archive)
+        = 0;
+};
+
+/*
+ * The function_request_impl functionality required by function_request outside
+ * its constructor.
+ */
+// note Value used in resolve() only
+template<typename Value>
+class function_request_intf : public base_request_intf
+{
+ public:
+    virtual ~function_request_intf() = default;
+
+    virtual caching_level_type
+    get_caching_level() const
         = 0;
 
     virtual std::size_t
@@ -132,23 +141,23 @@ class function_request_intf : public id_interface
         = 0;
 
     virtual void
-    save(JSONRequestOutputArchive& archive) const
-        = 0;
-
-    virtual void
-    load(JSONRequestInputArchive& archive)
-        = 0;
-
-    virtual void
-    save(msgpack_packer& packer)
-        = 0;
-
-    virtual void
-    load(msgpack::object const msgpack_objs[3])
+    register_uuid(
+        seri_registry& registry,
+        catalog_id cat_id,
+        std::shared_ptr<seri_resolver_intf> resolver) const
         = 0;
 
     virtual void
     accept(req_visitor_intf& visitor) const
+        = 0;
+
+    // would be needed in base if server can create proxy_request objects
+    virtual void
+    save_msgpack(msgpack_packer& packer)
+        = 0;
+
+    virtual void
+    load_msgpack(msgpack::object const msgpack_objs[3])
         = 0;
 
     virtual cppcoro::task<Value>
@@ -340,7 +349,7 @@ template<
     typename ImplProps,
     typename Function,
     typename... Args>
-class function_request_impl
+class function_request_impl final
     : public function_request_intf<Value>,
       public detail::request_title_mixin<ImplProps::introspective>,
       public std::enable_shared_from_this<
@@ -395,58 +404,22 @@ class function_request_impl
                 is_same_v<std::decay_t<CtorFunction>, std::decay_t<Function>>);
     }
 
-    void
-    set_containment(containment_data const& containment) override
+    // cereal and msgpack related
+    // Construct an object to be deserialized.
+    // The uuid uniquely identifies the function. It is deserialized in
+    // function_request, and stored here so that is available during
+    // deserialization, which populates the remainder of this object.
+    function_request_impl(request_uuid&& uuid) : uuid_{std::move(uuid)}
     {
-        containment_ = std::make_unique<containment_data>(containment);
     }
 
-    caching_level_type
-    get_caching_level() const override
+    static std::shared_ptr<void>
+    create(request_uuid&& uuid)
     {
-        return caching_level;
+        return std::make_shared<this_type>(std::move(uuid));
     }
 
-    request_uuid const&
-    get_uuid() const override
-    {
-        return uuid_;
-    }
-
-    bool
-    is_introspective() const override
-    {
-        return introspective;
-    }
-
-    std::string
-    get_introspection_title() const override
-    {
-        if constexpr (introspective)
-        {
-            return this->get_title();
-        }
-        throw not_implemented_error{
-            "function_request_impl::get_introspection_title()"};
-    }
-
-    // Registers this instantiation to be identified by its uuid, so that the
-    // deserialization will translate an input containing that same uuid to an
-    // object of the same type, with the same function_ value.
-    void
-    register_uuid(
-        seri_registry& registry,
-        catalog_id cat_id,
-        std::shared_ptr<seri_resolver_intf> resolver) const override
-    {
-        registry.add(
-            cat_id, uuid_.str(), std::move(resolver), create, function_);
-
-        // Register uuids for any args resulting from normalize_arg()
-        register_uuid_for_normalized_args(
-            registry, cat_id, args_, ArgIndices{});
-    }
-
+ public: // id_interface
     // other will be a function_request_impl, but possibly instantiated from
     // different template arguments.
     bool
@@ -524,6 +497,70 @@ class function_request_impl
         hasher.combine(this->unique_hash_);
     }
 
+ public: // base_request_intf
+    void
+    set_containment(containment_data const& containment) override
+    {
+        containment_ = std::make_unique<containment_data>(containment);
+    }
+
+    request_uuid const&
+    get_uuid() const override
+    {
+        return uuid_;
+    }
+
+    bool
+    is_introspective() const override
+    {
+        return introspective;
+    }
+
+    std::string
+    get_introspection_title() const override
+    {
+        if constexpr (introspective)
+        {
+            return this->get_title();
+        }
+        throw not_implemented_error{
+            "function_request_impl::get_introspection_title()"};
+    }
+
+    void
+    save(JSONRequestOutputArchive& archive) const override
+    {
+        this->save_intrsp_state(archive);
+        archive(cereal::make_nvp("args", args_));
+        if (containment_)
+        {
+            containment_->save(archive);
+        }
+        else
+        {
+            containment_data::save_nothing(archive);
+        }
+    }
+
+    void
+    load(JSONRequestInputArchive& archive) override
+    {
+        this->load_intrsp_state(archive);
+        archive(cereal::make_nvp("args", args_));
+        containment_ = containment_data::load(archive);
+        auto& resources{archive.get_resources()};
+        auto the_seri_registry{resources.get_seri_registry()};
+        function_
+            = the_seri_registry->find_function<stored_function_t>(uuid_.str());
+    }
+
+ public: // function_request_intf
+    caching_level_type
+    get_caching_level() const override
+    {
+        return caching_level;
+    }
+
     std::size_t
     deep_size() const override
     {
@@ -531,10 +568,57 @@ class function_request_impl
         return sizeof(*this) + sizeof(containment_data);
     }
 
+    // Registers this instantiation to be identified by its uuid, so that the
+    // deserialization will translate an input containing that same uuid to an
+    // object of the same type, with the same function_ value.
+    void
+    register_uuid(
+        seri_registry& registry,
+        catalog_id cat_id,
+        std::shared_ptr<seri_resolver_intf> resolver) const override
+    {
+        registry.add(
+            cat_id, uuid_.str(), std::move(resolver), create, function_);
+
+        // Register uuids for any args resulting from normalize_arg()
+        register_uuid_for_normalized_args(
+            registry, cat_id, args_, ArgIndices{});
+    }
+
     void
     accept(req_visitor_intf& visitor) const override
     {
         visit_args(visitor, args_, ArgIndices{});
+    }
+
+    void
+    save_msgpack(msgpack_packer& packer) override
+    {
+        this->save_intrsp_state(packer);
+        // Args tuple saved as an array
+        packer.pack(args_);
+        if (containment_)
+        {
+            containment_->save(packer);
+        }
+        else
+        {
+            containment_data::save_nothing(packer);
+        }
+    }
+
+    void
+    load_msgpack(msgpack::object const msgpack_objs[3]) override
+    {
+        // begin base_request_mixin::load()
+        this->load_intrsp_state(msgpack_objs[0]);
+        msgpack_objs[1].convert(args_);
+        containment_ = containment_data::load(msgpack_objs[2]);
+        // end
+        auto& resources{get_current_inner_resources()};
+        auto the_seri_registry{resources.get_seri_registry()};
+        function_
+            = the_seri_registry->find_function<stored_function_t>(uuid_.str());
     }
 
     cppcoro::task<Value>
@@ -544,14 +628,14 @@ class function_request_impl
         return resolve_impl(ctx, *this, lock_ptr);
     }
 
+ public: // called from resolve_impl.h
+    // TODO should be in some interface or concept?
     captured_id
     get_captured_id() const
     {
         return captured_id{this->shared_from_this()};
     }
 
- public:
-    // resolve_sync() and resolve_async() called from resolve_impl.h
     cppcoro::task<Value>
     resolve_sync(local_context_intf& ctx) const
     {
@@ -592,6 +676,7 @@ class function_request_impl
             make_clone_props(), *function_, std::move(sub_results));
     }
 
+ private:
     auto
     make_clone_props() const
         requires(!introspective)
@@ -615,7 +700,6 @@ class function_request_impl
         return uuid_.clone().set_flattened();
     }
 
- private:
     // Synchronously resolve the function in contained mode, so in a
     // subprocess.
     // Used for both coro and plain functions (no difference when execution
@@ -846,78 +930,6 @@ class function_request_impl
     {
         ctx.update_status(async_status::FINISHED);
         co_return std::get<0>(args_);
-    }
-
- public:
-    // cereal and msgpack related
-
-    // Construct an object to be deserialized.
-    // The uuid uniquely identifies the function. It is deserialized in
-    // function_request, and stored here so that is available during
-    // deserialization, which populates the remainder of this object.
-    function_request_impl(request_uuid&& uuid) : uuid_{std::move(uuid)}
-    {
-    }
-
-    static std::shared_ptr<void>
-    create(request_uuid&& uuid)
-    {
-        return std::make_shared<this_type>(std::move(uuid));
-    }
-
-    void
-    save(JSONRequestOutputArchive& archive) const override
-    {
-        this->save_intrsp_state(archive);
-        archive(cereal::make_nvp("args", args_));
-        if (containment_)
-        {
-            containment_->save(archive);
-        }
-        else
-        {
-            containment_data::save_nothing(archive);
-        }
-    }
-
-    void
-    load(JSONRequestInputArchive& archive) override
-    {
-        this->load_intrsp_state(archive);
-        archive(cereal::make_nvp("args", args_));
-        containment_ = containment_data::load(archive);
-        auto& resources{archive.get_resources()};
-        auto the_seri_registry{resources.get_seri_registry()};
-        function_
-            = the_seri_registry->find_function<stored_function_t>(uuid_.str());
-    }
-
-    void
-    save(msgpack_packer& packer) override
-    {
-        this->save_intrsp_state(packer);
-        // Args tuple saved as an array
-        packer.pack(args_);
-        if (containment_)
-        {
-            containment_->save(packer);
-        }
-        else
-        {
-            containment_data::save_nothing(packer);
-        }
-    }
-
-    void
-    load(msgpack::object const msgpack_objs[3]) override
-    {
-        this->load_intrsp_state(msgpack_objs[0]);
-        msgpack_objs[1].convert(args_);
-        containment_ = containment_data::load(msgpack_objs[2]);
-        auto& resources{get_current_inner_resources()};
-        auto the_seri_registry{resources.get_seri_registry()};
-        function_
-            = the_seri_registry->find_function<stored_function_t>(uuid_.str());
     }
 
  private:
@@ -1186,7 +1198,7 @@ class function_request : public ObjectProps::retrier_type
         packer.pack_array(msgpack_array_size);
         impl_->get_uuid().save(packer);
         this->save_retrier_state(packer);
-        impl_->save(packer);
+        impl_->save_msgpack(packer);
     }
 
     void
@@ -1206,7 +1218,7 @@ class function_request : public ObjectProps::retrier_type
         auto the_seri_registry{resources.get_seri_registry()};
         impl_ = the_seri_registry->create<intf_type>(std::move(uuid));
         // Deserialize the remainder of the function_request_impl object.
-        impl_->load(&subobjs[2]);
+        impl_->load_msgpack(&subobjs[2]);
     }
 
  private:
@@ -1240,26 +1252,9 @@ deep_sizeof(function_request<Value, ObjectProps> const& req)
  * Interface class for class proxy_request_impl
  *
  * Compared to class proxy_request_impl, the argument types have been erased;
- * only the Value template parameter remains.
+ * not even the Value template parameter remains.
  */
-template<typename Value>
-class proxy_request_intf
-{
- public:
-    virtual ~proxy_request_intf() = default;
-
-    virtual void
-    set_containment(containment_data const& containment)
-        = 0;
-
-    virtual request_uuid const&
-    get_uuid() const
-        = 0;
-
-    virtual void
-    save(JSONRequestOutputArchive& archive) const
-        = 0;
-};
+using proxy_request_intf = base_request_intf;
 
 /*
  * Proxy request implementation.
@@ -1278,9 +1273,9 @@ class proxy_request_intf
  * function arguments, and the only thing it does with them is to serialize
  * them.
  */
-template<typename Value, typename ImplProps, typename... Args>
-class proxy_request_impl
-    : public proxy_request_intf<Value>,
+template<typename ImplProps, typename... Args>
+class proxy_request_impl final
+    : public proxy_request_intf,
       public detail::request_title_mixin<ImplProps::introspective>
 {
  public:
@@ -1288,6 +1283,7 @@ class proxy_request_impl
 
     static constexpr bool introspective = ImplProps::introspective;
 
+    using this_type = proxy_request_impl;
     using intrsp_mixin_type = detail::request_title_mixin<introspective>;
 
     template<typename CtorProps, typename... CtorArgs>
@@ -1298,20 +1294,79 @@ class proxy_request_impl
     {
     }
 
+    // cereal and msgpack related
+    // Construct an object to be deserialized.
+    // The uuid is deserialized in proxy_request, and stored here so that is
+    // available during deserialization, which populates the remainder of this
+    // object.
+    proxy_request_impl(request_uuid&& uuid) : uuid_{std::move(uuid)}
+    {
+    }
+
+    static std::shared_ptr<void>
+    create(request_uuid&& uuid)
+    {
+        return std::make_shared<this_type>(std::move(uuid));
+    }
+
+ public: // id_interface
+    // equals(), less_than() and hash() needed only for memory caching,
+    // which does not apply to proxy requests.
+    bool
+    equals(id_interface const& other) const override
+    {
+        throw not_implemented_error{"proxy_request_impl::equals()"};
+    }
+
+    // other will be a proxy_request_impl, but possibly instantiated from
+    // different template arguments.
+    bool
+    less_than(id_interface const& other) const override
+    {
+        throw not_implemented_error{"proxy_request_impl::less_than()"};
+    }
+
+    // Maybe caching the hashes could be optional (policy?).
+    size_t
+    hash() const override
+    {
+        throw not_implemented_error{"proxy_request_impl::hash()"};
+    }
+
+    void
+    update_hash(unique_hasher& hasher) const override
+    {
+        throw not_implemented_error{"proxy_request_impl::update_hash()"};
+#if 0
+        if (!this->have_unique_hash_)
+        {
+            calc_unique_hash();
+        }
+        hasher.combine(this->unique_hash_);
+#endif
+    }
+
+ public: // base_request_intf
     void
     set_containment(containment_data const& containment) override
     {
         containment_ = std::make_unique<containment_data>(containment);
     }
 
+    request_uuid const&
+    get_uuid() const override
+    {
+        return uuid_;
+    }
+
     bool
-    is_introspective() const
+    is_introspective() const override
     {
         return introspective;
     }
 
     std::string
-    get_introspection_title() const
+    get_introspection_title() const override
     {
         if constexpr (introspective)
         {
@@ -1319,12 +1374,6 @@ class proxy_request_impl
         }
         throw not_implemented_error{
             "proxy_request_impl::get_introspection_title()"};
-    }
-
-    request_uuid const&
-    get_uuid() const override
-    {
-        return uuid_;
     }
 
     void
@@ -1342,10 +1391,46 @@ class proxy_request_impl
         }
     }
 
+    void
+    load(JSONRequestInputArchive& archive) override
+    {
+        this->load_intrsp_state(archive);
+        archive(cereal::make_nvp("args", args_));
+        containment_ = containment_data::load(archive);
+    }
+
+ public: // proxy_request_intf
+    // Registers this instantiation to be identified by its uuid, so that the
+    // deserialization will translate an input containing that same uuid to an
+    // object of the same type.
+    void
+    register_uuid(
+        seri_registry& registry,
+        catalog_id cat_id) const // override
+    {
+        registry.add(cat_id, uuid_.str(), create);
+    }
+
  private:
     request_uuid uuid_;
     std::tuple<Args...> args_;
     std::unique_ptr<containment_data> containment_;
+
+#if 0
+    void
+    calc_unique_hash() const
+    {
+        unique_hasher hasher;
+        update_unique_hash(hasher, uuid_);
+        std::apply(
+            [&hasher](auto&&... args) {
+                (update_unique_hash(hasher, args), ...);
+            },
+            args_);
+        this->unique_hash_ = hasher.get_result();
+        this->have_unique_hash_ = true;
+    }
+#endif
 };
 
 template<typename Value, typename ObjectProps>
@@ -1383,7 +1468,7 @@ class proxy_request : public ObjectProps::retrier_type
 
     using element_type = proxy_request;
     using value_type = Value;
-    using intf_type = proxy_request_intf<Value>;
+    using intf_type = proxy_request_intf;
     using props_type = ObjectProps;
     using retrier_type = typename ObjectProps::retrier_type;
 
@@ -1404,7 +1489,6 @@ class proxy_request : public ObjectProps::retrier_type
                 is_same_v<make_request_object_props_type<Props>, ObjectProps>);
         static_assert(is_uncached(level));
         using impl_type = proxy_request_impl<
-            Value,
             make_request_impl_props_type<Props>,
             std::remove_cvref_t<Args>...>;
         impl_ = std::make_shared<impl_type>(
@@ -1443,6 +1527,17 @@ class proxy_request : public ObjectProps::retrier_type
         throw not_implemented_error{"proxy_request::get_essentials()"};
     }
 
+#if 0
+    // TODO
+    void
+    register_uuid(
+        seri_registry& registry,
+        catalog_id cat_id)
+    {
+        impl_->register_uuid(registry, cat_id);
+    }
+#endif
+
  public:
     // Interface for cereal
 
@@ -1454,6 +1549,23 @@ class proxy_request : public ObjectProps::retrier_type
         impl_->get_uuid().save_with_name(archive, "uuid");
         this->save_retrier_state(archive);
         impl_->save(archive);
+    }
+
+    // We always create JSONRequestInputArchive objects for deserializing
+    // requests, but cereal only knows about cereal::JSONInputArchive.
+    void
+    load(cereal::JSONInputArchive& counted_archive)
+    {
+        auto& archive{static_cast<JSONRequestInputArchive&>(counted_archive)};
+        auto& resources{archive.get_resources()};
+        auto the_seri_registry{resources.get_seri_registry()};
+        auto uuid{request_uuid::load_with_name(archive, "uuid")};
+        this->load_retrier_state(archive);
+        // Create a mostly empty proxy_request_impl object. uuid defines its
+        // exact type (proxy_request_impl class instantiation).
+        impl_ = the_seri_registry->create<intf_type>(std::move(uuid));
+        // Deserialize the remainder of the proxy_request_impl object.
+        impl_->load(archive);
     }
 
  private:
