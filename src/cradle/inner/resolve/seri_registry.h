@@ -73,6 +73,7 @@ class seri_registry
 
     seri_registry();
 
+    // Called from function_request_impl::register_uuid()
     template<typename Function>
     void
     add(catalog_id cat_id,
@@ -82,6 +83,13 @@ class seri_registry
         function_t<Function> function)
     {
         add(cat_id, uuid_str, std::move(resolver), create, std::any{function});
+    }
+
+    // Called from proxy_request_impl::register_uuid()
+    void
+    add(catalog_id cat_id, std::string const& uuid_str, create_t* create)
+    {
+        add(cat_id, uuid_str, resolver_t{}, create, std::any{});
     }
 
     /*

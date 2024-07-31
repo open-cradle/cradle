@@ -56,6 +56,25 @@ rq_cancellable_coro(Loops loops, Delay delay)
         normalize_arg<int, props_type>(std::move(delay)));
 }
 
+// proxy_request counterpart of rq_cancellable_coro().
+// Note that the two have the same uuid's.
+template<caching_level_type Level, typename Loops, typename Delay>
+    requires TypedArg<Loops, int> && TypedArg<Delay, int>
+auto
+rq_cancellable_proxy(Loops loops, Delay delay)
+{
+    constexpr bool introspective{true};
+    using props_type
+        = request_props<Level, request_function_t::proxy_coro, introspective>;
+    request_uuid uuid{"cancellable_coro"};
+    uuid.set_level(Level);
+    std::string title{"cancellable_coro"};
+    return rq_proxy<int>(
+        props_type(std::move(uuid), std::move(title)),
+        normalize_arg<int, props_type>(std::move(loops)),
+        normalize_arg<int, props_type>(std::move(delay)));
+}
+
 // A non-coroutine, non-cancellable, simplified version of cancellable_coro()
 int
 non_cancellable_func(int loops, int delay);
