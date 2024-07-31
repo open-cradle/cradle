@@ -30,6 +30,10 @@ testing_seri_catalog::testing_seri_catalog(
         rq_copy_demo_class<caching_level_type::memory>(demo_class{0, y}));
     register_resolver(
         rq_copy_demo_class<caching_level_type::full>(demo_class{0, y}));
+
+    // Proxy requests are registered so that they can be restored from storage,
+    // not for resolving them.
+    register_proxy(rq_cancellable_proxy<caching_level_type::memory>(0, 0));
 }
 
 } // namespace cradle

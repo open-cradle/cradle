@@ -49,6 +49,7 @@ request_uuid::request_uuid(std::string complete, complete_tag)
 request_uuid
 request_uuid::clone() const
 {
+    // TODO modifiers used after finalizing?!
     request_uuid res{make_base_string(str_)};
     if (include_level_)
     {
@@ -57,6 +58,10 @@ request_uuid::clone() const
     if (flattened_)
     {
         res.set_flattened();
+    }
+    if (is_proxy_)
+    {
+        res.make_proxy();
     }
     return res;
 }
@@ -82,6 +87,25 @@ request_uuid::set_flattened()
     }
     flattened_ = true;
     return *this;
+}
+
+request_uuid&
+request_uuid::make_proxy()
+{
+    check_not_finalized();
+    if (is_proxy_)
+    {
+        throw std::logic_error("request_uuid object already proxy");
+    }
+    is_proxy_ = true;
+    return *this;
+}
+
+void
+request_uuid::deproxy()
+{
+    do_finalize();
+    str_ = deproxy_uuid_str(str_);
 }
 
 void
@@ -122,7 +146,27 @@ request_uuid::do_finalize() const
     {
         str_ += "+flattened";
     }
+    if (is_proxy_)
+    {
+        str_ += ":proxy";
+    }
     finalized_ = true;
+}
+
+std::string
+deproxy_uuid_str(std::string const& uuid_str)
+{
+    std::string res = uuid_str;
+    for (;;)
+    {
+        auto pos = res.find(":proxy");
+        if (pos == res.npos)
+        {
+            break;
+        }
+        res = res.substr(0, pos) + res.substr(pos + 6);
+    }
+    return res;
 }
 
 } // namespace cradle

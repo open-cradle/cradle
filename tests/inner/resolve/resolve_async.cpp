@@ -620,4 +620,22 @@ TEST_CASE("create rq_cancellable_coro with different loop/delay types", tag)
         rq_cancellable_coro<caching_level_type::full, int, unsigned>(0, 0));
 }
 
+TEST_CASE("resolve proxy async on rpclib", tag)
+{
+    std::string proxy_name{"rpclib"};
+    constexpr int loops = 3;
+    constexpr auto level = caching_level_type::memory;
+    int delay0 = 5;
+    int delay1 = 60;
+    auto req{rq_cancellable_proxy<level>(
+        rq_cancellable_proxy<level>(loops, delay0),
+        rq_cancellable_proxy<level>(loops, delay1))};
+    auto resources{
+        make_inner_test_resources(proxy_name, testing_domain_option())};
+    ResolutionConstraintsRemoteAsync constraints;
+    atst_context ctx{*resources, proxy_name};
+
+    test_resolve_async(ctx, req, constraints, true, loops, delay0, delay1);
+}
+
 } // namespace cradle
