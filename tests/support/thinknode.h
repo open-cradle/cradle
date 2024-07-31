@@ -9,6 +9,7 @@
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/rpclib/client/proxy.h>
+#include <cradle/thinknode/async_context.h>
 #include <cradle/thinknode/context.h>
 #include <cradle/thinknode/service/core.h>
 
@@ -43,6 +44,9 @@ class thinknode_test_scope
 
     thinknode_request_context
     make_context(tasklet_tracker* tasklet = nullptr);
+
+    async_thinknode_context
+    make_async_context(tasklet_tracker* tasklet = nullptr);
 
     mock_http_session&
     enable_http_mocking();

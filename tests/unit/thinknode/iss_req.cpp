@@ -28,7 +28,9 @@
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/test_dlls_dir.h>
+#include <cradle/thinknode/async_context.h>
 #include <cradle/thinknode/iss_req.h>
+#include <cradle/thinknode_dlls_dir.h>
 #include <cradle/typing/utilities/testing.h>
 
 using namespace cradle;
@@ -655,7 +657,7 @@ TEST_CASE("RETRIEVE IMMUTABLE OBJECT - rpclib", tag)
         scope, rq_retrieve_immutable_object<level>("123", "abc"));
 }
 
-TEST_CASE("RETRIEVE IMMUTABLE OBJECT - proxy, rpclib", tag)
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT - proxy, rpclib", "[T][9]")
 {
     thinknode_test_scope scope{"rpclib"};
     test_retrieve_immutable_object(
@@ -681,4 +683,48 @@ TEST_CASE("Composite request serialization", tag)
         deserialize_function<decltype(req2)>,
         validate_request,
         "composite.json");
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT - sync, proxy, rpclib", "[T][0]")
+{
+    std::string proxy_name{"rpclib"};
+    auto req{rq_proxy_retrieve_immutable_object("123", "abc")};
+    std::string expected{"payload"};
+    thinknode_test_scope scope{proxy_name};
+    auto& resources{scope.get_resources()};
+
+    {
+        auto& proxy{resources.get_proxy(proxy_name)};
+        auto http_response{make_http_200_response(expected)};
+        auto const& body{http_response.body};
+        std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
+        proxy.mock_http(s);
+    }
+
+    thinknode_request_context ctx{scope.make_context()};
+    auto res = cppcoro::sync_wait(resolve_request(ctx, req));
+
+    REQUIRE(to_string(res) == expected);
+}
+
+TEST_CASE("RETRIEVE IMMUTABLE OBJECT - async, proxy, rpclib", "[T][1]")
+{
+    std::string proxy_name{"rpclib"};
+    auto req{rq_proxy_retrieve_immutable_object("123", "abc")};
+    std::string expected{"payload"};
+    thinknode_test_scope scope{proxy_name};
+    auto& resources{scope.get_resources()};
+
+    {
+        auto& proxy{resources.get_proxy(proxy_name)};
+        auto http_response{make_http_200_response(expected)};
+        auto const& body{http_response.body};
+        std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
+        proxy.mock_http(s);
+    }
+
+    async_thinknode_context ctx{scope.make_async_context()};
+    auto res = cppcoro::sync_wait(resolve_request(ctx, req));
+
+    REQUIRE(to_string(res) == expected);
 }

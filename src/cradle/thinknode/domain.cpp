@@ -1,4 +1,5 @@
 #include <cradle/inner/core/exception.h>
+#include <cradle/thinknode/async_context.h>
 #include <cradle/thinknode/context.h>
 #include <cradle/thinknode/domain.h>
 
@@ -24,8 +25,10 @@ thinknode_domain::make_local_sync_context(service_config const& config) const
 std::shared_ptr<root_local_async_context_intf>
 thinknode_domain::make_local_async_context(service_config const& config) const
 {
-    throw not_implemented_error(
-        "thinknode_domain::make_local_async_context()");
+    // Creating an async_thinknode_context object should also work, but its
+    // flexibility is not needed here.
+    return std::make_shared<root_local_async_thinknode_context>(
+        std::make_unique<local_tree_context_base>(resources_), config);
 }
 
 } // namespace cradle
