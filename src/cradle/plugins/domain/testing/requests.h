@@ -57,7 +57,7 @@ rq_cancellable_coro(Loops loops, Delay delay)
 }
 
 // proxy_request counterpart of rq_cancellable_coro().
-// Note that the two have the same uuid's.
+// Note that the two have related but different uuid's.
 template<caching_level_type Level, typename Loops, typename Delay>
     requires TypedArg<Loops, int> && TypedArg<Delay, int>
 auto

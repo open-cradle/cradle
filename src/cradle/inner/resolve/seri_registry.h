@@ -24,7 +24,7 @@ class unregistered_uuid_error : public uuid_error
 
 /*
  * Registry helping the deserialization process create the correct
- * function_request_impl objects.
+ * function_request_impl / proxy_request_impl objects.
  *
  * The registry consists of entries associated with some uuid. An entry
  * contains:
@@ -60,6 +60,11 @@ class unregistered_uuid_error : public uuid_error
  * Instead, we need a mechanism where the uuid in the serialization identifies
  * both the function_request_impl _class_ (template instantiation), and the
  * function _value_ in that class.
+ *
+ * A function request and a proxy request cannot have the same uuid. The latter
+ * has a unique ":proxy" postfix, so deserialization gives different objects
+ * (a function_request_impl and proxy_request_impl instantiation,
+ * respectively).
  *
  * All functions in this class's API are thread-safe.
  */
@@ -103,10 +108,13 @@ class seri_registry
     void
     unregister_catalog(catalog_id cat_id);
 
-    // Intf should be a function_request_intf instantiation.
+    // Creates a function_request_impl object whose class derives from Intf,
+    // if Intf is a function_request_intf instantiation.
+    // Creates a proxy_request_impl object whose class derives from Intf,
+    // if Intf is a proxy_request_intf instantiation.
     template<typename Intf>
     std::shared_ptr<Intf>
-    create(request_uuid&& uuid)
+    create_impl(request_uuid&& uuid)
     {
         entry_t& entry{find_entry(uuid.str(), false)};
         return std::static_pointer_cast<Intf>(entry.create(std::move(uuid)));

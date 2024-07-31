@@ -1175,10 +1175,11 @@ class function_request : public ObjectProps::retrier_type
         auto& resources{archive.get_resources()};
         auto the_seri_registry{resources.get_seri_registry()};
         auto uuid{request_uuid::load_with_name(archive, "uuid")};
+        uuid.deproxy();
         this->load_retrier_state(archive);
         // Create a mostly empty function_request_impl object. uuid defines its
         // exact type (function_request_impl class instantiation).
-        impl_ = the_seri_registry->create<intf_type>(std::move(uuid));
+        impl_ = the_seri_registry->create_impl<intf_type>(std::move(uuid));
         // Deserialize the remainder of the function_request_impl object.
         impl_->load(archive);
     }
@@ -1215,12 +1216,13 @@ class function_request : public ObjectProps::retrier_type
         }
         msgpack::object* const subobjs = msgpack_obj.via.array.ptr;
         auto uuid{request_uuid::load(subobjs[0])};
+        uuid.deproxy();
         this->load_retrier_state(subobjs[1]);
         // Create a mostly empty function_request_impl object. uuid defines
         // its exact type (function_request_impl class instantiation).
         auto& resources{get_current_inner_resources()};
         auto the_seri_registry{resources.get_seri_registry()};
-        impl_ = the_seri_registry->create<intf_type>(std::move(uuid));
+        impl_ = the_seri_registry->create_impl<intf_type>(std::move(uuid));
         // Deserialize the remainder of the function_request_impl object.
         impl_->load_msgpack(&subobjs[2]);
     }
@@ -1344,6 +1346,7 @@ class proxy_request_impl final
 
     using this_type = proxy_request_impl;
     using intrsp_mixin_type = detail::request_title_mixin<introspective>;
+    using ArgIndices = std::index_sequence_for<Args...>;
 
     template<typename CtorProps, typename... CtorArgs>
     proxy_request_impl(CtorProps&& props, CtorArgs&&... args)
@@ -1351,6 +1354,7 @@ class proxy_request_impl final
           uuid_{std::forward<CtorProps>(props).get_uuid()},
           args_{std::forward<CtorArgs>(args)...}
     {
+        uuid_.make_proxy();
     }
 
  public: // cereal related
@@ -1413,10 +1417,6 @@ class proxy_request_impl final
     }
 
     // Needed for storing a request.
-    //
-    // Note that the hash (key) is identical to the one for a function_request
-    // having the same uuid and args. This is OK because their serializations
-    // are the same, too.
     void
     update_hash(unique_hasher& hasher) const override
     {
@@ -1488,6 +1488,10 @@ class proxy_request_impl final
     register_uuid(seri_registry& registry, catalog_id cat_id) const override
     {
         registry.add(cat_id, uuid_.str(), create);
+
+        // Register uuids for any args resulting from normalize_arg()
+        register_uuid_for_normalized_args(
+            registry, cat_id, args_, ArgIndices{});
     }
 
  private:
@@ -1668,7 +1672,7 @@ class proxy_request : public ObjectProps::retrier_type
         this->load_retrier_state(archive);
         // Create a mostly empty proxy_request_impl object. uuid defines its
         // exact type (proxy_request_impl class instantiation).
-        impl_ = the_seri_registry->create<intf_type>(std::move(uuid));
+        impl_ = the_seri_registry->create_impl<intf_type>(std::move(uuid));
         // Deserialize the remainder of the proxy_request_impl object.
         impl_->load(archive);
     }
@@ -1676,6 +1680,18 @@ class proxy_request : public ObjectProps::retrier_type
  private:
     std::shared_ptr<intf_type> impl_;
 };
+
+// register_uuid_for_normalized_arg() specialization for proxy_request types
+// arg should result from normalize_arg()
+template<typename Value, typename Props>
+void
+register_uuid_for_normalized_arg(
+    seri_registry& registry,
+    catalog_id cat_id,
+    proxy_request<Value, Props> const& arg)
+{
+    arg.register_uuid(registry, cat_id);
+}
 
 // Used for comparing subrequests, where the main requests have the same type;
 // so the subrequests have the same type too.

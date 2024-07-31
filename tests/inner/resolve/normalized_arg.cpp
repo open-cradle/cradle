@@ -7,6 +7,7 @@
 
 #include <cradle/inner/encodings/msgpack_value.h>
 #include <cradle/inner/requests/function.h>
+#include <cradle/inner/requests/uuid.h>
 #include <cradle/inner/resolve/seri_catalog.h>
 #include <cradle/inner/resolve/seri_registry.h>
 #include <cradle/inner/resolve/seri_req.h>
@@ -158,7 +159,10 @@ TEST_CASE("compare normalized proxy/function requests", tag)
     std::string seri_req_a{serialize_request(req_a)};
     std::string seri_req_b{serialize_request(req_b)};
 
-    REQUIRE(seri_req_a == seri_req_b);
+    // Serialization for a proxy_request is identical to the one for the
+    // corresponding function_request, except for the "proxy" markers in the
+    // uuid's.
+    REQUIRE(deproxy_uuid_str(seri_req_a) == deproxy_uuid_str(seri_req_b));
 }
 
 TEST_CASE("compare normalized proxy/coroutine requests", tag)
@@ -182,5 +186,8 @@ TEST_CASE("compare normalized proxy/coroutine requests", tag)
     std::string seri_req_a{serialize_request(req_a)};
     std::string seri_req_b{serialize_request(req_b)};
 
-    REQUIRE(seri_req_a == seri_req_b);
+    // Serialization for a proxy_request is identical to the one for the
+    // corresponding function_request, except for the "proxy" markers in the
+    // uuid's.
+    REQUIRE(deproxy_uuid_str(seri_req_a) == deproxy_uuid_str(seri_req_b));
 }
