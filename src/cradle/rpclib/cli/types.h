@@ -22,6 +22,7 @@ struct cli_options
     std::optional<std::string> key;
     std::optional<std::string> domain_name;
     std::optional<int> arg0;
+    bool proxy_flag{false};
 };
 
 int

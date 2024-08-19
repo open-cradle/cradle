@@ -87,6 +87,15 @@ class request_uuid
     request_uuid&
     set_flattened();
 
+    // Lets this uuid refer to a proxy request.
+    request_uuid&
+    make_proxy();
+
+    // If this uuid refers to a proxy_request, convert it to a reference to
+    // the corresponding function_request
+    void
+    deproxy();
+
     // Returns the full uuid (base + any extensions)
     std::string const&
     str() const
@@ -127,6 +136,7 @@ class request_uuid
     {
         request_uuid uuid;
         archive(cereal::make_nvp(name, uuid.str_));
+        uuid.do_finalize();
         return uuid;
     }
 
@@ -153,6 +163,7 @@ class request_uuid
     bool include_level_{false};
     caching_level_type level_{};
     bool flattened_{false};
+    bool is_proxy_{false};
 
     void
     check_not_finalized() const;
@@ -193,6 +204,11 @@ update_unique_hash(unique_hasher& hasher, request_uuid const& uuid)
 {
     update_unique_hash(hasher, uuid.str());
 }
+
+// If the uuid_str contains a proxy marker, strip it; converting a uuid_str for
+// a proxy_request to the uuid_str for the corresponding function_request.
+std::string
+deproxy_uuid_str(std::string const& uuid_str);
 
 } // namespace cradle
 

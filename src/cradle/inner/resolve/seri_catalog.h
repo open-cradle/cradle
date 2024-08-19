@@ -57,10 +57,21 @@ class seri_catalog
     template<Request Req>
     void
     register_resolver(Req const& req)
+        requires(!Req::is_proxy)
     {
-        static_assert(!Req::is_proxy);
         req.register_uuid(
             *registry_, cat_id_, std::make_shared<seri_resolver_impl<Req>>());
+    }
+
+    // Needed to deserialize a (stored) proxy request.
+    // No attempt should be made to call its resolver, because it doesn't have
+    // any.
+    template<Request Req>
+    void
+    register_proxy(Req const& req)
+        requires(Req::is_proxy)
+    {
+        req.register_uuid(*registry_, cat_id_);
     }
 
  protected:

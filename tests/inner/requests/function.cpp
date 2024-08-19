@@ -472,7 +472,7 @@ TEST_CASE("function_request: serialize proxy_retrier", tag)
     CHECK(json.find("\"max_attempts\": 14,") != json.npos);
 }
 
-TEST_CASE("rq_function and rq_proxy give the same serialization", tag)
+TEST_CASE("rq_function and rq_proxy give almost the same serialization", tag)
 {
     request_props<caching_level_type::memory, request_function_t::coro>
         props_a{make_test_uuid("0300")};
@@ -484,5 +484,8 @@ TEST_CASE("rq_function and rq_proxy give the same serialization", tag)
     auto seri_a = serialize_request(req_a);
     auto seri_b = serialize_request(req_b);
 
-    REQUIRE(seri_a == seri_b);
+    // Serialization for a proxy_request is identical to the one for the
+    // corresponding function_request, except for the "proxy" markers in the
+    // uuid's.
+    REQUIRE(deproxy_uuid_str(seri_a) == deproxy_uuid_str(seri_b));
 }
