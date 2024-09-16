@@ -283,6 +283,98 @@ test_post_iss_request(thinknode_test_scope& scope, Request const& req)
         scope, requests, payloads, results, introspective);
 }
 
+template<typename Request>
+void
+test_post_async_iss_request(
+    thinknode_test_scope& scope,
+    Request const& request,
+    blob const& payload,
+    std::string const& result)
+{
+    caching_level_type level = request.get_caching_level();
+    scope.clear_caches();
+    auto& resources{scope.get_resources()};
+
+    mock_http_session* mock_http{nullptr};
+    auto proxy = scope.get_proxy();
+    if (proxy)
+    {
+        // Assumes a single request/response
+        auto response{
+            make_http_200_response("{ \"id\": \"" + result + "\" }")};
+        // TODO should body be blob or string?
+        auto const& body{response.body};
+        std::string s{reinterpret_cast<char const*>(body.data()), body.size()};
+        proxy->mock_http(s);
+    }
+    else
+    {
+        mock_http_script script;
+        mock_http_exchange exchange{
+            make_http_request(
+                http_request_method::POST,
+                "https://mgh.thinknode.io/api/v1.0/iss/string?context=123",
+                {{"Authorization", "Bearer xyz"},
+                 {"Accept", "application/json"},
+                 {"Content-Type", "application/octet-stream"}},
+                payload),
+            make_http_200_response("{ \"id\": \"" + result + "\" }")};
+        script.push_back(exchange);
+        mock_http = &resources.enable_http_mocking();
+        mock_http->set_script(script);
+    }
+
+    {
+        tasklet_tracker* tasklet = nullptr;
+        auto ctx{scope.make_async_context(tasklet)};
+        auto res = cppcoro::sync_wait(resolve_request(
+            ctx, request, ResolutionConstraintsLocalAsyncRoot()));
+
+        REQUIRE(res == result);
+        if (mock_http)
+        {
+            CHECK(mock_http->is_complete());
+            CHECK(mock_http->is_in_order());
+        }
+    }
+
+    if (!proxy && is_cached(level))
+    {
+        tasklet_tracker* tasklet = nullptr;
+        auto ctx{scope.make_async_context(tasklet)};
+
+        // Resolve using memory cache
+        auto res1 = cppcoro::sync_wait(resolve_request(
+            ctx, request, ResolutionConstraintsLocalAsyncRoot()));
+        REQUIRE(res1 == result);
+    }
+
+    if (!proxy && is_fully_cached(level))
+    {
+        tasklet_tracker* tasklet = nullptr;
+        auto ctx{scope.make_async_context(tasklet)};
+
+        sync_wait_write_disk_cache(resources);
+        resources.reset_memory_cache();
+
+        // Resolve using disk cache
+        auto res2 = cppcoro::sync_wait(resolve_request(
+            ctx, request, ResolutionConstraintsLocalAsyncRoot()));
+        REQUIRE(res2 == result);
+    }
+}
+
+// Test a single "post ISS object" request
+template<typename Request>
+void
+test_async_post_iss_request(thinknode_test_scope& scope, Request const& req)
+{
+    auto payload = make_blob("payload");
+    std::string results = "def";
+
+    test_post_async_iss_request(scope, req, payload, results);
+}
+
 } // namespace
 
 TEST_CASE("ISS POST serialization - value", tag)
@@ -422,6 +514,68 @@ TEST_CASE("ISS POST resolution - subreq, proxy, rpclib", tag)
         get_test_dlls_dir(), "test_thinknode_dll_t0");
     test_post_iss_request(scope, make_post_iss_proxy_request_subreq());
 }
+
+TEST_CASE("ISS POST resolution - value, loopback, async", tag)
+{
+    thinknode_test_scope scope{"loopback"};
+    test_async_post_iss_request(scope, make_post_iss_request_constant());
+}
+
+TEST_CASE("ISS POST resolution - subreq, loopback, async", tag)
+{
+    thinknode_test_scope scope{"loopback"};
+    scope.get_proxy()->load_shared_library(
+        get_test_dlls_dir(), "test_thinknode_dll_t0");
+    test_async_post_iss_request(
+        scope, make_post_iss_request_subreq<caching_level_type::full>());
+}
+
+// TEST_CASE("ISS POST resolution - value, proxy, loopback, async", tag)
+// {
+//     thinknode_test_scope scope{"loopback"};
+//     test_async_post_iss_request(scope,
+//     make_post_iss_proxy_request_constant());
+// }
+
+// TEST_CASE("ISS POST resolution - subreq, proxy, loopback, async", tag)
+// {
+//     thinknode_test_scope scope{"loopback"};
+//     scope.get_proxy()->load_shared_library(
+//         get_test_dlls_dir(), "test_thinknode_dll_t0");
+//     test_async_post_iss_request(scope,
+//     make_post_iss_proxy_request_subreq());
+// }
+
+// TEST_CASE("ISS POST resolution - value, rpclib, async", tag)
+// {
+//     thinknode_test_scope scope{"rpclib"};
+//     test_async_post_iss_request(scope, make_post_iss_request_constant());
+// }
+
+// TEST_CASE("ISS POST resolution - subreq, rpclib, async", tag)
+// {
+//     thinknode_test_scope scope{"rpclib"};
+//     scope.get_proxy()->load_shared_library(
+//         get_test_dlls_dir(), "test_thinknode_dll_t0");
+//     test_async_post_iss_request(
+//         scope, make_post_iss_request_subreq<caching_level_type::full>());
+// }
+
+// TEST_CASE("ISS POST resolution - value, proxy, rpclib, async", tag)
+// {
+//     thinknode_test_scope scope{"rpclib"};
+//     test_async_post_iss_request(scope,
+//     make_post_iss_proxy_request_constant());
+// }
+
+// TEST_CASE("ISS POST resolution - subreq, proxy, rpclib, async", tag)
+// {
+//     thinknode_test_scope scope{"rpclib"};
+//     scope.get_proxy()->load_shared_library(
+//         get_test_dlls_dir(), "test_thinknode_dll_t0");
+//     test_async_post_iss_request(scope,
+//     make_post_iss_proxy_request_subreq());
+// }
 
 TEST_CASE("RESOLVE ISS OBJECT TO IMMUTABLE serialization", tag)
 {

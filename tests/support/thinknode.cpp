@@ -105,6 +105,19 @@ thinknode_test_scope::make_context(tasklet_tracker* tasklet)
         *resources_, session, tasklet, proxy_name_};
 }
 
+root_local_async_thinknode_context
+thinknode_test_scope::make_async_context(tasklet_tracker* tasklet)
+{
+    thinknode_session session;
+    session.api_url = "https://mgh.thinknode.io/api/v1.0";
+    session.access_token
+        = use_real_api_token_
+              ? get_environment_variable("CRADLE_THINKNODE_API_TOKEN")
+              : "xyz";
+    return root_local_async_thinknode_context{
+        std::make_unique<local_tree_context_base>(*resources_), session};
+}
+
 mock_http_session&
 thinknode_test_scope::enable_http_mocking()
 {

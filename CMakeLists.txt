@@ -88,7 +88,7 @@ else()
 endif()
 
 # CRADLE requires C++20
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
 # Some of CRADLE's libraries are intended to be dynamically loaded, so are

@@ -109,7 +109,8 @@ concept MatchingRequestConstraints
 
 template<typename Val, typename Constraints>
     requires(!Request<Val>)
-cppcoro::task<Val> resolve_request_local(
+cppcoro::task<Val>
+resolve_request_local(
     local_context_intf& ctx,
     Val const& val,
     bool retrying,
@@ -294,7 +295,8 @@ template<
     typename Val,
     typename Constraints = NoResolutionConstraints>
     requires(!Request<Val>)
-cppcoro::task<Val> resolve_request(
+cppcoro::task<Val>
+resolve_request(
     Ctx& ctx, Val const& val, Constraints constraints = Constraints())
 {
     static_assert(!constraints.force_remote);

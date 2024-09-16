@@ -68,4 +68,65 @@ thinknode_request_context::make_config(bool need_record_lock) const
     return service_config{config_map};
 }
 
+root_local_async_thinknode_context::root_local_async_thinknode_context(
+    std::unique_ptr<local_tree_context_base> tree_ctx,
+    service_config const& config)
+    : root_local_async_context_base{*tree_ctx},
+      session{make_session(config)},
+      owning_tree_ctx_{std::move(tree_ctx)}
+{
+}
+
+root_local_async_thinknode_context::root_local_async_thinknode_context(
+    std::unique_ptr<local_tree_context_base> tree_ctx,
+    thinknode_session session)
+    : root_local_async_context_base{*tree_ctx},
+      session{std::move(session)},
+      owning_tree_ctx_{std::move(tree_ctx)}
+{
+}
+
+std::string const&
+root_local_async_thinknode_context::domain_name() const
+{
+    return the_domain_name;
+}
+
+std::unique_ptr<req_visitor_intf>
+root_local_async_thinknode_context::make_ctx_tree_builder()
+{
+    return std::make_unique<local_async_thinknode_context_tree_builder>(*this);
+}
+
+std::string const&
+non_root_local_async_thinknode_context::domain_name() const
+{
+    return the_domain_name;
+}
+
+local_async_thinknode_context_tree_builder::
+    local_async_thinknode_context_tree_builder(local_async_context_base& ctx)
+    : local_context_tree_builder_base{ctx}
+{
+}
+
+std::unique_ptr<local_context_tree_builder_base>
+local_async_thinknode_context_tree_builder::make_sub_builder(
+    local_async_context_base& sub_ctx)
+{
+    return std::make_unique<local_async_thinknode_context_tree_builder>(
+        sub_ctx);
+}
+
+std::shared_ptr<local_async_context_base>
+local_async_thinknode_context_tree_builder::make_sub_ctx(
+    local_tree_context_base& tree_ctx,
+    std::size_t ix,
+    bool is_req,
+    std::unique_ptr<request_essentials> essentials)
+{
+    return std::make_shared<non_root_local_async_thinknode_context>(
+        tree_ctx, &ctx_, is_req, std::move(essentials));
+}
+
 } // namespace cradle

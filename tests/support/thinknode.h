@@ -44,6 +44,9 @@ class thinknode_test_scope
     thinknode_request_context
     make_context(tasklet_tracker* tasklet = nullptr);
 
+    root_local_async_thinknode_context
+    make_async_context(tasklet_tracker* tasklet = nullptr);
+
     mock_http_session&
     enable_http_mocking();
 

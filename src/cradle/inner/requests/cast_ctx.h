@@ -2,7 +2,9 @@
 #define CRADLE_INNER_REQUESTS_CAST_CTX_H
 
 #include <concepts>
+#include <iostream>
 #include <memory>
+#include <stacktrace>
 #include <stdexcept>
 
 #include <cradle/inner/requests/generic.h>
@@ -118,14 +120,16 @@ struct dynamic_ctx_caster<introspective_context_intf>
 // Retains the original type if no cast is needed.
 template<Context DestCtx, Context SrcCtx>
     requires(std::convertible_to<SrcCtx&, DestCtx&>)
-SrcCtx* cast_ctx_to_ptr_base(SrcCtx& ctx) noexcept
+SrcCtx*
+cast_ctx_to_ptr_base(SrcCtx& ctx) noexcept
 {
     return &ctx;
 }
 
 template<Context DestCtx, Context SrcCtx>
     requires(!std::convertible_to<SrcCtx&, DestCtx&>)
-DestCtx* cast_ctx_to_ptr_base(SrcCtx& ctx) noexcept
+DestCtx*
+cast_ctx_to_ptr_base(SrcCtx& ctx) noexcept
 {
     return dynamic_ctx_caster<DestCtx>::cast_ptr(&ctx);
 }
@@ -199,14 +203,16 @@ cast_ctx_to_ptr(SrcCtx& ctx) noexcept
 // Retains the original type if no cast is needed.
 template<Context DestCtx, Context SrcCtx>
     requires(std::convertible_to<SrcCtx&, DestCtx&>)
-SrcCtx& cast_ctx_to_ref_base(SrcCtx& ctx)
+SrcCtx&
+cast_ctx_to_ref_base(SrcCtx& ctx)
 {
     return ctx;
 }
 
 template<Context DestCtx, Context SrcCtx>
     requires(!std::convertible_to<SrcCtx&, DestCtx&>)
-DestCtx& cast_ctx_to_ref_base(SrcCtx& ctx)
+DestCtx&
+cast_ctx_to_ref_base(SrcCtx& ctx)
 {
     auto* ptr = dynamic_ctx_caster<DestCtx>::cast_ptr(&ctx);
     if (!ptr)
@@ -293,6 +299,7 @@ throw_on_ctx_mismatch(SrcCtx& ctx)
         }
         else if (ctx.is_async())
         {
+            std::cout << std::stacktrace::current() << std::endl;
             throw std::logic_error("is_async() returning true");
         }
     }

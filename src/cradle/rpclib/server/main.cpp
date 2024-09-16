@@ -154,6 +154,9 @@ create_config_map(cli_options const& options)
         config_map[inner_config_keys::SECONDARY_CACHE_FACTORY]
             = options.secondary_cache;
         config_map[local_disk_cache_config_keys::DIRECTORY] = cache_dir;
+        config_map[local_disk_cache_config_keys::SIZE_LIMIT] = 0x1900000000ull;
+        config_map[inner_config_keys::MEMORY_CACHE_UNUSED_SIZE_LIMIT]
+            = 0x100000000ull;
     }
     config_map[blob_cache_config_keys::DIRECTORY] = cache_dir;
     config_map[http_cache_config_keys::PORT] = 9090U;
