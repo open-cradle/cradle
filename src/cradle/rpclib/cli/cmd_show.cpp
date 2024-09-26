@@ -33,7 +33,7 @@ cmd_show(cli_options const& options)
             "sub [{}]: id {} ({})\n", i, spec_id, is_req ? "REQ" : "VAL");
     }
 
-    if (status == async_status::ERROR)
+    if (status == async_status::FAILED)
     {
         fmt::print("error: {}\n", client.get_async_error_message(remote_id));
     }

@@ -385,7 +385,7 @@ TEST_CASE("convert async_status to string", tag)
     REQUIRE(to_string(async_status::CANCELLED) == "CANCELLED");
     REQUIRE(to_string(async_status::AWAITING_RESULT) == "AWAITING_RESULT");
     REQUIRE(to_string(async_status::FINISHED) == "FINISHED");
-    REQUIRE(to_string(async_status::ERROR) == "ERROR");
+    REQUIRE(to_string(async_status::FAILED) == "FAILED");
     REQUIRE(
         to_string(static_cast<async_status>(789)) == "bad async_status 789");
 }

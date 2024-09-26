@@ -10,7 +10,7 @@ bool
 is_final(async_status s)
 {
     return s == async_status::CANCELLED || s == async_status::FINISHED
-           || s == async_status::ERROR;
+           || s == async_status::FAILED;
 }
 
 std::string
@@ -37,8 +37,8 @@ to_string(async_status s)
         case async_status::FINISHED:
             res = "FINISHED";
             break;
-        case async_status::ERROR:
-            res = "ERROR";
+        case async_status::FAILED:
+            res = "FAILED";
             break;
         default:
             return fmt::format("bad async_status {}", static_cast<int>(s));

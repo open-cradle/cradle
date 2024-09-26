@@ -43,6 +43,12 @@ save(Archive& archive, blob const& x)
     {
         archive(cereal::make_nvp("as_file", true));
         archive(cereal::make_nvp("path", owner->mapped_file()));
+        // TODO: Get rid of these casts.
+        archive(cereal::make_nvp(
+            "offset",
+            x.data()
+                - reinterpret_cast<std::byte const*>(
+                    const_cast<data_owner*>(owner)->data())));
     }
     else
     {
@@ -75,9 +81,11 @@ load(Archive& archive, blob& x)
     {
         std::string path;
         archive(cereal::make_nvp("path", path));
+        std::size_t offset;
+        archive(cereal::make_nvp("offset", offset));
         auto owner = std::make_shared<cradle::blob_file_reader>(
             file_path(std::move(path)));
-        x.reset(owner, owner->bytes(), owner->size());
+        x.reset(owner, owner->bytes() + offset, owner->size());
     }
     else
     {

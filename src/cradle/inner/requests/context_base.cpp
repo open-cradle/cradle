@@ -402,11 +402,11 @@ local_async_context_base::update_status_error(std::string const& errmsg)
 {
     auto& logger{tree_ctx_.get_logger()};
     logger.info(
-        "local_async_context_base {} update_status_error: {} -> ERROR: {}",
+        "local_async_context_base {} update_status_error: {} -> FAILED: {}",
         id_,
         status_.load(std::memory_order_relaxed),
         errmsg);
-    status_ = async_status::ERROR;
+    status_ = async_status::FAILED;
     errmsg_ = errmsg;
 }
 

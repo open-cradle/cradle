@@ -148,7 +148,8 @@ TEST_CASE("cereal converting file blob", "[encodings][cereal]")
     {{
         "value0": {{
             "as_file": true,
-            "path": "{}"
+            "path": "{}",
+            "offset": 0
         }}
     }}
     )",

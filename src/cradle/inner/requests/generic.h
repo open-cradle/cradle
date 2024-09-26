@@ -515,7 +515,7 @@ class local_async_context_intf : public virtual local_context_intf,
         = 0;
 
     // Gets the error message for this task.
-    // Should be called only when get_status() returns ERROR.
+    // Should be called only when get_status() returns FAILED.
     virtual std::string
     get_error_message()
         = 0;
@@ -526,16 +526,16 @@ class local_async_context_intf : public virtual local_context_intf,
     // If status == FINISHED and using_result() was called, the new status
     // will be AWAITING_RESULT.
     // TODO think of something less tricky for update_status()
-    // TODO need to the the same if status == ERROR?
+    // TODO need to the the same if status == FAILED?
     // TODO keep history of an async request e.g.
     // TODO vector<tuple<async_status, timestamp>>
-    // TODO plus extra info for ERROR status
+    // TODO plus extra info for FAILED status
     // TODO this could replace introspection
     virtual void
     update_status(async_status status)
         = 0;
 
-    // Updates the status of this task to "ERROR", and stores an associated
+    // Updates the status of this task to "FAILED", and stores an associated
     // error message.
     virtual void
     update_status_error(std::string const& errmsg)
@@ -791,13 +791,12 @@ concept LocalContext = std::convertible_to<Ctx&, local_context_intf&>;
 // Context that supports remote resolution only, and does not support local
 template<typename Ctx>
 concept DefinitelyRemoteContext
-    = std::is_final_v<Ctx> && RemoteContext<Ctx> && !
-LocalContext<Ctx>;
+    = std::is_final_v<Ctx> && RemoteContext<Ctx> && !LocalContext<Ctx>;
 
 // Context that supports local resolution only, and does not support remote
 template<typename Ctx>
-concept DefinitelyLocalContext = std::is_final_v<Ctx> && LocalContext<Ctx> && !
-RemoteContext<Ctx>;
+concept DefinitelyLocalContext
+    = std::is_final_v<Ctx> && LocalContext<Ctx> && !RemoteContext<Ctx>;
 
 // Context that supports caching
 template<typename Ctx>
@@ -814,14 +813,14 @@ concept AsyncContext = std::convertible_to<Ctx&, async_context_intf&>;
 // Context that supports synchronous resolution only, and does not support
 // asynchronous
 template<typename Ctx>
-concept DefinitelySyncContext = std::is_final_v<Ctx> && SyncContext<Ctx> && !
-AsyncContext<Ctx>;
+concept DefinitelySyncContext
+    = std::is_final_v<Ctx> && SyncContext<Ctx> && !AsyncContext<Ctx>;
 
 // Context that supports asynchronous resolution only, and does not support
 // synchronous
 template<typename Ctx>
-concept DefinitelyAsyncContext = std::is_final_v<Ctx> && AsyncContext<Ctx> && !
-SyncContext<Ctx>;
+concept DefinitelyAsyncContext
+    = std::is_final_v<Ctx> && AsyncContext<Ctx> && !SyncContext<Ctx>;
 
 // Context that supports introspection
 template<typename Ctx>
@@ -859,12 +858,11 @@ concept MaybeResolutionRetrier
 
 template<typename T>
 concept ResolutionRetrier
-    = MaybeResolutionRetrier<T>
-      && requires(T const& obj) {
-             {
-                 obj.handle_exception(0, std::runtime_error{""})
-                 } -> std::convertible_to<std::chrono::milliseconds>;
-         };
+    = MaybeResolutionRetrier<T> && requires(T const& obj) {
+          {
+              obj.handle_exception(0, std::runtime_error{""})
+          } -> std::convertible_to<std::chrono::milliseconds>;
+      };
 
 /*
  * A request is something that can be resolved, resulting in a result
@@ -885,32 +883,22 @@ concept ResolutionRetrier
  * TODO is_introspective+get_introspection_title vs get_essentials
  */
 template<typename T>
-concept Request
-    = requires {
-          requires std::same_as<typename T::element_type, T>;
-          typename T::value_type;
-          requires std::
-              same_as<std::remove_const_t<decltype(T::is_proxy)>, bool>;
-          requires std::
-              same_as<std::remove_const_t<decltype(T::retryable)>, bool>;
-      } && requires(T const& req) {
-               {
-                   req.get_caching_level()
-                   } -> std::same_as<caching_level_type>;
-           } && requires(T const& req) {
-                    {
-                        req.is_introspective()
-                        } -> std::same_as<bool>;
-                } && requires(T const& req) {
-                         {
-                             req.get_introspection_title()
-                             } -> std::same_as<std::string>;
-                     } && requires(T const& req) {
-                              {
-                                  req.get_essentials()
-                                  } -> std::same_as<
-                                      std::unique_ptr<request_essentials>>;
-                          };
+concept Request = requires {
+    requires std::same_as<typename T::element_type, T>;
+    typename T::value_type;
+    requires std::same_as<std::remove_const_t<decltype(T::is_proxy)>, bool>;
+    requires std::same_as<std::remove_const_t<decltype(T::retryable)>, bool>;
+} && requires(T const& req) {
+    { req.get_caching_level() } -> std::same_as<caching_level_type>;
+} && requires(T const& req) {
+    { req.is_introspective() } -> std::same_as<bool>;
+} && requires(T const& req) {
+    { req.get_introspection_title() } -> std::same_as<std::string>;
+} && requires(T const& req) {
+    {
+        req.get_essentials()
+    } -> std::same_as<std::unique_ptr<request_essentials>>;
+};
 
 // By having retryable=true, a request advertises itself as being retryable...
 template<typename Req>
@@ -925,12 +913,9 @@ concept ValidRetryableRequest
 // This functionality is being used for constructing a context tree when a
 // request is resolved locally and asynchronously.
 template<typename Req>
-concept VisitableRequest
-    = Request<Req> && requires(Req const& req) {
-                          {
-                              req.accept(*(req_visitor_intf*) nullptr)
-                          };
-                      };
+concept VisitableRequest = Request<Req> && requires(Req const& req) {
+    { req.accept(*(req_visitor_intf*) nullptr) };
+};
 
 // A context/request pair where the context can be used to resolve the request.
 template<typename Ctx, typename Req>
