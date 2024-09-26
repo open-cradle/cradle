@@ -24,7 +24,7 @@ extract_uuid_str(std::string const& seri_req)
     {
         throw uuid_error{fmt::format("no uuid found in JSON: {}", seri_req)};
     }
-    return match[1].str();
+    return deproxy_uuid_str(match[1].str());
 }
 
 } // namespace

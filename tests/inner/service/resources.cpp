@@ -31,6 +31,15 @@ class test_proxy : public remote_proxy
         throw not_implemented_error{"test_proxy::get_logger()"};
     }
 
+    void
+    store_request(
+        std::string storage_name,
+        std::string key,
+        std::string seri_req) override
+    {
+        throw not_implemented_error{"test_proxy::store_request()"};
+    }
+
     serialized_result
     resolve_sync(service_config config, std::string seri_req) override
     {
@@ -41,6 +50,15 @@ class test_proxy : public remote_proxy
     submit_async(service_config config, std::string seri_req) override
     {
         throw not_implemented_error{"test_proxy::submit_async()"};
+    }
+
+    async_id
+    submit_stored(
+        service_config config,
+        std::string storage_name,
+        std::string key) override
+    {
+        throw not_implemented_error{"test_proxy::submit_stored()"};
     }
 
     remote_context_spec_list
@@ -65,6 +83,12 @@ class test_proxy : public remote_proxy
     get_async_response(async_id root_aid) override
     {
         throw not_implemented_error{"test_proxy::get_async_response()"};
+    }
+
+    request_essentials
+    get_essentials(async_id aid) override
+    {
+        throw not_implemented_error{"test_proxy::get_essentials()"};
     }
 
     void

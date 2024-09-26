@@ -146,11 +146,25 @@ handle_ack_response(rpclib_handler_context& hctx, int response_id);
 void
 handle_mock_http(rpclib_handler_context& hctx, std::string body);
 
+int
+handle_store_request(
+    rpclib_handler_context& hctx,
+    std::string storage_name,
+    std::string key,
+    std::string seri_req);
+
 async_id
 handle_submit_async(
     rpclib_handler_context& hctx,
     std::string config_json,
     std::string seri_req);
+
+async_id
+handle_submit_stored(
+    rpclib_handler_context& hctx,
+    std::string config_json,
+    std::string storage_name,
+    std::string key);
 
 remote_context_spec_list
 handle_get_sub_contexts(rpclib_handler_context& hctx, async_id aid);
@@ -190,6 +204,9 @@ handle_release_cache_record_lock(
 
 int
 handle_get_num_contained_calls(rpclib_handler_context& hctx);
+
+rpclib_essentials
+handle_get_essentials(rpclib_handler_context& hctx, async_id aid);
 
 } // namespace cradle
 

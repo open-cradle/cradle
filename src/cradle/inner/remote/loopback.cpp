@@ -14,6 +14,7 @@
 #include <cradle/inner/requests/test_context.h>
 #include <cradle/inner/resolve/seri_req.h>
 #include <cradle/inner/resolve/util.h>
+#include <cradle/inner/service/secondary_storage_intf.h>
 #include <cradle/inner/utilities/logging.h>
 
 namespace cradle {
@@ -41,6 +42,16 @@ spdlog::logger&
 loopback_service::get_logger()
 {
     return *logger_;
+}
+
+void
+loopback_service::store_request(
+    std::string storage_name, std::string key, std::string seri_req)
+{
+    logger_->debug("store_request ({}, {})", storage_name, key);
+    auto& storage{resources_->requests_storage(storage_name)};
+    cppcoro::sync_wait(
+        storage.write(std::move(key), make_blob(std::move(seri_req))));
 }
 
 serialized_result
@@ -190,10 +201,26 @@ loopback_service::submit_async(service_config config, std::string seri_req)
     return aid;
 }
 
+async_id
+loopback_service::submit_stored(
+    service_config config, std::string storage_name, std::string key)
+{
+    logger_->debug("submit_stored ({}, {})", storage_name, key);
+    auto& storage{resources_->requests_storage(storage_name)};
+    auto opt_seri_req_as_blob
+        = cppcoro::sync_wait(storage.read(std::move(key)));
+    if (!opt_seri_req_as_blob)
+    {
+        throw std::logic_error{"Request not in storage"};
+    }
+    auto seri_req{to_string(*opt_seri_req_as_blob)};
+    return submit_async(std::move(config), std::move(seri_req));
+}
+
 remote_context_spec_list
 loopback_service::get_sub_contexts(async_id aid)
 {
-    logger_->info("handle_get_sub_contexts {}", aid);
+    logger_->info("get_sub_contexts {}", aid);
     auto actx{get_async_db().find(aid)};
     auto nsubs = actx->get_local_num_subs();
     logger_->debug("  {} subs", nsubs);
@@ -216,35 +243,43 @@ loopback_service::get_sub_contexts(async_id aid)
 async_status
 loopback_service::get_async_status(async_id aid)
 {
-    logger_->info("handle_get_async_status {}", aid);
+    logger_->debug("get_async_status {}", aid);
     auto actx{get_async_db().find(aid)};
     auto status = actx->get_status();
-    logger_->info("handle_get_async_status -> {}", status);
+    logger_->debug("get_async_status -> {}", status);
     return status;
 }
 
 std::string
 loopback_service::get_async_error_message(async_id aid)
 {
-    logger_->info("handle_get_async_error_message {}", aid);
+    logger_->info("get_async_error_message {}", aid);
     auto actx{get_async_db().find(aid)};
     auto errmsg = actx->get_error_message();
-    logger_->info("handle_get_async_error_message -> {}", errmsg);
+    logger_->info("get_async_error_message -> {}", errmsg);
     return errmsg;
 }
 
 serialized_result
 loopback_service::get_async_response(async_id root_aid)
 {
-    logger_->info("handle_get_async_response {}", root_aid);
+    logger_->info("get_async_response {}", root_aid);
     auto actx{get_async_db().find_root(root_aid)};
     return serialized_result{actx->get_result(), actx->get_cache_record_id()};
+}
+
+request_essentials
+loopback_service::get_essentials(async_id aid)
+{
+    logger_->debug("get_essentials {}", aid);
+    auto actx{get_async_db().find_root(aid)};
+    return actx->get_essentials();
 }
 
 void
 loopback_service::request_cancellation(async_id aid)
 {
-    logger_->info("handle_request_cancellation {}", aid);
+    logger_->info("request_cancellation {}", aid);
     auto actx{get_async_db().find(aid)};
     actx->request_cancellation();
 }
@@ -252,7 +287,7 @@ loopback_service::request_cancellation(async_id aid)
 void
 loopback_service::finish_async(async_id root_aid)
 {
-    logger_->info("handle_finish_async {}", root_aid);
+    logger_->info("finish_async {}", root_aid);
     get_async_db().remove_tree(root_aid);
 }
 

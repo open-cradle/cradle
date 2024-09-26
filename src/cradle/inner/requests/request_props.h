@@ -184,9 +184,9 @@ static_assert(ResolutionRetrier<proxy_retrier>);
  * all requests, but Level, Introspective and Retrier may differ.
  *
  * When a request is resolved remotely, any caching happens remotely only;
- * there is no additional local caching. In particular, this means that the
- * caching level is unused for proxy requests; it must be set to "none" for
- * these requests.
+ * there is no additional local caching. The caching level refers to the
+ * machine (local or remote) where caching happens; for a proxy request, this
+ * will always be the remote machine.
  *
  * If a non-proxy request is used for a remote resolution, the request types
  * are identical between client and server. If additionally a real retrier is
@@ -219,8 +219,6 @@ class request_props : public introspection_mixin<Introspective>, public Retrier
     static constexpr bool retryable = Retrier::retryable;
     static constexpr bool value_based_caching = is_value_based(Level);
     using retrier_type = Retrier;
-
-    static_assert(!for_proxy || is_uncached(level));
 
     // Constructor for a request that does not support introspection
     explicit request_props(request_uuid uuid, Retrier retrier = Retrier())
@@ -354,8 +352,6 @@ class request_impl_props : public introspection_mixin<Introspective>
           || FunctionType == request_function_t::proxy_coro;
     static constexpr bool introspective = Introspective;
     static constexpr bool value_based_caching = is_value_based(Level);
-
-    static_assert(!for_proxy || is_uncached(level));
 
     // Constructor for a request that does not support introspection
     explicit request_impl_props(request_uuid uuid)
