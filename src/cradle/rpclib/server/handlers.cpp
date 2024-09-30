@@ -124,6 +124,7 @@ resolve_sync(
     auto domain_name
         = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
     logger.info("resolve_sync {}: {}", domain_name, seri_req);
+    logger.info("  config_json {}", config_json);
     auto need_record_lock{config.get_bool_or_default(
         remote_config_keys::NEED_RECORD_LOCK, false)};
     auto seri_lock{alloc_cache_record_lock_if_needed(hctx, need_record_lock)};
@@ -279,9 +280,9 @@ try_handle_submit_async(
     service_config config{read_config_map_from_json(config_json)};
     auto domain_name
         = config.get_mandatory_string(remote_config_keys::DOMAIN_NAME);
-    logger.info(
-        "submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
-    // logger.info("  config_json {}", config_json);
+    logger.info("submit_async {}: {} ...", domain_name, seri_req);
+    //"submit_async {}: {} ...", domain_name, seri_req.substr(0, 10));
+    logger.info("  config_json {}", config_json);
     auto& dom = hctx.service().find_domain(domain_name);
     auto actx{dom.make_local_async_context(config)};
     actx->track_blob_file_writers();
