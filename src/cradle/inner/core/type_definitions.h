@@ -119,6 +119,12 @@ class blob
         return owner_.get();
     }
 
+    std::shared_ptr<data_owner> const&
+    shared_owner() const noexcept
+    {
+        return owner_;
+    }
+
     data_owner const*
     mapped_file_data_owner() const noexcept
     {
