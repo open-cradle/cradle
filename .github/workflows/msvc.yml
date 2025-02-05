@@ -71,7 +71,7 @@ jobs:
 
     - uses: friendlyanon/setup-vcpkg@v1
       with:
-        committish: 7ba0ba7334c3346e7eee1e049ba85da193a8d821
+        committish: 0ed3bfe969b2f95ad45f431c5ea482a69f132a67
 
     - name: Download preprocessed headers
       uses: actions/download-artifact@v4
