@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <fmt/format.h>
 
 #include <cradle/inner/core/fmt_format.h>

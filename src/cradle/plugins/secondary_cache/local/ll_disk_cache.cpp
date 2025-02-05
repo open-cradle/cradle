@@ -7,6 +7,8 @@
 #include <utility>
 #include <vector>
 
+#include <boost/numeric/conversion/cast.hpp>
+
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 #include <sqlite3.h>
