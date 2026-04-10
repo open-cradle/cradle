@@ -1,4 +1,6 @@
+#include <chrono>
 #include <cstdlib>
+#include <filesystem>
 #include <mutex>
 #include <vector>
 
@@ -38,9 +40,18 @@ static bool ignore_env_setting;
 static std::string the_prefix;
 
 static auto
-create_file_sink()
+create_file_sink(std::optional<file_path> const& log_file_dir)
 {
-    auto log_path = get_user_logs_dir(none, "cradle") / "log";
+    file_path log_path;
+    if (log_file_dir)
+    {
+        std::filesystem::create_directories(*log_file_dir);
+        log_path = *log_file_dir / "log";
+    }
+    else
+    {
+        log_path = get_user_logs_dir(none, "cradle") / "log";
+    }
     auto sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
         log_path.string(), 262144, 2);
     sink->set_pattern(
@@ -84,15 +95,17 @@ void
 initialize_logging(
     std::string const& level_spec_arg,
     bool ignore_env_setting_arg,
-    std::string prefix)
+    std::string prefix,
+    std::optional<file_path> log_file_dir)
 {
     the_prefix = std::move(prefix);
-    shared_file_sink = create_file_sink();
+    shared_file_sink = create_file_sink(log_file_dir);
     main_stdout_sink = create_stdout_sink();
     other_stdout_sink = create_stdout_sink();
     level_spec = level_spec_arg;
     ignore_env_setting = ignore_env_setting_arg;
     create_logger("cradle");
+    spdlog::flush_every(std::chrono::seconds(5));
 }
 
 std::shared_ptr<spdlog::logger>
@@ -105,6 +118,7 @@ create_logger(std::string const& name)
         std::make_shared<spdlog::logger>(name, begin(sinks), end(sinks))};
     spdlog::register_logger(logger);
     load_levels();
+    logger->flush_on(spdlog::level::warn);
     return logger;
 }
 
