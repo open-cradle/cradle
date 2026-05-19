@@ -1,3 +1,22 @@
+# Create a dummy DLL used for generating test_dlls_dir.h
+add_library(dummy_dll MODULE inner-dll/dummy/dummy.cpp)
+
+# Create a C++ header file defining the location of the dynamically-loaded test DLLs.
+# A reference to any test DLL would introduce a circular reference, so instead
+# dummy_dll is used, which is in the same directory.
+set(test_dlls_dir_file "${intgen_src_dir}/cradle/test_dlls_dir.h")
+add_custom_command(
+    OUTPUT ${test_dlls_dir_file}
+    COMMAND ${CMAKE_COMMAND}
+        -D input_file=${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.h.in
+        -D output_file=${test_dlls_dir_file}
+        -D test_dlls_dir=$<TARGET_FILE_DIR:dummy_dll>
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.cmake
+    DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.cmake
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.h.in)
+add_custom_target(test_dlls_dir_target DEPENDS ${test_dlls_dir_file})
+
 # Define an object library containg the test runner for the Catch2-based tests.
 # (An object library is a CMake artifact. The linker will see the object files, not a library.)
 add_library(catch2_runner OBJECT
@@ -36,6 +55,8 @@ target_include_directories(thinknode_test_support PRIVATE
 target_link_libraries(thinknode_test_support PUBLIC
     basic_test_support
     cradle_thinknode)
+add_dependencies(thinknode_test_support
+    thinknode_dlls_dir_target)
 
 # Define an object library covering the source files in unit/.
 file(GLOB_RECURSE test_srcs_unit CONFIGURE_DEPENDS
@@ -59,7 +80,8 @@ target_link_libraries(unit_test_runner PRIVATE
     cradle_inner
     test_thinknode_t0)
 add_dependencies(unit_test_runner
-    copy_thinknode_dlls)
+    copy_thinknode_dlls
+    test_dlls_dir_target)
 
 # Add the unit testing target.
 add_custom_target(
@@ -80,25 +102,6 @@ add_test(
     COMMAND ${CMAKE_COMMAND}
         --build ${CMAKE_BINARY_DIR}
         --target unit_tests)
-
-# Create a dummy DLL used for generating test_dlls_dir.h
-add_library(dummy_dll MODULE inner-dll/dummy/dummy.cpp)
-
-# Create a C++ header file defining the location of the dynamically-loaded test DLLs.
-# A reference to any test DLL would introduce a circular reference, so instead
-# dummy_dll is used, which is in the same directory.
-set(test_dlls_dir_file "${intgen_src_dir}/cradle/test_dlls_dir.h")
-add_custom_command(
-    OUTPUT ${test_dlls_dir_file}
-    COMMAND ${CMAKE_COMMAND}
-        -D input_file=${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.h.in
-        -D output_file=${test_dlls_dir_file}
-        -D test_dlls_dir=$<TARGET_FILE_DIR:dummy_dll>
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.cmake
-    DEPENDS
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.cmake
-        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/test_dlls_dir.h.in)
-add_custom_target(test_dlls_dir_target DEPENDS ${test_dlls_dir_file})
 
 # Create a shared library that can be loaded dynamically at runtime.
 file(GLOB_RECURSE srcs_inner_dll_v1 CONFIGURE_DEPENDS
@@ -217,7 +220,7 @@ target_link_libraries(test_lib_inner PUBLIC
     cradle_plugins_inner
     cradle_inner
     Catch2::Catch2)
-add_dependencies(test_lib_inner 
+add_dependencies(test_lib_inner
     test_dlls_dir_target)
 
 # Add the inner test runner.
