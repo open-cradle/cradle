@@ -95,8 +95,8 @@ pip install gcovr pytest requests websocket-client msgpack pyyaml
 ## Secrets
 
 A couple of Thinknode secrets are currently required to build and test CRADLE.
-Be sure to acquire them. You have two options for passing them into the build
-system:
+Be sure to acquire them from an existing developer on the project. You have two
+options for passing them into the build system:
 
 You can store them in environment variables:
 
