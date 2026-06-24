@@ -10,7 +10,7 @@ env:
 jobs:
 
   gcc:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     strategy:
       matrix:
@@ -27,7 +27,7 @@ jobs:
 
     - name: Install
       run: |
-        sudo apt install lcov ocaml-nox
+        sudo apt install gcc-10 g++-10 lcov ocaml-nox
         sudo pip3 install virtualenv
 
     - name: Configure
