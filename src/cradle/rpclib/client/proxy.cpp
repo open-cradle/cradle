@@ -477,6 +477,12 @@ rpclib_client_impl::server_is_running()
         logger_->info("rpclib server is not running (rpc_error)");
         return false;
     }
+    catch (rpc::timeout const&)
+    {
+        // A ping timeout means we could not establish a usable RPC session.
+        logger_->info("rpclib server is not running (timeout)");
+        return false;
+    }
     catch (remote_error const&)
     {
         // Already reported

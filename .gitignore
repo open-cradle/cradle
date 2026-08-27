@@ -13,3 +13,7 @@ python/config.yml
 .token
 coverage*.txt
 .docker-auth
+server_cache_testing/
+input/
+output/
+.github/
