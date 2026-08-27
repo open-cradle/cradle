@@ -23,12 +23,15 @@
 
 namespace cradle {
 
+class ac_intf;
 class async_db;
 class blob_file_directory;
+class cas_intf;
 class domain;
 struct immutable_cache;
 class inner_resources;
 struct mock_http_session;
+class mutable_store_intf;
 class remote_proxy;
 class secondary_storage_intf;
 
@@ -72,6 +75,13 @@ class inner_resources_impl
     std::map<std::string, std::unique_ptr<secondary_storage_intf>>
         requests_storages_;
     secondary_storage_intf* default_requests_storage_{nullptr};
+    std::map<std::string, std::unique_ptr<cas_intf>> cas_stores_;
+    cas_intf* default_cas_store_{nullptr};
+    std::map<std::string, std::unique_ptr<ac_intf>> ac_stores_;
+    ac_intf* default_ac_store_{nullptr};
+    std::map<std::string, std::unique_ptr<mutable_store_intf>>
+        mutable_stores_;
+    mutable_store_intf* default_mutable_store_{nullptr};
     std::unique_ptr<blob_file_directory> blob_dir_;
     std::unique_ptr<async_db> the_async_db_;
     std::unordered_map<std::string, std::unique_ptr<domain>> domains_;

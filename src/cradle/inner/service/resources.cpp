@@ -23,6 +23,9 @@
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/service/resources_impl.h>
 #include <cradle/inner/service/secondary_storage_intf.h>
+#include <cradle/inner/storage/ac_intf.h>
+#include <cradle/inner/storage/cas_intf.h>
+#include <cradle/inner/storage/mutable_store_intf.h>
 #include <cradle/inner/utilities/logging.h>
 #include <cradle/rpclib/client/proxy.h>
 #include <cradle/rpclib/common/config.h>
@@ -188,6 +191,140 @@ inner_resources::requests_storage(std::string const& name)
     {
         throw std::logic_error(fmt::format(
             "inner_resources has no requests storage named {}", name));
+    }
+    return *it->second;
+}
+
+void
+inner_resources::set_cas_store(
+    std::unique_ptr<cas_intf> store, bool is_default)
+{
+    auto& impl{*impl_};
+    std::string name{store->name()};
+    if (impl.cas_stores_.contains(name))
+    {
+        throw std::logic_error(fmt::format(
+            "inner_resources already has CAS store named {}", name));
+    }
+    if (is_default && impl.default_cas_store_)
+    {
+        throw std::logic_error(
+            "inner_resources already has a default CAS store");
+    }
+    impl.default_cas_store_ = &*store;
+    impl.cas_stores_.emplace(
+        std::make_pair(std::move(name), std::move(store)));
+}
+
+cas_intf&
+inner_resources::cas_store()
+{
+    auto& impl{*impl_};
+    if (!impl.default_cas_store_)
+    {
+        throw std::logic_error("inner_resources has no default CAS store");
+    }
+    return *impl.default_cas_store_;
+}
+
+cas_intf&
+inner_resources::cas_store(std::string const& name)
+{
+    auto& impl{*impl_};
+    auto it = impl.cas_stores_.find(name);
+    if (it == impl.cas_stores_.end())
+    {
+        throw std::logic_error(
+            fmt::format("inner_resources has no CAS store named {}", name));
+    }
+    return *it->second;
+}
+
+void
+inner_resources::set_ac_store(std::unique_ptr<ac_intf> store, bool is_default)
+{
+    auto& impl{*impl_};
+    std::string name{store->name()};
+    if (impl.ac_stores_.contains(name))
+    {
+        throw std::logic_error(fmt::format(
+            "inner_resources already has AC store named {}", name));
+    }
+    if (is_default && impl.default_ac_store_)
+    {
+        throw std::logic_error(
+            "inner_resources already has a default AC store");
+    }
+    impl.default_ac_store_ = &*store;
+    impl.ac_stores_.emplace(std::make_pair(std::move(name), std::move(store)));
+}
+
+ac_intf&
+inner_resources::ac_store()
+{
+    auto& impl{*impl_};
+    if (!impl.default_ac_store_)
+    {
+        throw std::logic_error("inner_resources has no default AC store");
+    }
+    return *impl.default_ac_store_;
+}
+
+ac_intf&
+inner_resources::ac_store(std::string const& name)
+{
+    auto& impl{*impl_};
+    auto it = impl.ac_stores_.find(name);
+    if (it == impl.ac_stores_.end())
+    {
+        throw std::logic_error(
+            fmt::format("inner_resources has no AC store named {}", name));
+    }
+    return *it->second;
+}
+
+void
+inner_resources::set_mutable_store(
+    std::unique_ptr<mutable_store_intf> store, bool is_default)
+{
+    auto& impl{*impl_};
+    std::string name{store->name()};
+    if (impl.mutable_stores_.contains(name))
+    {
+        throw std::logic_error(fmt::format(
+            "inner_resources already has mutable store named {}", name));
+    }
+    if (is_default && impl.default_mutable_store_)
+    {
+        throw std::logic_error(
+            "inner_resources already has a default mutable store");
+    }
+    impl.default_mutable_store_ = &*store;
+    impl.mutable_stores_.emplace(
+        std::make_pair(std::move(name), std::move(store)));
+}
+
+mutable_store_intf&
+inner_resources::mutable_store()
+{
+    auto& impl{*impl_};
+    if (!impl.default_mutable_store_)
+    {
+        throw std::logic_error(
+            "inner_resources has no default mutable store");
+    }
+    return *impl.default_mutable_store_;
+}
+
+mutable_store_intf&
+inner_resources::mutable_store(std::string const& name)
+{
+    auto& impl{*impl_};
+    auto it = impl.mutable_stores_.find(name);
+    if (it == impl.mutable_stores_.end())
+    {
+        throw std::logic_error(fmt::format(
+            "inner_resources has no mutable store named {}", name));
     }
     return *it->second;
 }
