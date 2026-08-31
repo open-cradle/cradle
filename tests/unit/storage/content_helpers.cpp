@@ -11,8 +11,7 @@
 
 using namespace cradle;
 
-static char const tag[]
-    = "[unit][inner][storage][content_helpers]";
+static char const tag[] = "[unit][inner][storage][content_helpers]";
 
 TEST_CASE("digest_of - equal content yields equal digest", tag)
 {
@@ -22,7 +21,7 @@ TEST_CASE("digest_of - equal content yields equal digest", tag)
     digest d1 = digest_of(content1);
     digest d2 = digest_of(content2);
 
-    // Equal content must yield equal digest (FR-9)
+    // Equal content must yield equal digest
     REQUIRE(d1 == d2);
 }
 
@@ -34,7 +33,7 @@ TEST_CASE("digest_of - different content yields different digest", tag)
     digest d1 = digest_of(content1);
     digest d2 = digest_of(content2);
 
-    // Different content must yield different digest (FR-9)
+    // Different content must yield different digest
     REQUIRE(d1 != d2);
 }
 
@@ -42,7 +41,7 @@ TEST_CASE("digest_of - callable without storing", tag)
 {
     blob content = make_blob("standalone hashing");
 
-    // digest_of is a pure function; no CAS required (FR-9)
+    // digest_of is a pure function; no CAS required
     digest d = digest_of(content);
 
     // Verify the digest is non-empty (a well-defined value was computed)
@@ -57,7 +56,7 @@ TEST_CASE("digest_of - empty content has stable digest", tag)
     digest d1 = digest_of(empty1);
     digest d2 = digest_of(empty2);
 
-    // Empty content should have a stable, non-empty digest (§8)
+    // Empty content should have a stable, non-empty digest
     REQUIRE_FALSE(d1.empty());
     REQUIRE(d1 == d2);
 }
@@ -67,13 +66,13 @@ TEST_CASE("put_content - stores and returns digest", tag)
     auto cas = make_memory_cas("test_cas");
     blob content = make_blob("content to store");
 
-    // put_content returns the digest (FR-10)
+    // put_content returns the digest
     digest d = cppcoro::sync_wait(put_content(*cas, content));
 
     // Verify the digest is non-empty
     REQUIRE_FALSE(d.empty());
 
-    // Verify the content is now stored under that digest (FR-10)
+    // Verify the content is now stored under that digest
     auto retrieved = cppcoro::sync_wait(cas->get(d));
     REQUIRE(retrieved.has_value());
     REQUIRE(to_string(*retrieved) == "content to store");
@@ -90,7 +89,7 @@ TEST_CASE("put_content - idempotent behavior", tag)
     // Second put with same content
     digest d2 = cppcoro::sync_wait(put_content(*cas, content));
 
-    // Both puts return the same digest (FR-10, FR-1)
+    // Both puts return the same digest
     REQUIRE(d1 == d2);
 
     // Verify the stored value is unchanged
@@ -104,7 +103,7 @@ TEST_CASE("put_content - empty blob round-trip", tag)
     auto cas = make_memory_cas("test_cas");
     blob empty_content = make_blob("");
 
-    // put_content with empty blob (§8)
+    // put_content with empty blob
     digest d = cppcoro::sync_wait(put_content(*cas, empty_content));
 
     // Verify a digest was returned
@@ -126,7 +125,7 @@ TEST_CASE("put_content_if_absent - stores when absent", tag)
     bool exists_before = cppcoro::sync_wait(cas->exists(key));
     REQUIRE_FALSE(exists_before);
 
-    // put_content_if_absent should store when absent (FR-11)
+    // put_content_if_absent should store when absent
     cppcoro::sync_wait(put_content_if_absent(*cas, key, content));
 
     // Verify the content is now stored
@@ -146,9 +145,7 @@ TEST_CASE("put_content_if_absent - no-op when present", tag)
     cppcoro::sync_wait(cas->put(key, original_content));
 
     // put_content_if_absent with different content should be a no-op
-    // (FR-11)
-    cppcoro::sync_wait(
-        put_content_if_absent(*cas, key, different_content));
+    cppcoro::sync_wait(put_content_if_absent(*cas, key, different_content));
 
     // Verify the stored value is still the original (no overwrite)
     auto retrieved = cppcoro::sync_wait(cas->get(key));
@@ -156,17 +153,15 @@ TEST_CASE("put_content_if_absent - no-op when present", tag)
     REQUIRE(to_string(*retrieved) == "original content");
 }
 
-TEST_CASE(
-    "put_content_if_absent - uses caller-supplied digest", tag)
+TEST_CASE("put_content_if_absent - uses caller-supplied digest", tag)
 {
     auto cas = make_memory_cas("test_cas");
     blob content = make_blob("content with caller digest");
     // Arbitrary caller-chosen key (not the actual hash of content)
     digest caller_key = "arbitrary_caller_chosen_key";
 
-    // put_content_if_absent uses the caller-supplied digest as-is (FR-13)
-    cppcoro::sync_wait(
-        put_content_if_absent(*cas, caller_key, content));
+    // put_content_if_absent uses the caller-supplied digest as-is
+    cppcoro::sync_wait(put_content_if_absent(*cas, caller_key, content));
 
     // Verify the content is stored under the caller's key
     auto retrieved = cppcoro::sync_wait(cas->get(caller_key));
@@ -187,7 +182,7 @@ TEST_CASE("put_content_verified - stores on match", tag)
     blob content = make_blob("verified content");
     digest expected = digest_of(content);
 
-    // put_content_verified with correct digest should store (FR-12)
+    // put_content_verified with correct digest should store
     cppcoro::sync_wait(put_content_verified(*cas, content, expected));
 
     // Verify the content is stored under the expected digest
@@ -206,10 +201,9 @@ TEST_CASE("put_content_verified - throws on mismatch", tag)
     digest actual_digest = digest_of(content);
     REQUIRE(wrong_digest != actual_digest);
 
-    // put_content_verified with wrong digest should throw (FR-12, D4, §8)
+    // put_content_verified with wrong digest should throw
     REQUIRE_THROWS_AS(
-        cppcoro::sync_wait(
-            put_content_verified(*cas, content, wrong_digest)),
+        cppcoro::sync_wait(put_content_verified(*cas, content, wrong_digest)),
         internal_check_failed);
 
     // Verify the content was NOT stored under the wrong digest
@@ -217,8 +211,7 @@ TEST_CASE("put_content_verified - throws on mismatch", tag)
     REQUIRE_FALSE(not_stored.has_value());
 }
 
-TEST_CASE(
-    "put_content_verified - throws on mismatch, does not store", tag)
+TEST_CASE("put_content_verified - throws on mismatch, does not store", tag)
 {
     auto cas = make_memory_cas("test_cas");
     blob content = make_blob("another content");
@@ -229,8 +222,8 @@ TEST_CASE(
     REQUIRE_FALSE(exists_before);
 
     // put_content_verified with wrong digest should throw
-    REQUIRE_THROWS(cppcoro::sync_wait(
-        put_content_verified(*cas, content, wrong_digest)));
+    REQUIRE_THROWS(
+        cppcoro::sync_wait(put_content_verified(*cas, content, wrong_digest)));
 
     // Verify the digest is still absent (nothing was stored)
     bool exists_after = cppcoro::sync_wait(cas->exists(wrong_digest));

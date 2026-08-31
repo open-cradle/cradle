@@ -19,7 +19,7 @@ memory_ac_impl::put(request_key key, digest value)
 {
     std::lock_guard<std::mutex> lock{mutex_};
     // Idempotent: insert only if absent; leave an existing association
-    // unchanged (FR-5).
+    // unchanged.
     storage_.try_emplace(std::move(key), std::move(value));
     co_return;
 }
@@ -29,7 +29,7 @@ memory_ac_impl::get(request_key key)
 {
     std::lock_guard<std::mutex> lock{mutex_};
     auto it = storage_.find(key);
-    // A present entry is a hit (FR-6), distinct from a nullopt miss (FR-7).
+    // A present entry is a hit, distinct from a nullopt miss.
     co_return it != storage_.end() ? std::make_optional(it->second)
                                    : std::nullopt;
 }

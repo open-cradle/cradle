@@ -16,7 +16,7 @@
 namespace cradle {
 
 // In-memory, std::map-backed content-addressable store. Thread-safe via an
-// internal mutex (NFR-1). Suitable for tests (NFR-3); no external service,
+// internal mutex. Suitable for tests; no external service,
 // filesystem, or network dependency.
 class memory_cas_impl : public cas_intf
 {

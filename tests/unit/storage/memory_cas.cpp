@@ -114,15 +114,12 @@ TEST_CASE("memory_cas - concurrent same-digest put race-freedom", tag)
 
     // Launch multiple threads doing put of the same digest concurrently
     std::vector<std::thread> threads;
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(cas->put(key, content1));
-    });
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(cas->put(key, content2));
-    });
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(cas->put(key, content3));
-    });
+    threads.emplace_back(
+        [&]() { cppcoro::sync_wait(cas->put(key, content1)); });
+    threads.emplace_back(
+        [&]() { cppcoro::sync_wait(cas->put(key, content2)); });
+    threads.emplace_back(
+        [&]() { cppcoro::sync_wait(cas->put(key, content3)); });
 
     // Wait for all threads to complete
     for (auto& t : threads)
@@ -140,9 +137,10 @@ TEST_CASE("memory_cas - concurrent same-digest put race-freedom", tag)
 
     // The retrieved content should be one of the three (proving no corruption)
     std::string retrieved_str = to_string(*retrieved);
-    bool is_valid = (retrieved_str == "content from thread 1"
-                     || retrieved_str == "content from thread 2"
-                     || retrieved_str == "content from thread 3");
+    bool is_valid
+        = (retrieved_str == "content from thread 1"
+           || retrieved_str == "content from thread 2"
+           || retrieved_str == "content from thread 3");
     REQUIRE(is_valid);
 }
 
@@ -194,4 +192,12 @@ TEST_CASE("memory_cas - name accessor", tag)
 {
     auto cas = make_memory_cas("custom_test_name");
     REQUIRE(cas->name() == "custom_test_name");
+}
+
+TEST_CASE("memory_cas - default name when using default constructor", tag)
+{
+    memory_cas_impl cas;
+
+    // Verify the default name is "memory_cas"
+    REQUIRE(cas.name() == "memory_cas");
 }

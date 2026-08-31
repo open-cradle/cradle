@@ -15,7 +15,7 @@
 namespace cradle {
 
 // In-memory, std::map-backed mutable store. Thread-safe via an internal
-// mutex (NFR-1). Suitable for tests (NFR-3); no external service,
+// mutex. Suitable for tests; no external service,
 // filesystem, or network dependency.
 class memory_mutable_store_impl : public mutable_store_intf
 {

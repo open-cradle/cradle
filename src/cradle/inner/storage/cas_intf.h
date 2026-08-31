@@ -12,7 +12,7 @@
 namespace cradle {
 
 // Content-addressable store: an idempotent mapping of digest -> bytes.
-// Never computes a digest; the caller always supplies it (FR-13).
+// Never computes a digest; the caller always supplies it.
 class cas_intf
 {
  public:
@@ -24,25 +24,22 @@ class cas_intf
         = 0;
 
     // Idempotently store content under a caller-supplied digest.
-    // Storing an already-present digest is a no-op and not an error (FR-1).
+    // Storing an already-present digest is a no-op and not an error.
     // Arguments are taken by value because this may be a coroutine.
-    // Throws on a genuine backend error (D4).
+    // Throws on a genuine backend error.
     virtual cppcoro::task<void>
-    put(digest key, blob content)
-        = 0;
+    put(digest key, blob content) = 0;
 
-    // Retrieve the content previously stored under a digest (FR-2).
-    // Returns std::nullopt for a not-present digest (FR-3, a distinguishable
-    // miss); throws on a genuine backend error (D4).
+    // Retrieve the content previously stored under a digest.
+    // Returns std::nullopt for a not-present digest (a distinguishable
+    // miss); throws on a genuine backend error.
     virtual cppcoro::task<std::optional<blob>>
-    get(digest key)
-        = 0;
+    get(digest key) = 0;
 
     // Report whether a digest is currently present, without returning the
-    // content (FR-4). Throws only on a genuine backend error.
+    // content. Throws only on a genuine backend error.
     virtual cppcoro::task<bool>
-    exists(digest key)
-        = 0;
+    exists(digest key) = 0;
 };
 
 } // namespace cradle

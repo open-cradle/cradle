@@ -47,8 +47,7 @@ register_storage_from_config(inner_resources& resources)
     {
         if (*key == storage_config_values::MEMORY_MUTABLE_STORE)
         {
-            resources.set_mutable_store(
-                make_memory_mutable_store(*key), true);
+            resources.set_mutable_store(make_memory_mutable_store(*key), true);
         }
         else
         {

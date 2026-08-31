@@ -22,7 +22,7 @@ TEST_CASE("memory_ac - put/get association", tag)
     // Put an association
     cppcoro::sync_wait(ac->put(key, value));
 
-    // Get it back and verify it matches (FR-5, FR-6)
+    // Get it back and verify it matches
     auto retrieved = cppcoro::sync_wait(ac->get(key));
     REQUIRE(retrieved.has_value());
     REQUIRE(*retrieved == value);
@@ -33,7 +33,7 @@ TEST_CASE("memory_ac - miss returns nullopt", tag)
     auto ac = make_memory_ac("test_ac");
     request_key key = "never_associated_key";
 
-    // Get on a never-associated request key should return nullopt (FR-7)
+    // Get on a never-associated request key should return nullopt
     auto retrieved = cppcoro::sync_wait(ac->get(key));
     REQUIRE_FALSE(retrieved.has_value());
 }
@@ -44,14 +44,14 @@ TEST_CASE("memory_ac - exists", tag)
     request_key key = "request_key_exists_test";
     digest value = "result_digest_xyz789";
 
-    // exists should be false before put (FR-8)
+    // exists should be false before put
     bool exists_before = cppcoro::sync_wait(ac->exists(key));
     REQUIRE_FALSE(exists_before);
 
     // Put the association
     cppcoro::sync_wait(ac->put(key, value));
 
-    // exists should be true after put (FR-8)
+    // exists should be true after put
     bool exists_after = cppcoro::sync_wait(ac->exists(key));
     REQUIRE(exists_after);
 }
@@ -106,17 +106,11 @@ TEST_CASE("memory_ac - concurrent put operations", tag)
     digest value2 = "concurrent_digest_2";
     digest value3 = "concurrent_digest_3";
 
-    // Launch multiple threads doing put of different keys concurrently (NFR-1)
+    // Launch multiple threads doing put of different keys concurrently
     std::vector<std::thread> threads;
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(ac->put(key1, value1));
-    });
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(ac->put(key2, value2));
-    });
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(ac->put(key3, value3));
-    });
+    threads.emplace_back([&]() { cppcoro::sync_wait(ac->put(key1, value1)); });
+    threads.emplace_back([&]() { cppcoro::sync_wait(ac->put(key2, value2)); });
+    threads.emplace_back([&]() { cppcoro::sync_wait(ac->put(key3, value3)); });
 
     // Wait for all threads to complete
     for (auto& t : threads)
@@ -151,17 +145,11 @@ TEST_CASE("memory_ac - concurrent same-key put race-freedom", tag)
     digest value2 = "digest_from_thread_2";
     digest value3 = "digest_from_thread_3";
 
-    // Launch multiple threads doing put of the same key concurrently (NFR-1)
+    // Launch multiple threads doing put of the same key concurrently
     std::vector<std::thread> threads;
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(ac->put(key, value1));
-    });
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(ac->put(key, value2));
-    });
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(ac->put(key, value3));
-    });
+    threads.emplace_back([&]() { cppcoro::sync_wait(ac->put(key, value1)); });
+    threads.emplace_back([&]() { cppcoro::sync_wait(ac->put(key, value2)); });
+    threads.emplace_back([&]() { cppcoro::sync_wait(ac->put(key, value3)); });
 
     // Wait for all threads to complete
     for (auto& t : threads)
@@ -178,8 +166,9 @@ TEST_CASE("memory_ac - concurrent same-key put race-freedom", tag)
     REQUIRE(retrieved.has_value());
 
     // The retrieved digest should be one of the three (proving no corruption)
-    bool is_valid = (*retrieved == value1 || *retrieved == value2
-                     || *retrieved == value3);
+    bool is_valid
+        = (*retrieved == value1 || *retrieved == value2
+           || *retrieved == value3);
     REQUIRE(is_valid);
 }
 
@@ -192,7 +181,7 @@ TEST_CASE("memory_ac - concurrent get/exists operations", tag)
     // Pre-populate the association
     cppcoro::sync_wait(ac->put(key, value));
 
-    // Launch multiple threads doing concurrent reads (NFR-1)
+    // Launch multiple threads doing concurrent reads
     std::vector<std::thread> threads;
     for (int i = 0; i < 10; ++i)
     {

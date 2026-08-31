@@ -21,25 +21,22 @@ class ac_intf
     name() const
         = 0;
 
-    // Record an association from a request key to a result digest (FR-5).
+    // Record an association from a request key to a result digest.
     // Arguments are taken by value because this may be a coroutine.
-    // Throws on a genuine backend error (D4).
+    // Throws on a genuine backend error.
     virtual cppcoro::task<void>
-    put(request_key key, digest value)
-        = 0;
+    put(request_key key, digest value) = 0;
 
-    // Retrieve the digest previously associated with a request key (FR-6).
-    // Returns std::nullopt for a not-associated key (FR-7, a distinguishable
-    // miss); throws on a genuine backend error (D4).
+    // Retrieve the digest previously associated with a request key.
+    // Returns std::nullopt for a not-associated key (a distinguishable
+    // miss); throws on a genuine backend error.
     virtual cppcoro::task<std::optional<digest>>
-    get(request_key key)
-        = 0;
+    get(request_key key) = 0;
 
-    // Report whether a request key is currently associated with a digest
-    // (FR-8). Throws only on a genuine backend error.
+    // Report whether a request key is currently associated with a digest.
+    // Throws only on a genuine backend error.
     virtual cppcoro::task<bool>
-    exists(request_key key)
-        = 0;
+    exists(request_key key) = 0;
 };
 
 } // namespace cradle

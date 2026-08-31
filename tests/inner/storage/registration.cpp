@@ -20,7 +20,7 @@ static char const tag[] = "[inner][storage][registration]";
 
 } // namespace
 
-TEST_CASE("CAS shared instance by reference (FR-21)", tag)
+TEST_CASE("CAS shared instance by reference", tag)
 {
     // Set a CAS store once, get it twice, and confirm both lookups return the
     // SAME instance by reference (compare addresses).
@@ -30,7 +30,7 @@ TEST_CASE("CAS shared instance by reference (FR-21)", tag)
     cas_intf& ref1 = resources.cas_store();
     cas_intf& ref2 = resources.cas_store();
 
-    // FR-21: same instance by reference — both addresses must be identical
+    // Same instance by reference — both addresses must be identical
     REQUIRE(&ref1 == &ref2);
 
     // Confirm it is usable (sanity check: store and retrieve)
@@ -43,7 +43,7 @@ TEST_CASE("CAS shared instance by reference (FR-21)", tag)
     REQUIRE(retrieved.has_value());
 }
 
-TEST_CASE("AC shared instance by reference (FR-21)", tag)
+TEST_CASE("AC shared instance by reference", tag)
 {
     inner_resources resources{make_inner_tests_config()};
     resources.set_ac_store(make_memory_ac("test_ac"), true);
@@ -64,7 +64,7 @@ TEST_CASE("AC shared instance by reference (FR-21)", tag)
     REQUIRE(*retrieved == digest_val);
 }
 
-TEST_CASE("Mutable store shared instance by reference (FR-21)", tag)
+TEST_CASE("Mutable store shared instance by reference", tag)
 {
     inner_resources resources{make_inner_tests_config()};
     resources.set_mutable_store(
@@ -85,7 +85,7 @@ TEST_CASE("Mutable store shared instance by reference (FR-21)", tag)
     REQUIRE(retrieved.has_value());
 }
 
-TEST_CASE("CAS by-name selection returns configured instance (FR-22)", tag)
+TEST_CASE("CAS by-name selection returns configured instance", tag)
 {
     inner_resources resources{make_inner_tests_config()};
 
@@ -93,7 +93,7 @@ TEST_CASE("CAS by-name selection returns configured instance (FR-22)", tag)
     std::string const cas_name = "my_cas";
     resources.set_cas_store(make_memory_cas(cas_name), true);
 
-    // FR-22: by-name lookup returns the instance registered under that name
+    // By-name lookup returns the instance registered under that name
     cas_intf& by_name = resources.cas_store(cas_name);
     cas_intf& by_default = resources.cas_store();
 
@@ -111,7 +111,7 @@ TEST_CASE("CAS by-name selection returns configured instance (FR-22)", tag)
     REQUIRE(retrieved.has_value());
 }
 
-TEST_CASE("AC by-name selection returns configured instance (FR-22)", tag)
+TEST_CASE("AC by-name selection returns configured instance", tag)
 {
     inner_resources resources{make_inner_tests_config()};
 
@@ -135,7 +135,7 @@ TEST_CASE("AC by-name selection returns configured instance (FR-22)", tag)
     REQUIRE(*retrieved == digest_val);
 }
 
-TEST_CASE("Mutable store by-name selection (FR-22)", tag)
+TEST_CASE("Mutable store by-name selection", tag)
 {
     inner_resources resources{make_inner_tests_config()};
 
@@ -158,7 +158,7 @@ TEST_CASE("Mutable store by-name selection (FR-22)", tag)
     REQUIRE(retrieved.has_value());
 }
 
-TEST_CASE("register_storage_from_config - CAS (FR-22)", tag)
+TEST_CASE("register_storage_from_config - CAS", tag)
 {
     // Build a service_config with CAS_FACTORY = MEMORY_CAS, register it, and
     // confirm the by-name getter returns a usable instance.
@@ -184,7 +184,7 @@ TEST_CASE("register_storage_from_config - CAS (FR-22)", tag)
     REQUIRE(retrieved.has_value());
 }
 
-TEST_CASE("register_storage_from_config - AC (FR-22)", tag)
+TEST_CASE("register_storage_from_config - AC", tag)
 {
     service_config_map config_map{
         {storage_config_keys::AC_FACTORY, storage_config_values::MEMORY_AC}};
@@ -208,7 +208,7 @@ TEST_CASE("register_storage_from_config - AC (FR-22)", tag)
     REQUIRE(*retrieved == digest_val);
 }
 
-TEST_CASE("register_storage_from_config - Mutable (FR-22)", tag)
+TEST_CASE("register_storage_from_config - Mutable", tag)
 {
     service_config_map config_map{
         {storage_config_keys::MUTABLE_STORE_FACTORY,
@@ -218,8 +218,8 @@ TEST_CASE("register_storage_from_config - Mutable (FR-22)", tag)
     inner_resources resources{config};
     register_storage_from_config(resources);
 
-    mutable_store_intf& store = resources.mutable_store(
-        storage_config_values::MEMORY_MUTABLE_STORE);
+    mutable_store_intf& store
+        = resources.mutable_store(storage_config_values::MEMORY_MUTABLE_STORE);
 
     REQUIRE(store.name() == storage_config_values::MEMORY_MUTABLE_STORE);
 
@@ -233,7 +233,7 @@ TEST_CASE("register_storage_from_config - Mutable (FR-22)", tag)
     REQUIRE(retrieved.has_value());
 }
 
-TEST_CASE("CAS unset-name lookup throws (§8, NFR-4)", tag)
+TEST_CASE("CAS unset-name lookup throws", tag)
 {
     inner_resources resources{make_inner_tests_config()};
 
@@ -243,14 +243,14 @@ TEST_CASE("CAS unset-name lookup throws (§8, NFR-4)", tag)
         resources.cas_store("nonexistent_cas"), std::logic_error);
 }
 
-TEST_CASE("AC unset-name lookup throws (§8, NFR-4)", tag)
+TEST_CASE("AC unset-name lookup throws", tag)
 {
     inner_resources resources{make_inner_tests_config()};
 
     REQUIRE_THROWS_AS(resources.ac_store("nonexistent_ac"), std::logic_error);
 }
 
-TEST_CASE("Mutable store unset-name lookup throws (§8, NFR-4)", tag)
+TEST_CASE("Mutable store unset-name lookup throws", tag)
 {
     inner_resources resources{make_inner_tests_config()};
 
@@ -258,7 +258,7 @@ TEST_CASE("Mutable store unset-name lookup throws (§8, NFR-4)", tag)
         resources.mutable_store("nonexistent_mutable"), std::logic_error);
 }
 
-TEST_CASE("Default CAS not set throws (§8, NFR-4)", tag)
+TEST_CASE("Default CAS not set throws", tag)
 {
     // Create resources without registering a default CAS
     inner_resources resources{make_inner_tests_config()};
@@ -267,14 +267,14 @@ TEST_CASE("Default CAS not set throws (§8, NFR-4)", tag)
     REQUIRE_THROWS_AS(resources.cas_store(), std::logic_error);
 }
 
-TEST_CASE("Default AC not set throws (§8, NFR-4)", tag)
+TEST_CASE("Default AC not set throws", tag)
 {
     inner_resources resources{make_inner_tests_config()};
 
     REQUIRE_THROWS_AS(resources.ac_store(), std::logic_error);
 }
 
-TEST_CASE("Default mutable store not set throws (§8, NFR-4)", tag)
+TEST_CASE("Default mutable store not set throws", tag)
 {
     inner_resources resources{make_inner_tests_config()};
 

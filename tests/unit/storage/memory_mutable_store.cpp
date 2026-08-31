@@ -20,10 +20,10 @@ TEST_CASE("memory_mutable_store - put/get", tag)
     std::string key = "my_key";
     mutable_value value = make_blob("my value content");
 
-    // Put a value (FR-14)
+    // Put a value
     cppcoro::sync_wait(store->put(key, value));
 
-    // Get it back and verify it matches (FR-15)
+    // Get it back and verify it matches
     auto retrieved = cppcoro::sync_wait(store->get(key));
     REQUIRE(retrieved.has_value());
     REQUIRE(to_string(*retrieved) == "my value content");
@@ -45,7 +45,7 @@ TEST_CASE("memory_mutable_store - overwrite replaces prior value", tag)
     REQUIRE(to_string(*retrieved1) == "first value");
 
     // Second put with the same key but different content should replace
-    // (FR-16) - KEY DIFFERENTIATOR from CAS/AC idempotent behavior
+    // - KEY DIFFERENTIATOR from CAS/AC idempotent behavior
     cppcoro::sync_wait(store->put(key, value2));
 
     // Verify the most recent value is returned (overwrite occurred)
@@ -59,7 +59,7 @@ TEST_CASE("memory_mutable_store - miss returns nullopt", tag)
     auto store = make_memory_mutable_store("test_store");
     std::string key = "never_stored_key";
 
-    // Get on a never-stored key should return nullopt (FR-17)
+    // Get on a never-stored key should return nullopt
     auto retrieved = cppcoro::sync_wait(store->get(key));
     REQUIRE_FALSE(retrieved.has_value());
 }
@@ -70,14 +70,14 @@ TEST_CASE("memory_mutable_store - exists", tag)
     std::string key = "exists_test_key";
     mutable_value value = make_blob("some content");
 
-    // exists should be false before put (FR-18)
+    // exists should be false before put
     bool exists_before = cppcoro::sync_wait(store->exists(key));
     REQUIRE_FALSE(exists_before);
 
     // Put the value
     cppcoro::sync_wait(store->put(key, value));
 
-    // exists should be true after put (FR-18)
+    // exists should be true after put
     bool exists_after = cppcoro::sync_wait(store->exists(key));
     REQUIRE(exists_after);
 }
@@ -87,7 +87,7 @@ TEST_CASE("memory_mutable_store - opaque value only / no schema", tag)
     auto store = make_memory_mutable_store("test_store");
 
     // Demonstrate arbitrary opaque byte values stored/retrieved verbatim
-    // with no interpretation (FR-19)
+    // with no interpretation
 
     // A value that looks like a jobs/<id> string payload
     std::string key1 = "job_123";
@@ -124,7 +124,7 @@ TEST_CASE(
     std::string key_missing = "missing_key";
     mutable_value empty_value = make_blob("");
 
-    // Store an empty blob (§8)
+    // Store an empty blob
     cppcoro::sync_wait(store->put(key_empty, empty_value));
 
     // Get the empty blob - should return a populated optional (a hit)
@@ -157,17 +157,13 @@ TEST_CASE("memory_mutable_store - concurrent access", tag)
     mutable_value value3 = make_blob("concurrent value 3");
 
     // Launch multiple threads doing put of different keys concurrently
-    // (NFR-1)
     std::vector<std::thread> threads;
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(store->put(key1, value1));
-    });
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(store->put(key2, value2));
-    });
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(store->put(key3, value3));
-    });
+    threads.emplace_back(
+        [&]() { cppcoro::sync_wait(store->put(key1, value1)); });
+    threads.emplace_back(
+        [&]() { cppcoro::sync_wait(store->put(key2, value2)); });
+    threads.emplace_back(
+        [&]() { cppcoro::sync_wait(store->put(key3, value3)); });
 
     // Wait for all threads to complete
     for (auto& t : threads)
@@ -204,17 +200,14 @@ TEST_CASE("memory_mutable_store - concurrent overwrite", tag)
     mutable_value value3 = make_blob("from thread 3");
 
     // Launch multiple threads doing put of the same key with different
-    // values (NFR-1)
+    // values
     std::vector<std::thread> threads;
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(store->put(key, value1));
-    });
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(store->put(key, value2));
-    });
-    threads.emplace_back([&]() {
-        cppcoro::sync_wait(store->put(key, value3));
-    });
+    threads.emplace_back(
+        [&]() { cppcoro::sync_wait(store->put(key, value1)); });
+    threads.emplace_back(
+        [&]() { cppcoro::sync_wait(store->put(key, value2)); });
+    threads.emplace_back(
+        [&]() { cppcoro::sync_wait(store->put(key, value3)); });
 
     // Wait for all threads to complete
     for (auto& t : threads)
@@ -222,7 +215,7 @@ TEST_CASE("memory_mutable_store - concurrent overwrite", tag)
         t.join();
     }
 
-    // After concurrent overwrites, the key should exist (NFR-1)
+    // After concurrent overwrites, the key should exist
     bool exists = cppcoro::sync_wait(store->exists(key));
     REQUIRE(exists);
 
@@ -232,9 +225,9 @@ TEST_CASE("memory_mutable_store - concurrent overwrite", tag)
 
     // The retrieved value should be one of the three (proving no corruption)
     std::string retrieved_str = to_string(*retrieved);
-    bool is_valid = (retrieved_str == "from thread 1"
-                     || retrieved_str == "from thread 2"
-                     || retrieved_str == "from thread 3");
+    bool is_valid
+        = (retrieved_str == "from thread 1" || retrieved_str == "from thread 2"
+           || retrieved_str == "from thread 3");
     REQUIRE(is_valid);
 }
 
@@ -244,8 +237,13 @@ TEST_CASE("memory_mutable_store - name accessor", tag)
 
     // Verify the name accessor returns the factory-supplied name
     REQUIRE(store->name() == "my_custom_store_name");
+}
 
-    // Also test the default constructor name
-    auto default_store = make_memory_mutable_store("another_name");
-    REQUIRE(default_store->name() == "another_name");
+TEST_CASE(
+    "memory_mutable_store - default name when using default constructor", tag)
+{
+    memory_mutable_store_impl store;
+
+    // Verify the default name is "memory_mutable_store"
+    REQUIRE(store.name() == "memory_mutable_store");
 }

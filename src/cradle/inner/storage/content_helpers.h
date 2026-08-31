@@ -9,23 +9,23 @@
 
 namespace cradle {
 
-// Compute a digest over content, independently of storing it (FR-9).
+// Compute a digest over content, independently of storing it.
 // Hashing is done here, outside the CAS; not a coroutine (pure computation).
 digest
 digest_of(blob const& content);
 
-// Compute the digest of content, store it idempotently, and return the digest
-// (FR-10). Returns the digest even when it was already present (FR-1).
+// Compute the digest of content, store it idempotently, and return the
+// digest. Returns the digest even when it was already present.
 cppcoro::task<digest>
 put_content(cas_intf& cas, blob content);
 
 // Store content only when its digest is not already present; a no-op when the
-// digest is already present (FR-11). Uses the caller-supplied digest (FR-13).
+// digest is already present. Uses the caller-supplied digest.
 cppcoro::task<void>
 put_content_if_absent(cas_intf& cas, digest key, blob content);
 
-// Verify content against the supplied digest, then store on a match (FR-12).
-// Throws on a digest mismatch (D4).
+// Verify content against the supplied digest, then store on a match.
+// Throws on a digest mismatch.
 cppcoro::task<void>
 put_content_verified(cas_intf& cas, blob content, digest expected);
 

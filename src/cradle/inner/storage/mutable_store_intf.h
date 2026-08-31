@@ -11,7 +11,7 @@
 namespace cradle {
 
 // Generic mutable store: a mapping of key -> opaque value, with overwrite.
-// Carries no built-in interpretation of the value structure (FR-19).
+// Carries no built-in interpretation of the value structure.
 class mutable_store_intf
 {
  public:
@@ -22,26 +22,23 @@ class mutable_store_intf
     name() const
         = 0;
 
-    // Associate an opaque value with a key (FR-14). A later put under an
-    // existing key replaces the prior value (FR-16, overwrite).
+    // Associate an opaque value with a key. A later put under an
+    // existing key replaces the prior value (overwrite).
     // Arguments are taken by value because this may be a coroutine.
-    // Throws on a genuine backend error (D4).
+    // Throws on a genuine backend error.
     virtual cppcoro::task<void>
-    put(std::string key, mutable_value value)
-        = 0;
+    put(std::string key, mutable_value value) = 0;
 
-    // Retrieve the value most recently stored under a key (FR-15).
-    // Returns std::nullopt for a not-present key (FR-17, a distinguishable
-    // miss); throws on a genuine backend error (D4).
+    // Retrieve the value most recently stored under a key.
+    // Returns std::nullopt for a not-present key (a distinguishable
+    // miss); throws on a genuine backend error.
     virtual cppcoro::task<std::optional<mutable_value>>
-    get(std::string key)
-        = 0;
+    get(std::string key) = 0;
 
-    // Report whether a key is currently present (FR-18).
+    // Report whether a key is currently present.
     // Throws only on a genuine backend error.
     virtual cppcoro::task<bool>
-    exists(std::string key)
-        = 0;
+    exists(std::string key) = 0;
 };
 
 } // namespace cradle

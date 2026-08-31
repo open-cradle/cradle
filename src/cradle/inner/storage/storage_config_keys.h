@@ -5,25 +5,25 @@
 
 namespace cradle {
 
-// Config keys selecting a storage backend/instance by name at construction
-// (FR-22), following the local_disk_cache_config_keys / http_cache_config_keys
+// Config keys selecting a storage backend/instance by name at construction,
+// following the local_disk_cache_config_keys / http_cache_config_keys
 // convention (slash-namespaced strings grouped in a struct).
 struct storage_config_keys
 {
-    // Selects the CAS backend/instance by name (FR-22).
+    // Selects the CAS backend/instance by name.
     inline static std::string const CAS_FACTORY{"storage/cas_factory"};
 
-    // Selects the AC backend/instance by name (FR-22).
+    // Selects the AC backend/instance by name.
     inline static std::string const AC_FACTORY{"storage/ac_factory"};
 
-    // Selects the mutable-store backend/instance by name (FR-22).
+    // Selects the mutable-store backend/instance by name.
     inline static std::string const MUTABLE_STORE_FACTORY{
         "storage/mutable_store_factory"};
 };
 
 // Config values naming the registered backends, following the
 // *_config_values::PLUGIN_NAME convention. For M1 the only registered backend
-// is the in-memory implementation (D6).
+// is the in-memory implementation.
 struct storage_config_values
 {
     // Value selecting the in-memory CAS backend.

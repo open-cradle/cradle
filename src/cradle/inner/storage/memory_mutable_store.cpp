@@ -20,7 +20,7 @@ memory_mutable_store_impl::put(std::string key, mutable_value value)
 {
     std::lock_guard<std::mutex> lock{mutex_};
     // Overwrite: a later put under an existing key replaces the prior
-    // value (FR-16), so the most recent write wins.
+    // value, so the most recent write wins.
     storage_.insert_or_assign(std::move(key), std::move(value));
     co_return;
 }
@@ -31,7 +31,7 @@ memory_mutable_store_impl::get(std::string key)
     std::lock_guard<std::mutex> lock{mutex_};
     auto it = storage_.find(key);
     // Membership decides hit vs. miss, so an empty value is still a hit
-    // (FR-15) distinct from a nullopt miss (FR-17).
+    // distinct from a nullopt miss.
     co_return it != storage_.end() ? std::make_optional(it->second)
                                    : std::nullopt;
 }

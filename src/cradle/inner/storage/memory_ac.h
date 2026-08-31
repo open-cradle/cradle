@@ -15,7 +15,7 @@
 namespace cradle {
 
 // In-memory, std::map-backed action cache. Thread-safe via an internal
-// mutex (NFR-1). Suitable for tests (NFR-3); no external service,
+// mutex. Suitable for tests; no external service,
 // filesystem, or network dependency.
 class memory_ac_impl : public ac_intf
 {
