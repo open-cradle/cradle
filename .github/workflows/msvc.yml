@@ -55,6 +55,7 @@ jobs:
         token: ${{ secrets.CRADLE_PREPROCESSOR_OUTPUT_TOKEN }}
         folder: build/generated
         single-commit: true
+        force: true
 
   VS2022:
     runs-on: windows-2022
