@@ -16,7 +16,7 @@ jobs:
     - name: Install
       run: |
         sudo apt update
-        sudo apt install build-essential gcc-10 g++-10 lcov ocaml-nox
+        sudo apt install build-essential autoconf automake libtool gcc-10 g++-10 lcov ocaml-nox
         sudo pip3 install virtualenv
 
     - uses: actions/checkout@v4
