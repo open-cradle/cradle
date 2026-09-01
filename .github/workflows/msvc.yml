@@ -21,6 +21,8 @@ jobs:
     - uses: friendlyanon/setup-vcpkg@v1
       with:
         committish: 30ef65cad98f08e7197c9a1656fbd871bcb72f2d
+        cache-version: "2"
+        cache-restore-keys: vcpkg-${{ runner.os }}-2-
 
     - name: Install
       run: |
@@ -73,6 +75,8 @@ jobs:
     - uses: friendlyanon/setup-vcpkg@v1
       with:
         committish: 30ef65cad98f08e7197c9a1656fbd871bcb72f2d
+        cache-version: "2"
+        cache-restore-keys: vcpkg-${{ runner.os }}-2-
 
     - name: Download preprocessed headers
       uses: actions/download-artifact@v4
