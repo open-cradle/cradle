@@ -35,7 +35,7 @@ verify_ref_result(unique_hasher& hasher, unique_hasher& ref_hasher)
 {
     auto actual_string{hasher.get_string()};
     auto ref_string{ref_hasher.get_string()};
-    REQUIRE(actual_string.size() == SHA256_DIGEST_LENGTH * 2);
+    REQUIRE(actual_string.size() == unique_hasher::result_size * 2);
     REQUIRE(actual_string != null_string);
     REQUIRE(actual_string == ref_string);
 
@@ -68,7 +68,7 @@ verify_non_ref_result(unique_hasher& hasher)
     auto ref_result{ref_hasher.get_result()};
 
     auto actual_string{hasher.get_string()};
-    REQUIRE(actual_string.size() == SHA256_DIGEST_LENGTH * 2);
+    REQUIRE(actual_string.size() == unique_hasher::result_size * 2);
     REQUIRE(actual_string != null_string);
     REQUIRE(actual_string != ref_string);
 

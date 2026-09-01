@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 
 #include <cradle/inner/core/type_definitions.h>
 
@@ -23,19 +23,25 @@ class unique_hasher
 {
  public:
     using byte_t = unsigned char;
-    static constexpr size_t result_size = SHA256_DIGEST_LENGTH;
+    static constexpr size_t result_size = 32;
     using result_t = std::array<unsigned char, result_size>;
 
-    unique_hasher()
-    {
-        SHA256_Init(&ctx_);
-    }
+    unique_hasher();
+    ~unique_hasher();
+
+    unique_hasher(unique_hasher const& other);
+    unique_hasher&
+    operator=(unique_hasher const& other);
+
+    unique_hasher(unique_hasher&& other) noexcept;
+    unique_hasher&
+    operator=(unique_hasher&& other) noexcept;
 
     void
     encode_bytes(void const* data, size_t len)
     {
         assert(!finished_);
-        SHA256_Update(&ctx_, data, len);
+        EVP_DigestUpdate(ctx_, data, len);
     }
 
     void
@@ -77,8 +83,11 @@ class unique_hasher
     void
     finish();
 
-    SHA256_CTX ctx_;
-    result_t result_;
+    void
+    init();
+
+    EVP_MD_CTX* ctx_{nullptr};
+    result_t result_{};
     bool finished_{false};
 };
 
