@@ -323,7 +323,7 @@ struct local_supervisor_data
 {
     service_core& service;
 
-    asio::io_service io_service;
+    asio::io_context io_context;
     tcp::acceptor acceptor;
     std::unique_ptr<tcp::socket> socket;
     std::mutex socket_write_mutex;
@@ -344,10 +344,10 @@ struct local_supervisor_data
 
     local_supervisor_data(service_core& service)
         : service(service),
-          io_service(),
+          io_context(),
           acceptor(
-              io_service,
-              tcp::endpoint(asio::ip::address::from_string("127.0.0.1"), 0)),
+              io_context,
+              tcp::endpoint(asio::ip::make_address("127.0.0.1"), 0)),
           state(local_supervisor_state::IDLE)
     {
         static local_calculation_service local_service;
@@ -383,7 +383,7 @@ process_messages(std::shared_ptr<local_supervisor_data> data)
     {
         spdlog::get("cradle")->info("[super] supervisor accepting...");
         supervisor.socket
-            = std::make_unique<tcp::socket>(supervisor.io_service);
+            = std::make_unique<tcp::socket>(supervisor.io_context);
         supervisor.acceptor.accept(*supervisor.socket);
         spdlog::get("cradle")->info(
             "[super] {}: ACCEPTED!", (void*) &supervisor);

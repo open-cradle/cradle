@@ -1,5 +1,5 @@
 {
-    "builtin-baseline": "0ed3bfe969b2f95ad45f431c5ea482a69f132a67",
+    "builtin-baseline": "30ef65cad98f08e7197c9a1656fbd871bcb72f2d",
     "dependencies": [
         "benchmark",
         "boost-algorithm",
@@ -34,7 +34,6 @@
         "spdlog",
         "sqlite3",
         "vcpkg-cmake",
-        "websocketpp",
         "yaml-cpp",
         "zlib"
     ],
@@ -54,10 +53,6 @@
         {
             "name": "bshoshany-thread-pool",
             "version": "4.1.0"
-        },
-        {
-            "name": "openssl",
-            "version-string": "1.1.1n"
         }
     ]
 }

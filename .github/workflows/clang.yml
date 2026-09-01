@@ -17,21 +17,24 @@ jobs:
         config: [Debug, Release]
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Install
+      run: |
+        sudo apt update
+        sudo apt install build-essential autoconf autoconf-archive automake libtool lcov ocaml-nox
+        sudo pip3 install virtualenv
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        sudo ./llvm.sh 15
+
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
     - uses: friendlyanon/setup-vcpkg@v1
       with:
-        committish: 0ed3bfe969b2f95ad45f431c5ea482a69f132a67
-
-    - name: Install
-      run: |
-        sudo apt install lcov ocaml-nox
-        sudo pip3 install virtualenv
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 15
+        committish: 30ef65cad98f08e7197c9a1656fbd871bcb72f2d
+        cache-version: "2"
+        cache-restore-keys: vcpkg-${{ runner.os }}-2-
 
     - name: Configure
       run: |
