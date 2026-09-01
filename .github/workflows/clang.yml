@@ -20,7 +20,7 @@ jobs:
     - name: Install
       run: |
         sudo apt update
-        sudo apt install build-essential autoconf automake libtool lcov ocaml-nox
+        sudo apt install build-essential autoconf autoconf-archive automake libtool lcov ocaml-nox
         sudo pip3 install virtualenv
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
