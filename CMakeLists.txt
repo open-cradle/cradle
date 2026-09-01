@@ -173,7 +173,6 @@ find_package(msgpack CONFIG REQUIRED)
 find_package(CURL CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(SQLite3 REQUIRED)
-find_package(websocketpp CONFIG REQUIRED)
 find_package(yaml-cpp CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
@@ -190,6 +189,22 @@ FetchContent_Declare(
     GIT_TAG        v3.4.0
 )
 FetchContent_MakeAvailable(fetched_tomlplusplus)
+
+# websocketpp was removed from vcpkg because it does not build against Boost
+# 1.87+. Fetch a header-only fork that replaces asio::io_service with
+# io_context. (Don't use the upstream CMakeLists.txt. It calls project() and
+# injects install rules.)
+FetchContent_Declare(fetched_websocketpp
+    GIT_REPOSITORY https://github.com/amini-allight/websocketpp.git
+    GIT_TAG 363ec80247782e4b933f93079f02a0835de28570)
+FetchContent_GetProperties(fetched_websocketpp)
+if(NOT fetched_websocketpp_POPULATED)
+    FetchContent_Populate(fetched_websocketpp)
+endif()
+add_library(websocketpp INTERFACE)
+add_library(websocketpp::websocketpp ALIAS websocketpp)
+target_include_directories(websocketpp INTERFACE
+    "${fetched_websocketpp_SOURCE_DIR}")
 
 find_package(Git REQUIRED)
 # The patch command may not be idempotent; if anything changes (like GIT_TAG),
@@ -543,7 +558,7 @@ target_link_libraries(cradle_typing PUBLIC
     Catch2::Catch2
     cppcoro
     spdlog::spdlog
-    yaml-cpp)
+    yaml-cpp::yaml-cpp)
 
 # The thinknode library adds some Thinknode requests
 file(GLOB_RECURSE srcs_thinknode CONFIGURE_DEPENDS
@@ -585,7 +600,8 @@ target_link_libraries(cradle_websocket PUBLIC
     Boost::random
     cereal::cereal
     cppcoro
-    spdlog::spdlog
+    spdlog::spdlog)
+target_link_libraries(cradle_websocket PRIVATE
     websocketpp::websocketpp)
 
 # The external library adds a C++ API

@@ -8,7 +8,11 @@
 #include <string>
 #include <tuple>
 
-#include <boost/process.hpp>
+#include <boost/process/v1/args.hpp>
+#include <boost/process/v1/child.hpp>
+#include <boost/process/v1/exe.hpp>
+#include <boost/process/v1/group.hpp>
+#include <boost/process/v1/search_path.hpp>
 #include <rpc/client.h>
 #include <spdlog/spdlog.h>
 
@@ -109,8 +113,8 @@ class rpclib_client_impl
     // process group (group_) so that any (contained) subprocesses terminate
     // when the server is terminated. For the same reason, contained processes
     // are _not_ put in a new group; group_ is unused for them.
-    boost::process::group group_;
-    boost::process::child child_;
+    boost::process::v1::group group_;
+    boost::process::v1::child child_;
 
     std::mutex loaded_dlls_mutex_;
     std::set<std::string> loaded_dlls_;

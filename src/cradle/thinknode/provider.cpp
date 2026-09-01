@@ -27,10 +27,10 @@ check_error(boost::system::error_code const& error)
 
 struct calc_provider
 {
-    boost::asio::io_service io_service;
+    boost::asio::io_context io_context;
     tcp::socket socket;
 
-    calc_provider() : socket(io_service)
+    calc_provider() : socket(io_context)
     {
     }
 };
@@ -40,19 +40,10 @@ struct calc_provider
 static bool
 has_incoming_message(calc_provider& provider)
 {
-    // Start a reactor-style read operation by providing a null_buffer.
-    provider.socket.async_receive(
-        boost::asio::null_buffers(),
-        [](boost::system::error_code const& error,
-           std::size_t bytes_transferred) { check_error(error); });
-
-    // Poll the I/O service and see if the handler runs.
-    bool ready_to_read = provider.io_service.poll() != 0;
-
-    // The I/O service needs to be reset when we do stuff like this.
-    provider.io_service.reset();
-
-    return ready_to_read;
+    boost::system::error_code ec;
+    auto bytes_available = provider.socket.available(ec);
+    check_error(ec);
+    return bytes_available > 0;
 }
 
 // internal_message_queue is used to transmit messages from the thread that's
@@ -213,12 +204,11 @@ provide_calculations(
     calc_provider provider;
 
     // Resolve the address of the supervisor.
-    tcp::resolver resolver(provider.io_service);
-    tcp::resolver::query query(tcp::v4(), host, std::to_string(port));
-    tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+    tcp::resolver resolver(provider.io_context);
+    auto endpoints = resolver.resolve(tcp::v4(), host, std::to_string(port));
 
     // Connect to the supervisor and send the registration message.
-    boost::asio::connect(provider.socket, endpoint_iterator);
+    boost::asio::connect(provider.socket, endpoints);
     write_message(
         provider.socket,
         ipc_version,

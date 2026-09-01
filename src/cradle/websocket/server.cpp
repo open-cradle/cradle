@@ -1948,7 +1948,7 @@ websocket_server::listen()
     else
     {
         server.ws.listen(boost::asio::ip::tcp::endpoint(
-            boost::asio::ip::address::from_string("127.0.0.1"), port));
+            boost::asio::ip::make_address("127.0.0.1"), port));
     }
     server.ws.start_accept();
 }

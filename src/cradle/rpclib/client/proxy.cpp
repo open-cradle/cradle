@@ -4,7 +4,6 @@
 #include <thread>
 
 #include <boost/filesystem.hpp>
-#include <boost/process.hpp>
 #include <fmt/format.h>
 #include <rpc/client.h>
 #include <rpc/rpc_error.h>
@@ -99,7 +98,7 @@ rpclib_client::rpclib_client(
     ephemeral_port_owner* port_owner,
     std::shared_ptr<spdlog::logger> logger)
     : pimpl_{std::make_unique<rpclib_client_impl>(
-        config, port_owner, std::move(logger))}
+          config, port_owner, std::move(logger))}
 {
 }
 
@@ -530,7 +529,7 @@ void
 rpclib_client_impl::start_server()
 {
     namespace bf = boost::filesystem;
-    namespace bp = boost::process;
+    namespace bp = boost::process::v1;
     if (server_is_running())
     {
         return;
@@ -569,7 +568,7 @@ rpclib_client_impl::start_server()
         cmd += fmt::format(" {}", arg);
     }
     logger_->info("starting {}", cmd);
-    boost::process::child child;
+    bp::child child;
     if (contained_)
     {
         child = bp::child(bp::exe = path, bp::args = child_args);
@@ -625,7 +624,7 @@ rpclib_client_impl::stop_server()
     // but an RPC call won't get a response.
 
     logger_->info("rpclib server process killed");
-    child_ = boost::process::child();
+    child_ = boost::process::v1::child();
 }
 
 // Performs a synchronous RPC call (returning a response)
