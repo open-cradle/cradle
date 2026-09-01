@@ -203,7 +203,7 @@ if(NOT fetched_websocketpp_POPULATED)
 endif()
 add_library(websocketpp INTERFACE)
 add_library(websocketpp::websocketpp ALIAS websocketpp)
-target_include_directories(websocketpp INTERFACE
+target_include_directories(websocketpp SYSTEM INTERFACE
     "${fetched_websocketpp_SOURCE_DIR}")
 
 find_package(Git REQUIRED)
