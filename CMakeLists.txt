@@ -190,13 +190,21 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(fetched_tomlplusplus)
 
+find_package(Git REQUIRED)
+
 # websocketpp was removed from vcpkg because it does not build against Boost
 # 1.87+. Fetch a header-only fork that replaces asio::io_service with
 # io_context. (Don't use the upstream CMakeLists.txt. It calls project() and
 # injects install rules.)
+# The patch fixes template-id constructor/destructor names (e.g.
+# ~endpoint<connection,config>()) that newer GCC rejects. The patch command may
+# not be idempotent; if anything changes (like GIT_TAG or the patch), all
+# build-directory/_deps/fetched_websocketpp* should be removed before rebuilding.
 FetchContent_Declare(fetched_websocketpp
     GIT_REPOSITORY https://github.com/amini-allight/websocketpp.git
-    GIT_TAG 363ec80247782e4b933f93079f02a0835de28570)
+    GIT_TAG 363ec80247782e4b933f93079f02a0835de28570
+    PATCH_COMMAND ${GIT_EXECUTABLE} apply ${CMAKE_CURRENT_SOURCE_DIR}/patches/websocketpp.patch
+    UPDATE_DISCONNECTED TRUE)
 FetchContent_GetProperties(fetched_websocketpp)
 if(NOT fetched_websocketpp_POPULATED)
     FetchContent_Populate(fetched_websocketpp)
@@ -206,7 +214,6 @@ add_library(websocketpp::websocketpp ALIAS websocketpp)
 target_include_directories(websocketpp SYSTEM INTERFACE
     "${fetched_websocketpp_SOURCE_DIR}")
 
-find_package(Git REQUIRED)
 # The patch command may not be idempotent; if anything changes (like GIT_TAG),
 # all build-directory/_deps/fetched_rpclib* should be removed before rebuilding.
 FetchContent_Declare(fetched_rpclib
