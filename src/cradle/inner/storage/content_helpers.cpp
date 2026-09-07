@@ -25,13 +25,10 @@ put_content(cas_intf& cas, blob content)
 }
 
 cppcoro::task<void>
-put_content_if_absent(cas_intf& cas, digest key, blob content)
+put_content(cas_intf& cas, digest key, blob content)
 {
     // Caller-supplied digest; a no-op when already present.
-    if (!co_await cas.exists(key))
-    {
-        co_await cas.put(std::move(key), std::move(content));
-    }
+    co_await cas.put(std::move(key), std::move(content));
     co_return;
 }
 

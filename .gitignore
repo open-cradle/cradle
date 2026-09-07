@@ -14,6 +14,6 @@ python/config.yml
 coverage*.txt
 .docker-auth
 server_cache_testing/
-input/
-output/
-.github/
+.github/agents
+.github/skills
+.github/copilot-instructions.md

@@ -115,7 +115,7 @@ TEST_CASE("put_content - empty blob round-trip", tag)
     REQUIRE(retrieved->size() == 0);
 }
 
-TEST_CASE("put_content_if_absent - stores when absent", tag)
+TEST_CASE("put_content - stores when absent", tag)
 {
     auto cas = make_memory_cas("test_cas");
     blob content = make_blob("initially absent content");
@@ -125,8 +125,8 @@ TEST_CASE("put_content_if_absent - stores when absent", tag)
     bool exists_before = cppcoro::sync_wait(cas->exists(key));
     REQUIRE_FALSE(exists_before);
 
-    // put_content_if_absent should store when absent
-    cppcoro::sync_wait(put_content_if_absent(*cas, key, content));
+    // put_content should store when absent
+    cppcoro::sync_wait(put_content(*cas, key, content));
 
     // Verify the content is now stored
     auto retrieved = cppcoro::sync_wait(cas->get(key));
@@ -134,7 +134,7 @@ TEST_CASE("put_content_if_absent - stores when absent", tag)
     REQUIRE(to_string(*retrieved) == "initially absent content");
 }
 
-TEST_CASE("put_content_if_absent - no-op when present", tag)
+TEST_CASE("put_content - no-op when present", tag)
 {
     auto cas = make_memory_cas("test_cas");
     digest key = "existing_digest";
@@ -144,8 +144,8 @@ TEST_CASE("put_content_if_absent - no-op when present", tag)
     // Store original content under the digest
     cppcoro::sync_wait(cas->put(key, original_content));
 
-    // put_content_if_absent with different content should be a no-op
-    cppcoro::sync_wait(put_content_if_absent(*cas, key, different_content));
+    // put_content with different content should be a no-op
+    cppcoro::sync_wait(put_content(*cas, key, different_content));
 
     // Verify the stored value is still the original (no overwrite)
     auto retrieved = cppcoro::sync_wait(cas->get(key));
@@ -153,15 +153,15 @@ TEST_CASE("put_content_if_absent - no-op when present", tag)
     REQUIRE(to_string(*retrieved) == "original content");
 }
 
-TEST_CASE("put_content_if_absent - uses caller-supplied digest", tag)
+TEST_CASE("put_content - uses caller-supplied digest", tag)
 {
     auto cas = make_memory_cas("test_cas");
     blob content = make_blob("content with caller digest");
     // Arbitrary caller-chosen key (not the actual hash of content)
     digest caller_key = "arbitrary_caller_chosen_key";
 
-    // put_content_if_absent uses the caller-supplied digest as-is
-    cppcoro::sync_wait(put_content_if_absent(*cas, caller_key, content));
+    // put_content uses the caller-supplied digest as-is
+    cppcoro::sync_wait(put_content(*cas, caller_key, content));
 
     // Verify the content is stored under the caller's key
     auto retrieved = cppcoro::sync_wait(cas->get(caller_key));

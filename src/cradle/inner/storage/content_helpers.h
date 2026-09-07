@@ -22,7 +22,7 @@ put_content(cas_intf& cas, blob content);
 // Store content only when its digest is not already present; a no-op when the
 // digest is already present. Uses the caller-supplied digest.
 cppcoro::task<void>
-put_content_if_absent(cas_intf& cas, digest key, blob content);
+put_content(cas_intf& cas, digest key, blob content);
 
 // Verify content against the supplied digest, then store on a match.
 // Throws on a digest mismatch.

@@ -151,8 +151,8 @@ class inner_resources
     secondary_storage_intf&
     requests_storage(std::string const& name);
 
-    // Content-addressable store (CAS): shared, named instances (FR-21,
-    // FR-22). inner_resources takes ownership and hands out references; all
+    // Content-addressable store (CAS): shared, named instances. 
+    // inner_resources takes ownership and hands out references; all
     // callers of a given name observe the same instance.
     void
     set_cas_store(std::unique_ptr<cas_intf> store, bool is_default = false);
@@ -165,7 +165,7 @@ class inner_resources
     cas_intf&
     cas_store(std::string const& name);
 
-    // Action cache (AC): shared, named instances (FR-21, FR-22).
+    // Action cache (AC): shared, named instances.
     void
     set_ac_store(std::unique_ptr<ac_intf> store, bool is_default = false);
 
@@ -177,7 +177,7 @@ class inner_resources
     ac_intf&
     ac_store(std::string const& name);
 
-    // Generic mutable store: shared, named instances (FR-21, FR-22).
+    // Generic mutable store: shared, named instances.
     void
     set_mutable_store(
         std::unique_ptr<mutable_store_intf> store, bool is_default = false);
