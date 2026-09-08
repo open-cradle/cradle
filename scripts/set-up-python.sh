@@ -6,3 +6,5 @@ virtualenv "$@" --prompt="(cradle) " .venv
 source .venv/bin/activate
 python --version
 pip install gcovr pytest requests websocket-client msgpack pyyaml
+# Install the CRADLE Python package (provides "import cradle" for integration tests).
+pip install -e python

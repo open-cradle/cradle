@@ -16,13 +16,16 @@
 
 namespace cradle {
 
+class ac_intf;
 class async_db;
 class blob_file_writer;
+class cas_intf;
 class dll_collection;
 class domain;
 struct immutable_cache;
 class inner_resources_impl;
 struct mock_http_session;
+class mutable_store_intf;
 class remote_proxy;
 class rpclib_client;
 class secondary_storage_intf;
@@ -147,6 +150,45 @@ class inner_resources
     // Throws if not set.
     secondary_storage_intf&
     requests_storage(std::string const& name);
+
+    // Content-addressable store (CAS): shared, named instances. 
+    // inner_resources takes ownership and hands out references; all
+    // callers of a given name observe the same instance.
+    void
+    set_cas_store(std::unique_ptr<cas_intf> store, bool is_default = false);
+
+    // Returns the default CAS store. Throws if not set.
+    cas_intf&
+    cas_store();
+
+    // Returns the CAS store identified by name. Throws if not set.
+    cas_intf&
+    cas_store(std::string const& name);
+
+    // Action cache (AC): shared, named instances.
+    void
+    set_ac_store(std::unique_ptr<ac_intf> store, bool is_default = false);
+
+    // Returns the default AC store. Throws if not set.
+    ac_intf&
+    ac_store();
+
+    // Returns the AC store identified by name. Throws if not set.
+    ac_intf&
+    ac_store(std::string const& name);
+
+    // Generic mutable store: shared, named instances.
+    void
+    set_mutable_store(
+        std::unique_ptr<mutable_store_intf> store, bool is_default = false);
+
+    // Returns the default mutable store. Throws if not set.
+    mutable_store_intf&
+    mutable_store();
+
+    // Returns the mutable store identified by name. Throws if not set.
+    mutable_store_intf&
+    mutable_store(std::string const& name);
 
     http_connection_interface&
     http_connection_for_thread();
