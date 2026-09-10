@@ -72,6 +72,41 @@ class seri_resolver_impl : public seri_resolver_intf
     }
 };
 
+/**
+ * Locally resolves a serialized pooled-leaf request whose arguments are
+ * encoded uniformly as embedded value blobs.
+ *
+ * Reconstructs the request via Req::load_plain_args() (which decodes every
+ * argument via deserialize_value<>, rather than by each argument's own cereal
+ * type), then resolves and serializes the value exactly like
+ * seri_resolver_impl<>. Valid only for pooled leaves whose arguments are
+ * already-resolved plain values; no argument may be a subrequest.
+ *
+ * Auto-registered under the request's derived pool plain-args variant uuid by
+ * function_request_impl::register_uuid(), alongside the normal resolver.
+ */
+template<Request Req>
+class pool_plain_args_seri_resolver_impl : public seri_resolver_intf
+{
+ public:
+    cppcoro::task<serialized_result>
+    resolve(
+        local_context_intf& ctx,
+        std::string seri_req,
+        seri_cache_record_lock_t seri_lock) override
+    {
+        assert(!ctx.remotely());
+        auto req{deserialize_request_plain_args<Req>(
+            ctx.get_resources(), std::move(seri_req))};
+        ResolutionConstraintsLocal constraints;
+        auto value = co_await resolve_request(
+            ctx, req, seri_lock.lock_ptr, constraints);
+        bool allow_blob_files{true};
+        co_return serialized_result{
+            serialize_value(value, allow_blob_files), seri_lock.record_id};
+    }
+};
+
 } // namespace cradle
 
 #endif

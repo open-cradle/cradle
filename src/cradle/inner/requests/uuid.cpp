@@ -59,6 +59,10 @@ request_uuid::clone() const
     {
         res.set_flattened();
     }
+    if (pool_plain_args_)
+    {
+        res.set_pool_plain_args();
+    }
     if (is_proxy_)
     {
         res.make_proxy();
@@ -86,6 +90,18 @@ request_uuid::set_flattened()
         throw std::logic_error("request_uuid object already flattened");
     }
     flattened_ = true;
+    return *this;
+}
+
+request_uuid&
+request_uuid::set_pool_plain_args()
+{
+    check_not_finalized();
+    if (pool_plain_args_)
+    {
+        throw std::logic_error("request_uuid object already pool_plain_args");
+    }
+    pool_plain_args_ = true;
     return *this;
 }
 
@@ -146,6 +162,10 @@ request_uuid::do_finalize() const
     {
         str_ += "+flattened";
     }
+    if (pool_plain_args_)
+    {
+        str_ += "+pool_plain_args";
+    }
     if (is_proxy_)
     {
         str_ += ":proxy";
@@ -167,6 +187,12 @@ deproxy_uuid_str(std::string const& uuid_str)
         res = res.substr(0, pos) + res.substr(pos + 6);
     }
     return res;
+}
+
+std::string
+pool_variant_uuid_str(std::string const& uuid_str)
+{
+    return uuid_str + "+pool_plain_args";
 }
 
 } // namespace cradle

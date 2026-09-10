@@ -17,6 +17,7 @@
 #include <cradle/inner/introspection/config.h>
 #include <cradle/inner/introspection/tasklet.h>
 #include <cradle/inner/io/mock_http.h>
+#include <cradle/inner/pool/pool_intf.h>
 #include <cradle/inner/remote/async_db.h>
 #include <cradle/inner/remote/proxy.h>
 #include <cradle/inner/requests/domain.h>
@@ -325,6 +326,48 @@ inner_resources::mutable_store(std::string const& name)
     {
         throw std::logic_error(fmt::format(
             "inner_resources has no mutable store named {}", name));
+    }
+    return *it->second;
+}
+
+void
+inner_resources::set_pool(std::unique_ptr<pool_intf> pool, bool is_default)
+{
+    auto& impl{*impl_};
+    std::string name{pool->name()};
+    if (impl.pools_.contains(name))
+    {
+        throw std::logic_error(
+            fmt::format("inner_resources already has pool named {}", name));
+    }
+    if (is_default && impl.default_pool_)
+    {
+        throw std::logic_error("inner_resources already has a default pool");
+    }
+    impl.default_pool_ = &*pool;
+    impl.pools_.emplace(std::make_pair(std::move(name), std::move(pool)));
+}
+
+pool_intf&
+inner_resources::pool()
+{
+    auto& impl{*impl_};
+    if (!impl.default_pool_)
+    {
+        throw std::logic_error("inner_resources has no default pool");
+    }
+    return *impl.default_pool_;
+}
+
+pool_intf&
+inner_resources::pool(std::string const& name)
+{
+    auto& impl{*impl_};
+    auto it = impl.pools_.find(name);
+    if (it == impl.pools_.end())
+    {
+        throw std::logic_error(
+            fmt::format("inner_resources has no pool named {}", name));
     }
     return *it->second;
 }

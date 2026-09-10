@@ -60,7 +60,10 @@ class seri_catalog
         requires(!Req::is_proxy)
     {
         req.register_uuid(
-            *registry_, cat_id_, std::make_shared<seri_resolver_impl<Req>>());
+            *registry_,
+            cat_id_,
+            std::make_shared<seri_resolver_impl<Req>>(),
+            std::make_shared<pool_plain_args_seri_resolver_impl<Req>>());
     }
 
     // Needed to deserialize a (stored) proxy request.
