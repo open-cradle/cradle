@@ -278,6 +278,11 @@ add_test(
 file(GLOB_RECURSE test_srcs_plugins CONFIGURE_DEPENDS
     "plugins/*.cpp")
 add_library(test_lib_plugins OBJECT ${test_srcs_plugins})
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set_source_files_properties(
+        plugins/pool/local/pool_registration.cpp
+        PROPERTIES COMPILE_OPTIONS "-Wno-maybe-uninitialized")
+endif()
 target_link_libraries(test_lib_plugins PUBLIC
     cradle_external
     cradle_plugins_inner)

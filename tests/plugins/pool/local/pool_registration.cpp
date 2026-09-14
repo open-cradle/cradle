@@ -397,20 +397,13 @@ TEST_CASE(
         seri_catalog cat{resources.get_seri_registry()};
         cat.register_resolver(pooled_req);
 
-        // The result content survived in the CAS. GCC emits a false-positive
-        // -Wmaybe-uninitialized for the optional<blob> returned via the
-        // coroutine; suppress it locally (clang lacks this warning).
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-#endif
-        std::optional<blob> const content{
-            cppcoro::sync_wait(resources.cas_store().get(result_digest))};
-        REQUIRE(content.has_value());
-        REQUIRE(to_string(deserialize_value<blob>(*content)) == expected);
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
+        // The result content survived in the CAS.
+        REQUIRE(
+            cppcoro::sync_wait(resources.cas_store().exists(result_digest)));
+        blob const content
+            = cppcoro::sync_wait(resources.cas_store().get(result_digest))
+                  .value();
+        REQUIRE(to_string(deserialize_value<blob>(content)) == expected);
 
         // The request-key -> digest association survived in the AC.
         std::optional<digest> const assoc{
