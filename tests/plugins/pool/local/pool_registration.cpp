@@ -397,8 +397,8 @@ TEST_CASE(
         cat.register_resolver(pooled_req);
 
         // The result content survived in the CAS.
-        std::optional<blob> const content{
-            cppcoro::sync_wait(resources.cas_store().get(result_digest))};
+        auto const content
+            = cppcoro::sync_wait(resources.cas_store().get(result_digest));
         REQUIRE(content.has_value());
         REQUIRE(to_string(deserialize_value<blob>(*content)) == expected);
 
