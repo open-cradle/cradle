@@ -9,8 +9,8 @@ from cradle.session import Session
 # Creates a Python data structure which, when converted to JSON,
 # becomes the JSON serialization of a C++ function_request_erased object
 def make_req(
-    session: Session, uuid_base: str, title: str, args: List,
-    pool_name: Optional[str] = None) -> Any:
+        session: Session, uuid_base: str, title: str, args: List,
+        pool_name: Optional[str] = None) -> Any:
     # Request metadata
     uuid = uuid_base
 
@@ -56,8 +56,8 @@ def normalized_arg(session: Session, type_id: str, arg: Any) -> Any:
 
 
 def make_post_iss_object_request(
-    session: Session, value: str,
-    pool_name: Optional[str] = None) -> Any:
+        session: Session, value: str,
+        pool_name: Optional[str] = None) -> Any:
     uuid_base = 'rq_post_iss_object+full'
     title = 'post_iss_object'
     msgpack_encoded = msgpack.packb(value, use_bin_type=True)
@@ -73,8 +73,8 @@ def make_post_iss_object_request(
 
 
 def make_get_iss_object_metadata_request(
-    session: Session, object_id: Any,
-    pool_name: Optional[str] = None) -> Any:
+        session: Session, object_id: Any,
+        pool_name: Optional[str] = None) -> Any:
     uuid_base = 'rq_get_iss_object_metadata+full'
     title = 'get_iss_object_metadata'
     args = [normalized_arg(session, 'string', object_id)]
@@ -83,8 +83,8 @@ def make_get_iss_object_metadata_request(
 
 
 def make_retrieve_immutable_object_request(
-    session: Session, immutable_id: Any,
-    pool_name: Optional[str] = None) -> Any:
+        session: Session, immutable_id: Any,
+        pool_name: Optional[str] = None) -> Any:
     uuid_base = 'rq_retrieve_immutable_object+full'
     title = 'retrieve_immutable_object'
     args = [normalized_arg(session, 'string', immutable_id)]
@@ -93,8 +93,8 @@ def make_retrieve_immutable_object_request(
 
 
 def make_resolve_iss_object_to_immutable_request(
-    session: Session, object_id: Any,
-    pool_name: Optional[str] = None) -> Any:
+        session: Session, object_id: Any,
+        pool_name: Optional[str] = None) -> Any:
     uuid_base = 'rq_resolve_iss_object_to_immutable+full'
     title = 'resolve_iss_object_to_immutable'
     ignore_upgrades = False
