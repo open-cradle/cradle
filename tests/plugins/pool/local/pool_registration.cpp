@@ -73,10 +73,11 @@ std::atomic<int> inline_run_count{0};
 // A pooled leaf provider whose result reflects both of its inputs: the exact
 // content of the large blob input and the value of the small integer input.
 cppcoro::task<blob>
-pooled_concat(context_intf&, blob large, int small)
+pooled_concat(context_intf&, blob large, int small_value)
 {
     ++pooled_run_count;
-    co_return make_blob(fmt::format("pooled[{}]:{}", to_string(large), small));
+    co_return make_blob(
+        fmt::format("pooled[{}]:{}", to_string(large), small_value));
 }
 
 // A non-pooled leaf resolved on the unchanged inline path. It is deliberately
@@ -242,7 +243,7 @@ TEST_CASE("a mixed pooled and non-pooled tree resolves end to end", tag)
     inline_run_count = 0;
 
     blob const big{large_input()};
-    int const small{7};
+    int const small_value{7};
 
     // The pooled leaf and the resolver registered for its uuid.
     seri_catalog cat{resources->get_seri_registry()};
@@ -250,7 +251,7 @@ TEST_CASE("a mixed pooled and non-pooled tree resolves end to end", tag)
         leaf_props{request_uuid{"pool_registration/pooled_concat"}},
         pooled_concat,
         big,
-        small)};
+        small_value)};
     cat.register_resolver(pooled_req);
     pooled_req.set_pool_name(std::optional<std::string>{"local"});
 
@@ -270,7 +271,7 @@ TEST_CASE("a mixed pooled and non-pooled tree resolves end to end", tag)
 
     // The whole tree resolves to the expected combined value.
     std::string const expected_pooled{
-        fmt::format("pooled[{}]:{}", to_string(big), small)};
+        fmt::format("pooled[{}]:{}", to_string(big), small_value)};
     std::string const expected{fmt::format("{}|inline:3", expected_pooled)};
     REQUIRE(to_string(result) == expected);
 
@@ -332,9 +333,9 @@ TEST_CASE(
     std::string const pool_name{"durable_pool"};
 
     blob const big{large_input()};
-    int const small{9};
+    int const small_value{9};
     std::string const expected{
-        fmt::format("pooled[{}]:{}", to_string(big), small)};
+        fmt::format("pooled[{}]:{}", to_string(big), small_value)};
 
     // The leaf whose completed result must outlive a teardown/recreate. Its
     // request key is identity-derived, so it is identical across sessions.
@@ -342,7 +343,7 @@ TEST_CASE(
         leaf_props{request_uuid{"pool_registration/durable_leaf"}},
         pooled_concat,
         big,
-        small)};
+        small_value)};
     pooled_req.set_pool_name(std::optional<std::string>{pool_name});
     request_key const pooled_key{
         get_unique_string(*pooled_req.get_captured_id())};
@@ -368,7 +369,7 @@ TEST_CASE(
 
         std::vector<blob> inputs;
         inputs.push_back(serialize_value(big, true));
-        inputs.push_back(serialize_value(small, true));
+        inputs.push_back(serialize_value(small_value, true));
         auto spec{cppcoro::sync_wait(build_job_spec(
             pool.cas(),
             pooled_req.get_essentials()->uuid_str,
@@ -396,11 +397,20 @@ TEST_CASE(
         seri_catalog cat{resources.get_seri_registry()};
         cat.register_resolver(pooled_req);
 
-        // The result content survived in the CAS.
-        auto const content
-            = cppcoro::sync_wait(resources.cas_store().get(result_digest));
+        // The result content survived in the CAS. GCC emits a false-positive
+        // -Wmaybe-uninitialized for the optional<blob> returned via the
+        // coroutine; suppress it locally (clang lacks this warning).
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+        std::optional<blob> const content{
+            cppcoro::sync_wait(resources.cas_store().get(result_digest))};
         REQUIRE(content.has_value());
         REQUIRE(to_string(deserialize_value<blob>(*content)) == expected);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
         // The request-key -> digest association survived in the AC.
         std::optional<digest> const assoc{
