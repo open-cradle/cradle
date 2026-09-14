@@ -6,10 +6,12 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <tuple>
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
+#include <vector>
 
 #include <cereal/types/memory.hpp>
 #include <cereal/types/tuple.hpp>
@@ -19,12 +21,16 @@
 #include <msgpack.hpp>
 
 #include <cradle/inner/core/exception.h>
+#include <cradle/inner/core/get_unique_string.h>
 #include <cradle/inner/core/hash.h>
 #include <cradle/inner/core/id.h>
 #include <cradle/inner/core/sha256_hash_id.h>
 #include <cradle/inner/core/unique_hash.h>
 #include <cradle/inner/encodings/cereal.h>
 #include <cradle/inner/encodings/msgpack_packer.h>
+#include <cradle/inner/pool/pool_config_keys.h>
+#include <cradle/inner/pool/pool_intf.h>
+#include <cradle/inner/pool/pool_selection.h>
 #include <cradle/inner/requests/containment_data.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/normalization_uuid.h>
@@ -34,9 +40,11 @@
 #include <cradle/inner/requests/value.h>
 #include <cradle/inner/resolve/creq_controller.h>
 #include <cradle/inner/resolve/resolve_impl.h>
+#include <cradle/inner/resolve/resolve_pool.h>
 #include <cradle/inner/resolve/resolve_request.h>
 #include <cradle/inner/resolve/seri_registry.h>
 #include <cradle/inner/resolve/seri_resolver.h>
+#include <cradle/inner/service/resources.h>
 
 namespace cradle {
 
@@ -107,6 +115,13 @@ class base_request_intf : public id_interface
     set_containment(containment_data const& containment)
         = 0;
 
+    virtual void
+    set_pool_name(std::optional<std::string> pool_name)
+        = 0;
+
+    virtual std::optional<std::string>
+    get_pool_name() const = 0;
+
     virtual request_uuid const&
     get_uuid() const
         = 0;
@@ -148,7 +163,8 @@ class function_request_intf : public base_request_intf
     register_uuid(
         seri_registry& registry,
         catalog_id cat_id,
-        std::shared_ptr<seri_resolver_intf> resolver) const
+        std::shared_ptr<seri_resolver_intf> resolver,
+        std::shared_ptr<seri_resolver_intf> pool_variant_resolver) const
         = 0;
 
     virtual void
@@ -162,7 +178,16 @@ class function_request_intf : public base_request_intf
         = 0;
 
     virtual void
-    load_msgpack(msgpack::object const msgpack_objs[3])
+    load_msgpack(msgpack::object const msgpack_objs[4])
+        = 0;
+
+    // Reconstructs the argument tuple in "plain-args" mode: every argument is
+    // decoded uniformly as an embedded value blob via deserialize_value<>,
+    // rather than by each argument's own cereal type. Used only by the pool
+    // plain-args variant resolver; the default load() is unchanged. Valid only
+    // for leaves whose arguments are already-resolved plain values.
+    virtual void
+    load_plain_args(JSONRequestInputArchive& archive)
         = 0;
 
     virtual cppcoro::task<Value>
@@ -512,6 +537,18 @@ class function_request_impl final
         containment_ = std::make_unique<containment_data>(containment);
     }
 
+    void
+    set_pool_name(std::optional<std::string> pool_name) override
+    {
+        pool_name_ = std::move(pool_name);
+    }
+
+    std::optional<std::string>
+    get_pool_name() const override
+    {
+        return pool_name_;
+    }
+
     request_uuid const&
     get_uuid() const override
     {
@@ -548,6 +585,7 @@ class function_request_impl final
         {
             containment_data::save_nothing(archive);
         }
+        save_pool_name(archive);
     }
 
     void
@@ -556,6 +594,58 @@ class function_request_impl final
         this->load_intrsp_state(archive);
         archive(cereal::make_nvp("args", args_));
         containment_ = containment_data::load(archive);
+        load_pool_name(archive);
+        auto& resources{archive.get_resources()};
+        auto the_seri_registry{resources.get_seri_registry()};
+        function_
+            = the_seri_registry->find_function<stored_function_t>(uuid_.str());
+    }
+
+    // Cereal input helper for load_plain_args(): decodes each stored argument
+    // uniformly as an embedded value blob via deserialize_value<>, matching
+    // local_worker's args_writer, rather than by each argument's own cereal
+    // type. Populates the impl's args_ tuple.
+    struct plain_args_loader
+    {
+        function_request_impl& impl_;
+
+        template<typename Archive>
+        void
+        load(Archive& archive)
+        {
+            load_elements(archive, ArgIndices{});
+        }
+
+        template<typename Archive, std::size_t... Ix>
+        void
+        load_elements(Archive& archive, std::index_sequence<Ix...>)
+        {
+            (load_element<Ix>(archive), ...);
+        }
+
+        template<std::size_t Ix, typename Archive>
+        void
+        load_element(Archive& archive)
+        {
+            blob arg_blob;
+            archive(cereal::make_nvp(
+                "tuple_element" + std::to_string(Ix), arg_blob));
+            using elem_t = std::tuple_element_t<Ix, std::tuple<Args...>>;
+            std::get<Ix>(impl_.args_) = deserialize_value<elem_t>(arg_blob);
+        }
+    };
+
+    // Pool plain-args variant of load(): decodes every argument uniformly as
+    // an embedded value blob (mirroring local_worker's args_writer), rather
+    // than by each argument's own cereal type. Everything else matches load().
+    void
+    load_plain_args(JSONRequestInputArchive& archive) override
+    {
+        this->load_intrsp_state(archive);
+        plain_args_loader loader{*this};
+        archive(cereal::make_nvp("args", loader));
+        containment_ = containment_data::load(archive);
+        load_pool_name(archive);
         auto& resources{archive.get_resources()};
         auto the_seri_registry{resources.get_seri_registry()};
         function_
@@ -583,10 +673,24 @@ class function_request_impl final
     register_uuid(
         seri_registry& registry,
         catalog_id cat_id,
-        std::shared_ptr<seri_resolver_intf> resolver) const override
+        std::shared_ptr<seri_resolver_intf> resolver,
+        std::shared_ptr<seri_resolver_intf> pool_variant_resolver)
+        const override
     {
         registry.add(
             cat_id, uuid_.str(), std::move(resolver), create, function_);
+
+        // Also register the pool plain-args variant resolver under the derived
+        // variant uuid, with the same create and function value; only the
+        // argument decoding differs (see seri_resolver.h). A caller that
+        // registers the normal resolver thus automatically obtains the
+        // variant, so the worker's uniform value-blob arguments round-trip.
+        registry.add(
+            cat_id,
+            make_pool_variant_uuid().str(),
+            std::move(pool_variant_resolver),
+            create,
+            function_);
 
         // Register uuids for any args resulting from normalize_arg()
         register_uuid_for_normalized_args(
@@ -613,14 +717,16 @@ class function_request_impl final
         {
             containment_data::save_nothing(packer);
         }
+        save_pool_name(packer);
     }
 
     void
-    load_msgpack(msgpack::object const msgpack_objs[3]) override
+    load_msgpack(msgpack::object const msgpack_objs[4]) override
     {
         this->load_intrsp_state(msgpack_objs[0]);
         msgpack_objs[1].convert(args_);
         containment_ = containment_data::load(msgpack_objs[2]);
+        load_pool_name(msgpack_objs[3]);
         auto& resources{get_current_inner_resources()};
         auto the_seri_registry{resources.get_seri_registry()};
         function_
@@ -646,7 +752,12 @@ class function_request_impl final
     cppcoro::task<Value>
     resolve_sync(local_context_intf& ctx) const
     {
-        if (containment_)
+        if (auto pool_name
+            = select_pool_name(pool_name_, ctx.get_default_pool_name()))
+        {
+            return resolve_sync_on_pool(ctx, std::move(*pool_name));
+        }
+        else if (containment_)
         {
             return resolve_sync_contained(ctx);
         }
@@ -659,7 +770,12 @@ class function_request_impl final
     cppcoro::task<Value>
     resolve_async(local_async_context_intf& ctx) const
     {
-        if (containment_)
+        if (auto pool_name
+            = select_pool_name(pool_name_, ctx.get_default_pool_name()))
+        {
+            return resolve_async_on_pool(ctx, std::move(*pool_name));
+        }
+        else if (containment_)
         {
             return resolve_async_contained(ctx);
         }
@@ -705,6 +821,14 @@ class function_request_impl final
     make_clone_uuid() const
     {
         return uuid_.clone().set_flattened();
+    }
+
+    // Returns the derived pool plain-args variant uuid for this request,
+    // under which the pool_plain_args_seri_resolver_impl is registered.
+    request_uuid
+    make_pool_variant_uuid() const
+    {
+        return uuid_.clone().set_pool_plain_args();
     }
 
     // Synchronously resolve the function in contained mode, so in a
@@ -758,8 +882,80 @@ class function_request_impl final
             // No containment data
             containment_data::save_nothing(oarchive);
             oarchive(cereal::make_nvp("args", sub_results));
+            // No pool name
+            oarchive(cereal::make_nvp("has_pool_name", false));
         }
         return os.str();
+    }
+
+    // Synchronously resolve the leaf as a job on the named pool. Subrequests
+    // are resolved to values here; the leaf itself runs on the pool.
+    cppcoro::task<Value>
+    resolve_sync_on_pool(local_context_intf& ctx, std::string pool_name) const
+    {
+        auto sub_tasks = make_sync_sub_tasks(ctx, args_, ArgIndices{});
+        auto sub_results
+            = co_await when_all_wrapper(std::move(sub_tasks), ArgIndices{});
+        co_return co_await resolve_on_pool(
+            ctx, std::move(pool_name), std::move(sub_results));
+    }
+
+    // Asynchronously resolve the leaf as a job on the named pool.
+    cppcoro::task<Value>
+    resolve_async_on_pool(
+        local_async_context_intf& ctx, std::string pool_name) const
+    {
+        auto sub_tasks = make_async_sub_tasks(ctx, args_, ArgIndices{});
+        ctx.update_status(async_status::SUBS_RUNNING);
+        auto sub_results
+            = co_await when_all_wrapper(std::move(sub_tasks), ArgIndices{});
+        ctx.update_status(async_status::SELF_RUNNING);
+        Value result = co_await resolve_on_pool(
+            ctx, std::move(pool_name), std::move(sub_results));
+        ctx.update_status(async_status::FINISHED);
+        co_return result;
+    }
+
+    // Serializes the resolved subrequest values as the leaf's inputs,
+    // dispatches the leaf to the named pool, and deserializes the returned
+    // value. Mirrors how the inline path produces and consumes a serialized
+    // value.
+    cppcoro::task<Value>
+    resolve_on_pool(
+        local_context_intf& ctx, std::string pool_name, auto sub_results) const
+    {
+        inner_resources& resources{ctx.get_resources()};
+        pool_intf& pool{resources.pool(pool_name)};
+        [[maybe_unused]] constexpr bool allow_blob_files{true};
+        std::vector<blob> serialized_inputs;
+        serialized_inputs.reserve(sizeof...(Args));
+        std::apply(
+            [&serialized_inputs](auto const&... vals) {
+                (serialized_inputs.push_back(
+                     serialize_value(vals, allow_blob_files)),
+                 ...);
+            },
+            sub_results);
+        blob result = co_await resolve_leaf_on_pool(
+            ctx,
+            pool,
+            uuid_.str(),
+            get_unique_string(*this),
+            context_id{},
+            std::move(serialized_inputs),
+            get_pool_input_size_boundary(resources));
+        co_return deserialize_value<Value>(result);
+    }
+
+    // Serialized-size boundary for input classification, read from config with
+    // a built-in inner default when absent.
+    static std::size_t
+    get_pool_input_size_boundary(inner_resources& resources)
+    {
+        constexpr std::size_t default_input_size_boundary{1024};
+        return resources.config().get_number_or_default(
+            pool_config_keys::INPUT_SIZE_BOUNDARY,
+            default_input_size_boundary);
     }
 
     cppcoro::task<Value>
@@ -953,6 +1149,10 @@ class function_request_impl final
     // Containment data if function should run contained.
     std::unique_ptr<containment_data> containment_;
 
+    // Optional runtime pool name that a leaf request should be dispatched to.
+    // Not part of the request's identity.
+    std::optional<std::string> pool_name_;
+
     // Used when this request's caching level is at least memory; _OR_ if a
     // (direct or indirect) subrequest of a request with such a caching level.
     mutable std::optional<size_t> hash_;
@@ -962,6 +1162,62 @@ class function_request_impl final
     // caching level; _OR_ when storing the request.
     mutable unique_hasher::result_t unique_hash_;
     mutable bool have_unique_hash_{false};
+
+    void
+    save_pool_name(JSONRequestOutputArchive& archive) const
+    {
+        bool const has_pool_name{pool_name_.has_value()};
+        archive(cereal::make_nvp("has_pool_name", has_pool_name));
+        if (has_pool_name)
+        {
+            archive(cereal::make_nvp("pool_name", *pool_name_));
+        }
+    }
+
+    void
+    load_pool_name(JSONRequestInputArchive& archive)
+    {
+        bool has_pool_name{false};
+        archive(cereal::make_nvp("has_pool_name", has_pool_name));
+        if (has_pool_name)
+        {
+            std::string pool_name;
+            archive(cereal::make_nvp("pool_name", pool_name));
+            pool_name_ = std::move(pool_name);
+        }
+        else
+        {
+            pool_name_ = std::nullopt;
+        }
+    }
+
+    void
+    save_pool_name(msgpack_packer& packer) const
+    {
+        if (pool_name_)
+        {
+            packer.pack(*pool_name_);
+        }
+        else
+        {
+            packer.pack_nil();
+        }
+    }
+
+    void
+    load_pool_name(msgpack::object const& msgpack_obj)
+    {
+        if (msgpack_obj.type == msgpack::type::NIL)
+        {
+            pool_name_ = std::nullopt;
+        }
+        else
+        {
+            std::string pool_name;
+            msgpack_obj.convert(pool_name);
+            pool_name_ = std::move(pool_name);
+        }
+    }
 
     bool
     is_normalizer() const
@@ -1048,6 +1304,18 @@ class function_request : public ObjectProps::retrier_type
         impl_->set_containment(containment);
     }
 
+    void
+    set_pool_name(std::optional<std::string> pool_name)
+    {
+        impl_->set_pool_name(std::move(pool_name));
+    }
+
+    std::optional<std::string>
+    get_pool_name() const
+    {
+        return impl_->get_pool_name();
+    }
+
     caching_level_type
     get_caching_level() const
     {
@@ -1085,9 +1353,14 @@ class function_request : public ObjectProps::retrier_type
     register_uuid(
         seri_registry& registry,
         catalog_id cat_id,
-        std::shared_ptr<seri_resolver_intf> resolver) const
+        std::shared_ptr<seri_resolver_intf> resolver,
+        std::shared_ptr<seri_resolver_intf> pool_variant_resolver) const
     {
-        impl_->register_uuid(registry, cat_id, std::move(resolver));
+        impl_->register_uuid(
+            registry,
+            cat_id,
+            std::move(resolver),
+            std::move(pool_variant_resolver));
     }
 
     std::size_t
@@ -1184,7 +1457,24 @@ class function_request : public ObjectProps::retrier_type
         impl_->load(archive);
     }
 
- public: // Interface for msgpack
+    // Pool plain-args variant of load(): identical to load() except the impl's
+    // arguments are decoded uniformly as embedded value blobs via
+    // load_plain_args(). Used only on the pool consume path (the worker writes
+    // the derived variant uuid); the default load() is unchanged.
+    void
+    load_plain_args(JSONRequestInputArchive& archive)
+    {
+        auto& resources{archive.get_resources()};
+        auto the_seri_registry{resources.get_seri_registry()};
+        auto uuid{request_uuid::load_with_name(archive, "uuid")};
+        uuid.deproxy();
+        this->load_retrier_state(archive);
+        // Create a mostly empty function_request_impl object. uuid defines its
+        // exact type (function_request_impl class instantiation).
+        impl_ = the_seri_registry->create_impl<intf_type>(std::move(uuid));
+        // Deserialize the remainder in plain-args mode.
+        impl_->load_plain_args(archive);
+    }
     // The msgpack_pack() and msgpack_unpack() function signatures are dictated
     // by the msgpack library.
 
@@ -1194,7 +1484,8 @@ class function_request : public ObjectProps::retrier_type
     // [2] introspection state (impl)
     // [3] args (impl)
     // [4] containment (impl)
-    static constexpr int msgpack_array_size{5};
+    // [5] pool name (impl)
+    static constexpr int msgpack_array_size{6};
 
     void
     msgpack_pack(msgpack_packer_base& base_packer) const
@@ -1265,7 +1556,10 @@ register_uuid_for_normalized_arg(
 {
     using arg_t = function_request<Value, Props>;
     arg.register_uuid(
-        registry, cat_id, std::make_shared<seri_resolver_impl<arg_t>>());
+        registry,
+        cat_id,
+        std::make_shared<seri_resolver_impl<arg_t>>(),
+        std::make_shared<pool_plain_args_seri_resolver_impl<arg_t>>());
 }
 
 // Used for comparing subrequests, where the main requests have the same type;
@@ -1434,6 +1728,18 @@ class proxy_request_impl final
         containment_ = std::make_unique<containment_data>(containment);
     }
 
+    void
+    set_pool_name(std::optional<std::string> pool_name) override
+    {
+        pool_name_ = std::move(pool_name);
+    }
+
+    std::optional<std::string>
+    get_pool_name() const override
+    {
+        return pool_name_;
+    }
+
     request_uuid const&
     get_uuid() const override
     {
@@ -1470,6 +1776,7 @@ class proxy_request_impl final
         {
             containment_data::save_nothing(archive);
         }
+        save_pool_name(archive);
     }
 
     void
@@ -1478,6 +1785,7 @@ class proxy_request_impl final
         this->load_intrsp_state(archive);
         archive(cereal::make_nvp("args", args_));
         containment_ = containment_data::load(archive);
+        load_pool_name(archive);
     }
 
  public: // proxy_request_intf
@@ -1499,9 +1807,41 @@ class proxy_request_impl final
     std::tuple<Args...> args_;
     std::unique_ptr<containment_data> containment_;
 
+    // Optional runtime pool name that a leaf request should be dispatched to.
+    // Not part of the request's identity.
+    std::optional<std::string> pool_name_;
+
     // Used when storing the request.
     mutable unique_hasher::result_t unique_hash_;
     mutable bool have_unique_hash_{false};
+
+    void
+    save_pool_name(JSONRequestOutputArchive& archive) const
+    {
+        bool const has_pool_name{pool_name_.has_value()};
+        archive(cereal::make_nvp("has_pool_name", has_pool_name));
+        if (has_pool_name)
+        {
+            archive(cereal::make_nvp("pool_name", *pool_name_));
+        }
+    }
+
+    void
+    load_pool_name(JSONRequestInputArchive& archive)
+    {
+        bool has_pool_name{false};
+        archive(cereal::make_nvp("has_pool_name", has_pool_name));
+        if (has_pool_name)
+        {
+            std::string pool_name;
+            archive(cereal::make_nvp("pool_name", pool_name));
+            pool_name_ = std::move(pool_name);
+        }
+        else
+        {
+            pool_name_ = std::nullopt;
+        }
+    }
 
     void
     calc_unique_hash() const
@@ -1581,6 +1921,18 @@ class proxy_request : public ObjectProps::retrier_type
     set_containment(containment_data const& containment)
     {
         impl_->set_containment(containment);
+    }
+
+    void
+    set_pool_name(std::optional<std::string> pool_name)
+    {
+        impl_->set_pool_name(std::move(pool_name));
+    }
+
+    std::optional<std::string>
+    get_pool_name() const
+    {
+        return impl_->get_pool_name();
     }
 
     caching_level_type
