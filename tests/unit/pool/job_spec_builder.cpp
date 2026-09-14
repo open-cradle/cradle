@@ -139,9 +139,9 @@ TEST_CASE("build_job_spec - assembles the spec from its arguments", tag)
     request_key const key = "leaf/key/spec";
     context_id const context = "ctx-1";
 
-    blob const small = make_blob("in");
-    blob const large = make_blob("oversized-argument-bytes");
-    std::vector<blob> const inputs{small, large};
+    blob const small_input = make_blob("in");
+    blob const large_input = make_blob("oversized-argument-bytes");
+    std::vector<blob> const inputs{small_input, large_input};
 
     std::size_t const boundary = 4;
 
@@ -159,7 +159,7 @@ TEST_CASE("build_job_spec - assembles the spec from its arguments", tag)
 
     REQUIRE(std::holds_alternative<digest_input>(spec.inputs[1]));
     digest const d = std::get<digest_input>(spec.inputs[1]).content_digest;
-    REQUIRE(d == digest_of(large));
+    REQUIRE(d == digest_of(large_input));
 
     // Digest-conveyed content is present in the CAS after assembly.
     auto const retrieved = cppcoro::sync_wait(cas->get(d));
