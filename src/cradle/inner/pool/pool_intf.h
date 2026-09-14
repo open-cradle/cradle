@@ -53,7 +53,7 @@ class pool_intf
 
     // Request best-effort cancellation of a previously accepted job. When the
     // job is not yet terminal, causes it to become observable as cancelled; it
-    // does not interrupt work already in progress. A cancel of an
+    // doesn't necessarily interrupt work already in progress. A cancel of an
     // already-terminal or unknown job is a no-op. Throws on a genuine backend
     // fault.
     virtual cppcoro::task<void>
