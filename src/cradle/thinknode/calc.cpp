@@ -1,3 +1,5 @@
+#include <cradle/inner/utilities/logging.h>
+
 #include <cradle/thinknode/calc.h>
 
 #include <fmt/format.h>
@@ -525,7 +527,7 @@ search_calculation(
         if (get_error_info<http_response_info>(e)->status_code == 404)
         {
             is_matching[calculation_id] = false;
-            spdlog::get("cradle")->warn(
+            cradle::ensure_logger("cradle")->warn(
                 "failed to search {} due to 404; results may be incomplete",
                 calculation_id);
             co_return;

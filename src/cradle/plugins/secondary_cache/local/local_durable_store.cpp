@@ -1,3 +1,5 @@
+#include <cradle/inner/utilities/logging.h>
+
 #include <cradle/plugins/secondary_cache/local/local_durable_store.h>
 
 #include <cstdint>
@@ -116,7 +118,7 @@ local_durable_store::local_durable_store(service_config const& config)
               local_disk_cache_config_keys::START_EMPTY, false)}},
       read_pool_{default_num_read_threads},
       write_pool_{default_num_write_threads},
-      logger_{spdlog::get("cradle")}
+      logger_{cradle::ensure_logger("cradle")}
 {
 }
 
@@ -126,7 +128,7 @@ local_durable_store::local_durable_store(
       ll_cache_{make_ll_config(settings)},
       read_pool_{default_num_read_threads},
       write_pool_{default_num_write_threads},
-      logger_{spdlog::get("cradle")}
+      logger_{cradle::ensure_logger("cradle")}
 {
 }
 

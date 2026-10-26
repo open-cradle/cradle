@@ -1,3 +1,5 @@
+#include <cradle/inner/utilities/logging.h>
+
 #include <cradle/websocket/calculations.h>
 
 #include <picosha2.h>
@@ -160,7 +162,7 @@ resolve_calc_to_value(
             auto array = as_array(std::move(request));
             for (auto& item : array.items)
             {
-                spdlog::get("cradle")->info(
+                cradle::ensure_logger("cradle")->info(
                     "array.item_schema: {}",
                     boost::lexical_cast<std::string>(array.item_schema));
                 values.push_back(co_await coercive_call(

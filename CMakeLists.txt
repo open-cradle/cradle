@@ -91,6 +91,13 @@ endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
+if(APPLE)
+    add_compile_definitions(BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+        add_compile_definitions(_LIBCPP_ENABLE_EXPERIMENTAL)
+    endif()
+endif()
+
 # Some of CRADLE's libraries are intended to be dynamically loaded, so are
 # built as MODULE libraries.
 #

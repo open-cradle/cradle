@@ -366,7 +366,7 @@ coerce_encoded_object(
     blob encoded_object)
 {
     // Decode the object.
-    spdlog::get("cradle")->info("coerce_encoded_object: decoding");
+    cradle::ensure_logger("cradle")->info("coerce_encoded_object: decoding");
     dynamic decoded_object;
     switch (encoding)
     {
@@ -388,7 +388,7 @@ coerce_encoded_object(
     }
 
     // Apply type coercion.
-    spdlog::get("cradle")->info("coerce_encoded_object: coercing");
+    cradle::ensure_logger("cradle")->info("coerce_encoded_object: coercing");
     auto coerced_object = co_await coerce_value(
         [&](api_named_type_reference const& ref)
             -> cppcoro::task<api_type_info> {
@@ -399,7 +399,7 @@ coerce_encoded_object(
         std::move(decoded_object));
 
     // Encode it again as MessagePack.
-    spdlog::get("cradle")->info("coerce_encoded_object: encoding");
+    cradle::ensure_logger("cradle")->info("coerce_encoded_object: encoding");
     co_return value_to_msgpack_blob(coerced_object);
 }
 
@@ -1430,7 +1430,7 @@ send_response(
         }
         else
         {
-            spdlog::get("cradle")->info(os.str());
+            cradle::ensure_logger("cradle")->info(os.str());
         }
     }
     send(
@@ -1461,7 +1461,7 @@ process_message(websocket_server_impl& server, client_request request)
     if (get_client(server.clients, request.client).session.api_url.empty()
         && !is_registration(content))
     {
-        spdlog::get("cradle")->error("unregistered client");
+        cradle::ensure_logger("cradle")->error("unregistered client");
         send_response(
             server,
             request,
@@ -1803,7 +1803,7 @@ process_message_with_error_handling(
     }
     catch (bad_http_status_code& e)
     {
-        spdlog::get("cradle")->error(e.what());
+        cradle::ensure_logger("cradle")->error(e.what());
         auto req{make_prep_http_request(
             get_required_error_info<attempted_http_request_info>(e))};
         auto resp{make_prep_http_response(
@@ -1817,7 +1817,7 @@ process_message_with_error_handling(
     }
     catch (std::exception& e)
     {
-        spdlog::get("cradle")->error(e.what());
+        cradle::ensure_logger("cradle")->error(e.what());
         send_response(
             server,
             request,
@@ -1884,7 +1884,7 @@ on_message(
     }
     catch (std::exception& e)
     {
-        spdlog::get("cradle")->error("error processing message: {}", e.what());
+        cradle::ensure_logger("cradle")->error("error processing message: {}", e.what());
         send(
             server,
             hdl,

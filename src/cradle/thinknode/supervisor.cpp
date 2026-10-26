@@ -1,3 +1,5 @@
+#include <cradle/inner/utilities/logging.h>
+
 #include <cradle/typing/io/asio.h>
 
 #include <chrono>
@@ -231,7 +233,7 @@ stop_provider(
     http_connection_interface& connection,
     string const& docker_container_id)
 {
-    spdlog::get("cradle")->info("[super] stop_provider");
+    cradle::ensure_logger("cradle")->info("[super] stop_provider");
 
     null_check_in check_in;
     null_progress_reporter reporter;
@@ -257,7 +259,7 @@ stop_provider(
         // matures.
     }
 
-    spdlog::get("cradle")->info("[super] (provider stopped)");
+    cradle::ensure_logger("cradle")->info("[super] (provider stopped)");
 }
 
 struct local_function_invocation
@@ -371,7 +373,7 @@ transmit_request(local_supervisor_data& supervisor)
                     request.function_name, std::move(request.args))));
     }
     supervisor.active_request.reset();
-    spdlog::get("cradle")->info(
+    cradle::ensure_logger("cradle")->info(
         "[super] {}: ARGUMENTS SENT!", (void*) &supervisor);
 }
 
@@ -381,11 +383,11 @@ process_messages(std::shared_ptr<local_supervisor_data> data)
     local_supervisor_data& supervisor = *data;
     while (supervisor.state != local_supervisor_state::TERMINATED)
     {
-        spdlog::get("cradle")->info("[super] supervisor accepting...");
+        cradle::ensure_logger("cradle")->info("[super] supervisor accepting...");
         supervisor.socket
             = std::make_unique<tcp::socket>(supervisor.io_context);
         supervisor.acceptor.accept(*supervisor.socket);
-        spdlog::get("cradle")->info(
+        cradle::ensure_logger("cradle")->info(
             "[super] {}: ACCEPTED!", (void*) &supervisor);
 
         // TODO: Need better logic for this.
@@ -409,7 +411,7 @@ process_messages(std::shared_ptr<local_supervisor_data> data)
                             if (as_registration(message).pid
                                 == supervisor.active_provider->pid)
                             {
-                                spdlog::get("cradle")->info(
+                                cradle::ensure_logger("cradle")->info(
                                     "{}: REGISTRATION!", (void*) &supervisor);
                                 transmit_request(supervisor);
                             }
@@ -417,7 +419,7 @@ process_messages(std::shared_ptr<local_supervisor_data> data)
                         break;
 
                     case thinknode_provider_message_tag::RESULT:
-                        spdlog::get("cradle")->info(
+                        cradle::ensure_logger("cradle")->info(
                             "{}: RESULT!", (void*) &supervisor);
                         supervisor.state = local_supervisor_state::IDLE;
                         produce<optional<dynamic>>(
@@ -426,7 +428,7 @@ process_messages(std::shared_ptr<local_supervisor_data> data)
                         break;
 
                     case thinknode_provider_message_tag::FAILURE:
-                        spdlog::get("cradle")->info(
+                        cradle::ensure_logger("cradle")->info(
                             "{}: FAILURE!", (void*) &supervisor);
                         supervisor.state = local_supervisor_state::IDLE;
                         produce<optional<dynamic>>(supervisor.result, none);
@@ -440,7 +442,7 @@ process_messages(std::shared_ptr<local_supervisor_data> data)
             {
                 // Assume the error is related to the provider, so
                 // terminate it and signal an error.
-                spdlog::get("cradle")->info("[super] (IMPLICIT) FAILURE!");
+                cradle::ensure_logger("cradle")->info("[super] (IMPLICIT) FAILURE!");
                 // try
                 // {
                 //     this->stop_provider();
@@ -482,7 +484,7 @@ supervise_calculation(
     string const& function_name,
     std::vector<dynamic> args)
 {
-    spdlog::get("cradle")->info("[super] LOCAL CALC: {}", function_name);
+    cradle::ensure_logger("cradle")->info("[super] LOCAL CALC: {}", function_name);
 
     string const image_tag = extract_tag(image);
 
@@ -494,7 +496,7 @@ supervise_calculation(
             || supervisor.active_provider->app != app
             || supervisor.active_provider->image_tag != image_tag))
     {
-        spdlog::get("cradle")->info(
+        cradle::ensure_logger("cradle")->info(
             "[super] INTERNAL ERROR: inconsistent provider");
         CRADLE_THROW(
             internal_check_failed() << internal_error_message_info(
@@ -512,7 +514,7 @@ supervise_calculation(
     {
         try
         {
-            spdlog::get("cradle")->info(
+            cradle::ensure_logger("cradle")->info(
                 "{}: active provider", (void*) &supervisor);
             transmit_request(supervisor);
         }
@@ -559,10 +561,10 @@ supervise_calculation(
     optional<dynamic> result = consume(supervisor.result);
     if (!result)
         CRADLE_THROW(local_calculation_failure());
-    spdlog::get("cradle")->info("[super] {}: got result", (void*) &supervisor);
+    cradle::ensure_logger("cradle")->info("[super] {}: got result", (void*) &supervisor);
     if (supervisor.state != local_supervisor_state::IDLE)
     {
-        spdlog::get("cradle")->info(
+        cradle::ensure_logger("cradle")->info(
             "[super] INTERNAL ERROR: inconsistent provider");
         CRADLE_THROW(
             internal_check_failed() << internal_error_message_info(

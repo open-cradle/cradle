@@ -77,6 +77,19 @@ struct structure_field_type_info_adder
 
 struct dynamic;
 
+bool
+operator==(dynamic const& a, dynamic const& b);
+bool
+operator!=(dynamic const& a, dynamic const& b);
+bool
+operator<(dynamic const& a, dynamic const& b);
+bool
+operator<=(dynamic const& a, dynamic const& b);
+bool
+operator>(dynamic const& a, dynamic const& b);
+bool
+operator>=(dynamic const& a, dynamic const& b);
+
 enum class value_type
 {
     NIL, // nil_t - no value

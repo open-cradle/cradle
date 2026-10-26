@@ -9,7 +9,6 @@
 #include <thread>
 #include <unordered_map>
 
-#include <cppcoro/io_service.hpp>
 #include <cppcoro/static_thread_pool.hpp>
 #include <spdlog/spdlog.h>
 
@@ -19,6 +18,7 @@
 #include <cradle/inner/remote/types.h>
 #include <cradle/inner/resolve/seri_registry.h>
 #include <cradle/inner/service/config.h>
+#include <cradle/inner/service/io_service.h>
 #include <cradle/rpclib/client/contained_proxy_pool.h>
 
 namespace cradle {
@@ -100,7 +100,7 @@ class inner_resources_impl
         std::unique_ptr<cache_record_lock>>
         cache_record_locks_;
     tasklet_admin the_tasklet_admin_;
-    cppcoro::io_service io_svc_;
+    io_service io_svc_;
     std::jthread io_svc_thread_;
 
     cppcoro::static_thread_pool http_pool_;

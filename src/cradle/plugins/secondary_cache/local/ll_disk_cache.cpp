@@ -80,7 +80,7 @@ struct ll_disk_cache_impl
 static void
 open_db(sqlite3** db, file_path const& file)
 {
-    spdlog::get("cradle")->info("Using disk cache {}", file.string());
+    cradle::ensure_logger("cradle")->info("Using disk cache {}", file.string());
     // sqlite3_open() apparently is successful even if file is not an SQLite
     // database.
     if (sqlite3_open(file.string().c_str(), db) != SQLITE_OK)

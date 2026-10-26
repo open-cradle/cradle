@@ -496,7 +496,7 @@ inner_resources::the_tasklet_admin()
     return impl_->the_tasklet_admin_;
 }
 
-cppcoro::io_service&
+io_service&
 inner_resources::the_io_service()
 {
     return impl_->io_svc_;

@@ -4,7 +4,6 @@
 #include <memory>
 #include <optional>
 
-#include <cppcoro/io_service.hpp>
 #include <cppcoro/static_thread_pool.hpp>
 #include <cppcoro/task.hpp>
 #include <spdlog/spdlog.h>
@@ -13,6 +12,7 @@
 #include <cradle/inner/remote/types.h>
 #include <cradle/inner/resolve/seri_lock.h>
 #include <cradle/inner/service/config.h>
+#include <cradle/inner/service/io_service.h>
 
 namespace cradle {
 
@@ -254,7 +254,7 @@ class inner_resources
     tasklet_admin&
     the_tasklet_admin();
 
-    cppcoro::io_service&
+    io_service&
     the_io_service();
 
     std::unique_ptr<rpclib_client>
