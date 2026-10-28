@@ -1080,13 +1080,17 @@ resolve_meta_chain(
 {
     CRADLE_LOG_CALL(<< CRADLE_LOG_ARG(context_id) << CRADLE_LOG_ARG(request))
 
-    while (is_meta(request))
-    {
-        auto generator = as_meta(std::move(request)).generator;
-        request
-            = from_dynamic<calculation_request>(co_await resolve_calc_to_value(
-                ctx, context_id, std::move(generator)));
-    }
+    // TODO: This is unnecessary work that introduces a dependency on local
+    // resolution in order to improve the caching of the request chain steps.
+    // But it may be worth resurrecting at some point as an option...
+    // while (is_meta(request))
+    // {
+    //     auto generator = as_meta(std::move(request)).generator;
+    //     request
+    //         = from_dynamic<calculation_request>(co_await
+    //         resolve_calc_to_value(
+    //             ctx, context_id, std::move(generator)));
+    // }
     co_return co_await resolve_calc_to_iss_object(
         ctx, context_id, std::move(request));
 }
