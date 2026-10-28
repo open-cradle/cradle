@@ -1,3 +1,5 @@
+#include <cradle/inner/utilities/logging.h>
+
 #include <cradle/thinknode/utilities.h>
 
 #include <cradle/inner/introspection/tasklet.h>
@@ -128,7 +130,7 @@ log_info(thinknode_request_context& ctx, const char* msg)
     }
     else
     {
-        spdlog::get("cradle")->info(msg);
+        cradle::ensure_logger("cradle")->info(msg);
     }
 }
 

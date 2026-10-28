@@ -1,3 +1,5 @@
+#include <cradle/inner/utilities/logging.h>
+
 // A reference key-value store based on a local disk cache.
 
 #include <stdexcept>
@@ -76,7 +78,7 @@ local_disk_cache::local_disk_cache(service_config const& config)
       poller_{ll_cache_, get_poll_interval(config)},
       read_pool_{get_num_threads_read_pool(config)},
       write_pool_{get_num_threads_write_pool(config)},
-      logger_{spdlog::get("cradle")}
+      logger_{cradle::ensure_logger("cradle")}
 {
 }
 

@@ -211,19 +211,6 @@ deep_sizeof(dynamic const& v);
 void
 swap(dynamic& a, dynamic& b);
 
-bool
-operator==(dynamic const& a, dynamic const& b);
-bool
-operator!=(dynamic const& a, dynamic const& b);
-bool
-operator<(dynamic const& a, dynamic const& b);
-bool
-operator<=(dynamic const& a, dynamic const& b);
-bool
-operator>(dynamic const& a, dynamic const& b);
-bool
-operator>=(dynamic const& a, dynamic const& b);
-
 inline void
 to_dynamic(dynamic* v, dynamic const& x)
 {
