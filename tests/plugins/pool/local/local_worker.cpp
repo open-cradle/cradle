@@ -56,6 +56,14 @@ failing_demo(context_intf&, demo_class)
     throw std::runtime_error{"intentional provider failure"};
 }
 
+// Thinknode-style leaf: Args are normalize_arg identity requests, while the
+// pool job still carries resolved plain int values.
+cppcoro::task<int>
+add_normalized(context_intf&, int a, int b)
+{
+    co_return a + b;
+}
+
 using worker_props
     = request_props<caching_level_type::none, request_function_t::coro>;
 
@@ -64,6 +72,13 @@ using worker_props
 // serialize_value, and the worker later deserializes those same bytes.
 blob
 to_input(demo_class const& value)
+{
+    bool constexpr allow_blob_files{false};
+    return serialize_value(value, allow_blob_files);
+}
+
+blob
+to_input(int value)
 {
     bool constexpr allow_blob_files{false};
     return serialize_value(value, allow_blob_files);
@@ -229,4 +244,47 @@ TEST_CASE(
     std::optional<digest> const associated{
         cppcoro::sync_wait(ac->get(spec.key))};
     REQUIRE(!associated.has_value());
+}
+
+TEST_CASE(
+    "local_worker rebuilds normalize_arg-shaped Args from plain values", tag)
+{
+    auto resources{make_inner_test_resources()};
+    auto cas{make_memory_cas("pool_cas")};
+    auto ac{make_memory_ac("pool_ac")};
+    auto store{make_memory_mutable_store("pool_store")};
+
+    seri_catalog cat{resources->get_seri_registry()};
+    auto req{rq_function(
+        worker_props{request_uuid{"local_worker/add_normalized"}},
+        add_normalized,
+        normalize_arg<int, worker_props>(0),
+        normalize_arg<int, worker_props>(0))};
+    cat.register_resolver(req);
+    std::string const provider{req.get_essentials()->uuid_str};
+
+    auto worker{make_local_worker(*resources, *cas, *ac, *store, "local")};
+
+    job_spec spec;
+    spec.provider = provider;
+    spec.key = "leaf/add_normalized";
+    spec.context = "";
+    // As resolve_on_pool: only the resolved int values travel in the job.
+    spec.inputs.push_back(inline_input{to_input(3)});
+    spec.inputs.push_back(inline_input{to_input(4)});
+
+    job_id const id{"job-add-normalized"};
+    cppcoro::sync_wait(worker->execute(spec, id));
+
+    std::optional<mutable_value> const stored{
+        cppcoro::sync_wait(store->get(job_record_key(id)))};
+    REQUIRE(stored.has_value());
+    job_record const record{deserialize_job_record(*stored)};
+    REQUIRE(record.status == job_status::succeeded);
+    REQUIRE(!record.output_digest.empty());
+
+    std::optional<blob> const content{
+        cppcoro::sync_wait(cas->get(record.output_digest))};
+    REQUIRE(content.has_value());
+    REQUIRE(deserialize_value<int>(*content) == 7);
 }
