@@ -351,6 +351,7 @@ local_worker::execute(job_spec spec, job_id id)
             id,
             seri_req.size());
         auto ctx{make_worker_context(resources_, spec.context)};
+        ctx->track_blob_file_writers();
         auto const variant_uuid{pool_variant_uuid_str(spec.provider)};
         auto resolver{
             resources_.get_seri_registry()->find_resolver(variant_uuid)};
