@@ -2,14 +2,17 @@
 
 #include <cstddef>
 #include <exception>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
+#include <typeinfo>
 #include <utility>
 #include <variant>
 #include <vector>
 
 #include <cereal/types/string.hpp>
+#include <fmt/format.h>
 
 #include <cradle/inner/core/type_definitions.h>
 #include <cradle/inner/encodings/cereal.h>
@@ -17,6 +20,7 @@
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/requests/containment_data.h>
 #include <cradle/inner/requests/context_base.h>
+#include <cradle/inner/requests/domain.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/requests/uuid.h>
@@ -25,12 +29,14 @@
 #include <cradle/inner/resolve/seri_resolver.h>
 #include <cradle/inner/resolve/seri_result.h>
 #include <cradle/inner/service/config.h>
+#include <cradle/inner/service/config_map_from_json.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/storage/ac_intf.h>
 #include <cradle/inner/storage/cas_intf.h>
 #include <cradle/inner/storage/content_helpers.h>
 #include <cradle/inner/storage/digest.h>
 #include <cradle/inner/storage/mutable_store_intf.h>
+#include <cradle/inner/utilities/logging.h>
 
 namespace cradle {
 
@@ -93,12 +99,11 @@ struct args_writer
 };
 
 // Reconstructs the serialized request the provider's resolver expects, from
-// the provider uuid and the loaded input blobs. Mirrors the contained-request
-// serialization (function.h serialize_contained_request): the uuid, no
-// containment data, the classified inputs as the argument tuple, and no pool
-// name. Supports the non-introspective, no-retrier request shape used by
-// pooled leaves; introspective or retrying leaves would need their title /
-// retrier fields added here.
+// the provider uuid and the loaded input blobs. Cereal JSON is name-keyed, so
+// writers can include fields that some request shapes ignore: no-retrier /
+// non-introspective leaves skip the retrier and title NVPs, while Thinknode-
+// style default_retrier + introspective leaves consume them. No containment
+// data and no pool name (the worker must not re-pool).
 std::string
 build_seri_req(provider_id const& provider, std::vector<blob> const& inputs)
 {
@@ -109,11 +114,101 @@ build_seri_req(provider_id const& provider, std::vector<blob> const& inputs)
         // uniform value-blob args (args_writer) round-trip correctly.
         std::string variant_uuid{pool_variant_uuid_str(provider)};
         oarchive(cereal::make_nvp("uuid", variant_uuid));
+        // default_retrier defaults (ignored by no_retrier leaves)
+        oarchive(cereal::make_nvp("base_millis", int64_t{100}));
+        oarchive(cereal::make_nvp("max_attempts", 9));
+        // introspective title (ignored by non-introspective leaves)
+        oarchive(cereal::make_nvp("title", std::string{"pooled"}));
         containment_data::save_nothing(oarchive);
         oarchive(cereal::make_nvp("args", args_writer{inputs}));
         oarchive(cereal::make_nvp("has_pool_name", false));
     }
     return os.str();
+}
+
+// Summarize job-context config keys for logs without printing secrets.
+std::string
+describe_job_context_keys(service_config const& config)
+{
+    std::string result;
+    for (auto const& [key, value] : config.get_config_map())
+    {
+        if (!result.empty())
+        {
+            result += ", ";
+        }
+        // Redact known secret keys without depending on Thinknode headers.
+        if (key == "thinknode/access_token")
+        {
+            auto const* token = std::get_if<std::string>(&value);
+            result += fmt::format(
+                "{}=<redacted,{} chars>",
+                key,
+                token ? token->size() : 0);
+        }
+        else if (auto const* s = std::get_if<std::string>(&value))
+        {
+            result += fmt::format("{}={}", key, *s);
+        }
+        else if (auto const* n = std::get_if<std::size_t>(&value))
+        {
+            result += fmt::format("{}={}", key, *n);
+        }
+        else if (auto const* b = std::get_if<bool>(&value))
+        {
+            result += fmt::format("{}={}", key, *b);
+        }
+        else
+        {
+            result += key;
+        }
+    }
+    return result;
+}
+
+// Prefer a domain-built local sync context when the job carries a serialized
+// remote config (e.g. Thinknode session). Fall back to the provider-agnostic
+// pool_worker_context when the context field is empty or not usable.
+std::shared_ptr<local_context_intf>
+make_worker_context(inner_resources& resources, context_id const& context)
+{
+    auto logger{ensure_logger("local_pool")};
+    if (context.empty())
+    {
+        logger->warn(
+            "pool worker: job context empty; using generic pool_worker_context");
+        return std::make_shared<pool_worker_context>(resources);
+    }
+    try
+    {
+        service_config config{read_config_map_from_json(context)};
+        auto domain_name{
+            config.get_mandatory_string(remote_config_keys::DOMAIN_NAME)};
+        logger->warn(
+            "pool worker: rebuilding domain context '{}' ({})",
+            domain_name,
+            describe_job_context_keys(config));
+        auto& dom = resources.find_domain(domain_name);
+        auto ctx{dom.make_local_sync_context(config)};
+        logger->warn(
+            "pool worker: domain context ready; ctx.domain_name()='{}'",
+            ctx->domain_name());
+        return ctx;
+    }
+    catch (std::exception const& e)
+    {
+        // Keep the fallback for now, but make the swallowed failure visible:
+        // a generic pool_worker_context will typically fail later with a
+        // Thinknode cast error if the provider needs a domain context.
+        logger->error(
+            "pool worker: failed to rebuild domain context from job "
+            "context ({} chars): [{}] {}; falling back to "
+            "pool_worker_context",
+            context.size(),
+            typeid(e).name(),
+            e.what());
+        return std::make_shared<pool_worker_context>(resources);
+    }
 }
 
 // Loads one job input: inline bytes travel directly; a digest names content
@@ -200,12 +295,27 @@ local_worker::local_worker(
 cppcoro::task<void>
 local_worker::execute(job_spec spec, job_id id)
 {
+    auto logger{ensure_logger("local_pool")};
+
     // If cancellation already wrote a terminal record before dispatch, abandon
     // execution: do not run the provider and do not write any status.
     if (co_await current_is_terminal(mutable_store_, id))
     {
+        logger->warn(
+            "pool worker: job {} already terminal; skipping execute", id);
         co_return;
     }
+
+    logger->warn(
+        "pool worker: execute job {} pool='{}' provider='{}' "
+        "variant='{}' key='{}' context_chars={} inputs={}",
+        id,
+        pool_name_,
+        spec.provider,
+        pool_variant_uuid_str(spec.provider),
+        spec.key,
+        spec.context.size(),
+        spec.inputs.size());
 
     co_await record_status(
         mutable_store_,
@@ -222,17 +332,40 @@ local_worker::execute(job_spec spec, job_id id)
     {
         std::vector<blob> inputs;
         inputs.reserve(spec.inputs.size());
-        for (auto const& input : spec.inputs)
+        for (std::size_t i = 0; i != spec.inputs.size(); ++i)
         {
+            auto const& input = spec.inputs[i];
+            bool const inline_conveyed
+                = std::holds_alternative<inline_input>(input);
             inputs.push_back(co_await load_input(cas_, input));
+            logger->warn(
+                "pool worker: job {} input[{}] {} size={}",
+                id,
+                i,
+                inline_conveyed ? "inline" : "digest",
+                inputs.back().size());
         }
         std::string seri_req{build_seri_req(spec.provider, inputs)};
-        pool_worker_context ctx{resources_};
-        auto resolver{resources_.get_seri_registry()->find_resolver(
-            pool_variant_uuid_str(spec.provider))};
+        logger->warn(
+            "pool worker: job {} rebuilt seri_req chars={}",
+            id,
+            seri_req.size());
+        auto ctx{make_worker_context(resources_, spec.context)};
+        auto const variant_uuid{pool_variant_uuid_str(spec.provider)};
+        auto resolver{
+            resources_.get_seri_registry()->find_resolver(variant_uuid)};
+        logger->warn(
+            "pool worker: job {} resolving via '{}' on domain '{}'",
+            id,
+            variant_uuid,
+            ctx->domain_name());
         auto seri_result{co_await resolver->resolve(
-            ctx, std::move(seri_req), seri_cache_record_lock_t{})};
+            *ctx, std::move(seri_req), seri_cache_record_lock_t{})};
         result_value = seri_result.value();
+        logger->warn(
+            "pool worker: job {} provider returned {} bytes",
+            id,
+            result_value.size());
     }
     catch (std::exception const& e)
     {
@@ -240,6 +373,11 @@ local_worker::execute(job_spec spec, job_id id)
         // digest and no AC association are written, so the job is never
         // observable as succeeded. The record is written after the handler
         // because co_await is not permitted inside a catch handler.
+        logger->error(
+            "pool worker: job {} provider failed: [{}] {}",
+            id,
+            typeid(e).name(),
+            e.what());
         failure_error = e.what();
     }
 
@@ -268,6 +406,7 @@ local_worker::execute(job_spec spec, job_id id)
         job_status::succeeded,
         output_digest,
         std::string{});
+    logger->warn("pool worker: job {} succeeded", id);
 }
 
 std::unique_ptr<local_worker>

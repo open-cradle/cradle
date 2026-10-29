@@ -941,7 +941,7 @@ class function_request_impl final
             pool,
             uuid_.str(),
             get_unique_string(*this),
-            context_id{},
+            make_pool_job_context(ctx),
             std::move(serialized_inputs),
             get_pool_input_size_boundary(resources));
         co_return deserialize_value<Value>(result);
