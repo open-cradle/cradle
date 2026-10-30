@@ -183,10 +183,11 @@ class function_request_intf : public base_request_intf
 
     // Reconstructs the argument tuple in "plain-args" mode: every argument is
     // decoded as an embedded value blob via deserialize_value<>, and
-    // normalize_arg-shaped Args are rebuilt as identity requests around those
-    // values. Used only by the pool plain-args variant resolver; the default
-    // load() is unchanged. Valid only for leaves whose arguments are
-    // already-resolved plain values (raw values or normalize_arg wrappers).
+    // request-shaped Args are rebuilt as value_request or normalize_arg
+    // identity requests around those values. Used only by the pool plain-args
+    // variant resolver; the default load() is unchanged. Valid only for leaves
+    // whose arguments are already-resolved plain values (raw values,
+    // value_request, or normalize_arg wrappers).
     virtual void
     load_plain_args(JSONRequestInputArchive& archive)
         = 0;
@@ -340,7 +341,8 @@ class request_title_mixin<true>
     std::string title_;
 };
 
-// Rebuilds a normalize_arg-shaped Arg from a pool plain value. Declared here
+// Rebuilds a registered request-shaped Arg from a pool plain value
+// (value_request or normalize_arg identity function_request). Declared here
 // so function_request_impl::plain_args_loader can call it; defined after
 // make_normalization_request (which depends on rq_function).
 template<typename ImplProps, typename Elem, typename Value>
@@ -646,11 +648,10 @@ class function_request_impl final
             auto value = deserialize_value<value_t>(arg_blob);
             if constexpr (Request<elem_t>)
             {
-                // Pool jobs carry resolved plain values. Rebuild a
-                // normalization (identity) request so args_ keeps the
-                // registered request-shaped Arg types used by Thinknode-style
-                // normalize_arg APIs. Non-normalization Request Args are not
-                // supported on this path.
+                // Pool jobs carry resolved plain values. Rebuild the
+                // registered request-shaped Arg (value_request or
+                // normalize_arg identity function_request). Other Request
+                // Args are not supported on this path.
                 std::get<Ix>(impl_.args_)
                     = detail::rebuild_pool_plain_arg<ImplProps, elem_t>(
                         std::move(value));
@@ -664,7 +665,8 @@ class function_request_impl final
 
     // Pool plain-args variant of load(): decodes every argument as an embedded
     // value blob (mirroring local_worker's args_writer), rebuilding
-    // normalize_arg-shaped Args when needed. Everything else matches load().
+    // value_request / normalize_arg-shaped Args when needed. Everything else
+    // matches load().
     void
     load_plain_args(JSONRequestInputArchive& archive) override
     {
@@ -2279,18 +2281,42 @@ make_normalization_request(Value&& arg)
     return rq_proxy<V>(make_normalization_props<V, Props>(), arg);
 }
 
+template<typename T>
+inline constexpr bool pool_plain_args_always_false_v = false;
+
 template<typename ImplProps, typename Elem, typename Value>
 Elem
 rebuild_pool_plain_arg(Value&& value)
 {
-    using norm_props = make_normalization_props_type<ImplProps>;
-    auto reconstructed{
-        make_normalization_request<norm_props>(std::forward<Value>(value))};
-    static_assert(
-        std::is_same_v<Elem, decltype(reconstructed)>,
-        "pool plain-args rebuild expects normalize_arg-shaped request "
-        "arguments");
-    return reconstructed;
+    if constexpr (is_value_request_v<Elem>)
+    {
+        static_assert(
+            std::is_same_v<
+                typename Elem::value_type,
+                std::remove_cvref_t<Value>>,
+            "pool plain-args value_request Arg value_type mismatch");
+        return Elem{std::forward<Value>(value)};
+    }
+    else if constexpr (is_function_request_v<Elem>)
+    {
+        // Thinknode-style normalize_arg identity request.
+        using norm_props = make_normalization_props_type<ImplProps>;
+        auto reconstructed{make_normalization_request<norm_props>(
+            std::forward<Value>(value))};
+        static_assert(
+            std::is_same_v<Elem, decltype(reconstructed)>,
+            "pool plain-args function_request Args must be "
+            "normalize_arg-shaped");
+        return reconstructed;
+    }
+    else
+    {
+        static_assert(
+            pool_plain_args_always_false_v<Elem>,
+            "pool plain-args supports only value, value_request, or "
+            "normalize_arg-shaped function_request arguments");
+        return Elem{};
+    }
 }
 
 } // namespace detail
