@@ -2299,14 +2299,33 @@ rebuild_pool_plain_arg(Value&& value)
     }
     else if constexpr (is_function_request_v<Elem>)
     {
-        // Thinknode-style normalize_arg identity request.
-        using norm_props = make_normalization_props_type<ImplProps>;
-        auto reconstructed{make_normalization_request<norm_props>(
-            std::forward<Value>(value))};
+        // Thinknode-style normalize_arg identity request. The retrier is
+        // sourced from Elem and routed all the way into the final
+        // request_object_props, so the reconstructed type equals Elem; the
+        // shared make_normalization_props_type helper cannot do this because
+        // it hardcodes no_retrier.
+        using V = std::remove_cvref_t<Value>;
+        using norm_props = request_props<
+            caching_level_type::none,
+            Elem::props_type::function_type,
+            false,
+            typename Elem::retrier_type>;
+        norm_props props{make_normalization_uuid<V, norm_props>()};
+        auto reconstructed{[&] {
+            if constexpr (norm_props::for_local_coroutine)
+            {
+                return rq_function(props, identity_coro<V>, value);
+            }
+            else
+            {
+                return rq_function(
+                    props, identity_func<V>, std::forward<Value>(value));
+            }
+        }()};
         static_assert(
             std::is_same_v<Elem, decltype(reconstructed)>,
-            "pool plain-args function_request Args must be "
-            "normalize_arg-shaped");
+            "pool plain-args function_request Arg has unexpected "
+            "<value, function_type, retrier> shape");
         return reconstructed;
     }
     else
