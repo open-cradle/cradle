@@ -51,7 +51,7 @@ let union_has_registered_enum u =
     u.union_options
 
 let cpp_enum_value_of_union_member u m =
-  u.union_id ^ "_tag::" ^ String.uppercase m.um_id
+  u.union_id ^ "_tag::" ^ String.uppercase_ascii m.um_id
 
 let union_declaration u =
   "struct " ^ u.union_id ^ " " ^ "{ " (* members *) ^ u.union_id
