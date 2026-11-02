@@ -286,5 +286,6 @@ TEST_CASE(
     std::optional<blob> const content{
         cppcoro::sync_wait(cas->get(record.output_digest))};
     REQUIRE(content.has_value());
-    REQUIRE(deserialize_value<int>(*content) == 7);
+    int const result{deserialize_value<int>(*content)};
+    REQUIRE(result == 7);
 }
