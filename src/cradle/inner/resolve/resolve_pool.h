@@ -26,6 +26,12 @@ struct job_record;
 cppcoro::task<job_record>
 observe_until_terminal(local_context_intf& ctx, pool_intf& pool, job_id id);
 
+// Serializes the caller's remote config (domain, Thinknode session, ...) into
+// the job context field when ctx implements remote_context_intf; otherwise
+// returns an empty context id (provider-agnostic worker path).
+context_id
+make_pool_job_context(local_context_intf& ctx);
+
 // The job-path branch for one leaf. When the pool's AC already associates the
 // request key with a digest, returns the content by that digest without
 // submitting a job (the AC-hit short-circuit). Otherwise builds the job spec

@@ -15,10 +15,11 @@ SERVER_URL = "ws://localhost:41071"
 
 def server_is_running():
     try:
-        websocket.create_connection(SERVER_URL)
-    except ConnectionRefusedError:
+        conn = websocket.create_connection(SERVER_URL, timeout=2)
+    except (ConnectionRefusedError, OSError):
         return False
     else:
+        conn.close()
         return True
 
 
@@ -51,8 +52,8 @@ def wait_until_servers_running():
     attempts_left = 100
     while True:
         try:
-            return websocket.create_connection(SERVER_URL)
-        except ConnectionRefusedError:
+            return websocket.create_connection(SERVER_URL, timeout=2)
+        except (ConnectionRefusedError, OSError):
             time.sleep(0.01)
             attempts_left -= 1
             if attempts_left == 0:

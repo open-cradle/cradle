@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <exception>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -17,6 +18,7 @@
 #include <cradle/inner/remote/config.h>
 #include <cradle/inner/requests/containment_data.h>
 #include <cradle/inner/requests/context_base.h>
+#include <cradle/inner/requests/domain.h>
 #include <cradle/inner/requests/generic.h>
 #include <cradle/inner/requests/serialization.h>
 #include <cradle/inner/requests/uuid.h>
@@ -25,6 +27,7 @@
 #include <cradle/inner/resolve/seri_resolver.h>
 #include <cradle/inner/resolve/seri_result.h>
 #include <cradle/inner/service/config.h>
+#include <cradle/inner/service/config_map_from_json.h>
 #include <cradle/inner/service/resources.h>
 #include <cradle/inner/storage/ac_intf.h>
 #include <cradle/inner/storage/cas_intf.h>
@@ -86,19 +89,19 @@ struct args_writer
     {
         for (std::size_t i = 0; i != inputs.size(); ++i)
         {
-            archive(cereal::make_nvp(
-                "tuple_element" + std::to_string(i), inputs[i]));
+            archive(
+                cereal::make_nvp(
+                    "tuple_element" + std::to_string(i), inputs[i]));
         }
     }
 };
 
 // Reconstructs the serialized request the provider's resolver expects, from
-// the provider uuid and the loaded input blobs. Mirrors the contained-request
-// serialization (function.h serialize_contained_request): the uuid, no
-// containment data, the classified inputs as the argument tuple, and no pool
-// name. Supports the non-introspective, no-retrier request shape used by
-// pooled leaves; introspective or retrying leaves would need their title /
-// retrier fields added here.
+// the provider uuid and the loaded input blobs. Cereal JSON is name-keyed, so
+// writers can include fields that some request shapes ignore: no-retrier /
+// non-introspective leaves skip the retrier and title NVPs, while Thinknode-
+// style default_retrier + introspective leaves consume them. No containment
+// data and no pool name (the worker must not re-pool).
 std::string
 build_seri_req(provider_id const& provider, std::vector<blob> const& inputs)
 {
@@ -109,11 +112,33 @@ build_seri_req(provider_id const& provider, std::vector<blob> const& inputs)
         // uniform value-blob args (args_writer) round-trip correctly.
         std::string variant_uuid{pool_variant_uuid_str(provider)};
         oarchive(cereal::make_nvp("uuid", variant_uuid));
+        // default_retrier defaults (ignored by no_retrier leaves)
+        oarchive(cereal::make_nvp("base_millis", int64_t{100}));
+        oarchive(cereal::make_nvp("max_attempts", 9));
+        // introspective title (ignored by non-introspective leaves)
+        oarchive(cereal::make_nvp("title", std::string{"pooled"}));
         containment_data::save_nothing(oarchive);
         oarchive(cereal::make_nvp("args", args_writer{inputs}));
         oarchive(cereal::make_nvp("has_pool_name", false));
     }
     return os.str();
+}
+
+// Prefer a domain-built local sync context when the job carries a serialized
+// remote config (e.g. Thinknode session). Fall back to the provider-agnostic
+// pool_worker_context when the context field is empty.
+std::shared_ptr<local_context_intf>
+make_worker_context(inner_resources& resources, context_id const& context)
+{
+    if (context.empty())
+    {
+        return std::make_shared<pool_worker_context>(resources);
+    }
+    service_config config{read_config_map_from_json(context)};
+    auto domain_name{
+        config.get_mandatory_string(remote_config_keys::DOMAIN_NAME)};
+    auto& dom = resources.find_domain(domain_name);
+    return dom.make_local_sync_context(config);
 }
 
 // Loads one job input: inline bytes travel directly; a digest names content
@@ -227,11 +252,16 @@ local_worker::execute(job_spec spec, job_id id)
             inputs.push_back(co_await load_input(cas_, input));
         }
         std::string seri_req{build_seri_req(spec.provider, inputs)};
-        pool_worker_context ctx{resources_};
-        auto resolver{resources_.get_seri_registry()->find_resolver(
-            pool_variant_uuid_str(spec.provider))};
+        auto ctx{make_worker_context(resources_, spec.context)};
+        // Match rpclib/loopback: Production coro wrappers call
+        // on_value_complete() after shared-memory blob allocation, which
+        // requires tracking to have been enabled on this context first.
+        ctx->track_blob_file_writers();
+        auto const variant_uuid{pool_variant_uuid_str(spec.provider)};
+        auto resolver{
+            resources_.get_seri_registry()->find_resolver(variant_uuid)};
         auto seri_result{co_await resolver->resolve(
-            ctx, std::move(seri_req), seri_cache_record_lock_t{})};
+            *ctx, std::move(seri_req), seri_cache_record_lock_t{})};
         result_value = seri_result.value();
     }
     catch (std::exception const& e)

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <string>
 
 #include <fmt/format.h>
 
@@ -10,6 +11,8 @@
 #include <cradle/inner/pool/job_spec_builder.h>
 #include <cradle/inner/pool/pool_intf.h>
 #include <cradle/inner/requests/generic.h>
+#include <cradle/inner/service/config.h>
+#include <cradle/inner/service/config_map_to_json.h>
 #include <cradle/inner/storage/ac_intf.h>
 #include <cradle/inner/storage/cas_intf.h>
 #include <cradle/inner/storage/mutable_store_intf.h>
@@ -40,6 +43,17 @@ get_required_content(cas_intf& cas, digest const& content_digest)
 }
 
 } // namespace
+
+context_id
+make_pool_job_context(local_context_intf& ctx)
+{
+    if (auto* rem = ctx.to_remote_context_intf())
+    {
+        return write_config_map_to_json(
+            rem->make_config(false).get_config_map());
+    }
+    return {};
+}
 
 cppcoro::task<job_record>
 observe_until_terminal(local_context_intf& ctx, pool_intf& pool, job_id id)
@@ -75,7 +89,7 @@ resolve_leaf_on_pool(
     std::size_t input_size_boundary)
 {
     // AC-hit short-circuit: when the pool's action cache already associates
-    // the request key with a result digest, return that content without
+    // the request key with a digest, return that content without
     // submitting a job.
     if (auto opt_digest = co_await pool.ac().get(key))
     {
