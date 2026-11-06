@@ -87,6 +87,13 @@ class request_uuid
     request_uuid&
     set_flattened();
 
+    // Lets this uuid refer to the pool plain-args variant of a request, in
+    // which every argument is (de)serialized uniformly as an embedded value
+    // blob. On finalize, appends the "+pool_plain_args" extension (mirroring
+    // set_flattened()'s "+flattened"); preserved by clone().
+    request_uuid&
+    set_pool_plain_args();
+
     // Lets this uuid refer to a proxy request.
     request_uuid&
     make_proxy();
@@ -163,6 +170,7 @@ class request_uuid
     bool include_level_{false};
     caching_level_type level_{};
     bool flattened_{false};
+    bool pool_plain_args_{false};
     bool is_proxy_{false};
 
     void
@@ -209,6 +217,15 @@ update_unique_hash(unique_hasher& hasher, request_uuid const& uuid)
 // a proxy_request to the uuid_str for the corresponding function_request.
 std::string
 deproxy_uuid_str(std::string const& uuid_str);
+
+// Derives the pool plain-args variant uuid string from a finalized normal uuid
+// string, by appending the "+pool_plain_args" extension (mirroring
+// deproxy_uuid_str()). For a pooled leaf (a non-proxy plain function request)
+// this string-side derivation and the object-side derivation
+// (clone().set_pool_plain_args()) yield identical strings, so the worker
+// (holding only the normal uuid string) reaches the same variant resolver.
+std::string
+pool_variant_uuid_str(std::string const& uuid_str);
 
 } // namespace cradle
 
