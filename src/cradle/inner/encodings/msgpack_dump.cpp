@@ -1,3 +1,4 @@
+#include <ostream>
 #include <string>
 
 #include <fmt/format.h>
@@ -18,32 +19,37 @@ make_indent(int indent)
 
 // Note: incomplete implementation, does not cover all types
 void
-dump_msgpack_object(msgpack::object const& msgpack_obj, int indent)
+dump_msgpack_object(
+    std::ostream& os, msgpack::object const& msgpack_obj, int indent)
 {
     switch (msgpack_obj.type)
     {
         case msgpack::type::POSITIVE_INTEGER:
-            fmt::print("POSITIVE_INTEGER {}\n", msgpack_obj.via.u64);
+            os << fmt::format("POSITIVE_INTEGER {}\n", msgpack_obj.via.u64);
             break;
         case msgpack::type::ARRAY: {
             int size = static_cast<int>(msgpack_obj.via.array.size);
-            fmt::print("ARRAY size {}\n", size);
+            os << fmt::format("ARRAY size {}\n", size);
             for (int i = 0; i < size; ++i)
             {
-                fmt::print("{}[{}] ", make_indent(indent), i);
-                dump_msgpack_object(msgpack_obj.via.array.ptr[i], indent + 4);
+                int child_indent = indent + 4;
+                os << fmt::format("{}[{}] ", make_indent(child_indent), i);
+                dump_msgpack_object(
+                    os, msgpack_obj.via.array.ptr[i], child_indent);
             }
         }
         break;
         case msgpack::type::STR: {
             int size = static_cast<int>(msgpack_obj.via.str.size);
-            fmt::print("STR size {}", size);
-            fmt::print(
-                " \"{}\"\n", std::string(msgpack_obj.via.str.ptr, size));
+            os << fmt::format(
+                "STR size {} \"{}\"\n",
+                size,
+                std::string(msgpack_obj.via.str.ptr, size));
         }
         break;
         default:
-            fmt::print("UNKNOWN {}\n", (int) msgpack_obj.type);
+            os << fmt::format(
+                "UNKNOWN type {}\n", static_cast<int>(msgpack_obj.type));
             break;
     }
 }
