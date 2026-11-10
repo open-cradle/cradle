@@ -134,8 +134,8 @@ class blob
  private:
     static inline std::byte empty_data_{};
     std::shared_ptr<data_owner> owner_;
-    std::byte const* data_;
-    std::size_t size_;
+    std::byte const* data_{&empty_data_};
+    std::size_t size_{0};
 };
 
 } // namespace cradle

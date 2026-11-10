@@ -4,6 +4,7 @@
 #include <chrono>
 #include <concepts>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include <cppcoro/task.hpp>
@@ -265,6 +266,15 @@ class context_intf
     virtual std::string const&
     domain_name() const
         = 0;
+
+    // The default pool name that leaf requests should be dispatched to when
+    // they carry no explicit pool name. An empty optional means no default is
+    // configured.
+    virtual std::optional<std::string>
+    get_default_pool_name() const
+    {
+        return std::nullopt;
+    }
 
     // Delays the calling coroutine for the specified duration.
     // Cancellable if the context supports that.

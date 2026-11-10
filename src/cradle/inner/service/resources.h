@@ -26,6 +26,7 @@ struct immutable_cache;
 class inner_resources_impl;
 struct mock_http_session;
 class mutable_store_intf;
+class pool_intf;
 class remote_proxy;
 class rpclib_client;
 class secondary_storage_intf;
@@ -189,6 +190,18 @@ class inner_resources
     // Returns the mutable store identified by name. Throws if not set.
     mutable_store_intf&
     mutable_store(std::string const& name);
+
+    // Named pool instances: shared, named, owned by inner_resources.
+    void
+    set_pool(std::unique_ptr<pool_intf> pool, bool is_default = false);
+
+    // Returns the default pool. Throws if not set.
+    pool_intf&
+    pool();
+
+    // Returns the pool identified by name. Throws if not set.
+    pool_intf&
+    pool(std::string const& name);
 
     http_connection_interface&
     http_connection_for_thread();
