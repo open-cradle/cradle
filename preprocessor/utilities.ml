@@ -6,6 +6,21 @@ open Types
 
 exception DuplicateOption
 
+(* ASCII case conversion that works across OCaml versions.
+   String.lowercase_ascii / uppercase_ascii arrived in 4.03; the older
+   String.lowercase / uppercase were removed in 5.0. *)
+let lowercase_ascii s =
+  String.map
+    (fun c ->
+      if c >= 'A' && c <= 'Z' then Char.chr (Char.code c + 32) else c)
+    s
+
+let uppercase_ascii s =
+  String.map
+    (fun c ->
+      if c >= 'a' && c <= 'z' then Char.chr (Char.code c - 32) else c)
+    s
+
 (* Generate the C++ code for a C++ type. *)
 let cpp_code_for_type t =
   let rec code_for_type_component c =
