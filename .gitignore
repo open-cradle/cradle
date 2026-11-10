@@ -17,3 +17,20 @@ server_cache_testing/
 .github/agents
 .github/skills
 .github/copilot-instructions.md
+
+# Local credential attachments
+/ATT*.token
+/ATT*.docker-auth
+
+# macOS metadata
+.DS_Store
+
+# Runtime caches and generated test output
+/loopback_cache/
+/server_cache_production/
+/tests_cache/
+/composite.json
+/iss_post_subreq.json
+/iss_post_value.json
+/resolve_iss_object_to_immutable.json
+/retrieve_immutable.json

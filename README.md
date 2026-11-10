@@ -17,6 +17,11 @@ The following platforms/compilers are supported for building CRADLE:
 - Ubuntu 20.04 (Focal), using GCC 10 or Clang 14, or higher
 - Windows 10, using VS 2019 or higher
 
+Experimental macOS support is available with Apple Clang 17 on Apple Silicon.
+On macOS, delayed coroutine scheduling uses Boost.Asio instead of cppcoro's
+Linux/Windows I/O backend. The Apple SDK's experimental C++20 stop-token support
+is enabled by CMake.
+
 Other platforms (e.g., other Linux distros) will likely work with some
 adaptation.
 
@@ -124,6 +129,34 @@ You may also need to install these packages:
 Once you have everything set up, you can run CMake to generate your build
 files. The only tricky part about this is that you must include the vcpkg
 toolchain file.
+
+### macOS Setup
+
+Install Apple's Command Line Tools if they are not already installed
+(`xcode-select --install`); the full Xcode application is not needed.
+Install the build tools with Homebrew:
+
+```shell
+brew install cmake ocaml@4 pkgconf autoconf autoconf-archive automake libtool
+```
+
+The preprocessor requires OCaml 4.x, not OCaml 5. After setting up vcpkg and
+the secret files as described above, configure with explicit OCaml 4 paths:
+
+```shell
+cmake -S . -B build \
+	-DCMAKE_TOOLCHAIN_FILE="$HOME/vcpkg/scripts/buildsystems/vcpkg.cmake" \
+	-DOCAML_EXECUTABLE="$(brew --prefix ocaml@4)/bin/ocamlc" \
+	-DOCAML_LEX_EXECUTABLE="$(brew --prefix ocaml@4)/bin/ocamllex" \
+	-DOCAML_YACC_EXECUTABLE="$(brew --prefix ocaml@4)/bin/ocamlyacc" \
+	-DCMAKE_BUILD_TYPE=Release \
+	-DCRADLE_LOCAL_DOCKER_TESTING=OFF
+cmake --build build --config Release --target unit_tests --parallel 4
+```
+
+Use a separate build directory when changing operating systems. When switching
+from OCaml 5 to 4 in an existing build, remove the generated `.cmi` and `.cmo`
+files in `build/preprocessor` before rebuilding.
 
 ### Via the Command Line
 

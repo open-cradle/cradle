@@ -1,3 +1,5 @@
+#include <cradle/inner/utilities/logging.h>
+
 #include <cstdlib>
 
 #include <spdlog/spdlog.h>
@@ -14,7 +16,7 @@ namespace cradle {
 cppcoro::task<blob>
 make_some_blob(context_intf& ctx, std::size_t size, bool use_shared_memory)
 {
-    spdlog::get("cradle")->info(
+    cradle::ensure_logger("cradle")->info(
         "make_some_blob({}, {})", size, use_shared_memory);
     auto& loc_ctx{cast_ctx_to_ref<local_context_intf>(ctx)};
     auto owner = loc_ctx.make_data_owner(size, use_shared_memory);
@@ -33,7 +35,7 @@ cancellable_coro(context_intf& ctx, int loops, int delay)
 {
     auto& cctx{cast_ctx_to_ref<local_async_context_intf>(ctx)};
     async_id ctx_id{cctx.get_id()};
-    auto logger = spdlog::get("cradle");
+    auto logger = cradle::ensure_logger("cradle");
     logger->info(
         "cancellable_coro(ctx {}, loops={}, delay={})", ctx_id, loops, delay);
     int i = 0;
@@ -60,7 +62,7 @@ cancellable_coro(context_intf& ctx, int loops, int delay)
 int
 non_cancellable_func(int loops, int delay)
 {
-    auto logger = spdlog::get("cradle");
+    auto logger = cradle::ensure_logger("cradle");
     logger->info("non_cancellable_func(loops={}, delay={})", loops, delay);
     int i = 0;
     for (; i < std::abs(loops); ++i)

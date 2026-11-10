@@ -3,6 +3,7 @@
     "dependencies": [
         "benchmark",
         "boost-algorithm",
+        "boost-asio",
         "boost-core",
         "boost-crc",
         "boost-date-time",

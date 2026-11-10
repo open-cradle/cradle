@@ -11369,7 +11369,7 @@ struct ParamWalker
         current_arg&& p,
         arglist&&... args)
     {
-        ParamWalker<N - 1>::template Assign(
+        ParamWalker<N - 1>::Assign(
             arg_vals, std::forward<arglist>(args)...);
         GetArg(std::forward<current_arg>(p))
             = std::get<sizeof...(valuelist) - N>(arg_vals);

@@ -6,6 +6,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cradle/inner/utilities/logging.h>
 #include <cradle/typing/core/dynamic.h>
 
 namespace cradle {
@@ -36,7 +37,7 @@ operator<<(std::ostream& stream, arg_logger<Value> arg)
 // Create a logger for a function call.
 #define CRADLE_LOG_CALL(args)                                                 \
     {                                                                         \
-        auto logger = spdlog::get("cradle");                                  \
+        auto logger = cradle::ensure_logger("cradle");                        \
         std::ostringstream stream;                                            \
         stream << __func__ args;                                              \
         logger->info(stream.str());                                           \

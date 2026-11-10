@@ -7,6 +7,14 @@
 // CRADLE_LITTLE_ENDIAN.
 #ifdef _WIN32
 #define CRADLE_LITTLE_ENDIAN
+#elif defined(__APPLE__)
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define CRADLE_BIG_ENDIAN
+#elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define CRADLE_LITTLE_ENDIAN
+#else
+#error "unknown architecture: endianness detection failed"
+#endif
 #else
 #include <endian.h>
 #if __BYTE_ORDER == __BIG_ENDIAN

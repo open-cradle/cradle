@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include <fmt/format.h>
 #include <msgpack.hpp>
 
@@ -62,7 +64,7 @@ cmd_show(cli_options const& options)
                 reinterpret_cast<char const*>(x.data()), x.size());
             msgpack::object obj = oh.get();
             fmt::print("result: ");
-            dump_msgpack_object(obj);
+            dump_msgpack_object(std::cout, obj);
         }
         catch (remote_error const& e)
         {
